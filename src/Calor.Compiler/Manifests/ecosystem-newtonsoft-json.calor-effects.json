@@ -164,9 +164,5 @@
         "(TextWriter)": []
       }
     }
-  ],
-  "namespaceDefaults": {
-    "Newtonsoft.Json.Linq": [],
-    "Newtonsoft.Json.Serialization": []
-  }
+  ]
 }

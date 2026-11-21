@@ -1,4 +1,7 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Diagnostics;
 using Microsoft.Z3;
 
 namespace Calor.Compiler.Verification.Z3;
@@ -39,9 +42,8 @@ namespace Calor.Compiler.Verification.Z3;
 /// relies on null string semantics may not verify correctly.
 /// </para>
 /// <para>
-/// <b>Limitation - String comparison modes:</b> The <see cref="StringComparisonMode"/> parameter
-/// on string operations is ignored. Z3's string theory uses ordinal comparison only; case-insensitive
-/// and culture-aware comparisons are not supported.
+/// <b>Limitation - String comparison modes:</b> Z3's string theory uses ordinal comparison only;
+/// case-insensitive and culture-aware comparisons are refused.
 /// </para>
 /// <para>
 /// <b>Limitation - Unsupported string operations:</b> ToUpper, ToLower, Trim, TrimStart, TrimEnd,
@@ -64,12 +66,15 @@ public sealed class ContractTranslator
     /// Z3 verification cache but forgot the version bump (the failure mode
     /// #961 landed by hand in 0.13.2).
     /// </remarks>
-    public const string SemanticsVersion = "z3-executable-semantics-v2";
+    public const string SemanticsVersion = "z3-executable-semantics-v4";
 
     private readonly Context _ctx;
     private readonly Dictionary<string, (Expr Expr, string Type)> _variables = new();
     private readonly Stack<Dictionary<string, (Expr Expr, string Type)>> _scopeStack = new();
     private readonly List<BoolExpr> _bindingConstraints = [];
+    private readonly Binder _receiverBinder = new(new DiagnosticBag());
+    private readonly HashSet<ExpressionNode> _bclLengths = new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundCallExpression>? BoundCalls { get; set; }
 
     internal IReadOnlyList<BoolExpr> BindingConstraints => _bindingConstraints;
 
@@ -184,6 +189,275 @@ public sealed class ContractTranslator
     public ContractTranslator(Context ctx)
     {
         _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
+    }
+
+    /// <summary>
+    /// Lowers typed BCL spellings to the same modeled operations as the legacy built-ins.
+    /// This is verifier-only: executable ASTs and evaluation order are not rewritten.
+    /// </summary>
+    internal ExpressionNode NormalizeBclExpression(ExpressionNode expression)
+        => NormalizeBclExpression(expression, DeclaredBclVariables());
+
+    private IReadOnlyList<(string Name, string Type)> DeclaredBclVariables()
+        => _variables
+            .Where(pair => !pair.Key.Contains('$'))
+            .Select(pair => (pair.Key, pair.Value.Type.StartsWith("array<", StringComparison.Ordinal)
+                && pair.Value.Type.EndsWith('>') ? $"{pair.Value.Type[6..^1]}[]" : pair.Value.Type)).ToArray();
+
+    /// <summary>
+    /// Normalizes a function body for verification. A body-local binding is in scope for the
+    /// statements after it (and in their nested branches), so a typed local such as
+    /// <c>let string:t = …</c> resolves when a later <c>t.Length</c> is lowered; a branch-local
+    /// binding does not escape its branch. An untyped binding hides any outer name it shadows.
+    /// </summary>
+    internal IReadOnlyList<StatementNode> NormalizeBclBody(IReadOnlyList<StatementNode> body)
+        => NormalizeBclBody(body, DeclaredBclVariables());
+
+    private IReadOnlyList<StatementNode> NormalizeBclBody(
+        IReadOnlyList<StatementNode> body, IReadOnlyList<(string Name, string Type)> variables)
+    {
+        var normalized = new List<StatementNode>(body.Count);
+        foreach (var statement in body)
+        {
+            ExpressionNode Normalize(ExpressionNode expression) => NormalizeBclExpression(expression, variables);
+            normalized.Add(statement switch
+            {
+                ReturnStatementNode { Expression: not null } ret => new ReturnStatementNode(
+                    ret.Span, Normalize(ret.Expression)),
+                BindStatementNode bind => new BindStatementNode(bind.Span, bind.Name, bind.TypeName,
+                    bind.IsMutable, bind.Initializer == null ? null : Normalize(bind.Initializer),
+                    bind.Attributes, bind.IdentifierSpan, bind.TypeNameSpan, bind.Row)
+                    { IsCollectionStatementForm = bind.IsCollectionStatementForm },
+                IfStatementNode conditional => new IfStatementNode(conditional.Span, conditional.Id,
+                    Normalize(conditional.Condition), NormalizeBclBody(conditional.ThenBody, variables),
+                    conditional.ElseIfClauses.Select(clause => new ElseIfClauseNode(clause.Span,
+                        Normalize(clause.Condition), NormalizeBclBody(clause.Body, variables))).ToArray(),
+                    conditional.ElseBody == null ? null : NormalizeBclBody(conditional.ElseBody, variables),
+                    conditional.Attributes),
+                _ => statement
+            });
+            if (statement is BindStatementNode binding)
+            {
+                var scoped = variables.Where(variable => variable.Name != binding.Name);
+                variables = (binding.TypeName is { Length: > 0 } type
+                    ? scoped.Append((binding.Name, type)) : scoped).ToArray();
+            }
+        }
+        return normalized;
+    }
+
+    private ExpressionNode NormalizeBclExpression(
+        ExpressionNode expression, IReadOnlyList<(string Name, string Type)> variables)
+    {
+        ExpressionNode Normalize(ExpressionNode child) => NormalizeBclExpression(child, variables);
+        switch (expression)
+        {
+            case ReferenceNode reference when reference.Name.LastIndexOf('.') is var dot && dot > 0:
+                return NormalizeBclProperty(expression,
+                    new ReferenceNode(reference.Span, reference.Name[..dot], reference.IsVerbatim),
+                    reference.Name[(dot + 1)..], variables) ?? expression;
+            case FieldAccessNode field:
+                return NormalizeBclProperty(expression, field.Target, field.FieldName, variables)
+                    ?? new FieldAccessNode(field.Span, Normalize(field.Target), field.FieldName, field.FieldNameSpan);
+            case CallExpressionNode call:
+                return NormalizeBclCall(call, variables) ?? expression;
+            case ExpressionCallNode { TargetExpression: FieldAccessNode member } call:
+                return NormalizeBclCall(call, member.Target, member.FieldName, call.Arguments,
+                    call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments, variables) ?? expression;
+            case BinaryOperationNode binary:
+                return new BinaryOperationNode(binary.Span, binary.Operator, Normalize(binary.Left), Normalize(binary.Right));
+            case UnaryOperationNode unary:
+                return new UnaryOperationNode(unary.Span, unary.Operator, Normalize(unary.Operand));
+            case ConditionalExpressionNode conditional:
+                return new ConditionalExpressionNode(conditional.Span,
+                    Normalize(conditional.Condition), Normalize(conditional.WhenTrue), Normalize(conditional.WhenFalse));
+            case ImplicationExpressionNode implication:
+                return new ImplicationExpressionNode(implication.Span,
+                    Normalize(implication.Antecedent), Normalize(implication.Consequent));
+            case ForallExpressionNode forall:
+                return new ForallExpressionNode(forall.Span, forall.BoundVariables,
+                    NormalizeBclExpression(forall.Body, QuantifiedVariables(variables, forall.BoundVariables)));
+            case ExistsExpressionNode exists:
+                return new ExistsExpressionNode(exists.Span, exists.BoundVariables,
+                    NormalizeBclExpression(exists.Body, QuantifiedVariables(variables, exists.BoundVariables)));
+            case ArrayAccessNode access:
+                return new ArrayAccessNode(access.Span, Normalize(access.Array), Normalize(access.Index));
+            case ArrayLengthNode length:
+                return _bclLengths.Contains(length) ? length : new ArrayLengthNode(length.Span, Normalize(length.Array));
+            case StringOperationNode operation:
+                return _bclLengths.Contains(operation) ? operation
+                    : new StringOperationNode(operation.Span, operation.Operation,
+                        operation.Arguments.Select(Normalize).ToArray(), operation.ComparisonMode);
+            default:
+                return expression;
+        }
+    }
+
+    private static IReadOnlyList<(string Name, string Type)> QuantifiedVariables(
+        IReadOnlyList<(string Name, string Type)> variables, IReadOnlyList<QuantifierVariableNode> bound)
+        => variables.Where(variable => !bound.Any(b => b.Name == variable.Name))
+            .Concat(bound.Select(b => (b.Name, b.TypeName))).ToArray();
+
+    private BoundExpression? BindBclReceiver(
+        ExpressionNode receiver, IReadOnlyList<(string Name, string Type)> variables)
+    {
+        // A standalone verification context cannot resolve in-module aliases/classes.
+        // Refuse ambiguous identities instead of treating a user String/List as the BCL.
+        if (receiver is ReferenceNode reference
+            && (reference.Name.Contains('.')
+                    && variables.Any(variable => variable.Name == reference.Name.Split('.')[0])
+                || _userTypeRegistry?.Keys.Any(type => type == reference.Name
+                || GetSimpleTypeName(type) == reference.Name) == true
+                || variables.Any(variable => variable.Name == reference.Name
+                    && _userTypeRegistry?.Keys.Any(type => type == variable.Type.Split('<')[0]
+                        || GetSimpleTypeName(type) == variable.Type.Split('<')[0]) == true)))
+            return null;
+        return _receiverBinder.BindVerificationReceiver(receiver, variables);
+    }
+
+    private ExpressionNode? NormalizeBclProperty(
+        ExpressionNode original, ExpressionNode receiver, string member,
+        IReadOnlyList<(string Name, string Type)> variables)
+    {
+        if (member is not ("Length" or "Count"))
+            return null;
+        var bound = BindBclReceiver(receiver, variables);
+        if (bound is null or BoundTypeReferenceExpression)
+            return null;
+        var receiverType = bound.Type;
+        ExpressionNode? modeled = receiverType switch
+        {
+            NominalBoundType { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }
+                when member == "Length" => new StringOperationNode(original.Span, StringOp.Length,
+                    [NormalizeBclExpression(receiver, variables)]),
+            ArrayBoundType when member == "Length" && receiver is ReferenceNode
+                => new ArrayLengthNode(original.Span, receiver),
+            GenericInstantiationBoundType
+                { Definition.RoslynSymbol: { Name: "List", ContainingNamespace: var ns } }
+                when ns.ToDisplayString() == "System.Collections.Generic"
+                    && member == "Count" && receiver is ReferenceNode => new ArrayLengthNode(original.Span, receiver),
+            _ => null
+        };
+        if (modeled != null)
+            _bclLengths.Add(modeled);
+        return modeled;
+    }
+
+    private ExpressionNode? NormalizeBclCall(
+        CallExpressionNode call, IReadOnlyList<(string Name, string Type)> variables)
+    {
+        var dot = call.Target.LastIndexOf('.');
+        if (dot <= 0 || BoundCalls == null && call.Target[..dot].Contains('@'))
+            return null;
+        return NormalizeBclCall(call, new ReferenceNode(call.Span, call.Target[..dot]),
+            call.Target[(dot + 1)..], call.Arguments, call.ArgumentNames,
+            call.ArgumentModifiers, call.TypeArguments, variables);
+    }
+
+    private ExpressionNode? NormalizeBclCall(
+        ExpressionNode original, ExpressionNode receiver, string method,
+        IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers, IReadOnlyList<string>? typeArguments,
+        IReadOnlyList<(string Name, string Type)> variables)
+    {
+        // Named, by-reference and generic overloads are not part of this bounded model.
+        if (argumentNames?.Any(name => name != null) == true
+            || argumentModifiers?.Any(modifier => modifier != null) == true
+            || typeArguments is { Count: > 0 })
+            return null;
+        BoundCallExpression? selectedCall = null;
+        BoundExpression? bound;
+        if (BoundCalls != null)
+        {
+            // Missing source ownership is not permission to rebind in an empty scope.
+            if (!BoundCalls.TryGetValue(original, out selectedCall)
+                || selectedCall.IsInaccessibleCall || selectedCall.HasOpaqueOverloads
+                || selectedCall.HasUnresolvedArguments || selectedCall.HasUnknownInferredType
+                || selectedCall.ResolvedSymbol != null)
+                return null;
+            bound = selectedCall.Receiver;
+        }
+        else
+        {
+            // Without a source binder, only supplied values and the predefined keyword
+            // have unambiguous ownership. Aliases and qualified source names need binding.
+            if (original is ExpressionCallNode
+                && receiver is not ReferenceNode { IsVerbatim: false, Name: "string" }
+                && !(receiver is ReferenceNode reference && variables.Any(variable => variable.Name == reference.Name)))
+                return null;
+            bound = BindBclReceiver(receiver, variables);
+        }
+        if (bound == null || (selectedCall != null
+            ? selectedCall.ResolvedMetadataReceiverType?.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_String
+            : bound.Type is not NominalBoundType
+                { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }))
+            return null;
+        var isStatic = bound is BoundTypeReferenceExpression;
+        var args = arguments.ToList();
+        StringComparisonMode? mode = null;
+        if (!isStatic && method is "Contains" or "StartsWith" or "EndsWith" or "IndexOf" or "Equals"
+            && args.Count == 2
+            && (selectedCall?.Arguments.LastOrDefault() is BoundFieldAccessExpression
+                {
+                    ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
+                    {
+                        IsConst: true, Name: "Ordinal", ConstantValue: 4,
+                        ContainingType: { Name: "StringComparison", ContainingNamespace: { } ns }
+                    } ordinal
+                } && ns.ToDisplayString() == "System"
+                    && selectedCall.ResolvedMetadataMethod is { Parameters.Length: 2 } ordinalMethod
+                    && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                        ordinal.ContainingType, ordinalMethod.Parameters[1].Type)
+                || BoundCalls == null && args[1] is ReferenceNode comparison
+                    && comparison.Name is "StringComparison.Ordinal" or "System.StringComparison.Ordinal"
+                    && !variables.Any(variable => variable.Name == comparison.Name.Split('.')[0])
+                    && _userTypeRegistry?.Keys.Any(type => GetSimpleTypeName(type) == "StringComparison") != true))
+        {
+            mode = StringComparisonMode.Ordinal;
+            args.RemoveAt(1);
+        }
+        StringOp? operation = (isStatic, method, args.Count) switch
+        {
+            (true, "IsNullOrEmpty", 1) => StringOp.IsNullOrEmpty,
+            (true, "Concat", >= 2 and <= 4) => StringOp.Concat,
+            (true, "Equals", 2) => StringOp.Equals,
+            (false, "Contains", 1) => StringOp.Contains,
+            (false, "StartsWith", 1) => StringOp.StartsWith,
+            (false, "EndsWith", 1) => StringOp.EndsWith,
+            (false, "IndexOf", 1) => StringOp.IndexOf,
+            (false, "Equals", 1) => StringOp.Equals,
+            (false, "Substring", 1) => StringOp.SubstringFrom,
+            (false, "Substring", 2) => StringOp.Substring,
+            _ => null
+        };
+        if (operation == null)
+            return null;
+        var normalizedArguments = arguments.Select(argument =>
+            NormalizeBclExpression(argument, variables)).ToArray();
+        var selected = selectedCall?.ResolvedMetadataMethod ?? (BoundCalls == null
+            ? _receiverBinder.ResolveVerificationStringCall(
+                new CallExpressionNode(original.Span, $"string.{method}", normalizedArguments),
+                isStatic, mode.HasValue, variables)
+            : null);
+        if (selected is null || selected.Name != method || selected.IsStatic != isStatic
+            || selected.IsGenericMethod || selected.Parameters.Length != arguments.Count
+            || selected.ContainingType.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_String
+            || selected.Parameters.Any(parameter => parameter.RefKind != Microsoft.CodeAnalysis.RefKind.None
+                || parameter.IsParams))
+            return null;
+        if (operation is StringOp.Substring or StringOp.SubstringFrom)
+        {
+            if (selected.Parameters.Any(parameter => parameter.Type.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Int32))
+                return null;
+        }
+        else if (selected.Parameters.Any(parameter =>
+            parameter.Type.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_String
+            && !(mode.HasValue && parameter.Type.ToDisplayString() == "System.StringComparison")))
+            return null;
+        if (!isStatic)
+            args.Insert(0, receiver);
+        return new StringOperationNode(original.Span, operation.Value,
+            args.Select(argument => NormalizeBclExpression(argument, variables)).ToArray(), mode);
     }
 
     /// <summary>
@@ -515,7 +789,14 @@ public sealed class ContractTranslator
     /// </summary>
     public Expr? Translate(ExpressionNode node)
     {
-        return node switch
+        if (node is CallExpressionNode or ExpressionCallNode or FieldAccessNode
+            || node is ReferenceNode reference && reference.Name.Contains('.'))
+        {
+            var modeled = NormalizeBclExpression(node);
+            if (!ReferenceEquals(modeled, node) && modeled is not FieldAccessNode)
+                return Translate(modeled);
+        }
+        Expr? translated = node switch
         {
             IntLiteralNode intLit => TranslateIntLiteral(intLit),
             BoolLiteralNode boolLit => _ctx.MkBool(boolLit.Value),
@@ -542,10 +823,23 @@ public sealed class ContractTranslator
             CallExpressionNode => null,
             _ => null
         };
+        if (_bclLengths.Contains(node) && translated is BitVecExpr length)
+        {
+            // BCL Length/Count return int, not uint. Keep the legacy built-in model
+            // unchanged, but bound and sign the BCL result before numeric promotion.
+            _bindingConstraints.Add(_ctx.MkBVULE(length, _ctx.MkBV(int.MaxValue, 32)));
+            return TrackBitVec(_ctx.MkBVAdd(length, _ctx.MkBV(0, 32)), 32, isSigned: true);
+        }
+        return translated;
     }
 
     private Expr? TranslateReference(ReferenceNode node)
     {
+        if (node.IsNullLiteral)
+        {
+            LastRefusalReason = "Null literals are not modeled by the contract translator.";
+            return null;
+        }
         if (_variables.TryGetValue(node.Name, out var variable))
             return variable.Expr;
 
@@ -694,6 +988,14 @@ public sealed class ContractTranslator
             if (refusal != null)
                 return Refuse(refusal);
         }
+
+        // Equality across solver sorts has no model (a `string?` reads as a reference sort, a
+        // string literal as the string sort); Z3 would throw on it, so refuse it instead.
+        if (node.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
+            && !(left is BitVecExpr && right is BitVecExpr)
+            && !(left is ArithExpr && right is ArithExpr)
+            && !left.Sort.Equals(right.Sort))
+            return Refuse($"'{node.Operator}' compares values of different solver sorts ({left.Sort} and {right.Sort}).");
 
         return node.Operator switch
         {
@@ -1183,7 +1485,7 @@ public sealed class ContractTranslator
     {
         // For array access like arr{i}, we need to model it as an array select
         // First, get or create an array variable for the base array
-        if (node.Array is ReferenceNode arrayRef)
+        if (node.Array is ReferenceNode { IsNullLiteral: false } arrayRef)
         {
             var index = Translate(node.Index);
             if (index == null || index is not BitVecExpr indexBv)
@@ -1253,6 +1555,19 @@ public sealed class ContractTranslator
             return CreateArrayVariable(name, elementType);
         }
 
+        if (TryGetListElementType(typeName) != null)
+        {
+            var list = CreateUserDefinedTypeVariable(name, normalizedType, typeName);
+            var key = (normalizedType, "Count");
+            if (!_fieldAccessors.TryGetValue(key, out var count))
+            {
+                count = _ctx.MkFuncDecl(Z3Name($"{normalizedType}_Count"), list.Sort, _ctx.MkBitVecSort(32));
+                _fieldAccessors[key] = count;
+            }
+            _variables[$"{name}$length"] = (TrackBitVec((BitVecExpr)count.Apply(list), 32, isSigned: false), "u32");
+            return list;
+        }
+
         return normalizedType switch
         {
             // Signed integer types
@@ -1274,6 +1589,20 @@ public sealed class ContractTranslator
             "f32" or "f64" or "float" or "double" => null,
             _ => CreateUserDefinedTypeVariable(name, normalizedType, typeName)
         };
+    }
+
+    private string? TryGetListElementType(string typeName)
+    {
+        if (!typeName.Contains('<'))
+            return null;
+        var bound = BindBclReceiver(new ReferenceNode(default, "__calor_list"),
+            [("__calor_list", typeName)]);
+        var type = bound?.Type;
+        return type is GenericInstantiationBoundType
+            { Definition.RoslynSymbol: { Name: "List", ContainingNamespace: var ns }, TypeArguments.Length: 1 } list
+            && ns.ToDisplayString() == "System.Collections.Generic"
+            ? list.TypeArguments[0].DisplayString
+            : null;
     }
 
     /// <summary>
@@ -1341,7 +1670,8 @@ public sealed class ContractTranslator
             "boolean" or "system.boolean" => "bool",
             "single" or "system.single" => "f32",
             "double" or "system.double" => "f64",
-            var t => t
+            // User-defined types must retain their case-sensitive identity.
+            _ => typeName
         };
     }
 
@@ -1765,10 +2095,8 @@ public sealed class ContractTranslator
     /// all-occurrences divergence, W1 Slice 1.)
     /// </para>
     /// <para>
-    /// <b>Note:</b> The <see cref="StringOperationNode.ComparisonMode"/> property is ignored.
-    /// Z3's string theory only supports ordinal comparison; case-insensitive comparisons
-    /// (e.g., <c>:ignore-case</c>) cannot be modeled and will verify as if ordinal comparison
-    /// was specified.
+    /// <b>Note:</b> Z3's string theory only supports ordinal comparison. Non-ordinal
+    /// modes, and culture-sensitive overloads without an explicit mode, are refused.
     /// </para>
     /// </remarks>
     private Expr? TranslateStringOperation(StringOperationNode node)
@@ -2129,7 +2457,7 @@ public sealed class ContractTranslator
         // For now we look this up via the variable registry when the target is a plain reference.
         string? receiverType = node.Target switch
         {
-            ReferenceNode r when _variables.TryGetValue(r.Name, out var v) => v.Type,
+            ReferenceNode { IsNullLiteral: false } r when _variables.TryGetValue(r.Name, out var v) => v.Type,
             _ => null,
         };
         if (receiverType is null)
@@ -2172,7 +2500,7 @@ public sealed class ContractTranslator
         var applied = accessor.Apply(target);
 
         // If the field is an integer, track its width so subsequent operations work.
-        if (applied is BitVecExpr bv && fieldType is "i32" or "int" or "i64" or "long" or "u32" or "uint" or "u64" or "ulong" or "i8" or "i16" or "u8" or "u16" or "byte" or "short" or "ushort")
+        if (applied is BitVecExpr bv)
         {
             var (w, signed) = GetTypeWidthAndSignedness(fieldType);
             if (w > 0) TrackBitVec(bv, w, signed);
@@ -2188,12 +2516,11 @@ public sealed class ContractTranslator
     {
         var t = NormalizeTypeName(typeName);
         if (t.EndsWith("?")) t = t[..^1];
+        var (width, _) = GetTypeWidthAndSignedness(t);
+        if (width > 0)
+            return _ctx.MkBitVecSort(width);
         return t switch
         {
-            "i8" or "u8" => _ctx.MkBitVecSort(8),
-            "i16" or "u16" => _ctx.MkBitVecSort(16),
-            "i32" or "u32" or "int" or "uint" => _ctx.MkBitVecSort(32),
-            "i64" or "u64" or "long" or "ulong" => _ctx.MkBitVecSort(64),
             "bool" => _ctx.BoolSort,
             // Like every other string-sort site (D3/D12), this arm mints a field accessor's
             // result sort and accessor.Apply(target) does not pass through TrackString.
@@ -2211,7 +2538,7 @@ public sealed class ContractTranslator
     /// </summary>
     private Expr? TranslateArrayLength(ArrayLengthNode node)
     {
-        if (node.Array is ReferenceNode arrayRef)
+        if (node.Array is ReferenceNode { IsNullLiteral: false } arrayRef)
         {
             var lengthVarName = $"{arrayRef.Name}$length";
 
@@ -2496,7 +2823,7 @@ public sealed class ContractTranslator
             {
                 var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
                 if (z3Var == null)
-                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in forall expression";
+                    return $"Unsupported type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}' for bound variable '{bv.Name}' in forall expression";
                 _variables[bv.Name] = (z3Var, bv.TypeName);
             }
 
@@ -2517,7 +2844,7 @@ public sealed class ContractTranslator
             {
                 var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
                 if (z3Var == null)
-                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in exists expression";
+                    return $"Unsupported type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}' for bound variable '{bv.Name}' in exists expression";
                 _variables[bv.Name] = (z3Var, bv.TypeName);
             }
 
@@ -2548,7 +2875,7 @@ public sealed class ContractTranslator
 
     private string? DiagnoseArrayAccess(ArrayAccessNode node)
     {
-        if (node.Array is ReferenceNode baseRef
+        if (node.Array is ReferenceNode { IsNullLiteral: false } baseRef
             && _variables.TryGetValue(baseRef.Name, out var baseVar)
             && !baseVar.Type.Contains('[')
             && !baseVar.Type.StartsWith("array<", StringComparison.Ordinal))
@@ -2740,7 +3067,7 @@ public static class ModeledForms
                 {
                     if (s_floatTypeSpellings.Contains(bv.TypeName))
                     {
-                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
+                        offending = $"quantifier bound variable of floating-point type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}'";
                         return false;
                     }
                 }
@@ -2751,7 +3078,7 @@ public static class ModeledForms
                 {
                     if (s_floatTypeSpellings.Contains(bv.TypeName))
                     {
-                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
+                        offending = $"quantifier bound variable of floating-point type '{Parsing.AttributeHelper.ToSurfaceSpelling(bv.TypeName)}'";
                         return false;
                     }
                 }

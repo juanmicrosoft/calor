@@ -105,6 +105,8 @@ public static class ProjectIndexBuilder
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        var symbols = ProjectSymbolIndex.Build(options.Files, out var skipped,
+            initializeIdentityRoot: options.ProjectDirectory);
         var inputs = CurrentInputs(options);
         var index = new ProjectIndex
         {
@@ -114,7 +116,6 @@ public static class ProjectIndexBuilder
             Files = inputs.Files,
         };
 
-        var symbols = ProjectSymbolIndex.Build(options.Files, out var skipped);
         foreach (var unreadable in skipped)
             index.Residual.UnreadableFiles.Add(Relative(options.ProjectDirectory, unreadable));
 
@@ -125,7 +126,8 @@ public static class ProjectIndexBuilder
 
             foreach (var symbol in document.BoundModule.SymbolsById.Values)
             {
-                if (symbol.Id.IsNone || !declarationIds.Add(symbol.Id.Value))
+                if (symbol.Id.IsNone || IsSyntheticContractResult(symbol)
+                    || !declarationIds.Add(symbol.Id.Value))
                     continue;
 
                 var (line, column) = LineColumn(document.Source, symbol.DeclarationSpan.Start);
@@ -138,6 +140,24 @@ public static class ProjectIndexBuilder
                     Line = line,
                     Column = column,
                     SemanticHash = HashDefinition(document.Source, symbol),
+                });
+            }
+
+            foreach (var declaration in new Ids.IdScanner().Scan(document.Ast, document.FilePath))
+            {
+                var id = SymbolId.Create("declaration", declaration.Id).Value;
+                if (!declarationIds.Add(id))
+                    continue;
+                var (line, column) = LineColumn(document.Source, declaration.Span.Start);
+                index.Declarations.Add(new IndexedDeclaration
+                {
+                    SymbolId = id,
+                    Name = declaration.Name,
+                    Kind = declaration.Kind.ToString().ToLowerInvariant(),
+                    File = relative,
+                    Line = line,
+                    Column = column,
+                    SemanticHash = HashDefinition(document.Source, declaration.Span),
                 });
             }
         }
@@ -241,6 +261,7 @@ public static class ProjectIndexBuilder
             index.Residual.AmbiguousCallees.Add(ambiguous);
 
         RecordEffectRows(index, options, symbols);
+        symbols.SourceTypes.EnsureSourceSnapshots();
 
         index.Canonicalize();
         return index;
@@ -282,11 +303,26 @@ public static class ProjectIndexBuilder
             .BuildCrossModuleFunctionMap(modules.Select(module => module.Ast).ToList())
             .Keys
             .ToArray();
-        var registry = CrossModuleEffectRegistry.Build(modules);
+        // The map `calor build` hands both the per-file pass and the summary
+        // (built only for a multi-file project): without it a native qualified
+        // call into another module (`OrderService.SaveOrder()`) is charged as
+        // unknown by the pass and missed by the summary.
+        var summaryCrossModuleMap = EffectSummaryBuilder.CrossModuleFunctionMap(modules);
+        // One summary per module, built once: the registry is built from them
+        // (what CrossModuleEffectRegistry.Build(modules) does), and the same summary
+        // is what each document's cross-module charge is resolved from. A summary is
+        // a function of the module and the map, and the effect pass below does not
+        // change the module, so building it a second time gave the same summary.
+        var summaries = modules
+            .Select(module => EffectSummaryBuilder.Build(module.Ast, summaryCrossModuleMap))
+            .ToList();
+        var registry = CrossModuleEffectRegistry.Build(
+            summaries.Select((summary, position) => (summary, modules[position].FilePath)).ToList());
         var crossPass = new CrossModuleEffectEnforcementPass(UnknownCallPolicy.Strict);
 
-        foreach (var document in symbols.Documents)
+        for (var position = 0; position < symbols.Documents.Count; position++)
         {
+            var document = symbols.Documents[position];
             var relative = Relative(options.ProjectDirectory, document.FilePath);
             if (document.BindHadErrors)
             {
@@ -306,7 +342,10 @@ public static class ProjectIndexBuilder
                 // says the same thing.
                 var effectDiagnostics = new DiagnosticBag();
                 var pass = CreateEffectPass(
-                    effectDiagnostics, resolver, projectDirectory, crossModuleNames, options);
+                    effectDiagnostics, resolver, projectDirectory, crossModuleNames, options,
+                    summaryCrossModuleMap);
+                pass.CrossModuleTypes = symbols.SourceTypes;
+                pass.SourcePath = document.FilePath;
                 pass.Enforce(document.Ast);
                 if (effectDiagnostics.Any(d => d.Code == DiagnosticCode.EffectInferenceDidNotConverge))
                 {
@@ -316,7 +355,7 @@ public static class ProjectIndexBuilder
                 }
                 facts = pass.DeclarationFacts;
                 crossCharges = crossPass.ResolveCrossModuleEffects(
-                    EffectSummaryBuilder.Build(document.Ast), document.FilePath, registry);
+                    summaries[position], document.FilePath, registry);
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
@@ -408,18 +447,23 @@ public static class ProjectIndexBuilder
         EffectResolver resolver,
         string projectDirectory,
         IEnumerable<string> crossModuleFunctionNames,
-        Options options) =>
+        Options options,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions = null) =>
         (options.SccFixpointIterationCap, options.InstantiatedChargeIterationCap) switch
         {
             (null, null) => new EffectEnforcementPass(
                 diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
                 projectDirectory: projectDirectory,
-                crossModuleFunctionNames: crossModuleFunctionNames),
+                crossModuleFunctionNames: crossModuleFunctionNames)
+            {
+                CrossModuleFunctionModules = crossModuleFunctions,
+            },
             (not null, null) => new EffectEnforcementPass(
                 diagnostics, UnknownCallPolicy.Strict, resolver: resolver,
                 projectDirectory: projectDirectory,
                 crossModuleFunctionNames: crossModuleFunctionNames)
             {
+                CrossModuleFunctionModules = crossModuleFunctions,
                 SccFixpointIterationCap = options.SccFixpointIterationCap.Value,
             },
             (null, not null) => new EffectEnforcementPass(
@@ -427,6 +471,7 @@ public static class ProjectIndexBuilder
                 projectDirectory: projectDirectory,
                 crossModuleFunctionNames: crossModuleFunctionNames)
             {
+                CrossModuleFunctionModules = crossModuleFunctions,
                 InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap.Value,
             },
             _ => new EffectEnforcementPass(
@@ -434,6 +479,7 @@ public static class ProjectIndexBuilder
                 projectDirectory: projectDirectory,
                 crossModuleFunctionNames: crossModuleFunctionNames)
             {
+                CrossModuleFunctionModules = crossModuleFunctions,
                 SccFixpointIterationCap = options.SccFixpointIterationCap!.Value,
                 InstantiatedChargeIterationCap = options.InstantiatedChargeIterationCap!.Value,
             },
@@ -685,6 +731,11 @@ public static class ProjectIndexBuilder
         var span = symbol.DefinitionSpan;
         if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
             span = symbol.DeclarationSpan;
+        return HashDefinition(source, span);
+    }
+
+    private static string HashDefinition(string source, Calor.Compiler.Parsing.TextSpan span)
+    {
         if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
             return "";
 
@@ -693,6 +744,14 @@ public static class ProjectIndexBuilder
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(text)))[..16];
     }
+
+    // The binder declares a `result` pseudo-variable for every non-void contract scope.
+    // It has no source declaration (empty span), so it is not a project declaration;
+    // indexing it made every `result` lookup ambiguous at 1:1 of each file.
+    private static bool IsSyntheticContractResult(Symbol symbol)
+        => symbol is VariableSymbol { IsParameter: true }
+            && symbol.DeclarationSpan.Length == 0
+            && symbol.Id.Value.Contains("/contract-result/", StringComparison.Ordinal);
 
     private static string KindOf(Symbol symbol) => symbol switch
     {

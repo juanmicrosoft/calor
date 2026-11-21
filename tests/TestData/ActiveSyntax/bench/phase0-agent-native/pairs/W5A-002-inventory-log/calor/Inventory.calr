@@ -1,0 +1,23 @@
+module Inventory Inventory block
+  module InventoryModule partial
+    func FormatItem (string:name, int:count) → string
+      !
+      return (name + (" x" + count.ToString()))
+
+    func CountTotal (int:shelf, int:backroom) → int
+      !
+      return (shelf + backroom)
+
+    func FormatStock (string:name, int:shelf, int:backroom) → string
+      !
+      let int:total = CountTotal(shelf, backroom)
+      let string:line = FormatItem(name, total)
+      File.AppendAllText("inventory-audit.log", line)
+      return line
+
+    func SaveStock (string:path, string:name, int:shelf, int:backroom) → void
+      ! fs:w
+      let string:line = FormatStock(name, shelf, backroom)
+      File.WriteAllText(path, line)
+
+

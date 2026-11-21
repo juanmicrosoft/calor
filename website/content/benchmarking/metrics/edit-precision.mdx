@@ -16,24 +16,33 @@ collateral-edit risk. It does not run an AI agent or apply real edits.
 ## Why Targeting Matters
 
 An editing tool must find the intended declaration, locate its scope, and avoid
-changing similar code nearby. Calor provides two useful signals:
+changing similar code nearby. The historical representation measured here used
+two signals:
 
-- explicit structural markers such as `§F`, `§L`, and `§IF`;
-- optional source IDs that can distinguish otherwise similar structural targets.
+- explicit function, loop and conditional markers;
+- source IDs that distinguished otherwise similar structural targets.
+
+The following native illustration keeps the two original loop ranges and
+conditions. Current Calor keeps declaration identity in `.calor/ids.json`, and the
+calculator now reads IDs from there. The 1.36x corpus result has not been
+remeasured with this calculator.
 
 ```calor
-§L{for1:i:1:100:1}
-  §IF{if1} (> i 50)
-    §P i
-
-§L{for2:j:1:50:1}
-  §IF{if2} (< j 25)
-    §P j
+module EditTargets
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i > 50
+        System.Console.WriteLine(i)
+    for j from 1 to 50 step 1
+      if j < 25
+        System.Console.WriteLine(j)
 ```
 
-“Change `for1` to start at 0” has a direct syntactic target. In C#, an
-instruction such as “change the first loop” depends on location and surrounding
-context.
+The archived instruction “Change `for1` to start at 0” relied on a source ID.
+No such ID is written in the native loop above. Current targeting must use the
+available project identity or source-location tools; this illustration does
+not establish automatic loop-ID preservation or an edit-success rate.
 
 ---
 
@@ -54,15 +63,15 @@ The structural Calor score starts at 0.50 and adds:
 
 | Detected factor | Points |
 |:----------------|:-------|
-| At least one explicit module ID | 0.15 |
-| At least one explicit function ID | 0.20 |
+| A module ID in the identity sidecar | 0.15 |
+| A function, method, constructor or operator ID in the sidecar | 0.20 |
 | Indented body present | 0.10 |
-| Legacy `§V` pattern present | 0.10 |
 
-That final detector is a known limitation: current variable bindings use `§B`,
-not `§V`, so current source does not earn the legacy-variable bonus. Optional
-name-first declarations also do not earn an explicit-ID bonus until IDs are
-materialized in source.
+The calculator reads declaration IDs through the compiler's identity store
+(`.calor/ids.json`). An input with no sidecar gets fresh IDs, the same ones
+`calor ids sync` would assign. Native `let`/`var` bindings and loops have no IDs,
+so the historical calculator's 0.10 variable-ID bonus no longer exists, and a loop
+edit is scored by context, with the same rule the calculator applies to C#.
 
 The C# structural score starts at 0.50, adds namespace, class, and method
 signals, subtracts for deeper brace structure, and is capped at 0.85.
@@ -77,9 +86,9 @@ calculator's explicit-structure hypothesis. It is **not** a measured 36%
 improvement in production edit success, an agent accuracy experiment, or proof
 that an ID survives a refactor automatically.
 
-An explicit ID survives a rename or move only when the editing tool preserves
-it. Copies and extracted declarations need new IDs, and indentation—not closer
-tags—defines structural scope in v0.12.
+Current refactoring tools carry sidecar IDs through supported renames and moves.
+Copies and extracted declarations need new identities. Ambiguous plain-text
+changes fail reconciliation instead of guessing which ID to preserve.
 
 For actual agent behavior, use a blinded task suite that performs edits, runs the
 compiler and tests, and measures unintended changes. Keep that evidence separate
@@ -87,13 +96,13 @@ from this static metric.
 
 ---
 
-## Example Targeting Operations
+## Historical Simulated Targeting Operations
 
 ```text
-Delete function f002  -> remove its §F opener and indented body
+Delete function f002  -> remove its historical function opener and indented body
 Rename function f001  -> change the name while preserving the explicit ID
 Move loop for1        -> move its opener and indented body together
-Add contract to f003  -> insert §Q in the function's contract section
+Add contract to f003  -> insert its historical precondition marker
 ```
 
 C# has strong IDE and Roslyn refactoring support, which this source-pattern
@@ -105,5 +114,5 @@ a universal tooling comparison.
 ## Next
 
 - [Benchmark Methodology](/docs/benchmarking/methodology/) - Corpus, calculators, and validity limits
-- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Optional source IDs and preservation rules
+- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Current sidecar identity and preservation rules
 - [Refactoring Stability](/docs/benchmarking/metrics/refactoring-stability/) - The separate refactoring heuristic

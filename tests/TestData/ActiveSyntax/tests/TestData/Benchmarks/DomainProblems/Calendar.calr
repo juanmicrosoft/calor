@@ -1,0 +1,39 @@
+module Calendar Calendar
+  module CalendarModule
+    func IsLeapYear public (int:year) → bool
+      !
+      requires year > 0
+      if year % 400 == 0
+        return true
+      else if year % 4 == 0 && year % 100 != 0
+        return true
+      else
+        return false
+
+    func DaysInMonth public (int:month, bool:isLeap) → int
+      !
+      requires month >= 1
+      requires month <= 12
+      => result > 0
+      if month == 2
+        if isLeap
+          return 29
+        else
+          return 28
+      else if month == 4
+        return 30
+      else if month == 6
+        return 30
+      else if month == 9
+        return 30
+      else if month == 11
+        return 30
+      else
+        return 31
+
+    func DaysInYear public (bool:isLeap) → int
+      !
+      if isLeap
+        return 366
+      else
+        return 365

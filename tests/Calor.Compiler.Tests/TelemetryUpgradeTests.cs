@@ -324,8 +324,8 @@ public class TelemetryUpgradeTests
     #region Integration: Program.Compile Emits Telemetry Events
 
     private const string ValidCalorSource = @"
-§M{m001:Calculator}
-  §F{f001:Add:pub}
+§M{Calculator}
+  §F{Add:pub}
       §I{i32:a}
       §I{i32:b}
       §O{i32}
@@ -333,8 +333,8 @@ public class TelemetryUpgradeTests
 ";
 
     private const string InvalidCalorSource = @"
-§M{m001:Test}
-  §F{f001:Hello:pub}
+§M{Test}
+  §F{Hello:pub}
       §O{void}
         §INVALID_SYNTAX
 ";
@@ -355,30 +355,6 @@ public class TelemetryUpgradeTests
     }
 
     [Fact]
-    public void ProgramCompile_EmitsCompilationOutcome()
-    {
-        var (telemetry, channel) = CreateTestTelemetry();
-        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
-        telemetry.SetCommand("compile");
-
-        Program.Compile(ValidCalorSource, "calculator.calr");
-
-        var outcomeEvents = channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "CompilationOutcome").ToList();
-        Assert.NotEmpty(outcomeEvents);
-        var evt = outcomeEvents[0];
-        Assert.Equal("true", evt.Properties["success"]);
-        // W1 Slice 2 (#834 review M2): no content hash on the wire.
-        Assert.False(evt.Properties.ContainsKey("inputHash"));
-        // Must not contain source code
-        foreach (var value in evt.Properties.Values)
-        {
-            Assert.DoesNotContain("§M{m001", value);
-            Assert.DoesNotContain("§R (+ a b)", value);
-        }
-    }
-
-    [Fact]
     public void ProgramCompile_InvalidGeneratedCSharp_ReportsFailedOutcome()
     {
         var (telemetry, channel) = CreateTestTelemetry();
@@ -387,9 +363,10 @@ public class TelemetryUpgradeTests
 
         var result = Program.Compile(
             """
-            §M{m001:Invalid}
-              §F{f001:Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module Invalid Invalid block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """,
             "invalid.calr",
             new CompilationOptions { EnableTypeChecking = false });
@@ -414,9 +391,10 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             path,
             """
-            §M{m001:Invalid}
-              §F{f001:Main:pub} () -> i32
-                §R missing
+            module Invalid Invalid block
+              func Main () → int
+                !
+                return missing
             """);
 
         try
@@ -451,9 +429,10 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             path,
             """
-            §M{m001:Invalid}
-              §F{f001:Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module Invalid Invalid block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
 
         try
@@ -492,17 +471,18 @@ public class TelemetryUpgradeTests
         File.WriteAllText(
             libraryPath,
             """
-            §M{m001:Library}
-              §F{f001:Write:pub} () -> void
-                §E{cw}
-                §P "written"
+            module Library Library block
+              func Write () → void
+                ! cw
+                Console.WriteLine("written")
             """);
         File.WriteAllText(
             consumerPath,
             """
-            §M{m002:Consumer}
-              §F{f002:Run:pub} () -> void
-                §C{Write} §/C
+            module Consumer Consumer block
+              func Run () → void
+                !
+                Write()
             """);
 
         try

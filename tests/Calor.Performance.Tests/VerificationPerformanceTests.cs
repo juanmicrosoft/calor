@@ -546,14 +546,13 @@ public class VerificationPerformanceTests
     public void CFGConstruction_SmallFunction_IsTimingSmokeTest()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SmallFunc:pub}
-    §I{i32:x}
-    §O{i32}
-    §IF{if1} (> x INT:0)
-      §R x
-    §EL
-      §R (- INT:0 x)";
+module Test Test block
+  func SmallFunc (int:x) → int
+    !
+    if (x > 0)
+      return x
+    else
+      return (0 - x)";
 
         var module = RequireParsedAndBound(source);
 

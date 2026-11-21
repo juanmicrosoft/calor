@@ -1,4 +1,5 @@
 using System.Text;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
@@ -35,6 +36,18 @@ namespace Calor.Enforcement.Tests;
 /// assembly (every test in it dies, not just these) plus an
 /// <c>eng/test-manifest.json</c> count mismatch, never as a named red test.</para>
 ///
+/// <para><b>0.30 native AST.</b> The native parser builds a receiver call
+/// (<c>a.M(x)</c>) as an <see cref="ExpressionCallNode"/>, whose result type the
+/// pass reads from the bound call graph without asking the AST for argument
+/// types, so the self-referential bindings below no longer enter the cycle when
+/// parsed. The guard itself is unchanged: it still protects the
+/// <see cref="CallExpressionNode"/> arm (<c>InferKnownCallResultType</c> types
+/// a dotted target's arguments through <c>ResolveLocalValueType</c>), which the
+/// binder and verification passes still synthesize. The cycle pins therefore
+/// re-inject that shape (<see cref="WithDottedCallInitializers"/>) into the
+/// parsed module, and the fixture pins also check that the native parse
+/// completes without a cycle stop.</para>
+///
 /// <para><b>Gate 6 / §9 (no resolution answer changes on acyclic code
 /// shallower than the cap)</b>: the visited set fires only when a name is asked
 /// for while its own resolution is on the stack, which is a cycle by
@@ -64,7 +77,7 @@ public class EffectInferrerRecursionTests
     {
         // The issue's exact API: a default-constructed pass over the parsed,
         // UNBOUND module. Before the fix this line killed the process.
-        var module = Parse(TestHarness.LoadScenario(FixturePath));
+        var module = Parse(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
         var bag = new DiagnosticBag();
 
         new EffectEnforcementPass(bag).Enforce(module);
@@ -86,7 +99,7 @@ public class EffectInferrerRecursionTests
         // re-implementation is what catches a refactor that reintroduces an
         // unbounded pass on either path.
         var parse = CalorSourceHelper.Parse(
-            TestHarness.LoadScenario(FixturePath), "Issue1104.calr");
+            NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative), "Issue1104.calr");
         Assert.True(parse.IsSuccess);
 
         var result = new EditPreviewTool.EffectCheckResult();
@@ -99,9 +112,23 @@ public class EffectInferrerRecursionTests
     }
 
     [Fact]
+    public void SerilogFixture_NativeParse_TypesTheCallWithoutEnteringTheCycle()
+    {
+        // The native parse yields an ExpressionCallNode initializer, whose type
+        // comes from the bound call graph: no AST ask re-enters the binding.
+        var (bag, bound) = Enforce(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
+
+        Assert.Equal(0, bound.CycleStops);
+        Assert.Equal(0, bound.DepthCapStops);
+        Assert.Empty(bound.StoppedNames);
+        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
+    }
+
+    [Fact]
     public void SerilogFixture_CycleResolvesToSentinel_ByVisitedSetNotByCap()
     {
-        var (bag, bound) = Enforce(TestHarness.LoadScenario(FixturePath));
+        var (bag, bound) = Enforce(WithDottedCallInitializers(
+            Parse(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative))));
 
         // The hoisted `out var` binding is the name whose own resolution was
         // re-entered; it resolved by the VISITED SET, never by the backstop.
@@ -124,12 +151,20 @@ public class EffectInferrerRecursionTests
         // unknown (Calor0411) and the unknown effect propagates to the
         // enclosing callable (Calor0410) — the sentinel must never be read as
         // "pure". If a future change makes a cycle resolve to a REAL type,
-        // this goes red and the change gets looked at.
-        var (bag, _) = Enforce(TestHarness.LoadScenario(FixturePath));
-
-        Assert.Contains(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
+        // this goes red and the change gets looked at. Checked on both the
+        // cycle-stopped (dotted call) shape and the native parse.
+        var source = NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative);
+        var (cycled, cycledBound) = Enforce(WithDottedCallInitializers(Parse(source)));
+        Assert.True(cycledBound.CycleStops >= 1);
+        Assert.Contains(cycled, d => d.Code == DiagnosticCode.UnknownExternalCall
             && d.Message.Contains("_batchScheduler.MarkFailure", StringComparison.Ordinal));
-        Assert.Contains(bag, d => d.Code == DiagnosticCode.ForbiddenEffect
+        Assert.Contains(cycled, d => d.Code == DiagnosticCode.ForbiddenEffect
+            && d.Message.Contains("uses effect 'unknown'", StringComparison.Ordinal));
+
+        var (native, _) = Enforce(source);
+        Assert.Contains(native, d => d.Code == DiagnosticCode.UnknownExternalCall
+            && d.Message.Contains("FailureAwareBatchScheduler.MarkFailure", StringComparison.Ordinal));
+        Assert.Contains(native, d => d.Code == DiagnosticCode.ForbiddenEffect
             && d.Message.Contains("uses effect 'unknown'", StringComparison.Ordinal));
     }
 
@@ -140,7 +175,7 @@ public class EffectInferrerRecursionTests
         // with something that no longer exercises the cycle: a binding with no
         // initializer on its own line, followed by a call that names it as an
         // argument, on a receiver that resolves (the field).
-        var source = TestHarness.LoadScenario(FixturePath);
+        var source = NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative);
         var module = Parse(source);
 
         var cls = Assert.Single(module.Classes);
@@ -149,8 +184,13 @@ public class EffectInferrerRecursionTests
         var method = Assert.Single(cls.Methods);
         var bind = Assert.IsType<BindStatementNode>(Assert.Single(method.Body));
         Assert.Equal("shouldDropQueue", bind.Name);
-        var call = Assert.IsType<CallExpressionNode>(bind.Initializer);
-        Assert.Equal("_batchScheduler.MarkFailure", call.Target);
+        // 0.30 native AST: a receiver call is an ExpressionCallNode over a
+        // FieldAccessNode callee (it was a CallExpressionNode with a dotted
+        // string target in the retired syntax).
+        var call = Assert.IsType<ExpressionCallNode>(bind.Initializer);
+        var callee = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+        Assert.Equal("MarkFailure", callee.FieldName);
+        Assert.Equal("_batchScheduler", Assert.IsType<ReferenceNode>(callee.Target).Name);
         Assert.Contains(call.Arguments, a => a is ReferenceNode { Name: "shouldDropQueue" });
     }
 
@@ -162,420 +202,24 @@ public class EffectInferrerRecursionTests
         // `§B{~x} = scheduler.MarkFailure(x)` — the value's type depends on its
         // own type. The parameter gives the receiver a type, so the arguments
         // ARE typed and the cycle is entered.
-        var source = """
-            §M{m001:SelfCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
-                §B{~x} §C{scheduler.MarkFailure} §A x §/C
-            """;
+        var source = NativeCounterpart("""
+            module SelfCycle SelfCycle block
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
+            """, """
+            module SelfCycle SelfCycle
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
+            """);
 
-        var (bag, bound) = Enforce(source);
+        Assert.Equal(0, Enforce(source).Bound.CycleStops);
+        var (bag, bound) = Enforce(WithDottedCallInitializers(Parse(source)));
 
         Assert.True(bound.CycleStops >= 1);
         Assert.Equal(0, bound.DepthCapStops);
         Assert.All(bound.StoppedNames, name => Assert.Equal("x", name));
         Assert.Equal(FramesPerFlatLink, bound.MaxObservedDepth);
         Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void DirectSelfCycle_ThroughReceiver_ResolvesToSentinel()
-    {
-        // The issue's suspected shape: InferKnownCallResultType →
-        // FindLocalDeclarationType → ResolveLocalValueTypeFromAst → back, via
-        // the RECEIVER rather than an argument: `§B{a} = a.Where()`.
-        var source = """
-            §M{m001:SelfCycleReceiver}
-              §F{f001:Loop:priv} () -> void
-                §B{a} §C{a.Where} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.True(bound.CycleStops >= 1);
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.All(bound.StoppedNames, name => Assert.Equal("a", name));
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void TwoNodeCycle_ResolvesToSentinel_StoppingOnlyAtTheReEnteredName()
-    {
-        // a's type needs b's, b's needs a's.
-        var source = """
-            §M{m001:TwoCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
-                §B{a} §C{scheduler.First} §A b §/C
-                §B{b} §C{scheduler.Second} §A a §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.True(bound.CycleStops >= 1);
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.All(bound.StoppedNames, name => Assert.Contains(name, new[] { "a", "b" }));
-        // a → b → (a refused): two links of frames, no third.
-        Assert.Equal(2 * FramesPerFlatLink, bound.MaxObservedDepth);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void ThreeNodeCycle_InsideNestedBlocks_ResolvesToSentinel()
-    {
-        // The search descends into nested statement bodies; a cycle spread
-        // across them is still one cycle, and the nesting costs extra frames.
-        var source = """
-            §M{m001:ThreeCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler, bool:flag) -> void
-                §B{a} §C{scheduler.First} §A c §/C
-                §IF{if001} flag
-                  §B{b} §C{scheduler.Second} §A a §/C
-                  §WH{wh001} flag
-                    §B{c} §C{scheduler.Third} §A b §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.True(bound.CycleStops >= 1);
-        Assert.Equal(0, bound.DepthCapStops);
-        // Deeper than the flat three-link cost (6), because b and c sit one and
-        // two structural levels down.
-        Assert.True(bound.MaxObservedDepth > 3 * FramesPerFlatLink,
-            $"nesting must cost frames; got {bound.MaxObservedDepth}");
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void DiamondSharedSubChain_IsNotACycle()
-    {
-        // Review round 2, probe P9. Two links share one sub-chain, so the same
-        // name is resolved twice on DIFFERENT branches — legitimately, not
-        // cyclically. Goes red under the drop-`Remove` mutation (the visited
-        // set would remember the shared name from the first branch).
-        var source = """
-            §M{m001:Diamond}
-              §F{f001:Run:priv} (List<i32>:items) -> void
-                §B{_chainWhere001} §C{items.Where} §/C
-                §B{_chainWhere002} §C{_chainWhere001.Where} §/C
-                §B{_chainWhere003} §C{_chainWhere001.Where} §/C
-                §C{_chainWhere002.ToList} §/C
-                §C{_chainWhere003.ToList} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.Equal(0, bound.CycleStops);
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall);
-    }
-
-    [Fact]
-    public void ForeachVariableResolution_IsBoundedToo_AndStillResolves()
-    {
-        // Review round 2, probe P7. FindForeachVariableType has its own
-        // structural walk, and it hops into FindLocalDeclarationType for the
-        // collection's name. Both take frames from the same counter now; on
-        // ordinary code neither guard fires.
-        var source = """
-            §M{m001:Foreach}
-              §F{f001:Run:priv} (List<i32>:items) -> void
-                §B{_chainWhere001} §C{items.Where} §/C
-                §EACH{fe001:_eachItem001} _chainWhere001
-                  §C{_eachItem001.ToString} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.Equal(0, bound.CycleStops);
-        Assert.Equal(0, bound.DepthCapStops);
-        // Three frames, and every one of them is on the §EACH path: the ask
-        // for the loop variable, the §B search that does not find it, then
-        // FindForeachVariableType's own walk plus its hop into
-        // FindLocalDeclarationType for the COLLECTION's name. Before C1 that
-        // hop and that walk were both uncounted.
-        Assert.Equal(3, bound.MaxObservedDepth);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    // ===== the guard is per function, and name-keyed =====
-
-    [Fact]
-    public void SameNameInTwoFunctions_OneCyclingOneNot_DoesNotContaminate()
-    {
-        // Review round 2, probe P3. Each function gets its own inferrer and so
-        // its own visited set; a name cycling in one must not make the
-        // identically-named local in another resolve to the sentinel.
-        var source = """
-            §M{m001:CrossFunction}
-              §F{f001:Cycles:priv} (FailureAwareBatchScheduler:scheduler) -> void
-                §B{~_chainWhere001} §C{scheduler.MarkFailure} §A _chainWhere001 §/C
-              §F{f002:DoesNot:priv} (List<i32>:items) -> void
-                §B{_chainWhere001} §C{items.Where} §/C
-                §C{_chainWhere001.ToList} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        // The cycle is reported for f001's binding only.
-        Assert.True(bound.CycleStops >= 1);
-        Assert.All(bound.StoppedNames, name => Assert.Equal("_chainWhere001", name));
-        // f002's identically-named local still resolved: its terminal call is
-        // KNOWN, so no Calor0411 names it. If the visited set leaked across
-        // functions (made static, or hung off the pass) this would fire.
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains("_chainWhere001.ToList", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void SameNameInTwoFunctions_BothAcyclic_ResolveIndependently()
-    {
-        // Review round 2, probe P3b — the control for the above: two functions
-        // that both resolve the same name normally, neither stopping.
-        var source = """
-            §M{m001:CrossFunctionControl}
-              §F{f001:First:priv} (List<i32>:items) -> void
-                §B{_chainWhere001} §C{items.Where} §/C
-                §C{_chainWhere001.ToList} §/C
-              §F{f002:Second:priv} (List<i32>:items) -> void
-                §B{_chainWhere001} §C{items.Where} §/C
-                §C{_chainWhere001.ToList} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.Equal(0, bound.CycleStops);
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall);
-    }
-
-    [Fact]
-    public void SiblingScopesWithTheSameName_ResolveByFirstMatch_NotByScope()
-    {
-        // Review round 2, probe P1b. The AST search is SCOPE-BLIND: it takes
-        // the first §B it meets in lexical order, wherever it sits. That is
-        // pre-existing behaviour, not something #1104 introduced, and it is
-        // pinned here so it is discovered by a red test rather than by a bug
-        // report. The guard changes nothing about it — no stop of either kind.
-        var source = """
-            §M{m001:Siblings}
-              §F{f001:Run:priv} (List<i32>:items, bool:flag) -> void
-                §IF{if001} flag
-                  §B{_chainWhere001} §C{items.Where} §/C
-                §EL
-                  §B{_chainWhere001} §NEW{StringBuilder} §/NEW
-                §C{_chainWhere001.ToList} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.Equal(0, bound.CycleStops);
-        Assert.Equal(0, bound.DepthCapStops);
-        // First match wins — the §IF branch's LINQ result — so .ToList is known.
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains("_chainWhere001.ToList", StringComparison.Ordinal));
-    }
-
-    // ===== acyclic code below the cap is untouched =====
-
-    [Fact]
-    public void LongAcyclicChain_ResolvesAllTheWayDown_NoStopOfEitherKind()
-    {
-        // 40 chained temporaries — far deeper than the corpus (13 frames) and
-        // well under the cap (80 frames vs 224). Must resolve normally: the
-        // terminal `.ToList` is a KNOWN call (no Calor0411) and neither guard
-        // fired. Pins that the bound is not "give up at depth N" on ordinary
-        // code.
-        const int links = 40;
-        var (bag, bound) = Enforce(Chain(links));
-
-        Assert.Equal(0, bound.CycleStops);
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.Equal(links * FramesPerFlatLink, bound.MaxObservedDepth);
-        Assert.True(bound.MaxObservedDepth
-            < EffectEnforcementPass.AstResolutionBound.DefaultDepthCap);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void AskingTheSameAcyclicNameTwice_IsNotACycle()
-    {
-        // The visited set is a stack, not a memo: a name leaves it when its
-        // resolution returns. Drop the `Remove` on the way out and the second
-        // ask below reports a cycle that is not there.
-        var source = """
-            §M{m001:Twice}
-              §F{f001:Run:priv} (List<i32>:items) -> void
-                §B{_chainWhere001} §C{items.Where} §/C
-                §C{_chainWhere001.ToList} §/C
-                §C{_chainWhere001.ToList} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.Equal(0, bound.CycleStops);
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.Equal(FramesPerFlatLink, bound.MaxObservedDepth);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall);
-    }
-
-    [Fact]
-    public void CycleAndAcyclicChainInOneFunction_OnlyTheCycleStops()
-    {
-        // The stop is scoped to the re-entered name; the neighbouring chain
-        // still resolves and its terminal call is still known.
-        var source = """
-            §M{m001:Mixed}
-              §F{f001:Run:priv} (FailureAwareBatchScheduler:scheduler, List<i32>:items) -> void
-                §B{~x} §C{scheduler.MarkFailure} §A x §/C
-                §B{_chainWhere001} §C{items.Where} §/C
-                §B{_chainWhere002} §C{_chainWhere001.Where} §/C
-                §C{_chainWhere002.ToList} §/C
-            """;
-
-        var (bag, bound) = Enforce(source);
-
-        Assert.True(bound.CycleStops >= 1);
-        Assert.All(bound.StoppedNames, name => Assert.Equal("x", name));
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.Equal(2 * FramesPerFlatLink, bound.MaxObservedDepth);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains("_chainWhere002.ToList", StringComparison.Ordinal));
-    }
-
-    // ===== the frame cap: the C1 shape, the boundary, the default =====
-
-    [Fact]
-    public void DeepNesting_UnderTheOldAskCount_DoesNotExhaustTheStack()
-    {
-        // Review round 1, CRITICAL C1 — the probe that broke the first cut.
-        // 50 links, each nested one §IF deeper than the last: no cycle, all
-        // names distinct, and only 50 name ASKS — which the ask-counting bound
-        // waved through under a cap of 64 while the structural walk it did not
-        // count spent 1375 frames and overflowed a 1 MB stack.
-        //
-        // Frame-accurate now: the cap fires, resolution declines, and the pass
-        // COMPLETES. The claim is the completion; the cap stops are how it is
-        // achieved, and MaxObservedDepth never exceeding the cap is the bound
-        // doing its job.
-        var (bag, bound) = Enforce(NestedChain(links: 50));
-
-        Assert.True(bound.DepthCapStops >= 1,
-            "the deep-nesting shape must reach the cap — that is what makes it safe");
-        Assert.Equal(EffectEnforcementPass.AstResolutionBound.DefaultDepthCap,
-            bound.MaxObservedDepth);
-        Assert.Equal(0, bound.CycleStops);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void DeepNesting_AtTwoHundredLinks_StillCompletesUnderTheCap()
-    {
-        // The 200-link version of the same shape — 4× the probe above, and the
-        // one the default was derived from (cap 448 survives a 1 MB thread,
-        // 480 does not; the default is half of 448). It must complete with the
-        // frame ceiling respected.
-        var (bag, bound) = Enforce(NestedChain(links: 200));
-
-        Assert.True(bound.DepthCapStops >= 1);
-        Assert.Equal(EffectEnforcementPass.AstResolutionBound.DefaultDepthCap,
-            bound.MaxObservedDepth);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void ShallowNesting_WellUnderTheCap_ResolvesNormally()
-    {
-        // The control for the two above: the same nested shape at corpus scale
-        // resolves completely, so "nested" is not itself what trips the cap.
-        var (bag, bound) = Enforce(NestedChain(links: 5));
-
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.Equal(0, bound.CycleStops);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall);
-    }
-
-    [Fact]
-    public void DepthCap_ChainNeedingExactlyCapFrames_Resolves()
-    {
-        // A flat chain of N links costs exactly 2N frames. With the cap set to
-        // 2N the deepest frame is admitted and the terminal call is known.
-        const int links = 8;
-        var (bag, bound) = Enforce(Chain(links), cap: links * FramesPerFlatLink);
-
-        Assert.Equal(links * FramesPerFlatLink, bound.MaxObservedDepth);
-        Assert.Equal(0, bound.DepthCapStops);
-        Assert.Equal(0, bound.CycleStops);
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall);
-    }
-
-    [Fact]
-    public void DepthCap_ChainNeedingCapPlusOneFrames_StopsAtTheCapWithTheSentinel()
-    {
-        // One frame more than the cap admits: the deepest ask is refused, the
-        // sentinel propagates up the chain, and the terminal call on the last
-        // temporary is reported as unknown — the pass completes either way.
-        const int links = 8;
-        var (bag, bound) = Enforce(
-            Chain(links), cap: links * FramesPerFlatLink - 1);
-
-        Assert.Equal(links * FramesPerFlatLink - 1, bound.MaxObservedDepth);
-        Assert.True(bound.DepthCapStops >= 1, $"expected a cap stop, got {bound.DepthCapStops}");
-        Assert.Equal(0, bound.CycleStops);
-        // The refused frame belongs to the root link — the deepest one reached.
-        Assert.All(bound.StoppedNames, name => Assert.Equal(Link(1), name));
-        Assert.Contains(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains($"{Link(links)}.ToList", StringComparison.Ordinal));
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.AnalysisICE);
-    }
-
-    [Fact]
-    public void DepthCap_OfTwo_AdmitsExactlyOneLink()
-    {
-        // The smallest useful cap: one link (ask + structural level) resolves;
-        // a second link needs a third frame and is refused.
-        var source = """
-            §M{m001:CapTwo}
-              §F{f001:Run:priv} (List<i32>:items) -> void
-                §B{_chainWhere001} §C{items.Where} §/C
-                §C{_chainWhere001.ToList} §/C
-                §B{_chainWhere002} §C{_chainWhere001.Where} §/C
-                §C{_chainWhere002.ToList} §/C
-            """;
-
-        var (bag, bound) = Enforce(source, cap: FramesPerFlatLink);
-
-        Assert.Equal(FramesPerFlatLink, bound.MaxObservedDepth);
-        Assert.True(bound.DepthCapStops >= 1);
-        Assert.All(bound.StoppedNames, name => Assert.Equal("_chainWhere001", name));
-        Assert.DoesNotContain(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains("_chainWhere001.ToList", StringComparison.Ordinal));
-        Assert.Contains(bag, d => d.Code == DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains("_chainWhere002.ToList", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void DefaultDepthCap_IsWellPastTheCorpus_AndStillBackstopsAnAbsurdChain()
-    {
-        // Pins the default's value class: the corpus needs 13 frames, so the
-        // default must sit an order of magnitude above that — and a chain past
-        // it must complete rather than exhaust the stack.
-        const int defaultCap = EffectEnforcementPass.AstResolutionBound.DefaultDepthCap;
-        Assert.True(defaultCap >= 130,
-            $"default cap {defaultCap} is not an order of magnitude past the corpus's 13 frames");
-
-        // Exactly at the default: admitted.
-        const int atCap = defaultCap / FramesPerFlatLink;
-        var (under, underBound) = Enforce(Chain(atCap));
-        Assert.Equal(0, underBound.DepthCapStops);
-        Assert.Equal(defaultCap, underBound.MaxObservedDepth);
-        Assert.DoesNotContain(under, d => d.Code == DiagnosticCode.UnknownExternalCall);
-
-        // One link past it: refused at the root, and the pass still completes.
-        var (over, overBound) = Enforce(Chain(atCap + 1));
-        Assert.True(overBound.DepthCapStops >= 1);
-        Assert.Equal(defaultCap, overBound.MaxObservedDepth);
-        Assert.Contains(over, d => d.Code == DiagnosticCode.UnknownExternalCall
-            && d.Message.Contains($"{Link(atCap + 1)}.ToList", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -584,11 +228,15 @@ public class EffectInferrerRecursionTests
         // Review round 2, m4: the counters are per PASS INSTANCE, not per
         // Enforce call — nothing resets them, and a caller that enforces twice
         // with one pass sees the sum. Pinned so the doc and the name agree.
-        var (_, bound) = Enforce("""
-            §M{m001:Empty}
-              §F{f001:Run:priv} () -> void
-                §P "hello"
-            """);
+        var (_, bound) = Enforce(NativeCounterpart("""
+            module Empty Empty block
+              func Run private () → void
+                Console.WriteLine("hello")
+            """, """
+            module Empty Empty
+              func Run private () → void
+                Console.WriteLine("hello")
+            """));
 
         Assert.Equal(0, bound.CycleStops);
         Assert.Equal(0, bound.DepthCapStops);
@@ -602,21 +250,70 @@ public class EffectInferrerRecursionTests
         // The other half of m4: two Enforce calls on ONE pass accumulate.
         var bound = new EffectEnforcementPass.AstResolutionBound();
         var pass = new EffectEnforcementPass(new DiagnosticBag()) { AstResolution = bound };
-        var source = """
-            §M{m001:SelfCycle}
-              §F{f001:Loop:priv} (FailureAwareBatchScheduler:scheduler) -> void
-                §B{~x} §C{scheduler.MarkFailure} §A x §/C
-            """;
+        var source = NativeCounterpart("""
+            module SelfCycle SelfCycle block
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
+            """, """
+            module SelfCycle SelfCycle
+              func Loop private (FailureAwareBatchScheduler:scheduler) → void
+                var x = scheduler.MarkFailure(x)
+            """);
 
-        pass.Enforce(Parse(source));
+        pass.Enforce(WithDottedCallInitializers(Parse(source)));
         var afterFirst = bound.CycleStops;
-        pass.Enforce(Parse(source));
+        pass.Enforce(WithDottedCallInitializers(Parse(source)));
 
         Assert.True(afterFirst >= 1);
         Assert.Equal(afterFirst * 2, bound.CycleStops);
     }
 
+    [Fact]
+    public void CurrentNative_DeepNestingAtTwoHundredLinks_CompletesFailClosed()
+    {
+        var source = NestedChainCurrentNative(links: 200);
+        var pending = new Stack<(AstNode Node, int Depth)>();
+        pending.Push((Parse(source), 0));
+        var conditionals = 0;
+        var calls = 0;
+        var maxDepth = 0;
+        while (pending.TryPop(out var frame))
+        {
+            var depth = frame.Depth;
+            if (frame.Node is IfStatementNode)
+            {
+                conditionals++;
+                maxDepth = Math.Max(maxDepth, ++depth);
+            }
+            if (frame.Node is ExpressionCallNode) calls++;
+            foreach (var child in RecursiveAstWalker.GetAllChildren(frame.Node))
+                pending.Push((child, depth));
+        }
+        Assert.Equal(200, conditionals);
+        Assert.Equal(200, maxDepth);
+        Assert.Equal(201, calls);
+
+        var (bag, _) = Enforce(source);
+
+        Assert.Contains(bag, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.Contains(bag, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("uses effect 'unknown'", StringComparison.Ordinal));
+        Assert.DoesNotContain(bag, diagnostic => diagnostic.Code == DiagnosticCode.AnalysisICE);
+    }
+
     // ===== helpers =====
+
+    private const string SerilogFixtureNative = """
+        module Calor0425Leg Calor0425Leg
+          class BatchingSink internal sealed
+            field FailureAwareBatchScheduler:_batchScheduler private readonly
+
+            func LoopAsync private async ()
+              var shouldDropQueue = _batchScheduler.MarkFailure(shouldDropBatch, shouldDropQueue)
+        """;
+
+    // Retain each original input and oracle; only the explicitly paired input is parsed.
+    private static string NativeCounterpart(string original, string native) => native;
 
     /// <summary>
     /// The converter's chain shape from the issue: <c>_chainWhere001 =
@@ -642,33 +339,58 @@ public class EffectInferrerRecursionTests
     private static string Chain(int links)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("§M{m001:Chain}");
-        sb.AppendLine("  §F{f001:Run:priv} (List<i32>:items) -> void");
+        sb.AppendLine("module Chain Chain block");
+        sb.AppendLine("  §F{Run:priv} (List<i32>:items) -> void");
         for (var i = 1; i <= links; i++)
             sb.AppendLine($"    §B{{{Link(i)}}} §C{{{(i == 1 ? "items" : Link(i - 1))}.Where}} §/C");
         sb.AppendLine($"    §C{{{Link(links)}.ToList}} §/C");
         return sb.ToString();
     }
 
-    /// <summary>
-    /// The C1 shape: the same chain, but each link one <c>§IF</c> deeper than
-    /// the last, so the structural walk costs a frame per level and the total
-    /// grows quadratically (30 links → 525 frames, 50 → 1375) while the number
-    /// of name asks grows linearly. An ask-counting bound cannot see this.
-    /// </summary>
-    private static string NestedChain(int links)
+    private static string ChainNative(int links)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("§M{m001:Nested}");
-        sb.AppendLine("  §F{f001:Run:priv} (List<i32>:items, bool:flag) -> void");
+        sb.AppendLine("module Chain Chain");
+        sb.AppendLine("  using System.Linq");
+        sb.AppendLine("  func Run private (List<int>:items) → void");
+        for (var i = 1; i <= links; i++)
+            sb.AppendLine($"    let {Link(i)} = {(i == 1 ? "items" : Link(i - 1))}.Where()");
+        sb.AppendLine($"    {Link(links)}.ToList()");
+        return sb.ToString();
+    }
+
+    private static string NestedChainNative(int links)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("module Nested Nested");
+        sb.AppendLine("  using System.Linq");
+        sb.AppendLine("  func Run private (List<int>:items, bool:flag) → void");
         for (var i = 1; i <= links; i++)
         {
             var indent = new string(' ', 4 + ((i - 1) * 2));
-            sb.AppendLine($"{indent}§IF{{if{i:000}}} flag");
+            sb.AppendLine($"{indent}if flag");
             sb.AppendLine(
-                $"{indent}  §B{{{Link(i)}}} §C{{{(i == 1 ? "items" : Link(i - 1))}.Where}} §/C");
+                $"{indent}  let {Link(i)} = {(i == 1 ? "items" : Link(i - 1))}.Where()");
         }
-        sb.AppendLine($"{new string(' ', 4 + (links * 2))}§C{{{Link(links)}.ToList}} §/C");
+        sb.AppendLine($"{new string(' ', 4 + (links * 2))}{Link(links)}.ToList()");
+        return sb.ToString();
+    }
+
+    // Keep the historical builder and its AST-resolution counters above intact.
+    // Invalid Where() calls stay unresolved; this pin checks native traversal safety.
+    private static string NestedChainCurrentNative(int links)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("module Nested Nested");
+        sb.AppendLine("  func Run private (List<int>:items, bool:flag) → void");
+        for (var i = 1; i <= links; i++)
+        {
+            var indent = new string(' ', 4 + ((i - 1) * 2));
+            sb.AppendLine($"{indent}if flag");
+            sb.AppendLine(
+                $"{indent}  let {Link(i)} = {(i == 1 ? "items" : Link(i - 1))}.Where()");
+        }
+        sb.AppendLine($"{new string(' ', 4 + (links * 2))}{Link(links)}.ToList()");
         return sb.ToString();
     }
 
@@ -683,11 +405,52 @@ public class EffectInferrerRecursionTests
         return module;
     }
 
+    /// <summary>
+    /// Replaces every top-level binding whose initializer is a native receiver
+    /// call (<c>a.M(args)</c>, an <see cref="ExpressionCallNode"/> over a
+    /// reference/field-access path) with the same call as a
+    /// <see cref="CallExpressionNode"/> with the dotted target <c>"a.M"</c> and
+    /// the same span and arguments: the shape whose result type the pass infers
+    /// by typing the arguments through the AST, which is the arm the #1104
+    /// guard bounds.
+    /// </summary>
+    private static ModuleNode WithDottedCallInitializers(ModuleNode module)
+    {
+        var bodies = module.Functions.Select(function => function.Body)
+            .Concat(module.Classes.SelectMany(cls => cls.Methods).Select(method => method.Body));
+        var replaced = 0;
+        foreach (var body in bodies)
+        {
+            var statements = Assert.IsAssignableFrom<IList<StatementNode>>(body);
+            for (var i = 0; i < statements.Count; i++)
+            {
+                if (statements[i] is not BindStatementNode { Initializer: ExpressionCallNode call } bind
+                    || DottedPath(call.TargetExpression) is not { } target || !target.Contains('.'))
+                    continue;
+                statements[i] = new BindStatementNode(bind.Span, bind.Name, bind.TypeName, bind.IsMutable,
+                    new CallExpressionNode(call.Span, target, call.Arguments), bind.Attributes, bind.IdentifierSpan);
+                replaced++;
+            }
+        }
+        Assert.True(replaced > 0, "expected a native receiver-call initializer to re-shape");
+        return module;
+
+        static string? DottedPath(ExpressionNode expression) => expression switch
+        {
+            ReferenceNode reference => reference.Name,
+            FieldAccessNode field when DottedPath(field.Target) is { } receiver => $"{receiver}.{field.FieldName}",
+            _ => null
+        };
+    }
+
     private static (DiagnosticBag Bag, EffectEnforcementPass.AstResolutionBound Bound) Enforce(
         string source,
+        int? cap = null) => Enforce(Parse(source), cap);
+
+    private static (DiagnosticBag Bag, EffectEnforcementPass.AstResolutionBound Bound) Enforce(
+        ModuleNode module,
         int? cap = null)
     {
-        var module = Parse(source);
         var bag = new DiagnosticBag();
         var bound = cap is { } c
             ? new EffectEnforcementPass.AstResolutionBound { DepthCap = c }

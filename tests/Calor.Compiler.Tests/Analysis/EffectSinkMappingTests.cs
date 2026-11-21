@@ -371,8 +371,8 @@ public class EffectSinkMappingTests
         // verify it detects SQL injection when user input flows to db call
 
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableQuery:pub}
+§M{Test}
+  §F{VulnerableQuery:pub}
       §I{string:user_input}
       §O{string}
       §E{db:w}
@@ -414,8 +414,8 @@ public class EffectSinkMappingTests
     {
         // Parse actual Calor code with effect declaration
         var source = @"
-§M{m001:Test}
-  §F{f001:QueryUser:pub}
+§M{Test}
+  §F{QueryUser:pub}
       §I{string:user_input}
       §O{string}
       §E{db:w}

@@ -1,0 +1,12 @@
+module PropertyMatch PropertyMatch
+  module PropertyMatchModule
+    func ClassifyTemp public (float:temp, string:unit) → int
+      !
+      if temp < 0
+        return 0
+      else if temp < 15
+        return 1
+      else if temp < 30
+        return 2
+      else
+        return 3

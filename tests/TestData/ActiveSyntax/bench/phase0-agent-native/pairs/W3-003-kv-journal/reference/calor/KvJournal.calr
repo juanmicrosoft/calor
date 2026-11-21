@@ -1,0 +1,62 @@
+module KvJournal KvJournal block
+  module KvJournalModule partial
+    func Set (string:path, string:key, string:value) → void
+      ! fs:w
+      File.AppendAllText(path, (key + ("=" + (value + "\n"))))
+
+    func KeyOf private (string:line) → string
+      let int:eq = (line).IndexOf("=", StringComparison.Ordinal)
+      if (eq < 0)
+        return line
+      return (line).Substring(0, eq)
+
+    func ValueOf private (string:line) → string
+      let int:eq = (line).IndexOf("=", StringComparison.Ordinal)
+      if (eq < 0)
+        return ""
+      return (line).Substring((eq + 1), (line.Length - (eq + 1)))
+
+    func Get (string:path, string:key) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      let string[]:lines = File.ReadAllLines(path)
+      var string:found = ""
+      each ln in lines
+        let string:k = KeyOf(ln)
+        if (k == key)
+          set found ValueOf(ln)
+      return found
+
+    func CountKeys (string:path) → int
+      ! fs:r, mut, alloc
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return 0
+      let string[]:lines = File.ReadAllLines(path)
+      let List<string>:seen = new System.Collections.Generic.List<string>()
+      each ln in lines
+        let string:k = KeyOf(ln)
+        if (!seen.Contains(k))
+          seen.Add(k)
+      return seen . Count
+
+    func Compact (string:path) → void
+      ! fs:rw, mut, alloc
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return
+      let string[]:lines = File.ReadAllLines(path)
+      let List<string>:order = new System.Collections.Generic.List<string>()
+      each ln in lines
+        let string:k = KeyOf(ln)
+        if (!order.Contains(k))
+          order.Add(k)
+      var string:text = ""
+      each k2 in order
+        let string:v = Get(path, k2)
+        set text (text + (k2 + ("=" + (v + "\n"))))
+      File.WriteAllText(path, text)
+
+

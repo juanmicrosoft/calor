@@ -1,6 +1,6 @@
-§M{m1:Test}
-  §F{f001:RecursivePrint:pub} (i32:n) -> void
-    §IF{i1} (> n 0)
-      §P n
-      §C{RecursivePrint} §A (- n 1) §/C
-
+module Test Test block
+  func RecursivePrint (int:n) → void
+    !
+    if (n > 0)
+      Console.WriteLine(n)
+      RecursivePrint((n - 1))

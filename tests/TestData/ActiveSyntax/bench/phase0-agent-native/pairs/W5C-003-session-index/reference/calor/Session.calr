@@ -1,0 +1,43 @@
+module Session Session block
+  module SessionModule partial
+    func IndexLine (string:sessionId, int:hits) → string
+      !
+      return (sessionId + ("=" + hits.ToString()))
+
+    func WriteIndex (string:path, string:sessionId, int:hits) → void
+      ! fs:w
+      let string:line = IndexLine(sessionId, hits)
+      File.WriteAllText(path, line)
+
+    func ReadIndex (string:path) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      return File.ReadAllText(path)
+
+    func MarkActive (string:sessionId) → void
+      ! fs:w
+      WriteIndex("session-active.txt", sessionId, 1)
+
+    func LookupSession (string:path, string:sessionId) → string
+      ! fs:r
+      let string:content = ReadIndex(path)
+      return (sessionId + ("#" + content.Length.ToString()))
+
+    func HasIndex (string:path) → bool
+      ! fs:r
+      let string:content = ReadIndex(path)
+      return (content.Length > 0)
+
+    func DescribeSession (string:path, string:sessionId) → string
+      ! fs:r
+      let string:entry = LookupSession(path, sessionId)
+      return ("session: " + entry)
+
+    func IndexSize (string:path) → int
+      ! fs:r
+      let string:content = ReadIndex(path)
+      return content.Length
+
+

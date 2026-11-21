@@ -4,6 +4,9 @@ section: "benchmarking"
 order: 8
 ---
 
+> **Syntax and measurement:** Source illustrations use current native syntax.
+> All numerical results and approximate counts retained below are historical,
+> not measurements of these updated source bytes or the current milestone.
 
 **Category:** Token Economics
 **Historical dashboard result:** Calor wins (composite)
@@ -18,8 +21,8 @@ See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-result
 The Token Economics metric measures how compact each language is at expressing
 the same logic. It is a **composite** of three dimensions — token count,
 non-whitespace character count, and line count — combined as a geometric mean so
-that no single dimension dominates. Greater compactness means less context-window
-usage and lower edit cost.
+that no single dimension alone supplies the score. This is a source-size proxy,
+not a provider tokenizer, billing measurement or measured editing cost.
 
 > **Metric correction (v0.6.5, #668):** earlier releases reported this category as
 > "C# wins" using a **raw token count only**. The calculator computed the composite
@@ -53,6 +56,11 @@ Simple tokenization splits on:
 - Punctuation
 - Symbols
 
+These are heuristic source tokens, not model tokens. The calculator treats
+punctuation and symbols as individual characters; a model's tokenizer can split
+or combine text differently. Do not use this count to claim a model-context or
+paid-token improvement.
+
 ```csharp
 foreach (var ch in source)
 {
@@ -74,8 +82,8 @@ foreach (var ch in source)
 | Metric | Description |
 |:-------|:------------|
 | Token count | Number of tokens |
-| Character count | Non-whitespace characters |
-| Line count | Number of lines |
+| Character count | Characters after removing spaces, tabs, CR and LF |
+| Line count | Number of segments from splitting on LF, including a final empty segment |
 | Token ratio | C# tokens / Calor tokens |
 | Char ratio | C# chars / Calor chars |
 | Line ratio | C# lines / Calor lines |
@@ -88,8 +96,8 @@ CompositeAdvantage = (TokenRatio × CharRatio × LineRatio)^(1/3)
 
 Geometric mean of all three ratios. **This composite is the value the metric
 reports** (as of v0.6.5 / #668). Because the underlying counts are deterministic,
-the composite has no run-to-run variance — its 95% confidence interval equals its
-point estimate.
+the same input bytes produce the same score. That determinism does not quantify
+uncertainty about corpus selection, semantic equivalence or model tokenization.
 
 ---
 
@@ -98,19 +106,21 @@ point estimate.
 > The per-program ratios below report the **raw token dimension only** — one of the
 > three inputs to the composite. They show that on small programs Calor often uses
 > *more* raw tokens than C#. The composite metric additionally credits Calor's
-> character- and line-level compactness, which is why the aggregate category favors
-> Calor on the representative corpus.
+> character- and line-level compactness. These historical approximate annotations
+> have not been recomputed for the current illustrations. The legacy displayed
+> ratios use Calor/C#, the inverse of the calculator's C#/Calor advantage ratio.
 
 ### Hello World
 
 **Calor:**
 ```calor
-§M{m001:Hello}
-  §F{f001:Main:pub}
-    §O{void}
-    §E{cw}
-    §P "Hello World"
+module TokenHello
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello World")
 ```
+
+**Historical annotation, not a count of the native source above:**
 - Tokens: ~25
 - Lines: 7
 
@@ -124,6 +134,8 @@ class Program
     }
 }
 ```
+
+**Historical annotation:**
 - Tokens: ~15
 - Lines: 7
 
@@ -133,16 +145,21 @@ class Program
 
 **Calor:**
 ```calor
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
-    §O{void}
-    §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+module TokenFizzBuzz
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i % 15 == 0
+        Console.WriteLine("FizzBuzz")
+      else if i % 3 == 0
+        Console.WriteLine("Fizz")
+      else if i % 5 == 0
+        Console.WriteLine("Buzz")
+      else
+        Console.WriteLine(i)
 ```
+
+**Historical annotation, not a count of the native source above:**
 - Tokens: ~80
 - Lines: 13
 
@@ -156,6 +173,8 @@ for (int i = 1; i <= 100; i++)
     else Console.WriteLine(i);
 }
 ```
+
+**Historical annotation:**
 - Tokens: ~50
 - Lines: 7
 
@@ -165,14 +184,15 @@ for (int i = 1; i <= 100; i++)
 
 **Calor:**
 ```calor
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (>= result 0)
-  §R (/ a b)
+module TokenContracts
+  func Divide (int:a, int:b) → int
+    !
+    requires b != 0
+    => result >= 0
+    return a / b
 ```
+
+**Historical annotation, not a count of the native source above:**
 - Tokens: ~40
 - Lines: 8
 
@@ -185,14 +205,26 @@ public static int Divide(int a, int b)
     return a / b;
 }
 ```
+
+**Historical annotation:**
 - Tokens: ~35
 - Lines: 6
 
 **Ratio:** 40/35 = **1.14x** (Closer when contracts matter)
 
+The original C# fragments are retained unchanged. They require their appropriate
+project or statement context and imports. Their `ArgumentException` and
+conditional `Debug.Assert` behavior is not equivalent to Calor's throwing
+runtime contracts on all inputs. Both shown division bodies can also overflow
+on `int.MinValue / -1`. `Divide(6, 2)` returning `3` is a valid execution
+observation, not a full-domain equivalence proof.
+
 ---
 
 ## Token Breakdown by Element
+
+This is the retained historical estimate table, not a current syntax or
+model-token census:
 
 | Element | Calor Tokens | C# Tokens |
 |:--------|:------------|:----------|
@@ -209,15 +241,15 @@ public static int Divide(int a, int b)
 
 ## Why Calor Uses More Raw Tokens
 
-These factors raise Calor's **raw token count** (one of the three composite
-dimensions). They are outweighed in the composite by Calor's character- and
-line-level compactness on the representative corpus.
+The historical result reflects its recorded sources and corpus. It does not
+establish that current native programs necessarily use more or fewer source
+tokens, characters or model tokens.
 
-### 1. Explicit Tags
+### 1. Native Declarations
 
-```calor
-§M{m001:Name}    // Module requires tag + ID + name
-```
+Current declarations use ordinary headers such as `module Name` and
+`func Value () → int`. Declaration identities live in tool-owned sidecars,
+not source headers.
 
 ```csharp
 namespace Name   // Just keyword + name
@@ -225,29 +257,20 @@ namespace Name   // Just keyword + name
 
 ### 2. Effect Declarations
 
-```calor
-§E{cw,fs:r,net:rw}    // Explicit effects
-
-// C#: No equivalent - effects are implicit
-```
+An effect row such as `! cw,fs:r,net:rw` adds explicit permission information.
+C# has no built-in Calor-style row syntax, but library contracts and analyzers
+can convey effect information. Compare the actual guarantees, not just spelling.
 
 ### 3. Block Indentation
 
-Nested structures use indentation instead of structural closers:
-```calor
-§F{f001}
-  §L{for1}
-    §IF{if1}
-      §P i
-```
+Nested native bodies use indentation instead of structural closers. The
+FizzBuzz example above is a complete executable illustration. Its formatting
+also affects character and line counts, so fix formatting rules before comparing.
 
 ### 4. Contract Syntax
 
-Contracts add lines:
-```calor
-§Q (>= x 0)
-§S (>= result 0)
-```
+Contracts add information and source text: `requires x >= 0` is an entry
+condition; `=> result >= 0` is a postcondition.
 
 Though C# contracts can be verbose too:
 ```csharp
@@ -258,6 +281,9 @@ Contract.Ensures(Contract.Result<int>() >= 0);
 ---
 
 ## Context Window Impact
+
+These retained rough historical estimates are **not validated model-token
+measurements** or current context-window capacity claims:
 
 | Context Size | Calor Programs | C# Programs |
 |:-------------|:--------------|:------------|
@@ -274,24 +300,21 @@ Token efficiency is less critical when:
 1. **Context is plentiful** - Large context windows reduce pressure
 2. **Comprehension matters** - Worth extra tokens for clarity
 3. **Contracts add value** - Security/correctness worth the cost
-4. **Precision editing** - IDs save tokens in edit instructions
+4. **Precision editing** - Tool-owned identities can target edits, but token savings need separate measurement
 
 ---
 
 ## Interpretation
 
-On the representative benchmark corpus the **composite** Token Economics ratio
-favors Calor (currently **1.42×**): Calor is more compact overall once character
-and line counts are included alongside tokens.
+The retained historical composite is **1.42×** on its recorded corpus. This page
+does not establish that value for current native syntax or for an agent's actual
+input/output tokens.
 
-Calor does pay a **raw token** premium for:
-- Explicit structure
-- First-class contracts
-- Effect declarations
-- `§`-sigil markers
-
-That premium is real but is outweighed by Calor's character/line compactness in
-the composite. Lisp-style expressions help keep the raw-token premium manageable.
+Use the exact original bytes, options and comparison policy when replaying a
+historical result. For a new measurement, record the selected current inputs,
+semantic-equivalence controls and all three raw dimensions. Keep model usage,
+cache tokens, editing behavior and paid evaluation separate from this static
+source-size proxy.
 
 ---
 

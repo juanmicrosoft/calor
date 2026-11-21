@@ -1,10 +1,11 @@
 using System.Text;
+using System.Text.Json;
 using Calor.Compiler.Migration;
 
 namespace Calor.Compiler.Migration;
 
 /// <summary>
-/// Replays a <see cref="StructuralIdDropper.MigrationLog"/> against the
+/// Replays a <see cref="BytePreservationVerifier.MigrationLog"/> against the
 /// migrated files and asserts that every byte outside the recorded
 /// removal ranges matches the original. This is the in-process
 /// equivalent of the Python <c>byte_preservation_check.py</c> harness
@@ -18,6 +19,33 @@ namespace Calor.Compiler.Migration;
 /// </summary>
 public sealed class BytePreservationVerifier
 {
+    public sealed class MigrationLog
+    {
+        public List<LogEntry> Entries { get; init; } = new();
+    }
+
+    public sealed class LogEntry
+    {
+        public required string File { get; init; }
+        public required int RemovedOffset { get; init; }
+        public required int RemovedLength { get; init; }
+        public required string RemovedBytesBase64 { get; init; }
+    }
+
+    public static string SerializeLog(MigrationLog log) =>
+        JsonSerializer.Serialize(log, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        });
+
+    public static MigrationLog DeserializeLog(string json) =>
+        JsonSerializer.Deserialize<MigrationLog>(json, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNameCaseInsensitive = true,
+        }) ?? throw new JsonException("Expected a migration log object.");
+
     public sealed record FileResult(string File, bool Ok, string? Reason);
 
     /// <summary>
@@ -29,7 +57,7 @@ public sealed class BytePreservationVerifier
     public static bool Verify(
         ReadOnlySpan<byte> original,
         ReadOnlySpan<byte> migrated,
-        IEnumerable<StructuralIdDropper.LogEntry> entries,
+        IEnumerable<BytePreservationVerifier.LogEntry> entries,
         out string? reason)
     {
         var sorted = entries
@@ -103,7 +131,7 @@ public sealed class BytePreservationVerifier
     /// reader.
     /// </summary>
     public static IReadOnlyList<FileResult> VerifyLog(
-        StructuralIdDropper.MigrationLog log,
+        BytePreservationVerifier.MigrationLog log,
         string migratedRoot,
         Func<string, ReadOnlyMemory<byte>> originalProvider)
     {

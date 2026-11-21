@@ -1,0 +1,7 @@
+module Test_07_03 Test_07_03 overflow unchecked
+  using System
+
+  class StaticLambdaDemo public
+    func Test public ()
+      !
+      let Func<int,int>:doubler = static (int:x) => x * 2

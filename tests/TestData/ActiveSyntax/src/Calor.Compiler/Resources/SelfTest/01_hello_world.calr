@@ -1,0 +1,5 @@
+module Hello Hello block
+  module HelloModule
+    func Main () → void
+      ! cw
+      Console.WriteLine("Hello from Calor E2E Test!")

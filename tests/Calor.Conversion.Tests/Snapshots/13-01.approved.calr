@@ -1,13 +1,13 @@
-§M{m001:Test_13_01:overflow=unchecked}
+§M{Test_13_01:overflow=unchecked}
   §U{System.Collections.Generic}
 
-  §CL{c001:Container<TFixture>:pub}
+  §CL{Container<TFixture>:pub}
     §WHERE TFixture : BaseClass<TFixture>.FixtureBase, new
 
-    §MT{m002:Create:pub} () -> TFixture
+    §MT{Create:pub} () -> TFixture
       §E{alloc}
       §R §NEW{TFixture} §/NEW
 
 
-  §CL{c003:BaseClass<T>:pub}
-    §CL{c004:FixtureBase:pub}
+  §CL{BaseClass<T>:pub}
+    §CL{FixtureBase:pub}

@@ -1,0 +1,13 @@
+module FileService FileService
+  module FileServiceModule
+    func ReadFile public (string:path) → string
+      ! fr
+      return path
+
+    func WriteFile public (string:path, string:content) → void
+      ! fw
+      System.Console.WriteLine(content)
+
+    func ProcessFile public (string:input, string:output) → void
+      ! fw
+      System.Console.WriteLine(input)

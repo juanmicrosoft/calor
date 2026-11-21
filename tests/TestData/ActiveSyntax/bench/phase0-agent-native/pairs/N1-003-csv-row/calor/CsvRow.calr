@@ -1,0 +1,7 @@
+module CsvRow CsvRow block
+  module CsvRowModule partial
+    func NeedsQuoting (string:@field) → bool
+      !
+      return ((@field).Contains(",") || ((@field).Contains("\"") || ((@field).Contains("\r") || (@field).Contains("\n"))))
+
+

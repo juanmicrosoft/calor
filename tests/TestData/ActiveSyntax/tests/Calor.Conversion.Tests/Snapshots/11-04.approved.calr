@@ -1,0 +1,6 @@
+module Test_11_04 Test_11_04 overflow unchecked
+  pp NET6_0_OR_GREATER
+    class NetSixFeature public
+      property string:Name public
+        get
+        set

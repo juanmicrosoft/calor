@@ -1,0 +1,64 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_8a5ckjbydqca",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "ContractZ3Test",
+      "Signature": ""
+    },
+    {
+      "Id": "c_ct31xgtcczwn",
+      "File": "input.calr",
+      "Container": "ContractZ3Test",
+      "Kind": 2,
+      "Name": "AnotherValidService",
+      "Signature": "0"
+    },
+    {
+      "Id": "c_33mc6hdshp53",
+      "File": "input.calr",
+      "Container": "ContractZ3Test",
+      "Kind": 2,
+      "Name": "ValidService",
+      "Signature": "0"
+    },
+    {
+      "Id": "i_gvqqe8d8f6q8",
+      "File": "input.calr",
+      "Container": "ContractZ3Test",
+      "Kind": 3,
+      "Name": "IService",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_hmep8yqbd5vp",
+      "File": "input.calr",
+      "Container": "ContractZ3Test.AnotherValidService\u00600",
+      "Kind": 5,
+      "Name": "Process",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "mt_exbm3jggvrw1",
+      "File": "input.calr",
+      "Container": "ContractZ3Test.IService\u00600",
+      "Kind": 5,
+      "Name": "Process",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "mt_zf6a21xpy702",
+      "File": "input.calr",
+      "Container": "ContractZ3Test.ValidService\u00600",
+      "Kind": 5,
+      "Name": "Process",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    }
+  ]
+}

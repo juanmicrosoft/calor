@@ -1,0 +1,23 @@
+module Config Config block
+  module ConfigModule partial
+    func FormatEntry (string:key, string:val) → string
+      !
+      return (key + ("=" + val))
+
+    func QuoteValue (string:val) → string
+      !
+      return ("'" + (val + "'"))
+
+    func FormatConfig (string:key, string:val) → string
+      !
+      let string:quoted = QuoteValue(val)
+      let string:line = FormatEntry(key, quoted)
+      File.WriteAllText("config-trace.txt", line)
+      return line
+
+    func SaveConfig (string:path, string:key, string:val) → void
+      ! fs:w
+      let string:line = FormatConfig(key, val)
+      File.WriteAllText(path, line)
+
+

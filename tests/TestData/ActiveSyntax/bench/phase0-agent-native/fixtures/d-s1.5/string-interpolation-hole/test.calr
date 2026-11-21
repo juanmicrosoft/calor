@@ -1,0 +1,8 @@
+module InterpolationHoleTest InterpolationHoleTest
+  func Verify () → int
+    ! alloc
+    => result == 58
+    let int[]:items = new int[] { 3, 5, 8 }
+    let int:i = 1
+    let string:s = "[${items[i]}|${items[unchecked(i + 1)]}]"
+    return ((s == "[5|8]") ? 58 : (-1))

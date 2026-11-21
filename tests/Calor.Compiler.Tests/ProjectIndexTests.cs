@@ -38,18 +38,49 @@ public sealed class ProjectIndexTests : IDisposable
         new(dir, token, ProjectIndexBuilder.DiscoverSources(dir));
 
     private const string Library = """
-        §M{m001:Lib}
-          §F{f001:Double:pub} (i32:n) -> i32
-            §E{}
-            §R (* n INT:2)
+        module Lib Lib block
+          func Double (int:n) → int
+            !
+            return (n * 2)
         """;
 
     private const string App = """
-        §M{m002:App}
-          §F{f001:Run:pub} () -> i32
-            §E{}
-            §R §C{Double} §A INT:5 §/C
+        module App App block
+          func Run () → int
+            !
+            return Double(5)
         """;
+
+    [Fact]
+    public void ExplicitProjectEnrollmentKeepsPersistedIdentitiesAcrossBuildsAndNewInputs()
+    {
+        var root = NewProject(("lib.calr", Library), ("app.calr", App));
+        var first = ProjectIndexBuilder.Build(OptionsFor(root));
+        var sidecar = Path.Combine(root, ".calor", "ids.json");
+        var originalState = File.ReadAllText(sidecar);
+        var repeated = ProjectIndexBuilder.Build(OptionsFor(root));
+        Assert.Equal(originalState, File.ReadAllText(sidecar));
+        Assert.Equal(first.Declarations.Select(declaration => (declaration.SymbolId, declaration.Name)),
+            repeated.Declarations.Select(declaration => (declaration.SymbolId, declaration.Name)));
+        Assert.Equal(first.CallEdges.Select(edge => (edge.CallerSymbolId, edge.CalleeSymbolId)),
+            repeated.CallEdges.Select(edge => (edge.CallerSymbolId, edge.CalleeSymbolId)));
+
+        File.WriteAllText(Path.Combine(root, "new.calr"),
+            "module Added Added block\n  func Fresh () → int\n    !\n    return 1\n");
+        var extended = ProjectIndexBuilder.Build(OptionsFor(root));
+        Assert.Contains(extended.Declarations, declaration => declaration.Name == "Fresh");
+        Assert.All(first.Declarations, declaration =>
+            Assert.Contains(extended.Declarations, current => current.SymbolId == declaration.SymbolId));
+        var state = new Calor.Compiler.Ids.DeclarationIdentityStore(root).Sync();
+        Assert.Contains("new.calr", state.Files);
+        Assert.Contains(state.Declarations, declaration => declaration.Name == "Fresh");
+
+        File.WriteAllText(sidecar, "{invalid");
+        Assert.Throws<System.Text.Json.JsonException>(() => ProjectIndexBuilder.Build(OptionsFor(root)));
+        Assert.Equal("{invalid", File.ReadAllText(sidecar));
+        Assert.Equal(Library, File.ReadAllText(Path.Combine(root, "lib.calr")));
+        Assert.Equal(App, File.ReadAllText(Path.Combine(root, "app.calr")));
+    }
 
     // --- staleness: every recorded input must be compared -------------------
 
@@ -139,16 +170,18 @@ public sealed class ProjectIndexTests : IDisposable
     public void BoundPositionRow_AgreesWithTheDeclaredRow_WhereTheBinderDoesNotCollapse()
     {
         var dir = NewProject(("rows.calr", """
-            §M{m001:Rows}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-                §E{cw}
-                §R §C{transform} §A value §/C
-              §F{f002:Make:pub} (Func<i32,i32>:g §E{fs:w}) -> Func<i32,i32> §E{fs:w}
-                §E{}
-                §R g
-              §F{f003:Map:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:value) -> i32
-                §E{e}
-                §R §C{f} §A value §/C
+            module Rows Rows block
+              func Apply (Func<int, int>:transform ! cw, int:value) → int
+                ! cw
+                return transform(value)
+
+              func Make (Func<int, int>:g ! fs:w) → Func<int, int> ! fs:w
+                !
+                return g
+
+              func Map <! e> (Func<int, int>:f ! e, int:value) → int
+                ! e
+                return f(value)
             """));
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
@@ -191,7 +224,7 @@ public sealed class ProjectIndexTests : IDisposable
     [Fact]
     public void EffectsFacet_RecordsTheAssumedStateWithItsReasons()
     {
-        var dir = NewProject(("assumed.calr", "\n§M{m001:Interop}\n  §F{f001:UsesInterop:pub}\n      §O{void}\n      §RAW\nvar x = System.Environment.TickCount;\n§/RAW\n"));
+        var dir = NewProject(("assumed.calr", "\nmodule Interop Interop block\n  func UsesInterop () → void\n    ! unknown\n    raw member:conversion-error:Other:interop%20statement 37\nvar x = System.Environment.TickCount;\n"));
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
         var row = Assert.Single(index.EffectRows, row => row.Name == "UsesInterop");
@@ -214,10 +247,10 @@ public sealed class ProjectIndexTests : IDisposable
         var dir = NewProject(
             ("lib.calr", Library),
             ("broken.calr", """
-                §M{m002:Broken}
-                  §F{f001:Uses:pub} () -> i32
-                    §E{}
-                    §R (+ undefinedName INT:1)
+                module Broken Broken block
+                  func Uses () → int
+                    !
+                    return (undefinedName + 1)
                 """));
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
@@ -284,17 +317,17 @@ public sealed class ProjectIndexTests : IDisposable
     /// </summary>
     private static string DoubleChain(int n)
     {
-        var sb = new System.Text.StringBuilder("§M{m001:M}\n");
+        var sb = new System.Text.StringBuilder("module M M block\n");
         for (var i = 1; i <= n; i++)
         {
-            sb.Append($"  §F{{f{i:D4}:A{i}:pub}} (i32:n) -> i32\n    §E{{cw}}\n");
+            sb.Append($"  func A{i} (int:n) → int\n    ! cw\n");
             if (i == 1)
-                sb.Append("    §C{Console.WriteLine} §A \"x\" §/C\n");
-            sb.Append($"    §IF{{if{i}}} (> n 0)\n");
+                sb.Append("    Console.WriteLine(\"x\")\n");
+            sb.Append("    if (n > 0)\n");
             if (i < n)
-                sb.Append($"      §B{{u{i}:i32}} §C{{A{i + 1}}} §A (- n 1) §/C\n");
-            sb.Append(i > 1 ? $"      §R §C{{A{i - 1}}} §A (- n 1) §/C\n" : "      §R 0\n");
-            sb.Append("    §R n\n");
+                sb.Append($"      let int:u{i} = A{i + 1}(n - 1)\n");
+            sb.Append(i > 1 ? $"      return A{i - 1}(n - 1)\n" : "      return 0\n");
+            sb.Append("    return n\n");
         }
         return sb.ToString();
     }
@@ -519,41 +552,46 @@ public sealed class ProjectIndexTests : IDisposable
     /// means round 1 changes every member, so a cap of 1 fires.
     /// </summary>
     private const string ThreeHopMutualRecursion = """
-        §M{m003:Ring}
-          §F{f001:A:pub} (i32:n) -> i32
-            §E{cw}
-            §P "a"
-            §IF{if1} (> n 0)
-              §R §C{B} §A (- n 1) §/C
-            §R n
-          §F{f002:B:pub} (i32:n) -> i32
-            §E{cw}
-            §P "b"
-            §IF{if2} (> n 0)
-              §R §C{C} §A (- n 1) §/C
-            §R n
-          §F{f003:C:pub} (i32:n) -> i32
-            §E{cw}
-            §P "c"
-            §IF{if3} (> n 0)
-              §R §C{A} §A (- n 1) §/C
-            §R n
+        module Ring Ring block
+          func A (int:n) → int
+            ! cw
+            Console.WriteLine("a")
+            if (n > 0)
+              return B((n - 1))
+            return n
+
+          func B (int:n) → int
+            ! cw
+            Console.WriteLine("b")
+            if (n > 0)
+              return C((n - 1))
+            return n
+
+          func C (int:n) → int
+            ! cw
+            Console.WriteLine("c")
+            if (n > 0)
+              return A((n - 1))
+            return n
         """;
 
     private const string ThreeHopRank1Chain = """
-        §M{m004:Chain}
-          §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-            §E{e}
-            §R §C{g}
-          §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
-            §E{cw}
-            §R §C{Run} §A h §/C
-          §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
-            §E{cw}
-            §R §C{Outer} §A q §/C
-          §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
-            §E{cw}
-            §R §C{Top} §A r §/C
+        module Chain Chain block
+          func Run <! e> (Func<int>:g ! e) → int
+            ! e
+            return g()
+
+          func Outer (Func<int>:h ! cw) → int
+            ! cw
+            return Run(h)
+
+          func Top (Func<int>:q ! cw) → int
+            ! cw
+            return Outer(q)
+
+          func Top2 (Func<int>:r ! cw) → int
+            ! cw
+            return Top(r)
         """;
 
     [Fact]
@@ -563,10 +601,10 @@ public sealed class ProjectIndexTests : IDisposable
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
         File.WriteAllText(Path.Combine(dir, "extra.calr"), """
-            §M{m003:Extra}
-              §F{f001:Nothing:pub} () -> i32
-                §E{}
-                §R INT:0
+            module Extra Extra block
+              func Nothing () → int
+                !
+                return 0
             """);
         var afterAdd = ProjectIndexBuilder.CurrentInputs(OptionsFor(dir));
         Assert.Equal(
@@ -652,25 +690,26 @@ public sealed class ProjectIndexTests : IDisposable
         // not resolve is the shape this project keeps paying for.
         var dir = NewProject(
             ("a.calr", """
-                §M{m001:A}
-                  §F{f001:Shared:pub} () -> i32
-                    §E{}
-                    §R INT:1
-                  §F{f002:Caller:pub} () -> i32
-                    §E{}
-                    §R §C{Missing} §/C
+                module A A block
+                  func Shared () → int
+                    !
+                    return 1
+
+                  func Caller () → int
+                    !
+                    return Missing()
                 """),
             ("b.calr", """
-                §M{m002:B}
-                  §F{f001:Shared:pub} () -> i32
-                    §E{}
-                    §R INT:2
+                module B B block
+                  func Shared () → int
+                    !
+                    return 2
                 """),
             ("c.calr", """
-                §M{m003:C}
-                  §F{f001:Ask:pub} () -> i32
-                    §E{}
-                    §R §C{Shared} §/C
+                module C C block
+                  func Ask () → int
+                    !
+                    return Shared()
                 """));
 
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
@@ -690,7 +729,7 @@ public sealed class ProjectIndexTests : IDisposable
     {
         var dir = NewProject(
             ("good.calr", Library),
-            ("broken.calr", "§M{m009:Broken}\n  this is not Calor\n"));
+            ("broken.calr", "§M{Broken}\n  this is not Calor\n"));
 
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
         Assert.Contains("broken.calr", index.Residual.UnreadableFiles);
@@ -698,6 +737,38 @@ public sealed class ProjectIndexTests : IDisposable
     }
 
     // --- contents ----------------------------------------------------------
+
+    /// <summary>
+    /// A native module-qualified call into another file (<c>OrderService.SaveOrder()</c>)
+    /// is charged to the caller's inferred row the way <c>calor build</c> charges
+    /// it. 0.30 regression: the summary was built without the driver's cross-module
+    /// map and recorded the call as <c>&lt;expression&gt;.SaveOrder</c>, so the
+    /// callee's <c>db:w</c> never reached the caller and an undeclared write was
+    /// indexed as fitting.
+    /// </summary>
+    [Fact]
+    public void EffectsFacet_NativeQualifiedCrossFileCall_IsChargedToTheCaller()
+    {
+        const string orderService = """
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
+            """;
+        const string handler = """
+            module Handler Handler block
+              func HandleRequest () → void
+                !
+                OrderService.SaveOrder()
+            """;
+        var dir = NewProject(("orders.calr", orderService), ("handler.calr", handler));
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        var row = Assert.Single(index.EffectRows, row => row.Name == "HandleRequest");
+        Assert.NotNull(row.InferredRow);
+        Assert.Contains("db:w", row.InferredRow!.Display, StringComparison.Ordinal);
+        Assert.NotEqual("fits", row.Verdict);
+    }
 
     [Fact]
     public void CrossFileCallProducesAnEdgeWithItsCaller()

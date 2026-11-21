@@ -122,6 +122,221 @@ def statuses(report: dict) -> dict:
     return {f: r["status"] for r in report["rows"] for f in r["files"]}
 
 
+class ScratchDeclarationControls(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.source = self.root / "in" / "fixture.calr"
+        self.source.parent.mkdir()
+        self.source.write_text("controlled fixture", encoding="utf-8")
+        self.sidecar = self.source.parent / ".calor" / "ids.json"
+        self.sidecar.parent.mkdir()
+        self.declaration = {
+            "Id": "f_000000000001", "File": "fixture.calr", "Kind": 1,
+            "Container": "Demo", "Name": "Run",
+            "Signature": '{"arity":0,"parameters":[],"output":"void"}',
+        }
+
+    def keys(self, *declarations):
+        self.sidecar.write_text(json.dumps({
+            "Version": 1, "Files": ["fixture.calr"],
+            "Declarations": list(declarations),
+        }), encoding="utf-8")
+        return fcc.scratch_declaration_keys(self.root, [self.source])
+
+    def test_fresh_ids_keep_exact_semantic_identity(self):
+        first = self.keys(self.declaration)["f_000000000001"]
+        second = self.keys(dict(self.declaration, Id="f_000000000002"))
+        self.assertEqual(first, second["f_000000000002"])
+        for field, value in (("Kind", 2), ("Container", "Other"),
+                             ("Name", "Other"), ("Signature", "different")):
+            changed = self.keys(dict(self.declaration, **{field: value}))
+            self.assertNotEqual(first, changed["f_000000000001"])
+
+    def test_duplicate_or_invalid_storage_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.keys(self.declaration, self.declaration)
+        self.sidecar.write_text("{ malformed", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            fcc.scratch_declaration_keys(self.root, [self.source])
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            self.keys(dict(self.declaration, Kind=True))
+
+    def test_candidate_references_keep_exact_identity_and_cause(self):
+        def diagnostic(identity, arguments="OBJECT"):
+            return {"code": "Calor0208", "severity": "error",
+                    "message": f"No overload matches ({arguments}). Candidates: "
+                               f"F(str) [calor://declaration/{identity}]"}
+
+        first_id, second_id = "f_000000000001", "f_000000000002"
+        keys = self.keys(self.declaration)
+        first = fcc.signature([diagnostic(first_id)], keys)
+        fresh = self.keys(dict(self.declaration, Id=second_id))
+        self.assertEqual(first, fcc.signature([diagnostic(second_id)], fresh))
+        self.assertIn("calor://declaration/" + keys[first_id], first[0])
+        self.assertNotEqual(first, fcc.signature([diagnostic(first_id, "i32")], keys))
+        self.assertNotEqual(first, fcc.signature(
+            [diagnostic(first_id), diagnostic(first_id)], keys))
+        for field, value in (("Kind", 2), ("Container", "Other"),
+                             ("Name", "Other"), ("Signature", "different")):
+            changed = self.keys(dict(self.declaration, **{field: value}))
+            self.assertNotEqual(first, fcc.signature([diagnostic(first_id)], changed))
+
+    def test_unknown_candidate_reference_fails_closed_without_owner_identity(self):
+        diagnostic = {"code": "Calor0208", "severity": "error",
+                      "message": "Candidates: F(str) [calor://declaration/f_missing]",
+                      "declarationId": None}
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            fcc.signature([diagnostic], self.keys(self.declaration))
+
+    def test_missing_diagnostic_identity_is_not_normalized_away(self):
+        diagnostic = {"code": "Calor0410", "severity": "error",
+                      "message": "controlled", "declarationId": "f_missing"}
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            fcc.signature([diagnostic], self.keys(self.declaration))
+        result = subprocess.CompletedProcess(
+            [], 1, json.dumps({"diagnostics": [diagnostic]}), "")
+        with mock.patch.object(fcc.subprocess, "run", return_value=result):
+            outcome, _, detail, _ = fcc.run_unit(
+                ["unused"], self.root, ["in/fixture.calr"], [], 1)
+        self.assertIsNone(outcome)
+        self.assertIn("invalid scratch declaration identity", detail)
+
+    def test_distinct_input_paths_keep_distinct_identity(self):
+        first = self.keys(self.declaration)["f_000000000001"]
+        nested = self.source.parent / "nested" / self.source.name
+        nested.parent.mkdir()
+        nested.write_text("controlled fixture", encoding="utf-8")
+        other = self.keys(dict(self.declaration, File="nested/fixture.calr"))
+        self.assertNotEqual(first, other["f_000000000001"])
+
+    def test_unavailable_parser_identity_preserves_exact_error_causes(self):
+        diagnostic = {"code": "Calor0830", "severity": "error",
+                      "location": {"file": "broken.calr"},
+                      "message": "retired closer", "declarationId": None}
+        expected = ["broken.calr|Calor0830|-|retired closer"]
+        self.assertEqual(fcc.signature([diagnostic], {}), expected)
+        for field, value in (("code", "Calor0100"), ("message", "another cause"),
+                             ("location", {"file": "other.calr"})):
+            self.assertNotEqual(fcc.signature([dict(diagnostic, **{field: value})], {}),
+                                expected)
+        self.assertNotEqual(fcc.signature([diagnostic, diagnostic], {}), expected)
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            fcc.signature([dict(diagnostic, declarationId="f_parser_local")], {})
+
+
+class CurrentInputControls(unittest.TestCase):
+    def setUp(self):
+        self.registry = "current/inputs.json"
+        self.original = "fx/original.calr"
+        self.mirror = "current/" + self.original
+        self.repo = FakeRepo(self, {
+            self.original: "FAIL:Calor0100:historical source",
+            self.mirror: "current source",
+            "fx/direct.calr": "fine",
+            self.registry: json.dumps({"originalPaths": [self.original]}),
+        })
+
+    def check(self, groups):
+        return fcc.check(self.repo.root, {
+            "schemaVersion": 1, "currentInputs": self.registry, "groups": groups,
+        }, ["fx", "current"], checkout_compiler.tracked_calr(
+            self.repo.root, ["fx", "current"]), self.repo.cmd, 2, 20)
+
+    def test_explicit_resolution_keeps_subjects_paths_and_frozen_bytes(self):
+        before = (self.repo.root / self.original).read_bytes()
+        report = self.check([group("original", [self.original]),
+                             group("mirror", [self.mirror]),
+                             group("direct", ["fx/direct.calr"])])
+        self.assertEqual(report["verdict"], "PASS")
+        self.assertEqual(report["trackedFixtures"], 3)
+        self.assertEqual(report["counts"]["passed"], 3)
+        rows = {r["group"]: r for r in report["rows"]}
+        self.assertEqual(rows["original"]["files"], [self.original])
+        self.assertEqual(rows["original"]["currentFiles"], [self.mirror])
+        self.assertEqual(rows["mirror"]["currentFiles"], [self.mirror])
+        self.assertEqual(rows["direct"]["currentFiles"], ["fx/direct.calr"])
+        self.assertEqual((self.repo.root / self.original).read_bytes(), before)
+
+    def test_mirror_registration_and_original_expectation_are_not_waived(self):
+        groups = [group("original", [self.original], "known-failure",
+                        errors=["original.calr|Calor0100|-|historical source"]),
+                  group("direct", ["fx/direct.calr"])]
+        report = self.check(groups)
+        self.assertEqual(report["verdict"], "FAIL")
+        self.assertEqual(statuses(report)[self.original], "unexpected-pass")
+        self.assertEqual(statuses(report)[self.mirror], "unclassified")
+
+    def test_resolution_preserves_multifile_group_and_options(self):
+        report = self.check([group("pair", [self.original, "fx/direct.calr"],
+                                   mode="together", options=["--no-enforce-effects"]),
+                             group("mirror", [self.mirror])])
+        self.assertEqual(report["verdict"], "PASS")
+        row = next(r for r in report["rows"] if r["group"] == "pair")
+        self.assertEqual(row["files"], [self.original, "fx/direct.calr"])
+        self.assertEqual(row["currentFiles"], [self.mirror, "fx/direct.calr"])
+        self.assertEqual(row["options"], ["--no-enforce-effects"])
+
+    def test_missing_registry_or_mirror_fails_without_historical_fallback(self):
+        for missing in (self.registry, self.mirror):
+            with self.subTest(missing=missing):
+                path = self.repo.root / missing
+                saved = path.read_bytes()
+                path.unlink()
+                try:
+                    with mock.patch.object(fcc, "run_unit") as compile_input:
+                        report = self.check([group("original", [self.original])])
+                    compile_input.assert_not_called()
+                    self.assertEqual(report["counts"]["invalid"], 1)
+                    self.assertEqual(report["counts"]["passed"], 0)
+                    self.assertIn("invalid current input registry", report["rows"][0]["detail"])
+                finally:
+                    path.write_bytes(saved)
+
+    def test_duplicate_malformed_chained_and_escaping_mappings_fail_closed(self):
+        documents = [
+            {"originalPaths": [self.original, self.original]},
+            {"originalPaths": []},
+            {"originalPaths": "not a list"},
+            {"originalPaths": ["../outside.calr"]},
+            {"originalPaths": ["/outside.calr"]},
+            {"originalPaths": ["./" + self.original]},
+            {"originalPaths": [True]},
+            {"originalPaths": [self.original, self.mirror]},
+        ]
+        nested = self.repo.root / "current" / self.mirror
+        nested.parent.mkdir(parents=True)
+        nested.write_text("must not follow a chain", encoding="utf-8")
+        for document in documents:
+            with self.subTest(document=document):
+                (self.repo.root / self.registry).write_text(json.dumps(document))
+                report = self.check([group("original", [self.original])])
+                self.assertEqual(report["verdict"], "FAIL")
+                self.assertEqual(report["counts"]["invalid"], 1)
+        (self.repo.root / self.registry).write_text("{ malformed")
+        self.assertEqual(self.check([group("original", [self.original])])[
+            "counts"]["invalid"], 1)
+
+    def test_explicit_invalid_registry_path_does_not_disable_resolution(self):
+        manifest = {"schemaVersion": 1, "groups": [group("original", [self.original])]}
+        for value in (None, False, "", "../outside.json", "/outside.json"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                fcc.current_input_paths(self.repo.root, dict(manifest, currentInputs=value))
+
+    def test_distinct_registrations_cannot_alias_one_physical_mirror(self):
+        alias = "fx/alias.calr"
+        (self.repo.root / alias).write_text("historical alias", encoding="utf-8")
+        (self.repo.root / ("current/" + alias)).symlink_to(
+            Path(self.mirror).name)
+        (self.repo.root / self.registry).write_text(json.dumps({
+            "originalPaths": [self.original, alias],
+        }))
+        report = self.check([group("original", [self.original])])
+        self.assertEqual(report["counts"]["invalid"], 1)
+        self.assertIn("duplicate", report["rows"][0]["detail"])
+
+
 class FixtureCheckControls(unittest.TestCase):
     def setUp(self):
         self.repo = FakeRepo(self, {
@@ -375,15 +590,196 @@ class RepositoryGuards(unittest.TestCase):
     def test_benchmark_known_failures_match_the_bulk_test(self):
         src = (REPO_ROOT / "tests/Calor.Compiler.Tests/"
                "BulkBenchmarkCompilationTests.cs").read_text(encoding="utf-8")
-        block = src[src.index("KnownGeneratedCSharpFailures ="):]
         bench = "tests/TestData/Benchmarks/"
-        bulk = {bench + m for m in re.findall(r'"([^"]+\.calr)"',
-                                             block[:block.index("];")])}
+
+        def known_set(name):
+            block = src[src.index(name + " ="):]
+            return {bench + m for m in re.findall(r'"([^"]+\.calr)"',
+                                                 block[:block.index("];")])}
+
+        # 0.30 i1: the narrowing set holds former generated-C# failures that the
+        # type checker now rejects first (Calor0202); tier2 keeps them as known
+        # failures. HashMap is in it too, but tier2 registers it as a Calor0213
+        # reject (KnownWriteToReadOnlyLocal), not as a known failure.
+        bulk = ((known_set("KnownGeneratedCSharpFailures")
+                 | known_set("KnownNumericNarrowing"))
+                - known_set("KnownWriteToReadOnlyLocal"))
         listed = json.loads((REPO_ROOT / bench / "manifest.json").read_text())
         listed = {bench + b["calorFile"] for b in listed["benchmarks"]}
         known = {f for g in self.manifest["groups"]
                  if g["expect"] == "known-failure" for f in g["files"]}
         self.assertEqual(known & listed, bulk)
+
+    def test_all_current_copies_have_explicit_consumer_expectations(self):
+        mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)
+        self.assertTrue(mapping)
+        groups = {f: g for g in self.manifest["groups"] for f in g["files"]}
+        self.assertTrue(set(mapping.values()) <= groups.keys())
+        for original, current in mapping.items():
+            if original not in groups:
+                continue
+            with self.subTest(original=original):
+                self.assertEqual(groups[original]["expect"], groups[current]["expect"])
+                self.assertEqual(groups[original].get("options", []),
+                                 groups[current].get("options", []))
+        ds15 = [g for g in self.manifest["groups"]
+                if g["id"] == "active:ds15-conversion"]
+        self.assertEqual(len(ds15), 1)
+        self.assertEqual(set(ds15[0]["options"]),
+                         {"--no-enforce-effects", "--permissive-effects"})
+        self.assertEqual(ds15[0]["expect"], "compile")
+
+    def test_proven_current_defect_resolutions_require_compilation(self):
+        groups = {g["id"]: g for g in self.manifest["groups"]}
+        for identifier, files, options in [
+            ("conversion-snapshots:08-03.approved",
+             ["tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"],
+             ["--permissive-effects"]),
+            ("benchmarks:unregistered:NullDeref_buggy",
+             ["tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"],
+             ["--no-enforce-effects"]),
+        ]:
+            with self.subTest(group=identifier):
+                current = groups[identifier]
+                self.assertEqual(current["expect"], "compile")
+                self.assertEqual(current["mode"], "each")
+                self.assertEqual(current["files"], files)
+                self.assertEqual(current["options"], options)
+                self.assertNotIn("errors", current)
+                self.assertNotIn("defect", current)
+        malformed = groups["lint-scenarios:mismatched_ids"]
+        self.assertEqual(malformed["expect"], "reject")
+        self.assertEqual(len(malformed["errors"]), 2)
+        self.assertTrue(all(error.split("|", 3)[1:3] == ["Calor0830", "-"]
+                            for error in malformed["errors"]))
+
+    def test_current_gold_references_require_default_compilation(self):
+        mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)
+        groups = {f: g for g in self.manifest["groups"] for f in g["files"]}
+        gold = [current for original, current in mapping.items()
+                if original.startswith("bench/phase0-agent-native/pairs/")
+                and "/reference/calor/" in original]
+        self.assertTrue(gold)
+        for current in gold:
+            with self.subTest(current=current):
+                group = groups[current]
+                self.assertEqual(group["expect"], "compile")
+                self.assertEqual(group["mode"], "each")
+                self.assertEqual(group.get("options", []), [])
+                self.assertNotIn("errors", group)
+
+    def test_keyword_repaired_subjects_require_compilation(self):
+        groups = {g["id"]: g for g in self.manifest["groups"]}
+        expected = [(
+            "conversion-snapshots:13-02.approved",
+            "tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr",
+            ["--permissive-effects"],
+        )]
+        for prefix, root in (
+            ("benchmarks:", "tests/TestData/Benchmarks/"),
+            ("active:benchmarks:", "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/"),
+        ):
+            expected.extend((prefix + name, root + relative, ["--no-enforce-effects"])
+                            for name, relative in (
+                                ("NetworkEffect", "EffectSoundness/NetworkEffect.calr"),
+                                ("PureFunctions", "InteropEffectCoverage/PureFunctions.calr"),
+                                ("Power", "TokenEconomics/Power.calr"),
+                            ))
+        self.assertEqual(len(expected), 7)
+        for identifier, file, options in expected:
+            with self.subTest(group=identifier):
+                group = groups[identifier]
+                self.assertEqual(group["files"], [file])
+                self.assertEqual(group["mode"], "each")
+                self.assertEqual(group["options"], options)
+                self.assertEqual(group["expect"], "compile")
+                self.assertNotIn("errors", group)
+                self.assertNotIn("defect", group)
+                self.assertNotIn("negativeKind", group)
+
+    def test_interface_impl_retains_only_exact_unrepaired_float_cause(self):
+        groups = {g["id"]: g for g in self.manifest["groups"]}
+        signature = json.dumps({
+            "arity": 0, "parameters": [{"type": "f32", "modifier": "None"}],
+            "output": "f32",
+        }, separators=(",", ":"))
+        declaration = json.dumps([
+            "InterfaceImpl.calr", 1, "InterfaceImpl", "AreaCircle", signature,
+        ], separators=(",", ":"))
+        error = (
+            f"InterfaceImpl.calr|Calor1002:CS0266|{declaration}|"
+            "Generated C# failed compilation (CS0266): Cannot implicitly convert "
+            "type 'double' to 'float'. An explicit conversion exists "
+            "(are you missing a cast?)"
+        )
+        for prefix, root in (
+            ("benchmarks:", "tests/TestData/Benchmarks/"),
+            ("active:benchmarks:", "tests/TestData/ActiveSyntax/tests/TestData/Benchmarks/"),
+        ):
+            identifier = prefix + "InterfaceImpl"
+            with self.subTest(group=identifier):
+                group = groups[identifier]
+                self.assertEqual(group["files"], [root + "OOPGenerics/InterfaceImpl.calr"])
+                self.assertEqual(group["mode"], "each")
+                self.assertEqual(group["options"], ["--no-enforce-effects"])
+                self.assertEqual(group["expect"], "known-failure")
+                self.assertEqual(group["errors"], [error])
+                self.assertTrue(group["defect"])
+                self.assertNotIn("negativeKind", group)
+
+    def test_current_latency_project_keeps_all_modules_and_compile_obligation(self):
+        prefix = "bench/phase0-agent-native/latency/fixture-10k/src/"
+        mapping = fcc.current_input_paths(REPO_ROOT, self.manifest)
+        expected = {prefix + "main.calr"} | {
+            f"{prefix}l{layer}m{module:02}.calr"
+            for layer in range(1, 4) for module in range(1, 36)}
+        self.assertEqual({original for original in mapping
+                          if original.startswith(prefix)}, expected)
+        groups = [g for g in self.manifest["groups"]
+                  if set(g["files"]) & {mapping[original] for original in expected}]
+        self.assertEqual(len(groups), 1)
+        group = groups[0]
+        self.assertEqual(set(group["files"]), {mapping[original] for original in expected})
+        self.assertEqual(group["mode"], "together")
+        self.assertEqual(group["expect"], "compile")
+        self.assertEqual(group.get("options", []), [])
+        self.assertNotIn("errors", group)
+        self.assertNotIn("defect", group)
+
+    def test_added_historical_roles_keep_frozen_formatter_intent(self):
+        baseline = json.loads((REPO_ROOT / "tests/TestData/Formatting/"
+                               "formatter-corpus-baseline.json").read_text())
+        semantic = set(baseline["conservativeFallbacks"]["semanticErrors"])
+        generated = set(baseline["conservativeFallbacks"]["generatedCSharpErrors"])
+        parse = set(baseline["parseFailurePaths"])
+        originals = {current: original for original, current in
+                     fcc.current_input_paths(REPO_ROOT, self.manifest).items()}
+        groups = [g for g in self.manifest["groups"]
+                  if g["id"].startswith("active:historical-role:")]
+        self.assertEqual(sum(len(g["files"]) for g in groups), 345)
+        self.assertEqual(sum(len(g["files"]) for g in groups
+                             if g["expect"] == "reject"), 16)
+        for group in groups:
+            self.assertEqual(group.get("options", []), [])
+            self.assertNotEqual(group["expect"], "known-failure")
+            for current in group["files"]:
+                original = originals[current]
+                with self.subTest(current=current):
+                    self.assertNotIn(original, parse)
+                    if group["mode"] == "together":
+                        self.assertEqual(group["expect"], "compile")
+                    elif original in semantic:
+                        self.assertEqual(group["expect"], "reject")
+                        self.assertEqual(group["negativeKind"], "designed")
+                        self.assertTrue(group["errors"])
+                        allowed = ("Calor0410",) if "/pairs/" in original else (
+                            "Calor0213", "Calor0208")
+                        self.assertTrue(all(error.split("|", 2)[1] in allowed
+                                            for error in group["errors"]))
+                    else:
+                        self.assertNotIn(original, generated)
+                        self.assertEqual(group["expect"], "compile")
+                        self.assertEqual(group["mode"], "each")
 
     def test_codegen_only_failures_are_not_incidental_negatives(self):
         for g in self.manifest["groups"]:

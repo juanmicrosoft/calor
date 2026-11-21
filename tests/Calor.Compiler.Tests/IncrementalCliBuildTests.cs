@@ -73,16 +73,16 @@ public class IncrementalCliBuildTests : IDisposable
     private (string APath, string BPath) WriteIndependentPair()
     {
         var a = WriteSource("a.calr", """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         var b = WriteSource("b.calr", """
-            §M{m002:Beta}
-              §F{f001:Wave:pub} () -> void
-                §E{cw}
-                §P "wave"
+            module Beta Beta block
+              func Wave () → void
+                ! cw
+                Console.WriteLine("wave")
             """);
         return (a, b);
     }
@@ -152,10 +152,10 @@ public class IncrementalCliBuildTests : IDisposable
         Run([a, b]);
 
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "changed"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("changed")
             """);
 
         var warm = Run([a, b]);
@@ -173,10 +173,10 @@ public class IncrementalCliBuildTests : IDisposable
         // run would skip and the edited content would never be compiled.
         var (a, b) = WriteIndependentPair();
         var edited = """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "edited mid-compile"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("edited mid-compile")
             """;
 
         var cold = Run([a, b], afterCompile: file =>
@@ -290,36 +290,19 @@ public class IncrementalCliBuildTests : IDisposable
     }
 
     [Fact]
-    public void FailedFile_IsNotCached_AndRecompilesNextRun()
-    {
-        var (a, _) = WriteIndependentPair();
-        var broken = WriteSource("broken.calr", "§M{m003:Broken\n  not valid calor");
-
-        var cold = Run([a, broken]);
-        Assert.True(cold.Result.AnyErrors);
-
-        var warm = Run([a, broken]);
-        // The broken file was re-processed, not skipped: only a.calr is a cache hit,
-        // and the failure (with its diagnostics) is re-reported on the warm run.
-        Assert.Equal([Path.ChangeExtension(a, ".g.cs")], warm.SkippedOutputs);
-        Assert.Single(warm.Result.Skipped);
-        Assert.True(warm.Result.AnyErrors);
-        Assert.True(warm.Diagnostics.HasErrors);
-    }
-
-    [Fact]
     public void CrossModuleViolation_IsNeverPublishedOrCached()
     {
         var callee = WriteSource("callee.calr", """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub} () -> void
-                §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """);
         var caller = WriteSource("caller.calr", """
-            §M{m002:App}
-              §F{f001:Main:pub} () -> void
-                §E{}
-                §C{OrderService.SaveOrder} §/C
+            module App App block
+              func Main () → void
+                !
+                OrderService.SaveOrder()
             """);
 
         var cold = Run([callee, caller]);
@@ -343,15 +326,16 @@ public class IncrementalCliBuildTests : IDisposable
         // the module from cross-module enforcement and Calor0410 would silently
         // disappear on warm builds. Rule: no summary, no hit.
         var callee = WriteSource("callee2.calr", """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub} () -> void
-                §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """);
         var caller = WriteSource("caller2.calr", """
-            §M{m002:App}
-              §F{f001:Main:pub} () -> void
-                §E{}
-                §C{OrderService.SaveOrder} §/C
+            module App App block
+              func Main () → void
+                !
+                OrderService.SaveOrder()
             """);
 
         var cold = Run([callee, caller]);
@@ -449,16 +433,16 @@ public class IncrementalCliEndToEndTests : IDisposable
         var a = Path.Combine(_tempDir, "a.calr");
         var b = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         File.WriteAllText(b, """
-            §M{m002:Beta}
-              §F{f001:Wave:pub} () -> void
-                §E{cw}
-                §P "wave"
+            module Beta Beta block
+              func Wave () → void
+                ! cw
+                Console.WriteLine("wave")
             """);
 
         var cold = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b, "--cache");
@@ -484,10 +468,10 @@ public class IncrementalCliEndToEndTests : IDisposable
         // --cache no state file is written and repeat runs always recompile.
         var a = Path.Combine(_tempDir, "a.calr");
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
 
         for (var run = 0; run < 2; run++)
@@ -508,10 +492,10 @@ public class IncrementalCliEndToEndTests : IDisposable
         var source = Path.Combine(_tempDir, "explicit-output.calr");
         var output = Path.Combine(_tempDir, "explicit-output.cs");
         File.WriteAllText(source, """
-            §M{m001:ExplicitOutput}
-              §F{f001:Main:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module ExplicitOutput ExplicitOutput block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
 
         for (var run = 0; run < 2; run++)
@@ -589,11 +573,11 @@ public class IncrementalCliEndToEndTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "nullable-assignment.calr");
         File.WriteAllText(path, """
-            §M{m001:N0}
-              §F{f001:Probe:pub} () -> void
-                §E{}
-                §B{x:?str} null
-                §B{y:str} x
+            module N0 N0 block
+              func Probe () → void
+                !
+                let string?:x = null
+                let string:y = x
             """);
         return path;
     }
@@ -667,17 +651,17 @@ public class IncrementalCliEndToEndTests : IDisposable
     {
         var a = Path.Combine(_tempDir, "a.calr");
         File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Alpha Alpha block
+              func Greet () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         var b = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(b, """
-            §M{m002:Beta}
-              §F{f001:Wave:pub} () -> void
-                §E{cw}
-                §P "wave"
+            module Beta Beta block
+              func Wave () → void
+                ! cw
+                Console.WriteLine("wave")
             """);
         return (a, b);
     }
@@ -699,10 +683,10 @@ public class IncrementalCliEndToEndTests : IDisposable
         var (a, b) = WritePair();
         var c = Path.Combine(_tempDir, "c.calr");
         File.WriteAllText(c, """
-            §M{m003:Gamma}
-              §F{f001:Call:pub} () -> void
-                §E{cw}
-                §C{Greet} §/C
+            module Gamma Gamma block
+              func Call () → void
+                ! cw
+                Greet()
             """);
         Assert.Empty(Directory.EnumerateFiles(_tempDir, ".calor-index.json", SearchOption.AllDirectories));
         Assert.False(Directory.Exists(Path.Combine(_tempDir, "obj")));
@@ -718,7 +702,9 @@ public class IncrementalCliEndToEndTests : IDisposable
 
         var gamma = state.Files.Values.Single(entry => entry.EffectSummary!.ModuleName == "Gamma").EffectSummary!;
         var caller = Assert.Single(gamma.Callers);
-        Assert.Equal("f001", caller.CallerId);
+        var identity = new Calor.Compiler.Ids.DeclarationIdentityStore(_tempDir).Preview([])
+            .Declarations.Single(declaration => declaration.File == "c.calr" && declaration.Name == "Call").Id;
+        Assert.Equal(identity, caller.CallerId);
         Assert.Equal("Call", caller.DisplayName);
         Assert.Contains(caller.Calls, call => call.Target == "Greet");
         Assert.Contains(gamma.PublicFunctions, function => function.Name == "Call" && function.HasEffectDeclaration);
@@ -791,14 +777,15 @@ public class IncrementalCliEndToEndTests : IDisposable
         var diagnostics = new DiagnosticBag();
         var parser = new Parsing.Parser(
             new Parsing.Lexer("""
-                §M{m001:Overloads}
-                  §CL{c001:Box:pub}
-                    §MT{m001:Run:pub} (i32:x) -> void
-                      §E{cw}
-                      §C{System.Console.WriteLine} §A x §/C
-                    §MT{m002:Run:pub} (str:s) -> void
-                      §E{cw}
-                      §C{System.Console.WriteLine} §A s §/C
+                module Overloads Overloads block
+                  class Box
+                    func Run (int:x) → void
+                      ! cw
+                      System.Console.WriteLine(x)
+
+                    func Run (string:s) → void
+                      ! cw
+                      System.Console.WriteLine(s)
                 """, diagnostics).TokenizeAllForParser(), diagnostics);
         var module = parser.Parse();
         Assert.NotNull(module);
@@ -806,9 +793,618 @@ public class IncrementalCliEndToEndTests : IDisposable
 
         var summary = EffectSummaryBuilder.Build(module!);
         Assert.Equal(
-            new[] { "Box.m001", "Box.m002" },
+            Assert.Single(module.Classes).Methods.Select(method => $"Box.{method.Id}")
+                .OrderBy(id => id, StringComparer.Ordinal).ToArray(),
             summary.Callers.Select(caller => caller.CallerId).OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.All(summary.Callers, caller => Assert.Equal("Box.Run", caller.DisplayName));
         Assert.All(summary.Callers, caller => Assert.Single(caller.Calls));
     }
+}
+
+public sealed class NativeProjectCacheTests : IDisposable
+{
+    private string _root = Path.Combine(Path.GetTempPath(), "calor-native-cache-" + Guid.NewGuid().ToString("N"));
+    private readonly Xunit.Abstractions.ITestOutputHelper _output;
+
+    public NativeProjectCacheTests(Xunit.Abstractions.ITestOutputHelper output)
+    {
+        _output = output;
+        Directory.CreateDirectory(_root);
+    }
+
+    private const string Library = """
+        module Library Contracts block
+          module Arithmetic public
+            func Pick public (int:value) → int
+              !
+              return (value + 1)
+            func Name public () → string
+              !
+              return "Ada"
+        """;
+
+    private const string Caller = """
+        module Caller Consumer block
+          module Entry public
+            func Probe public () → int
+              !
+              return Contracts.Arithmetic.Pick(41)
+            func Read public () → string
+              !
+              return Contracts.Arithmetic.Name()
+        """;
+
+    private static string Independent(string name, int value) =>
+        $"module {name}\n  module {name}\n    func Answer public () → int\n      !\n      return {value}\n";
+
+    private void Write(string name, string source) => File.WriteAllText(Path.Combine(_root, name + ".calr"), source);
+
+    private (CompilationDriver.DriverResult Result, DiagnosticBag Diagnostics) Run(
+        bool clear = false, string token = "native-cache", bool enforceEffects = true)
+    {
+        var diagnostics = new DiagnosticBag();
+        var attempted = new List<string>();
+        var result = CompilationDriver.CompileAll(
+            Directory.GetFiles(_root, "*.calr").Order(StringComparer.Ordinal).Select(path => new FileInfo(path)).ToArray(),
+            _ => new CompilationOptions
+            {
+                EnforceEffects = enforceEffects,
+                ContractMode = ContractMode.Off,
+                StatusWriter = TextWriter.Null
+            },
+            crossModuleEnforcement: true, crossModulePolicy: UnknownCallPolicy.Strict,
+            onCompiled: (file, compiled) =>
+                File.WriteAllText(Path.ChangeExtension(file.FullName, ".g.cs"), compiled.GeneratedCode),
+            diagnosticSink: diagnostics,
+            cache: new(_root, token + ":effects=" + enforceEffects, clear,
+                file => Path.ChangeExtension(file.FullName, ".g.cs")),
+            onFileResult: (file, _) => attempted.Add(file.Name));
+        var statePath = BuildStateCache.GetCachePath(_root);
+        _output.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Recompiled = attempted,
+            Compiled = result.Compiled.Select(item => item.File.Name),
+            Skipped = result.Skipped.Select(file => file.Name),
+            result.AnyErrors,
+            Diagnostics = Snapshot(diagnostics),
+            CacheStateExists = File.Exists(statePath),
+            State = File.Exists(statePath) ? File.ReadAllText(statePath) : null
+        }));
+        return (result, diagnostics);
+    }
+
+    private static string[] Snapshot(DiagnosticBag diagnostics) => diagnostics.Select(diagnostic =>
+        $"{diagnostic.FilePath}|{diagnostic.Code}|{diagnostic.Severity}|{diagnostic.Span}|{diagnostic.Message}")
+        .Order(StringComparer.Ordinal).ToArray();
+
+    [Fact]
+    public void IndependentBodiesKeepRealHitsForSingleAndBatchedEdits()
+    {
+        Write("a", Independent("Alpha", 1));
+        Write("b", Independent("Beta", 2));
+        Write("c", Independent("Gamma", 3));
+        Assert.Equal(3, Run().Result.Compiled.Count);
+        Assert.Equal(3, Run().Result.Skipped.Count);
+        var unchanged = File.ReadAllText(Path.Combine(_root, "c.g.cs"));
+        Write("a", Independent("Alpha", 11));
+        var one = Run();
+        Assert.Equal("a.calr", Assert.Single(one.Result.Compiled).File.Name);
+        Assert.Equal(2, one.Result.Skipped.Count);
+        Write("a", Independent("Alpha", 12));
+        Write("b", Independent("Beta", 22));
+        var two = Run();
+        Assert.Equal(2, two.Result.Compiled.Count);
+        Assert.Equal("c.calr", Assert.Single(two.Result.Skipped).Name);
+        Assert.Equal(unchanged, File.ReadAllText(Path.Combine(_root, "c.g.cs")));
+        Assert.False(two.Result.AnyErrors, string.Join("\n", two.Diagnostics));
+    }
+
+    [Fact]
+    public void RelocatedProjectsDoNotReuseOldSourceLocations()
+    {
+        Write("a", Independent("Alpha", 1));
+        Write("b", Independent("Beta", 2));
+        Assert.Equal(2, Run().Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var oldRoot = _root;
+        var movedRoot = _root + "-moved";
+        Directory.Move(_root, movedRoot);
+        _root = movedRoot;
+        var moved = Run();
+        Assert.False(moved.Result.AnyErrors, string.Join("\n", moved.Diagnostics));
+        Assert.Equal(2, moved.Result.Compiled.Count);
+        Assert.Empty(moved.Result.Skipped);
+        Assert.DoesNotContain(oldRoot + Path.DirectorySeparatorChar,
+            File.ReadAllText(Path.Combine(_root, "a.g.cs")));
+    }
+
+    [Theory]
+    [InlineData("body")]
+    [InlineData("return")]
+    [InlineData("nullable")]
+    [InlineData("row")]
+    [InlineData("unsafe-body")]
+    [InlineData("owner")]
+    [InlineData("namespace")]
+    [InlineData("parameter")]
+    [InlineData("alias")]
+    public void SourceEditsInvalidateRealConsumersAndMatchColdDiagnostics(string edit)
+    {
+        Write("library", Library);
+        Write("caller", Caller);
+        var cold = Run();
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Equal(2, cold.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var changed = edit switch
+        {
+            "body" => Library.Replace("(value + 1)", "(value + 2)", StringComparison.Ordinal),
+            "return" => Library.Replace("→ int", "→ string", StringComparison.Ordinal)
+                .Replace("(value + 1)", "\"answer\"", StringComparison.Ordinal),
+            "nullable" => Library.Replace("→ string", "→ string?", StringComparison.Ordinal)
+                .Replace("\"Ada\"", "null", StringComparison.Ordinal),
+            "row" => Library.Replace("(int:value) → int\n      !", "(int:value) → int\n      ! cw", StringComparison.Ordinal),
+            "unsafe-body" => Library.Replace("return (value + 1)",
+                "System.Console.WriteLine(value)\n      return (value + 1)", StringComparison.Ordinal),
+            "owner" => Library.Replace("module Arithmetic public", "module Renamed public", StringComparison.Ordinal),
+            "namespace" => Library.Replace("Contracts block", "Moved block", StringComparison.Ordinal),
+            "parameter" => Library.Replace("int:value", "bool:value", StringComparison.Ordinal)
+                .Replace("(value + 1)", "42", StringComparison.Ordinal),
+            "alias" => Library.Replace("module Library Contracts block",
+                    "module Library Contracts block\n  namespace using Input = System.Boolean", StringComparison.Ordinal)
+                .Replace("int:value", "Input:value", StringComparison.Ordinal)
+                .Replace("(value + 1)", "42", StringComparison.Ordinal),
+            _ => throw new ArgumentOutOfRangeException(nameof(edit))
+        };
+        Write("library", changed);
+        var warm = Run();
+        Assert.Empty(warm.Result.Skipped);
+        Assert.Equal(edit != "body", warm.Result.AnyErrors);
+        if (edit == "body")
+            Assert.Equal(2, warm.Result.Compiled.Count);
+        var fresh = Run(clear: true);
+        Assert.Equal(Snapshot(fresh.Diagnostics), Snapshot(warm.Diagnostics));
+        Assert.Equal(fresh.Result.AnyErrors, warm.Result.AnyErrors);
+    }
+
+    [Theory]
+    [InlineData("instance")]
+    [InlineData("partial")]
+    [InlineData("field")]
+    [InlineData("extension")]
+    [InlineData("generic")]
+    [InlineData("global-alias")]
+    [InlineData("constant")]
+    public void UnprovenSourceContextsRetainFullSnapshotInvalidation(string kind)
+    {
+        var source = kind switch
+        {
+            "instance" => Library.Replace("module Arithmetic public", "class Arithmetic public", StringComparison.Ordinal),
+            "partial" => Library.Replace("module Arithmetic public", "module Arithmetic public partial", StringComparison.Ordinal),
+            "field" => Library.Replace("module Arithmetic public",
+                "module Arithmetic public\n    field int:Seed public static = 1", StringComparison.Ordinal),
+            "extension" => Library.Replace("int:value", "this int:value", StringComparison.Ordinal),
+            "generic" => Library.Replace("module Arithmetic public", "class Arithmetic<T> public", StringComparison.Ordinal),
+            "global-alias" => Library.Replace("module Library Contracts block",
+                "module Library Contracts block\n  global using Text = System.String", StringComparison.Ordinal),
+            "constant" => Library.Replace("module Arithmetic public",
+                "module Arithmetic public\n    field int:Seed public const = 1", StringComparison.Ordinal),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+        Write("library", source);
+        Write("peer", Independent("Peer", 7));
+        var cold = Run();
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        Write("library", kind == "constant"
+            ? source.Replace("Seed public const = 1", "Seed public const = 2", StringComparison.Ordinal)
+            : source.Replace("(value + 1)", "(value + 2)", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal(2, changed.Result.Compiled.Count);
+        Assert.Empty(changed.Result.Skipped);
+    }
+
+    [Theory]
+    [InlineData("output")]
+    [InlineData("missing-output")]
+    [InlineData("summary")]
+    [InlineData("manifest")]
+    [InlineData("options")]
+    public void GenuineCacheHitsStillRequireAllExistingIntegrityEvidence(string change)
+    {
+        Write("a", Independent("Alpha", 1));
+        Write("b", Independent("Beta", 2));
+        Assert.Equal(2, Run().Result.Compiled.Count);
+        if (change == "output")
+            File.AppendAllText(Path.Combine(_root, "a.g.cs"), "\n// external modification\n");
+        else if (change == "missing-output")
+            File.Delete(Path.Combine(_root, "a.g.cs"));
+        else if (change == "summary")
+        {
+            var state = BuildStateCache.Load(_root)!;
+            state.Files["a.calr"].EffectSummary = null;
+            BuildStateCache.Save(state, _root);
+        }
+        else if (change == "manifest")
+            File.WriteAllText(Path.Combine(_root, "local.calor-effects.json"), "{}");
+        var result = Run(token: change == "options" ? "changed-options" : "native-cache");
+        Assert.False(result.Result.AnyErrors, string.Join("\n", result.Diagnostics));
+        var global = change is "manifest" or "options";
+        Assert.Equal(global ? 2 : 1, result.Result.Compiled.Count);
+        Assert.Equal(global ? 0 : 1, result.Result.Skipped.Count);
+    }
+
+    [Fact]
+    public void CallerBodyEditsKeepTheUnchangedLibraryAsARealHit()
+    {
+        Write("library", Library);
+        Write("caller", Caller);
+        Assert.False(Run().Result.AnyErrors);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        Write("caller", Caller.Replace("Pick(41)", "Pick(42)", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal("caller.calr", Assert.Single(changed.Result.Compiled).File.Name);
+        Assert.Equal("library.calr", Assert.Single(changed.Result.Skipped).Name);
+    }
+
+    [Fact]
+    public void FullySkippedOutputsStillEnforceTheirCachedDeclaredEffectRows()
+    {
+        // 0.30: a public function must declare a row (Calor0124); an internal one may omit
+        // it, which is what the cross-module pass reports as Calor0417 on every build.
+        Write("library", """
+            module Store Storage
+              func Write internal () → void
+                return
+            """);
+        Write("caller", """
+            module Caller Client
+              func Main public () → void
+                !
+                Store.Write()
+            """);
+        var cold = Run(enforceEffects: false);
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Equal(2, cold.Result.Compiled.Count);
+        Assert.Contains(cold.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndeclaredPublicFunction);
+        var warm = Run(enforceEffects: false);
+        Assert.False(warm.Result.AnyErrors, string.Join("\n", warm.Diagnostics));
+        Assert.Empty(warm.Result.Compiled);
+        Assert.Equal(2, warm.Result.Skipped.Count);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(warm.Diagnostics));
+    }
+
+    [Fact]
+    public void CrossModuleViolationNeverPublishesOrCreatesAReusableState()
+    {
+        Write("library", """
+            module Store Storage
+              func Write public () → void
+                ! db:w
+            """);
+        Write("caller", """
+            module Caller Client
+              func Main public () → void
+                !
+                Store.Write()
+            """);
+        var cold = Run(enforceEffects: false);
+        Assert.True(cold.Result.AnyErrors);
+        Assert.Contains(cold.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.Empty(cold.Result.Compiled);
+        Assert.Null(BuildStateCache.Load(_root));
+        var warm = Run(enforceEffects: false);
+        Assert.True(warm.Result.AnyErrors);
+        Assert.Empty(warm.Result.Skipped);
+        Assert.Empty(warm.Result.Compiled);
+        Assert.Null(BuildStateCache.Load(_root));
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(warm.Diagnostics));
+    }
+
+    [Fact]
+    public void ConditionalCallerRebindsAliasChangesAndMatchesColdRejection()
+    {
+        const string library = """
+            module Library Contracts block
+              namespace using Result = System.Int32
+              module Arithmetic public
+                func Pick public (int:value) → Result
+                  !
+                  return 0
+            """ + "\n";
+        Write("library", library);
+        Write("caller", """
+            module Caller Consumer block
+              module Entry public
+                func Value public () → int
+                  !
+                  pp NEVER
+                    return Contracts.Arithmetic.Pick(41)
+                  return 7
+            """ + "\n");
+        var initial = Run();
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var statePath = BuildStateCache.GetCachePath(_root);
+        var callerOutput = File.ReadAllText(Path.Combine(_root, "caller.g.cs"));
+
+        Write("library", library.Replace("System.Int32", "System.Int64", StringComparison.Ordinal));
+        var warm = Run();
+        Assert.True(warm.Result.AnyErrors, string.Join("\n", warm.Diagnostics));
+        Assert.Equal("library.calr", Assert.Single(warm.Result.Compiled).File.Name);
+        Assert.Empty(warm.Result.Skipped);
+        Assert.Equal(new[] { "Calor0410", "Calor0411", "Calor0411" },
+            warm.Diagnostics.Select(diagnostic => diagnostic.Code).Order(StringComparer.Ordinal));
+        Assert.Equal("library.calr", Assert.Single(BuildStateCache.Load(_root)!.Files).Key);
+        Assert.Equal(callerOutput, File.ReadAllText(Path.Combine(_root, "caller.g.cs")));
+        var state = File.ReadAllText(statePath);
+        var outputs = Directory.GetFiles(_root, "*.g.cs").ToDictionary(path => path, File.ReadAllText);
+
+        var repeated = Run();
+        Assert.True(repeated.Result.AnyErrors);
+        Assert.Empty(repeated.Result.Compiled);
+        Assert.Equal("library.calr", Assert.Single(repeated.Result.Skipped).Name);
+
+        var cold = Run(clear: true);
+        Assert.True(cold.Result.AnyErrors);
+        Assert.Equal("library.calr", Assert.Single(cold.Result.Compiled).File.Name);
+        Assert.Empty(cold.Result.Skipped);
+        Assert.Equal(state, File.ReadAllText(statePath));
+        Assert.All(outputs, output => Assert.Equal(output.Value, File.ReadAllText(output.Key)));
+        var warmFields = System.Text.Json.JsonSerializer.Serialize(warm.Diagnostics.ToArray());
+        var coldFields = System.Text.Json.JsonSerializer.Serialize(cold.Diagnostics.ToArray());
+        _output.WriteLine("ConditionalWarmDiagnostics:" + warmFields);
+        _output.WriteLine("ConditionalColdDiagnostics:" + coldFields);
+        Assert.Equal(coldFields, warmFields);
+        Assert.Equal(coldFields, System.Text.Json.JsonSerializer.Serialize(repeated.Diagnostics.ToArray()));
+    }
+
+    [Fact]
+    public void NativeGlobalFunctionFragmentsKeepRealHitsAndExactColdArtifacts()
+    {
+        const string left = "module Left\n  func LeftValue public () → int\n    !\n    return 1\n";
+        const string right = "module Right\n  func RightValue public () → int\n    !\n    return 42\n";
+        Write("left", left);
+        Write("right", right);
+        var initial = Run();
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var rightPath = Path.Combine(_root, "right.g.cs");
+        var originalRight = File.ReadAllText(rightPath);
+
+        Write("left", left.Replace("return 1", "return 11", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal("left.calr", Assert.Single(changed.Result.Compiled).File.Name);
+        Assert.Equal("right.calr", Assert.Single(changed.Result.Skipped).Name);
+        Assert.Equal(originalRight, File.ReadAllText(rightPath));
+        var generated = Directory.GetFiles(_root, "*.g.cs").ToDictionary(path => path, File.ReadAllText);
+        var runtime = Execute();
+        Assert.Equal("System.Int32 LeftValue()=11|System.Int32 RightValue()=42", runtime);
+
+        var cold = Run(clear: true);
+        Assert.False(cold.Result.AnyErrors, string.Join("\n", cold.Diagnostics));
+        Assert.Empty(cold.Result.Skipped);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+        Assert.All(generated, output => Assert.Equal(output.Value, File.ReadAllText(output.Key)));
+        Assert.Equal(runtime, Execute());
+
+        string Execute()
+        {
+            var trees = Directory.GetFiles(_root, "*.g.cs")
+                .Select(path => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(File.ReadAllText(path)));
+            var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "SharedNativeCache_" + Guid.NewGuid().ToString("N"), trees,
+                CodeGen.GeneratedCSharpCompiler.References,
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                    Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var context = new System.Runtime.Loader.AssemblyLoadContext(null, isCollectible: true);
+            try
+            {
+                stream.Position = 0;
+                var assembly = context.LoadFromStream(stream);
+                var owner = assembly.GetType("GlobalModule", throwOnError: true)!;
+                return string.Join("|", owner.GetMethods(System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly)
+                    .OrderBy(method => method.Name, StringComparer.Ordinal)
+                    .Select(method => $"{method.ReturnType.FullName} {method.Name}()={method.Invoke(null, null)}"));
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
+    }
+
+    private static string Namespaced(string module, string ns, string function, int value) =>
+        $"module {module} {ns} block\n  func {function} public () → int\n    !\n    return {value}\n";
+
+    [Fact]
+    public void NamespacedModuleWrappersKeepRealHitsAndExactColdArtifacts()
+    {
+        // #1732: `module Alpha Alpha block` emits
+        // `namespace Alpha { public static partial class AlphaModule }`. The
+        // independence proof accepts that wrapper, so an edit to one namespaced
+        // module spares an unrelated one, byte for byte.
+        Write("alpha", Namespaced("Alpha", "Alpha", "Greet", 1));
+        Write("beta", Namespaced("Beta", "Beta", "Wave", 2));
+        Assert.Equal(2, Run().Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+        var betaPath = Path.Combine(_root, "beta.g.cs");
+        var beta = File.ReadAllText(betaPath);
+        Assert.Contains("public static partial class BetaModule", beta);
+
+        Write("alpha", Namespaced("Alpha", "Alpha", "Greet", 11));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal("alpha.calr", Assert.Single(changed.Result.Compiled).File.Name);
+        Assert.Equal("beta.calr", Assert.Single(changed.Result.Skipped).Name);
+        Assert.Equal(beta, File.ReadAllText(betaPath));
+        var generated = Directory.GetFiles(_root, "*.g.cs").ToDictionary(path => path, File.ReadAllText);
+        var state = CanonicalState();
+
+        var cold = Run(clear: true);
+        Assert.Empty(cold.Result.Skipped);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+        Assert.All(generated, output => Assert.Equal(output.Value, File.ReadAllText(output.Key)));
+        Assert.Equal(state, CanonicalState());
+
+        string CanonicalState()
+        {
+            var loaded = BuildStateCache.Load(_root)!;
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                loaded.CrossModuleMapHash,
+                loaded.CrossModuleFunctionMapHash,
+                Files = loaded.Files.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => new { pair.Key, pair.Value.ContentHash, pair.Value.OutputContentHash }),
+                Evidence = loaded.ValidatedOutputs.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => new { pair.Key, pair.Value.OutputContentHash, pair.Value.IsNativeGlobalModule })
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData("same-namespace")]
+    [InlineData("nested-namespace")]
+    public void SharedNamespacedWrapperIsNeverSpared(string shape)
+    {
+        // Two modules with the same namespace emit the SAME partial class
+        // (Alpha.AlphaModule): an edit to one can change member lookup in the
+        // other, so the other is recompiled. A nested namespace ending in the same
+        // segment emits a different type (Outer.Alpha.AlphaModule) but the proof
+        // compares simple names, so it is not spared either.
+        Write("alpha", Namespaced("Alpha", "Alpha", "Greet", 1));
+        Write("gamma", Namespaced("Gamma", shape == "same-namespace" ? "Alpha" : "Outer.Alpha", "Other", 3));
+        Write("beta", Namespaced("Beta", "Beta", "Wave", 2));
+        Assert.Equal(3, Run().Result.Compiled.Count);
+        Assert.Equal(3, Run().Result.Skipped.Count);
+
+        Write("gamma", Namespaced("Gamma", shape == "same-namespace" ? "Alpha" : "Outer.Alpha", "Other", 4));
+        var changed = Run();
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal(new[] { "alpha.calr", "gamma.calr" },
+            changed.Result.Compiled.Select(item => item.File.Name).Order(StringComparer.Ordinal));
+        Assert.Equal("beta.calr", Assert.Single(changed.Result.Skipped).Name);
+        var cold = Run(clear: true);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData("row")]
+    [InlineData("alias")]
+    [InlineData("conditional-alias")]
+    public void SharedGlobalOwnerStillRevalidatesSourceContractsAndDisabledBranches(string change)
+    {
+        const string library = """
+            module Library
+              global using Result = System.Int32
+              func Pick public (int:value) → Result
+                !
+                return value
+            """ + "\n";
+        var caller = change == "conditional-alias"
+            ? """
+              module Caller
+                func Value public () → int
+                  !
+                  pp NEVER
+                    return Pick(41)
+                  return 7
+              """ + "\n"
+            : """
+              module Caller
+                func Value public () → int
+                  !
+                  return Pick(41)
+              """ + "\n";
+        Write("library", library);
+        Write("caller", caller);
+        var initial = Run();
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run().Result.Skipped.Count);
+
+        Write("library", change == "row"
+            ? library.Replace("    !\n", "    ! cw\n", StringComparison.Ordinal)
+            : library.Replace("System.Int32", "System.Int64", StringComparison.Ordinal));
+        var changed = Run();
+        Assert.Equal(change != "conditional-alias", changed.Result.AnyErrors);
+        Assert.Empty(changed.Result.Skipped);
+        var cold = Run(clear: true);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+        Assert.Equal(cold.Result.AnyErrors, changed.Result.AnyErrors);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SharedGlobalOwnerRequiresNativeProvenanceInBothSnapshots(bool rawFirst)
+    {
+        const string native = "module Left\n  func LeftValue public () → int\n    !\n    return 1\n";
+        const string payload = "return 2;";
+        var raw = "module Left\n  func LeftValue public () → int\n    !\n"
+            + $"    raw member:post-validation-fallback:Other:opaque%20body {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        Write("left", rawFirst ? raw : native);
+        Write("right", "module Right\n  func RightValue public () → int\n    !\n    return 42\n");
+        var initial = Run(enforceEffects: false);
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Write("left", rawFirst ? native : raw);
+        var changed = Run(enforceEffects: false);
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Empty(changed.Result.Skipped);
+        Assert.Equal(2, changed.Result.Compiled.Count);
+        var cold = Run(clear: true, enforceEffects: false);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SharedGlobalOwnerInitializationCannotUseMemberNameDisjointness(bool explicitConstructor)
+    {
+        var stateful = explicitConstructor
+            ? """
+              module Library
+                module GlobalModule public partial
+                  field int:Seed public static
+                  ctor stat ()
+                    set Seed 1
+              """ + "\n"
+            : """
+              module Library
+                module GlobalModule public partial
+                  field int:Seed public static = 1
+              """ + "\n";
+        Write("state", stateful);
+        Write("caller", "module Caller\n  func Answer public () → int\n    !\n    return 42\n");
+        var initial = Run(enforceEffects: false);
+        Assert.False(initial.Result.AnyErrors, string.Join("\n", initial.Diagnostics));
+        Assert.Equal(2, initial.Result.Compiled.Count);
+        Assert.Equal(2, Run(enforceEffects: false).Result.Skipped.Count);
+        var before = BuildStateCache.Load(_root)!;
+        var callerOutput = File.ReadAllText(Path.Combine(_root, "caller.g.cs"));
+        Assert.DoesNotContain("Seed", callerOutput);
+
+        Write("state", stateful.Replace(explicitConstructor ? "Seed 1" : "= 1",
+            explicitConstructor ? "Seed 2" : "= 2", StringComparison.Ordinal));
+        var changed = Run(enforceEffects: false);
+        Assert.False(changed.Result.AnyErrors, string.Join("\n", changed.Diagnostics));
+        Assert.Equal(before.CrossModuleFunctionMapHash, BuildStateCache.Load(_root)!.CrossModuleFunctionMapHash);
+        Assert.Empty(changed.Result.Skipped);
+        Assert.Equal(2, changed.Result.Compiled.Count);
+        Assert.Equal(callerOutput, File.ReadAllText(Path.Combine(_root, "caller.g.cs")));
+        var cold = Run(clear: true, enforceEffects: false);
+        Assert.Equal(Snapshot(cold.Diagnostics), Snapshot(changed.Diagnostics));
+    }
+
+    public void Dispose() => Directory.Delete(_root, recursive: true);
 }

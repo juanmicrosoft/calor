@@ -76,7 +76,10 @@ public class EffectInferenceTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        Assert.Null(method.Effects);
+        // A public boundary must declare its row (Calor0124), so a pure method gets the
+        // explicit empty row `!` rather than no row.
+        Assert.NotNull(method.Effects);
+        Assert.Empty(method.Effects!.Effects);
     }
 
     [Fact]
@@ -212,7 +215,7 @@ public class EffectInferenceTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(module);
 
-        Assert.Contains("§E{cw}", output);
+        Assert.Contains("! cw", output);
     }
 
     [Fact]
@@ -269,7 +272,7 @@ public class EffectInferenceTests
         // C# → Calor
         var conversionResult = _converter.Convert(csharp);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
-        Assert.Contains("§E{cw}", conversionResult.CalorSource!);
+        Assert.Contains("! cw", conversionResult.CalorSource!);
 
         // Calor → parse → check AST
         var compilationResult = Program.Compile(conversionResult.CalorSource!);
@@ -289,4 +292,239 @@ public class EffectInferenceTests
     }
 
     #endregion
+
+    [Theory]
+    [InlineData("private")]
+    [InlineData("internal")]
+    public void InferredRow_ChargesTransitiveNonPublicEffectsAtThePublicBoundary(string visibility)
+    {
+        var source = $$"""
+            module InferredRows
+              func Write {{visibility}} () → void
+                System.Console.WriteLine("value")
+              func Forward {{visibility}} () → void
+                Write()
+              func Main public () → void
+                ! cw
+                Forward()
+            """;
+        var result = Program.Compile(source, "inferred.calr", new CompilationOptions { EnableTypeChecking = true });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        var refused = Program.Compile(source.Replace("! cw", "!", StringComparison.Ordinal), "inferred.calr");
+        Assert.Contains(refused.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'Main'"));
+        Assert.DoesNotContain(refused.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+            && (diagnostic.Message.Contains("'Write'") || diagnostic.Message.Contains("'Forward'")));
+    }
+
+    [Theory]
+    [InlineData("cw", false)]
+    [InlineData("", true)]
+    public void InferredRow_MethodGroupCarriesTheComputedRow(string destinationRow, bool rejected)
+    {
+        var source = $$"""
+            module InferredRows
+              func Write private () → void
+                System.Console.WriteLine("value")
+              func Main public () → void
+                ! cw
+                let System.Action:callback ! {{destinationRow}} = Write
+                callback()
+            """;
+        var result = Program.Compile(source, "inferred.calr", new CompilationOptions { EnableTypeChecking = true });
+        Assert.Equal(rejected, result.HasErrors);
+        if (rejected)
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.EffectRowMismatch);
+    }
+
+    [Fact]
+    public void InferredRow_ConvergesAcrossARecursiveComponent()
+    {
+        const string source = """
+            module InferredRows
+              func First private () → void
+                Second()
+              func Second private () → void
+                System.Console.WriteLine("value")
+                First()
+              func Main public () → void
+                ! cw
+                First()
+            """;
+        var result = Program.Compile(source, "inferred.calr");
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        var refused = Program.Compile(source.Replace("! cw", "!", StringComparison.Ordinal), "inferred.calr");
+        Assert.Contains(refused.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect && diagnostic.Message.Contains("'Main'"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InferredRow_UnknownMetadataGetterDoesNotBecomeAContract(bool typeChecking)
+    {
+        // Nullable<T>.Value is pure again under the restored 0.29 contract, so this probes
+        // a getter that still has no effect contract (System.Version.Major).
+        const string source = """
+            module InferredRows
+              func Read private (System.Version:value) → int
+                return value.Major
+              func Main public (System.Version:value) → int
+                ! alloc, mut
+                return Read(value)
+            """;
+        var result = Program.Compile(source, "inferred.calr",
+            new CompilationOptions { EnableTypeChecking = typeChecking });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void InferredRow_NonvirtualInstanceMethodUsesItsComputedBody()
+    {
+        const string source = """
+            module InferredRows
+              class Probe
+                func Write private () → void
+                  System.Console.WriteLine("value")
+                func Run public () → void
+                  ! cw
+                  Write()
+            """;
+        var result = Program.Compile(source, "inferred.calr");
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+    }
+
+    [Fact]
+    public void InferredRow_OpenVirtualBodyDoesNotBecomeASlotContract()
+    {
+        const string source = """
+            module InferredRows
+              class Probe
+                func Write internal virtual () → void
+                  System.Console.WriteLine("value")
+              func Main public (Probe:value) → void
+                ! cw
+                value.Write()
+            """;
+        var result = Program.Compile(source, "inferred.calr");
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void InferredRow_OpenVirtualMethodGroupCannotAcquireADeclaredCallbackRow()
+    {
+        const string source = """
+            module InferredRows
+              class Probe
+                func Write internal virtual () → void
+                  System.Console.WriteLine("value")
+              func Main public (Probe:value) → void
+                ! cw
+                let System.Action:callback ! cw = value.Write
+                callback()
+            """;
+        var result = Program.Compile(source, "inferred.calr");
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("unknown", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InferredRow_OmittedBindingRowRetainsItsMethodGroupsEffects(bool covered)
+    {
+        var source = $$"""
+            module InferredRows
+              func Write private () → void
+                System.Console.WriteLine("value")
+              func Main public () → void
+                ! {{(covered ? "cw" : "")}}
+                let System.Action:callback = Write
+                callback()
+            """;
+        var result = Program.Compile(source, "inferred.calr", new CompilationOptions { EnableTypeChecking = true });
+        Assert.Equal(!covered, result.HasErrors);
+        if (!covered)
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Main'") && diagnostic.Message.Contains("'cw'"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InferredRow_InstantiatesInferredVariablesAndChargesTransitiveCallers(bool covered)
+    {
+        var source = $$"""
+            module InferredRows
+              func Apply <! e> private (System.Action:callback ! e) → void
+                callback()
+              func Write private () → void
+                System.Console.WriteLine("value")
+              func Forward private () → void
+                Apply(Write)
+              func Main public () → void
+                ! {{(covered ? "cw" : "")}}
+                Forward()
+            """;
+        var result = Program.Compile(source, "inferred.calr", new CompilationOptions { EnableTypeChecking = true });
+        Assert.Equal(!covered, result.HasErrors);
+        if (!covered)
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Main'") && diagnostic.Message.Contains("'cw'"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InferredRow_ReturnedMethodGroupKeepsItsDeclaredReturnContract(bool covered)
+    {
+        var source = $$"""
+            module InferredRows
+              func Write private () → void
+                System.Console.WriteLine("value")
+              func Factory private () → System.Action ! cw
+                return Write
+              func Main public () → void
+                ! {{(covered ? "cw" : "")}}
+                let System.Action:callback = Factory()
+                callback()
+            """;
+        var result = Program.Compile(source, "inferred.calr", new CompilationOptions { EnableTypeChecking = true });
+        Assert.Equal(!covered, result.HasErrors);
+        if (!covered)
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'Main'") && diagnostic.Message.Contains("'cw'"));
+    }
+
+    [Fact]
+    public void InferredRow_ExplicitPrivateContractIsRejected()
+    {
+        const string source = """
+            module InferredRows
+              func Write private () → void
+                !
+                System.Console.WriteLine("value")
+              func Main public () → void
+                ! cw
+                Write()
+            """;
+        var result = Program.Compile(source, "inferred.calr");
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == Compiler.Diagnostics.DiagnosticCode.NonPublicEffectRow
+            && diagnostic.Message.Contains("'Write'"));
+    }
+
 }

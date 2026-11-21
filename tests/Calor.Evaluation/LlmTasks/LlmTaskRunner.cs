@@ -97,6 +97,9 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         LlmTaskRunnerOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        if (task.Scoring is not { IsValid: true })
+            throw new ArgumentException(
+                $"Task '{task.Id}' scoring weights must be between 0 and 1 and sum to 1.", nameof(task));
         options ??= new LlmTaskRunnerOptions();
 
         // Generate code for both languages using language-appropriate prompts
@@ -131,17 +134,19 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
             // Estimate tokens for both prompts
             var calorPrompt = task.GetPrompt("calor");
             var csharpPrompt = task.GetPrompt("csharp");
-            var calorInputTokens = _provider.EstimateTokenCount(calorPrompt);
-            var csharpInputTokens = _provider.EstimateTokenCount(csharpPrompt);
+            var calorOptions = CreateGenerationOptions("calor", options);
+            var csharpOptions = CreateGenerationOptions("csharp", options);
+            var calorInputTokens = EstimateInputTokens(calorPrompt, calorOptions);
+            var csharpInputTokens = EstimateInputTokens(csharpPrompt, csharpOptions);
 
             // Estimate output (assume ~500 tokens per generation)
             var estimatedOutputTokens = 500;
 
             // Check cache
             var calorCached = options.UseCache && !options.RefreshCache &&
-                _cache.Contains(_provider.Name, calorPrompt, LlmGenerationOptions.Default);
+                _cache.Contains(_provider.Name, calorPrompt, calorOptions);
             var csharpCached = options.UseCache && !options.RefreshCache &&
-                _cache.Contains(_provider.Name, csharpPrompt, LlmGenerationOptions.Default);
+                _cache.Contains(_provider.Name, csharpPrompt, csharpOptions);
 
             if (!calorCached)
             {
@@ -165,15 +170,16 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
 
             // Calculate per-category cost
             var taskCost = _provider.EstimateCost(
-                calorInputTokens + csharpInputTokens,
-                estimatedOutputTokens * 2);
+                (calorCached ? 0 : calorInputTokens) + (csharpCached ? 0 : csharpInputTokens),
+                estimatedOutputTokens * ((calorCached ? 0 : 1) + (csharpCached ? 0 : 1)),
+                options.Model);
 
             if (!byCategory.ContainsKey(task.Category))
                 byCategory[task.Category] = 0;
             byCategory[task.Category] += taskCost;
         }
 
-        var totalCost = _provider.EstimateCost(totalInputTokens, totalOutputTokens);
+        var totalCost = _provider.EstimateCost(totalInputTokens, totalOutputTokens, options.Model);
         var costWithCache = totalCost; // Already accounts for cache
 
         return new LlmTaskCostEstimate
@@ -197,11 +203,7 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         LlmTaskRunnerOptions options,
         CancellationToken cancellationToken)
     {
-        var genOptions = LlmGenerationOptions.Default with
-        {
-            SystemPrompt = GetSystemPrompt(language),
-            Model = options.Model
-        };
+        var genOptions = CreateGenerationOptions(language, options);
 
         // Check cache or generate
         LlmGenerationResult genResult;
@@ -388,16 +390,13 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
 
     /// <summary>
     /// Analyzes contracts in Calor source code.
-    /// Counts preconditions (§Q) and postconditions (§S) to give credit for contract usage.
+    /// Counts preconditions (`requires`) and postconditions (`=>`) to give credit for contract usage.
     /// </summary>
     private static ContractVerificationResults AnalyzeContracts(string calorSource)
     {
         // Count contracts using simple pattern matching
-        // §Q is precondition (requires), §S is postcondition (ensures)
-        var preconditionCount = System.Text.RegularExpressions.Regex.Matches(
-            calorSource, @"§Q\s*\(").Count;
-        var postconditionCount = System.Text.RegularExpressions.Regex.Matches(
-            calorSource, @"§S\s*\(").Count;
+        var preconditionCount = Calor.Evaluation.Metrics.CalorSyntax.Requires.Matches(calorSource).Count;
+        var postconditionCount = Calor.Evaluation.Metrics.CalorSyntax.Ensures.Matches(calorSource).Count;
 
         var totalContracts = preconditionCount + postconditionCount;
 
@@ -572,17 +571,19 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
         };
     }
 
-    private static string? _calorSkillsContent;
     private static string? _csharpSkillsContent;
 
     private static string? GetSkillsContent(string language)
     {
-        var cacheRef = language == "calor" ? ref _calorSkillsContent : ref _csharpSkillsContent;
+        if (language == "calor")
+            return Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+                "Calor.Compiler.Resources.current-language-reference.md");
+        ref var cacheRef = ref _csharpSkillsContent;
 
         if (cacheRef != null)
             return cacheRef;
 
-        var fileName = language == "calor" ? "calor-language-skills.md" : "csharp-language-skills.md";
+        const string fileName = "csharp-language-skills.md";
 
         // Try to load from various locations
         var possiblePaths = new[]
@@ -591,9 +592,6 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Skills", fileName),
             Path.Combine(Directory.GetCurrentDirectory(), "tests", "Calor.Evaluation", "Skills", fileName),
             Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "tests", "Calor.Evaluation", "Skills", fileName)),
-            // Compiler skills directory (legacy location for Calor)
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "src", "Calor.Compiler", "Resources", "Skills", "claude-calor-SKILL.md"),
-            Path.Combine(Directory.GetCurrentDirectory(), "src", "Calor.Compiler", "Resources", "Skills", "claude-calor-SKILL.md"),
         };
 
         foreach (var path in possiblePaths)
@@ -611,6 +609,21 @@ public sealed class LlmTaskRunner : ILlmTaskRunner, IDisposable
 
     private static string? GetCalorSkillsContent() => GetSkillsContent("calor");
     private static string? GetCSharpSkillsContent() => GetSkillsContent("csharp");
+
+    private int EstimateInputTokens(string prompt, LlmGenerationOptions options)
+    {
+        var tokens = _provider.EstimateTokenCount(prompt);
+        if (options.SystemPrompt is { } systemPrompt)
+            tokens += _provider.EstimateTokenCount(systemPrompt);
+        return tokens;
+    }
+
+    private static LlmGenerationOptions CreateGenerationOptions(
+        string language, LlmTaskRunnerOptions options) => LlmGenerationOptions.Default with
+    {
+        SystemPrompt = GetSystemPrompt(language),
+        Model = options.Model
+    };
 
     private static string GetSystemPrompt(string language)
     {
@@ -649,55 +662,15 @@ IMPORTANT INSTRUCTIONS:
 Create a public static class with a public static method. Output only the code, no markdown.";
     }
 
-    private static string GetCalorSystemPrompt()
-    {
-        var skillsContent = GetCalorSkillsContent();
+    private static string GetCalorSystemPrompt() =>
+        $"""
+        You are an expert Calor programmer. Generate only valid Calor code without any explanation.
 
-        if (skillsContent != null)
-        {
-            // Use the comprehensive skills file with instructions
-            return $@"You are an expert Calor programmer. Generate only valid Calor code without any explanation.
+        {GetCalorSkillsContent()}
 
-{skillsContent}
-
-IMPORTANT INSTRUCTIONS:
-1. Output ONLY the Calor code, no markdown code blocks, no explanation
-2. Always include the module wrapper §M{{id:ModuleName}} ... §/M{{id}}
-3. Use test-style IDs like m001, f001, if1
-4. For boolean logic, use (&&) not (and), (||) not (or), (!) not (not)
-5. For negation of numbers, use (- 0 n) not (- n)";
-        }
-
-        // Fallback to basic prompt
-        return @"You are an expert Calor programmer. Generate only valid Calor code without any explanation.
-
-Calor syntax uses section markers with IDs:
-- §M{id:ModuleName} starts a module, §/M{id} ends it
-- §F{id:FunctionName:pub} starts a public function, §/F{id} ends it
-- §I{type:paramName} declares an input parameter (types: i32, bool, string, void)
-- §O{type} declares the output/return type
-- §Q (condition) is a precondition (REQUIRES) using S-expression syntax
-- §S (condition) is a postcondition (ENSURES) using S-expression syntax
-- §R expression returns a value
-- §IF{id} (cond) → body with §EI, §EL, and §/I{id} for conditionals
-- §L{id:var:start:end:step} for loops, §/L{id} to end
-
-Math uses S-expressions: (+ a b), (* a b), (- a b), (/ a b), (% a b)
-Comparisons: (> a b), (< a b), (>= a b), (<= a b), (== a b), (!= a b)
-Logic: (&& a b), (|| a b), (! a)
-
-Example:
-§M{m001:Math}
-  §F{f001:Factorial:pub}
-      §I{i32:n}
-      §O{i32}
-      §Q (>= n 0)
-      §S (>= result 1)
-      §IF{if1} (<= n 1) → §R 1
-      §EL → §R (* n (Factorial (- n 1)))
-
-Output only the code, no markdown or explanation.";
-    }
+        Output only Calor source, no markdown or explanation. Include a complete module with indented bodies.
+        For boolean logic use a && b, a || b, !a. For numeric negation use -n.
+        """;
 
     private static List<LlmTaskDefinition> FilterTasks(
         List<LlmTaskDefinition> tasks,

@@ -29,6 +29,7 @@ public sealed class AnalyzeTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
                     "enum": ["security", "assess", "minimize"],
@@ -82,7 +83,7 @@ public sealed class AnalyzeTool : McpToolBase
                 },
                 "filePath": {
                     "type": "string",
-                    "description": "Path to a .calr file to analyze for §CSHARP blocks (minimize action)"
+                    "description": "Path to a .calr file to analyze for raw C# blocks (minimize action)"
                 },
                 "directoryPath": {
                     "type": "string",
@@ -146,13 +147,14 @@ public sealed class AnalyzeTool : McpToolBase
 
             var compileOptions = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 EnableVerificationAnalyses = true,
                 VerificationAnalysisOptions = analysisOptions,
                 VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp-analyze.calr", compileOptions);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp-analyze.calr", compileOptions);
 
             var analysisResult = compileOptions.VerificationAnalysisResult;
 
@@ -252,6 +254,7 @@ public sealed class AnalyzeTool : McpToolBase
 
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                     EnableVerificationAnalyses = true,
                     VerificationAnalysisOptions = analysisOptions,
                     VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -411,7 +414,7 @@ public sealed class AnalyzeTool : McpToolBase
         }
     }
 
-    // ── Directory minimize (§CSHARP block analysis) ────────────────────
+    // ── Directory minimize (converter-owned C# frame analysis) ─────────
 
     private Task<McpToolResult> HandleDirectoryMinimize(string directoryPath, int maxFiles)
     {
@@ -460,9 +463,9 @@ public sealed class AnalyzeTool : McpToolBase
                         HasErrors = false
                     });
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Skip unreadable files
+                    throw new InvalidOperationException($"Cannot minimize '{file}': {ex.Message}", ex);
                 }
             }
 
@@ -648,7 +651,7 @@ public sealed class AnalyzeTool : McpToolBase
 
         if (string.IsNullOrEmpty(source) && string.IsNullOrEmpty(csharpCode))
         {
-            return Task.FromResult(McpToolResult.Error("Provide 'source' (Calor with §CSHARP blocks) or 'csharpCode' (raw C#)"));
+            return Task.FromResult(McpToolResult.Error("Provide 'source' (Calor with converter-owned raw C# frames) or 'csharpCode' (raw C#)"));
         }
 
         try
@@ -694,25 +697,14 @@ public sealed class AnalyzeTool : McpToolBase
     private static List<CSharpBlock> ExtractCSharpBlocks(string source)
     {
         var blocks = new List<CSharpBlock>();
-        var lines = source.Split('\n');
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i].TrimStart();
-            if (line.StartsWith("§CSHARP", StringComparison.Ordinal))
+        foreach (var token in Parsing.RawCSharpFrame.ReadTokens(source)
+            .Where(t => t.Kind == Parsing.TokenKind.CSharpInterop))
+            blocks.Add(new CSharpBlock
             {
-                var codeLines = new List<string>();
-                int j = i + 1;
-                while (j < lines.Length && !lines[j].TrimStart().StartsWith("§/CSHARP", StringComparison.Ordinal))
-                {
-                    codeLines.Add(lines[j]);
-                    j++;
-                }
-                blocks.Add(new CSharpBlock { Code = string.Join('\n', codeLines), Line = i + 1 });
-                i = j;
-            }
-        }
-
+                Code = token.Value is Parsing.RawCSharpFrame frame
+                    ? frame.Code : token.Value as string ?? "",
+                Line = token.Span.Line
+            });
         return blocks;
     }
 
@@ -720,118 +712,110 @@ public sealed class AnalyzeTool : McpToolBase
     {
         var suggestions = new List<MinimizeSuggestion>();
 
-        try
+        var tree = CSharpSyntaxTree.ParseText(code);
+        if (tree.GetDiagnostics().Any(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            throw new FormatException("C# syntax errors prevent native minimization hints. Convert complete, valid C# instead.");
+        var root = tree.GetRoot();
+
+        foreach (var node in root.DescendantNodes())
         {
-            var tree = CSharpSyntaxTree.ParseText(code);
-            var root = tree.GetRoot();
-
-            foreach (var node in root.DescendantNodes())
+            switch (node)
             {
-                switch (node)
-                {
-                    case MethodDeclarationSyntax method:
-                        var asyncMod = method.Modifiers.Any(m => CSharpExtensions.IsKind(m, SyntaxKind.AsyncKeyword));
-                        var info = FeatureSupport.GetFeatureInfo("method");
-                        if (info?.Support == SupportLevel.Full)
-                        {
-                            suggestions.Add(new MinimizeSuggestion
-                            {
-                                Feature = asyncMod ? "async method" : "method",
-                                Construct = $"Method '{method.Identifier.Text}'",
-                                Confidence = "high",
-                                CalorEquivalent = asyncMod
-                                    ? $"§AF{{id:{method.Identifier.Text}:pub}}"
-                                    : $"§MT{{id:{method.Identifier.Text}:pub}}"
-                            });
-                        }
-                        break;
-
-                    case PropertyDeclarationSyntax prop:
-                        var propInfo = FeatureSupport.GetFeatureInfo("property");
-                        if (propInfo?.Support == SupportLevel.Full)
-                        {
-                            suggestions.Add(new MinimizeSuggestion
-                            {
-                                Feature = "property",
-                                Construct = $"Property '{prop.Identifier.Text}'",
-                                Confidence = "high",
-                                CalorEquivalent = $"§PROP{{id:{prop.Identifier.Text}:{prop.Type}}}"
-                            });
-                        }
-                        break;
-
-                    case FieldDeclarationSyntax field:
-                        var fieldInfo = FeatureSupport.GetFeatureInfo("field");
-                        if (fieldInfo?.Support == SupportLevel.Full)
-                        {
-                            foreach (var variable in field.Declaration.Variables)
-                            {
-                                suggestions.Add(new MinimizeSuggestion
-                                {
-                                    Feature = "field",
-                                    Construct = $"Field '{variable.Identifier.Text}'",
-                                    Confidence = "high",
-                                    CalorEquivalent = $"§FLD{{id:{variable.Identifier.Text}:{field.Declaration.Type}}}"
-                                });
-                            }
-                        }
-                        break;
-
-                    case ConstructorDeclarationSyntax ctor:
-                        var ctorInfo = FeatureSupport.GetFeatureInfo("constructor");
-                        if (ctorInfo?.Support == SupportLevel.Full)
-                        {
-                            suggestions.Add(new MinimizeSuggestion
-                            {
-                                Feature = "constructor",
-                                Construct = $"Constructor '{ctor.Identifier.Text}'",
-                                Confidence = "high",
-                                CalorEquivalent = "§CTOR{id:pub}"
-                            });
-                        }
-                        break;
-
-                    case EnumDeclarationSyntax enumDecl:
+                case MethodDeclarationSyntax method:
+                    var asyncMod = method.Modifiers.Any(m => CSharpExtensions.IsKind(m, SyntaxKind.AsyncKeyword));
+                    var info = FeatureSupport.GetFeatureInfo("method");
+                    if (info?.Support == SupportLevel.Full)
+                    {
                         suggestions.Add(new MinimizeSuggestion
                         {
-                            Feature = "enum",
-                            Construct = $"Enum '{enumDecl.Identifier.Text}'",
+                            Feature = asyncMod ? "async method" : "method",
+                            Construct = $"Method '{method.Identifier.Text}'",
                             Confidence = "high",
-                            CalorEquivalent = $"§EN{{id:{enumDecl.Identifier.Text}}}"
+                            CalorEquivalent = HelpTool.GetSyntaxTemplate(asyncMod ? "async_method" : "method_definition")
                         });
-                        break;
+                    }
+                    break;
 
-                    case OperatorDeclarationSyntax op:
-                        var opInfo = FeatureSupport.GetFeatureInfo("operator-overload");
-                        if (opInfo?.Support == SupportLevel.Full)
+                case PropertyDeclarationSyntax prop:
+                    var propInfo = FeatureSupport.GetFeatureInfo("property");
+                    if (propInfo?.Support == SupportLevel.Full)
+                    {
+                        suggestions.Add(new MinimizeSuggestion
+                        {
+                            Feature = "property",
+                            Construct = $"Property '{prop.Identifier.Text}'",
+                            Confidence = "high",
+                            CalorEquivalent = HelpTool.GetSyntaxTemplate("property_definition")
+                        });
+                    }
+                    break;
+
+                case FieldDeclarationSyntax field:
+                    var fieldInfo = FeatureSupport.GetFeatureInfo("field");
+                    if (fieldInfo?.Support == SupportLevel.Full)
+                    {
+                        foreach (var variable in field.Declaration.Variables)
                         {
                             suggestions.Add(new MinimizeSuggestion
                             {
-                                Feature = "operator overload",
-                                Construct = $"Operator '{op.OperatorToken.Text}'",
-                                Confidence = "medium",
-                                CalorEquivalent = $"§OP{{id:{op.OperatorToken.Text}}}"
+                                Feature = "field",
+                                Construct = $"Field '{variable.Identifier.Text}'",
+                                Confidence = "high",
+                                CalorEquivalent = HelpTool.GetSyntaxTemplate("field_definition")
                             });
                         }
-                        break;
+                    }
+                    break;
 
-                    case EventFieldDeclarationSyntax:
+                case ConstructorDeclarationSyntax ctor:
+                    var ctorInfo = FeatureSupport.GetFeatureInfo("constructor");
+                    if (ctorInfo?.Support == SupportLevel.Full)
+                    {
                         suggestions.Add(new MinimizeSuggestion
                         {
-                            Feature = "event",
-                            Construct = "Event declaration",
-                            Confidence = "medium",
-                            CalorEquivalent = "§EVT{id:name:type}"
+                            Feature = "constructor",
+                            Construct = $"Constructor '{ctor.Identifier.Text}'",
+                            Confidence = "high",
+                            CalorEquivalent = HelpTool.GetSyntaxTemplate("constructor")
                         });
-                        break;
-                }
+                    }
+                    break;
+
+                case EnumDeclarationSyntax enumDecl:
+                    suggestions.Add(new MinimizeSuggestion
+                    {
+                        Feature = "enum",
+                        Construct = $"Enum '{enumDecl.Identifier.Text}'",
+                        Confidence = "high",
+                        CalorEquivalent = HelpTool.GetSyntaxTemplate("enum_definition")
+                    });
+                    break;
+
+                case OperatorDeclarationSyntax op:
+                    var opInfo = FeatureSupport.GetFeatureInfo("operator-overload");
+                    if (opInfo?.Support == SupportLevel.Full)
+                    {
+                        suggestions.Add(new MinimizeSuggestion
+                        {
+                            Feature = "operator overload",
+                            Construct = $"Operator '{op.OperatorToken.Text}'",
+                            Confidence = "medium",
+                            CalorEquivalent = HelpTool.GetSyntaxTemplate("operator_overload")
+                        });
+                    }
+                    break;
+
+                case EventFieldDeclarationSyntax:
+                    suggestions.Add(new MinimizeSuggestion
+                    {
+                        Feature = "event",
+                        Construct = "Event declaration",
+                        Confidence = "medium",
+                        CalorEquivalent = HelpTool.GetSyntaxTemplate("event_definition")
+                    });
+                    break;
             }
         }
-        catch
-        {
-            // If parsing fails, the C# is too complex or incomplete — skip analysis
-        }
-
         return suggestions;
     }
 
@@ -976,6 +960,9 @@ public sealed class AnalyzeTool : McpToolBase
 
     private sealed class MinimizeOutput
     {
+        [JsonPropertyName("guidance")]
+        public string Guidance => "calorEquivalent values are syntax templates, not replacement patches or proof of convertibility. Convert the original C# with calor_convert, then check the result. Preserve modifiers, constructor selection, effects and metadata; unsupported shapes may remain converter-owned C#.";
+
         [JsonPropertyName("totalBlocks")]
         public int TotalBlocks { get; init; }
 

@@ -1,4 +1,11 @@
+using System.Runtime.Loader;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -79,8 +86,8 @@ public class WedgeW4SliceAStructuralTests
         foreach (var l in ppLosses) _output.WriteLine(l.ToString());
         _output.WriteLine(result.CalorSource!);
 
-        Assert.Contains("§R 2", result.CalorSource);
-        Assert.DoesNotContain("§R 1", result.CalorSource);
+        Assert.Contains("return 2", result.CalorSource);
+        Assert.DoesNotContain("return 1", result.CalorSource);
         Assert.NotEmpty(ppLosses);
         Assert.True(result.Context.Losses.Count > 0,
             "Conditional compilation must make the file non-native (LossCount > 0).");
@@ -122,45 +129,28 @@ public class WedgeW4SliceAStructuralTests
             namespace B { public class Foo { public int V() => 2; } }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        _output.WriteLine(result.CalorSource);
-
+        var outputs = AssertNativeNamespaceSplit(csharp);
+        var classes = outputs.SelectMany(result => result.Ast!.Classes).ToArray();
+        Assert.Equal(2, classes.Length);
         Assert.Contains(
-            "namespace-topology",
-            result.Context.GetExplanation().PartialFeatures);
-        Assert.Empty(result.Context.Losses);
-        Assert.Equal(2, result.Ast!.Classes.Count);
-        Assert.Contains(
-            result.Ast.Classes,
+            classes,
             type => type.FullyQualifiedSymbolIdentity == "global::A.Foo");
         Assert.Contains(
-            result.Ast.Classes,
+            classes,
             type => type.FullyQualifiedSymbolIdentity == "global::B.Foo");
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
-        Assert.Contains("§CL{", result.CalorSource);
+        Assert.All(outputs, result => Assert.Contains("class Foo", result.CalorSource));
     }
 
     [Fact]
     public void D2_UniqueNamesAcrossNamespaces_StayNative_AndRoundTrip()
     {
-        // Flattening carries no identity-merge risk when the bare names are unique,
-        // so these may remain native — and must round-trip to compilable C#.
+        // Distinct owners stay in separate native files, even when bare names differ.
         var csharp = """
             namespace A { public class Foo { public int V() => 1; } }
             namespace B { public class Bar { public int V() => 2; } }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        Assert.DoesNotContain(result.Context.Losses,
-            l => l.Feature == "namespace-collision");
-        Assert.Empty(result.Context.Losses);
-
-        var roundTrip = TestHelpers.FullRoundTrip(csharp, "W4SliceA");
-        Assert.True(roundTrip.RoslynSuccess,
-            "Unique cross-namespace types kept native must round-trip to compilable C#:\n"
-            + string.Join("\n", roundTrip.RoslynErrors));
+        AssertNativeNamespaceSplit(csharp);
     }
 
     [Fact]
@@ -174,15 +164,90 @@ public class WedgeW4SliceAStructuralTests
             namespace B { public class Foo<T> { public T V(T x) => x; } }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        Assert.DoesNotContain(result.Context.Losses,
-            l => l.Feature == "namespace-collision");
+        AssertNativeNamespaceSplit(csharp);
+    }
 
-        var roundTrip = TestHelpers.FullRoundTrip(csharp, "W4SliceA");
-        Assert.True(roundTrip.RoslynSuccess,
-            "Same-name-different-arity cross-namespace types must stay native and compile:\n"
-            + string.Join("\n", roundTrip.RoslynErrors));
+    private IReadOnlyList<ConversionResult> AssertNativeNamespaceSplit(string csharp)
+    {
+        var project = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "W4SliceA" })
+            .ConvertProject(csharp, "W4SliceA.cs");
+        Assert.True(project.Success);
+        Assert.True(project.IsSplit);
+        Assert.Equal(["W4SliceA.namespace1.calr", "W4SliceA.namespace2.calr"],
+            project.Outputs.Select(output => output.FileName));
+        var generated = new List<string>();
+        foreach (var output in project.Outputs)
+        {
+            var result = output.Conversion;
+            _output.WriteLine(result.CalorSource);
+            Assert.Empty(result.Losses);
+            Assert.Equal(0, result.InteropPreservationCount);
+            Assert.Contains("namespace-topology", result.Context.GetExplanation().PartialFeatures);
+            TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+            Assert.DoesNotContain('§', result.CalorSource!);
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser(),
+                diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors);
+            Assert.Single(module.NamespaceScopes);
+            Assert.Equal(output == project.Outputs[0] ? "A" : "B",
+                module.NamespaceScopes.Single().FullName);
+            var emitted = new CalorEmitter().Emit(module);
+            string? generatedSource = null;
+            foreach (var source in new[] { result.CalorSource!, emitted })
+            {
+                var compiled = Calor.Compiler.Program.Compile(source, null,
+                    new Calor.Compiler.CompilationOptions
+                    {
+                        EnableTypeChecking = true,
+                        DeferGeneratedOutputValidation = true,
+                        StatusWriter = TextWriter.Null
+                    });
+                Assert.False(compiled.HasErrors,
+                    string.Join("\n", compiled.Diagnostics.Errors.Select(error => error.Message)));
+                generatedSource = compiled.GeneratedCode;
+            }
+            generated.Add(generatedSource!);
+        }
+        AssertEquivalentOwnersAndRuntime([csharp], generated);
+        return project.Outputs.Select(output => output.Conversion).ToArray();
+    }
+
+    private static void AssertEquivalentOwnersAndRuntime(
+        IReadOnlyList<string> original, IReadOnlyList<string> generated)
+    {
+        var expected = Observe(original);
+        var actual = Observe(generated);
+        Assert.Equal(expected, actual);
+
+        static string[] Observe(IReadOnlyList<string> sources)
+        {
+            var compilation = CSharpCompilation.Create(Guid.NewGuid().ToString(),
+                sources.Select(source => CSharpSyntaxTree.ParseText(source)),
+                Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            stream.Position = 0;
+            var context = new AssemblyLoadContext(Guid.NewGuid().ToString(), isCollectible: true);
+            try
+            {
+                var assembly = context.LoadFromStream(stream);
+                return assembly.GetExportedTypes().OrderBy(type => type.FullName, StringComparer.Ordinal)
+                    .Select(type =>
+                    {
+                        var arity = type.GetGenericArguments().Length;
+                        var definition = type.GetMethod("V")!;
+                        var concrete = arity == 0 ? type : type.MakeGenericType(typeof(string));
+                        var method = concrete.GetMethod("V")!;
+                        var value = method.Invoke(Activator.CreateInstance(concrete),
+                            arity == 0 ? [] : ["witness"]);
+                        return $"{type.FullName}|{arity}|definition={definition}|static={definition.IsStatic}|{method}|{value}";
+                    }).ToArray();
+            }
+            finally { context.Unload(); }
+        }
     }
 
     [Fact]
@@ -209,17 +274,14 @@ public class WedgeW4SliceAStructuralTests
     // ==================================================================
 
     [Fact]
-    public void D3_Registry_Record_IsNotClaimedFull()
+    public void D3_Registry_RecordClasses_AreNative()
     {
-        Assert.NotEqual(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
+        Assert.Equal(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
     }
 
     [Fact]
-    public void D3_RecordWithValueSemantics_IsPreservedAsInterop()
+    public void D3_RecordWithValueSemantics_IsNativeAndEquivalent()
     {
-        // A record whose behaviour is exercised through the synthesized value
-        // semantics (with-expression, value equality) must not silently degrade
-        // to a sealed class with reference semantics — it is preserved verbatim.
         var csharp = """
             public record Money(decimal Amount, string Currency);
 
@@ -234,11 +296,47 @@ public class WedgeW4SliceAStructuralTests
         Assert.True(result.Success);
         _output.WriteLine(result.CalorSource);
 
-        var recordLoss = Assert.Single(
-            result.Context.Losses.Where(l => l.Feature == "record"));
-        Assert.Equal(ConversionLossKind.InteropPreserved, recordLoss.Kind);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Empty(result.Context.Losses);
+        Assert.True(Assert.Single(result.Ast!.Classes.Where(type => type.Name == "Money")).IsRecord);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Contains("record Money", result.CalorSource);
+        var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "money.calr",
+            new Calor.Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Select(d => d.Message)));
+        AssertMoney(csharp);
+        AssertMoney(compiled.GeneratedCode!);
+
+        void AssertMoney(string source)
+        {
+            var compilation = CSharpCompilation.Create(Guid.NewGuid().ToString(),
+                [CSharpSyntaxTree.ParseText(source)], Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = compilation.Emit(stream);
+            Assert.True(emitted.Success, string.Join("; ", emitted.Diagnostics));
+            stream.Position = 0;
+            var context = new AssemblyLoadContext(Guid.NewGuid().ToString(), isCollectible: true);
+            try
+            {
+                var assembly = context.LoadFromStream(stream);
+                var money = Assert.Single(assembly.GetTypes().Where(type => type.Name == "Money"));
+                var bank = Assert.Single(assembly.GetTypes().Where(type => type.Name == "Bank"));
+                Assert.NotNull(money.GetMethod("<Clone>$"));
+                var original = Activator.CreateInstance(money, [2m, "USD"])!;
+                var equal = Activator.CreateInstance(money, [2m, "USD"])!;
+                Assert.Equal(true, bank.GetMethod("Same")!.Invoke(null, [original, equal]));
+                var bumped = bank.GetMethod("Bump")!.Invoke(null, [original])!;
+                Assert.Equal(2m, money.GetProperty("Amount")!.GetValue(original));
+                Assert.Equal(3m, money.GetProperty("Amount")!.GetValue(bumped));
+                Assert.Equal("USD", money.GetProperty("Currency")!.GetValue(bumped));
+                Assert.Equal(false, bank.GetMethod("Same")!.Invoke(null, [original, bumped]));
+                Assert.Equal(original.GetHashCode(), equal.GetHashCode());
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
     }
 
     // ==================================================================
@@ -273,7 +371,7 @@ public class WedgeW4SliceAStructuralTests
 
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("Id<T>", result.CalorSource);
         // Not silently hoisted as a native module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Id");
@@ -300,7 +398,7 @@ public class WedgeW4SliceAStructuralTests
 
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Get");
     }
 
@@ -308,9 +406,9 @@ public class WedgeW4SliceAStructuralTests
     // (no same-named member) build-breaks (the call site is orphaned from the
     // hoisted function → CS0103), and when a same-named member DOES exist the
     // orphaned call silently rebinds to it and compiles clean (LossCount==0, wrong
-    // behaviour) — the §1 predicate-trust blocker. 0.25 F3 (#847): the bounded
-    // slice now converts IN PLACE as a nested §F (a C# static local function), so
-    // the call still names the local function. Everything else escalates the
+    // behaviour) — the §1 predicate-trust blocker. #1600: the bounded
+    // slice converts in place as a typed lambda binding, so the call still
+    // names its lexical binding. Everything else escalates the
     // whole member to §CSHARP interop. Behaviour is compared by execution in
     // Calor.Compiler.Tests LocalFunctionConversionTests.
 
@@ -320,9 +418,18 @@ public class WedgeW4SliceAStructuralTests
         Assert.DoesNotContain(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
         Assert.DoesNotContain(result.Issues, i => i.Feature == "local-function");
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
-        // In place: a nested §F with no visibility segment, inside the member.
-        Assert.Matches(@"\n {6,}§F\{f\d+:" + localName + @"\}", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        var binding = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(result.Ast!)
+            .OfType<BindStatementNode>().Where(node => node.Name == localName));
+        Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(result.Ast!),
+            node => node is LocalFunctionStatementNode);
+        var diagnostics = new DiagnosticBag();
+        var parsed = new Parser(new Lexer(result.CalorSource!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors));
+        var parsedBinding = Assert.Single(RecursiveAstWalker.DescendantsAndSelf(parsed)
+            .OfType<BindStatementNode>(), node => node.Name == localName);
+        Assert.IsType<LambdaExpressionNode>(parsedBinding.Initializer);
         // Never hoisted as a module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
     }
@@ -336,7 +443,7 @@ public class WedgeW4SliceAStructuralTests
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
         Assert.Contains(result.Issues, i => i.Feature == "local-function");
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         // Never hoisted as a native module function.
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
     }
@@ -631,7 +738,7 @@ public class WedgeW4SliceAStructuralTests
     }
 
     [Fact]
-    public void D4_MutuallyRecursiveLocalFunctions_ConvertNativelyInPlace()
+    public void D4_MutuallyRecursiveLocalFunctions_PreserveTheMember()
     {
         var csharp = """
             public class C
@@ -646,12 +753,12 @@ public class WedgeW4SliceAStructuralTests
             """;
 
         var result = Convert(csharp);
-        AssertLocalFunctionNative(result, "Even");
-        AssertLocalFunctionNative(result, "Odd");
+        AssertLocalFunctionEscalated(result, "Even");
+        AssertLocalFunctionEscalated(result, "Odd");
     }
 
     [Fact]
-    public void D4_RecursiveLocalFunction_ConvertsNativelyInPlace()
+    public void D4_DirectPureRecursiveLocalFunction_ConvertsAtItsDeclarationAndRunsTheSame()
     {
         var csharp = """
             public class F
@@ -668,7 +775,51 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionNative(Convert(csharp), "Fac");
+        var result = Convert(csharp);
+        Assert.True(result.Success, string.Join("; ", result.Issues));
+        Assert.Empty(result.Context.Losses);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "local-function");
+        var body = Assert.Single(Assert.Single(result.Ast!.Classes).Methods).Body;
+        var self = Assert.IsType<BindStatementNode>(body[0]);
+        Assert.Equal("Fac", self.Name);
+        Assert.True(self.IsMutable);
+        Assert.Null(self.Initializer);
+        Assert.Empty(Assert.IsType<EffectsNode>(self.Row).Effects);
+        var assignment = Assert.IsType<AssignmentStatementNode>(body[1]);
+        Assert.Equal("Fac", Assert.IsType<ReferenceNode>(assignment.Target).Name);
+        Assert.IsType<LambdaExpressionNode>(assignment.Value);
+        Assert.DoesNotContain(RecursiveAstWalker.DescendantsAndSelf(result.Ast),
+            node => node is LocalFunctionStatementNode or CSharpInteropBlockNode);
+        var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "recursive-current.calr",
+            new Calor.Compiler.CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics));
+        foreach (var (input, expected) in new[]
+                 { (-5, 1), (0, 1), (1, 1), (2, 2), (12, 479001600), (13, 1932053504) })
+        {
+            Assert.Equal(expected, Run(csharp, input));
+            Assert.Equal(expected, Run(compiled.GeneratedCode, input));
+        }
+
+        static int Run(string source, int input)
+        {
+            var compilation = CSharpCompilation.Create("Recursive_" + Guid.NewGuid().ToString("N"),
+                [CSharpSyntaxTree.ParseText(source)], Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emission = compilation.Emit(stream);
+            Assert.True(emission.Success, string.Join("; ", emission.Diagnostics));
+            stream.Position = 0;
+            var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
+            try
+            {
+                var type = context.LoadFromStream(stream).GetTypes().Single(candidate => candidate.Name == "F");
+                return Assert.IsType<int>(type.GetMethod("M")!.Invoke(Activator.CreateInstance(type), [input]));
+            }
+            finally
+            {
+                context.Unload();
+            }
+        }
     }
 
     [Fact]
@@ -677,7 +828,7 @@ public class WedgeW4SliceAStructuralTests
         // C-1: the class has both `int Foo() => 999` and a local `int Foo() => 1`.
         // The source M() returns 1; a naive hoist would orphan the call and silently
         // rebind it to the class method (round-trip M() == 999). In place, the
-        // nested §F keeps the call on the local function.
+        // lambda binding keeps the call on the local function.
         var csharp = """
             public class C
             {

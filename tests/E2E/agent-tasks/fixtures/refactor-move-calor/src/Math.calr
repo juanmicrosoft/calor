@@ -1,14 +1,16 @@
-§M{m001:MathModule}
-  §F{f001:Abs:pub} (i32:x) -> i32
-    §S (>= result 0)
-    §R (? (< x 0) (- 0 x) x)
+module MathModule MathModule block
+  func Abs (int:x) → int
+    !
+    => (result >= 0)
+    return ((x < 0) ? (0 - x) : x)
 
-  §F{f002:SafeDivide:pub} (i32:a, i32:b) -> i32
-    §Q (!= b 0)
-    §S (== result (/ a b))
-    §R (/ a b)
+  func SafeDivide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (result == (a / b))
+    return (a / b)
 
-  §F{f003:Distance:pub} (i32:x, i32:y) -> i32
-    §S (>= result 0)
-    §R §C{Abs} §A (+ (* x x) (* y y)) §/C
-
+  func Distance (int:x, int:y) → int
+    !
+    => (result >= 0)
+    return Abs(((x * x) + (y * y)))

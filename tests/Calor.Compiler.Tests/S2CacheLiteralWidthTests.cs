@@ -22,21 +22,21 @@ namespace Calor.Compiler.Tests;
 public sealed class S2CacheLiteralWidthTests : IDisposable
 {
     private const string IntSource = """
-        §M{m1:R1Case:overflow=unchecked}
-          §F{f1:Probe:pub} (i32:x) -> i32
-            §E{}
-            §Q (== x INT:2147483647)
-            §S (> (+ x INT:1) INT:0)
-            §R INT:0
+        module R1Case R1Case block overflow unchecked
+          func Probe (int:x) → int
+            !
+            requires (x == 2147483647)
+            => ((x + 1) > 0)
+            return 0
         """;
 
     private const string LongSource = """
-        §M{m1:R1Case:overflow=unchecked}
-          §F{f1:Probe:pub} (i32:x) -> i32
-            §E{}
-            §Q (== x INT:2147483647)
-            §S (> (+ x LONG:1) INT:0)
-            §R INT:0
+        module R1Case R1Case block overflow unchecked
+          func Probe (int:x) → int
+            !
+            requires (x == 2147483647)
+            => ((x + 1L) > 0)
+            return 0
         """;
 
     private readonly string _root = Path.Combine(
@@ -235,11 +235,11 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
     private static ExpressionNode ParsePostcondition(string literal)
     {
         var source = $$"""
-            §M{m1:M}
-              §F{f1:P:pub} (i64:x) -> i32
-                §E{}
-                §S (> x {{literal}})
-                §R INT:0
+            module M M block
+              func P (long:x) → int
+                !
+                => (x > {{literal}})
+                return 0
             """;
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
@@ -249,11 +249,11 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
     }
 
     [Theory]
-    [InlineData("INT:1", "LONG:1")]
-    [InlineData("INT:1", "UINT:1")]
-    [InlineData("LONG:1", "ULONG:1")]
-    [InlineData("UINT:1", "ULONG:1")]
-    [InlineData("ULONG:18446744073709551615", "LONG:-1")]
+    [InlineData("1", "1L")]
+    [InlineData("1", "1U")]
+    [InlineData("1L", "1UL")]
+    [InlineData("1U", "1UL")]
+    [InlineData("18446744073709551615UL", "-1L")]
     public void CanonicalKey_DistinguishesLiteralTyping(string left, string right)
     {
         var hasher = new ContractHasher();

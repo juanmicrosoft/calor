@@ -5,6 +5,7 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
@@ -234,6 +235,8 @@ public class ArchitectureTests
         Assert.Equal(aggregateProperties, updateProperties);
 
         var original = EmptyModule("Original");
+        original.ToolingId = "m-original";
+        original.ToolingIdAllocationKind = IdKind.Module;
         original.NamespaceIdentity = "Example";
         original.NamespaceScopeId = "scope";
         original.FullyQualifiedSymbolIdentity = "Example.Original";
@@ -251,6 +254,7 @@ public class ArchitectureTests
         Assert.Equal(original.NamespaceScopeId, copy.NamespaceScopeId);
         Assert.Equal(original.FullyQualifiedSymbolIdentity, copy.FullyQualifiedSymbolIdentity);
         Assert.Equal(original.DocComment, copy.DocComment);
+        Assert.Equal(original.ToolingIdAllocationKind, copy.ToolingIdAllocationKind);
 
         var astNodeSource = CSharpSyntaxTree.ParseText(
             File.ReadAllText(Path.Combine(
@@ -270,7 +274,8 @@ public class ArchitectureTests
             .Select(access => access.Name.Identifier.ValueText)
             .OrderBy(name => name, StringComparer.Ordinal);
         var mutableMetadata = typeof(AstNode)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic |
+                BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(property => property.SetMethod != null)
             .Select(property => property.Name)
             .OrderBy(name => name, StringComparer.Ordinal);
@@ -282,22 +287,22 @@ public class ArchitectureTests
     {
         var first = ParseModule(
             """
-            §M{m001:First}
-              §F{f001:Run:pub} () -> void
-                §E{cw}
-                §L{loop:i:1:3:1}
-                  §IF{branch} (== (% i 2) 0)
-                    §P "even"
-                  §EL
-                    §P i
+            module First
+              func Run public () → void
+                ! cw
+                for i from 1 to 3 step 1
+                  if i % 2 == 0
+                    System.Console.WriteLine("even")
+                  else
+                    System.Console.WriteLine(i)
             """);
         var second = ParseModule(
             """
-            §M{m002:Second}
-              §F{f002:Run:pub} () -> int
-                §E{}
-                §B{value:int} 42
-                §R value
+            module Second
+              func Run public () → int
+                !
+                let int:value = 42
+                return value
             """);
 
         var reusedCSharp = new CSharpEmitter();
@@ -314,7 +319,7 @@ public class ArchitectureTests
     {
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
-            "Migration/CSharpToCalorConverter.cs:ConvertWholeFileNamespaceInterop",
+            "Migration/CSharpToCalorConverter.cs:PreserveCompilationUnit",
             "Migration/CSharpToCalorConverter.cs:MemberParsesCleanly",
             "Migration/RoslynSyntaxVisitor.cs:Convert",
             "Parsing/Parser.cs:ParseModule",
@@ -452,7 +457,7 @@ public class ArchitectureTests
     /// is what PR #1095 review round 1 finding 10 flagged.
     ///
     /// <para><see cref="CompilerComponents_MatchDeclaredDependencyContract"/>
-    /// already declares Binding's allowed dependencies (Ast, CodeGen, Parsing —
+    /// already declares Binding's allowed dependencies (Analysis, Ast, CodeGen, Parsing —
     /// Effects is absent), but it matches the fully-qualified spelling
     /// <c>Calor.Compiler.Effects</c> only, so a namespace-relative
     /// <c>Effects.EffectEnforcementPass</c> slipped past it. This pin closes
@@ -529,7 +534,7 @@ public class ArchitectureTests
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(60, concreteExpressions.Length);
+        Assert.Equal(57, concreteExpressions.Length);
         Assert.Equal(concreteExpressions, registeredExpressions);
     }
 
@@ -544,6 +549,11 @@ public class ArchitectureTests
             ["Analysis/CallGraphAnalysis.cs:ResolveBoundCallSites"] =
                 ("Universal DescendantsAndSelf traversal; unresolved/incompatible sites remain explicit.",
                     "boundCallSites.Add"),
+            ["Analysis/CallGraphAnalysis.cs:ReceiverPath"] =
+                ("Name-keyed receiver identity classifier, not traversal; only variables and " +
+                    "field paths rooted in a recognized receiver have names. Computed or unsupported " +
+                    "receivers explicitly return null instead of borrowing an identity from a child.",
+                    "_ => null"),
             ["Effects/ExternalCallCollector.cs:IndexBoundCallReceivers"] =
                 ("Universal ChildNodes traversal; unresolved receivers remain explicit raw calls.",
                     "_boundReceiverTypes"),
@@ -553,9 +563,27 @@ public class ArchitectureTests
                     "identifier-bearing node would go unindexed. Rename correctness is " +
                     "established by the apply-recompile-and-run oracle, not by this switch.",
                     "No occurrence for this node kind"),
+            ["Effects/EffectEnforcementPass.cs:InferElementAccessor"] =
+                ("0.30 element-access receiver classifier, not traversal: arrays and string slices are " +
+                    "built in, a selected metadata indexer or a source class's own indexer is charged its " +
+                    "accessor, and every other receiver is explicitly charged unknown.",
+                    "{receiverName}[]"),
             ["Analysis/Dataflow/BoundNodeHelpers.cs:IsLiteralZero"] =
                 ("Literal classifier, not traversal; non-literals explicitly return false.",
                     "_ => false"),
+            ["Binding/Binder.cs:TryGetSignedIntegerLiteral"] =
+                ("Value-sensitive overload applicability recognizes only integer literals and " +
+                    "their signed unary forms; other expressions explicitly return false.",
+                    "return false"),
+            ["Binding/Binder.cs:ClassifyIntegralConstant"] =
+                ("0.30 constant classifier for overload applicability, not traversal; operator " +
+                    "and cast forms recurse into their operands, unknown forms that may be constants " +
+                    "are Unknown (the call declines), and every unlisted kind is not a constant.",
+                    "return IntegralConstant.NotConstant"),
+            ["Binding/Binder.cs:TryGetCSharpArgumentType"] =
+                ("0.30 argument-type trust classifier for overload betterness, not traversal; every " +
+                    "unlisted expression explicitly has no known C# type, so the comparison is unknown.",
+                    "_ => null"),
             ["Analysis/Security/TaintAnalysis.cs:GetExpressionName"] =
                 ("Display-only classifier; unsupported expressions explicitly return null.",
                     "_ => null"),

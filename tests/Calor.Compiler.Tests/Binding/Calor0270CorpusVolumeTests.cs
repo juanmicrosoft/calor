@@ -1,7 +1,13 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
@@ -22,11 +28,14 @@ namespace Calor.Compiler.Tests;
 /// (<see cref="MetadataBinderCorpusMeasurementTests"/>). A <i>rise</i> means a new
 /// unactionable shape started reporting and the editor got noisier; a <i>fall</i>
 /// means a shape that authors could act on went silent. Both are decisions, and
-/// both must be made deliberately in a PR that regenerates the ledger and says
-/// what moved — never absorbed silently.</para>
+/// both require explicit current source-site adjudication, never a rewrite of
+/// the immutable historical ledger.</para>
 ///
-/// <para>Regenerate: <c>CALOR_REGENERATE_CALOR0270_LEDGER=1 dotnet test
-/// --filter Calor0270CorpusVolume</c>.</para>
+/// <para>Historical acceptance replays the original compiler and test:
+/// <c>python3 scripts/registered_ledger_historical_replay.py signature</c>.
+/// The separate current-volume test retains every exact comparison against its
+/// current fixture, plus every original input identity and named diagnostic site.
+/// Passing historical replay does not settle a current-volume difference.</para>
 ///
 /// <para>Both sides of the narrowing were measured with this same instrument, by
 /// forcing <c>Binder.ShouldReportUnresolvedReceiver</c> to true and re-running:</para>
@@ -40,8 +49,8 @@ namespace Calor.Compiler.Tests;
 /// or a declared type string, both of which an explicit type annotation fixes.</item>
 /// </list>
 ///
-/// <para>Skipped when submodules are not initialized; the <c>compiler</c> shard
-/// checks them out.</para>
+/// <para>Current acceptance requires all three initialized corpus submodules;
+/// missing inputs, failed conversion and failed parsing are failures.</para>
 ///
 /// <para><b>v0.16 K1 — the bind rule, named (roadmap §3.1 K1, §6 row 2).</b> This
 /// ledger has <i>no</i> bind guard at all: it binds every module that PARSES
@@ -89,21 +98,64 @@ public class Calor0270CorpusVolumeTests
     private static string LedgerPath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "calor0270-corpus-ledger.json");
 
-    [SkippableFact]
+    private static void AssertRegenerationForbidden(string? value) =>
+        Assert.True(string.IsNullOrEmpty(value),
+            "The original Calor0270 ledger is immutable; CALOR_REGENERATE_CALOR0270_LEDGER is forbidden. "
+            + "Replay its original compiler with registered_ledger_historical_replay.py signature; "
+            + "adjudicate current source-site differences separately.");
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("1")]
+    [InlineData("0")]
+    [InlineData("true")]
+    [InlineData("false")]
+    [InlineData(" ")]
+    public void ImmutableLedger_RejectsEveryNonemptyRegenerationRequest(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            AssertRegenerationForbidden(value);
+        else
+            Assert.Throws<Xunit.Sdk.TrueException>(() => AssertRegenerationForbidden(value));
+    }
+
+    [Fact]
+    [Trait("Category", "HistoricalReplay")]
+    public async Task Calor0270Volume_OriginalCompiler_MatchesImmutableLedger()
+    {
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "registered_ledger_historical_replay.py"), "signature"],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical Calor0270 signature replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
+    [Fact]
+    [Trait("Category", "CorpusRequired")]
     public void Calor0270Volume_OverConvertedCorpus_MatchesLedger()
+    {
+        AssertRegenerationForbidden(Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0270_LEDGER"));
+        var expected = ReadCurrentExpectation();
+        var actual = MeasureCurrentCorpus();
+        AssertCurrentMeasurement(expected, actual);
+    }
+
+    private static CurrentExpectation MeasureCurrentCorpus()
     {
         var root = RepoRoot();
         var subjectDirs = new[] { "MediatR", "serilog", "FluentValidation" }
             .Select(subject => (Name: subject,
                 Path: Path.Combine(root, "bench", "corpus", subject, "src")))
             .ToList();
-        Skip.IfNot(subjectDirs.All(s => Directory.Exists(s.Path)),
-            "corpus submodules not initialized");
+        Assert.All(subjectDirs, subject => Assert.True(Directory.Exists(subject.Path),
+            $"Required corpus submodule not initialized: {subject.Name}"));
 
         var perSubject = new List<SubjectVolume>();
+        var files = new SortedDictionary<string, FileExpectation>(StringComparer.Ordinal);
         foreach (var subject in subjectDirs)
         {
-            perSubject.Add(MeasureSubject(subject.Name, subject.Path));
+            perSubject.Add(MeasureSubject(subject.Name, subject.Path, files));
             var last = perSubject[^1];
             Console.WriteLine(
                 $"Calor0270-corpus {last.Subject}: {last.Diagnostics} diagnostics across "
@@ -122,28 +174,25 @@ public class Calor0270CorpusVolumeTests
             $"Calor0270-corpus aggregate: {measured.AggregateDiagnostics} diagnostics across "
             + $"{measured.AggregateModulesWithDiagnostics} of {measured.AggregateModulesBound} bound modules");
 
-        var ledgerPath = LedgerPath();
-        var regenerate = string.Equals(
-            Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0270_LEDGER"),
-            "1", StringComparison.Ordinal);
-        if (regenerate)
-        {
-            File.WriteAllText(ledgerPath, JsonSerializer.Serialize(
-                measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            Console.WriteLine($"Calor0270 corpus ledger regenerated: {ledgerPath}");
-            return;
-        }
+        return new CurrentExpectation(measured, files);
+    }
 
-        // A missing ledger is a failure, never a silent regeneration (R2-A).
-        Assert.True(File.Exists(ledgerPath),
-            $"Calor0270 corpus ledger missing at {ledgerPath} — run once with CALOR_REGENERATE_CALOR0270_LEDGER=1");
-        var committed = JsonSerializer.Deserialize<Ledger>(File.ReadAllText(ledgerPath))!;
-
+    private static void AssertCurrentMeasurement(CurrentExpectation expectation, CurrentExpectation observation)
+    {
+        var committed = expectation.Volume;
+        var measured = observation.Volume;
         // Anti-vacuity: a ledger that measured nothing would pass every equality
-        // below. The corpus binds hundreds of modules; assert the denominator.
-        Assert.True(measured.AggregateModulesBound > 250,
-            $"Only {measured.AggregateModulesBound} modules bound — the corpus denominator "
-            + "collapsed, so the equalities below would be vacuous.");
+        // below. Every one of the 364 inputs is either bound or a pinned refusal, and
+        // the bound side is still the majority of the corpus. 0.30: the denominator
+        // is the CONVERTED modules (206), not all 364. Files the converter refuses
+        // under the legs' options (no Calor at all) are counted in ModulesNotMeasured
+        // and pinned by name and cause in the current fixture; before 0.30 every
+        // input converted, so the old "> 250 bound" guard measured the same set.
+        Assert.Equal(OriginalInputCount, measured.AggregateModulesBound
+            + measured.PerSubject.Sum(subject => subject.ModulesNotMeasured));
+        Assert.True(measured.AggregateModulesBound > OriginalInputCount / 2,
+            $"Only {measured.AggregateModulesBound} of {OriginalInputCount} modules bound — the "
+            + "corpus denominator collapsed, so the equalities below would be vacuous.");
 
         Assert.Equal(committed.PerSubject.Count, measured.PerSubject.Count);
         foreach (var (expected, actual) in committed.PerSubject.Zip(measured.PerSubject))
@@ -155,9 +204,9 @@ public class Calor0270CorpusVolumeTests
                 + $"(of {expected.ModulesBound}), measured {actual.Diagnostics} / "
                 + $"{actual.ModulesWithDiagnostics} (of {actual.ModulesBound}). A RISE means an "
                 + "unactionable receiver shape started reporting and the editor got noisier; a "
-                + "FALL means a shape authors could act on went silent. Either way, regenerate "
-                + "the ledger IN THIS PR with CALOR_REGENERATE_CALOR0270_LEDGER=1 and say what "
-                + "moved — never absorb it silently.");
+                + "FALL means a shape authors could act on went silent. Adjudicate current source-site "
+                + "differences explicitly in the current fixture; do not rewrite the immutable historical ledger or treat "
+                + "a passing original-compiler replay as current-volume acceptance.");
         }
 
         Assert.Equal(committed.AggregateDiagnostics, measured.AggregateDiagnostics);
@@ -167,7 +216,376 @@ public class Calor0270CorpusVolumeTests
 
         // v0.16 K1 — the rule, in the file, beside the numbers it produced.
         Assert.Equal(BindRuleText, committed.BindRule);
+        Assert.Equal(expectation.Files.Keys, observation.Files.Keys);
+        foreach (var (file, identity) in expectation.Files)
+        {
+            var observed = observation.Files[file];
+            Assert.True(identity.SourceHash == observed.SourceHash, $"Source input changed: {file}");
+            Assert.True(identity.Refusal == observed.Refusal,
+                $"Conversion refusal moved for {file}: committed '{identity.Refusal ?? "<converted>"}', "
+                + $"measured '{observed.Refusal ?? "<converted>"}'. A file that starts or stops "
+                + "converting, or is refused for a different cause, is a ledger move to adjudicate.");
+            Assert.True(identity.Sites.SequenceEqual(observed.Sites),
+                $"Calor0270 named diagnostic sites moved for {file}.\n"
+                + $"Expected: {JsonSerializer.Serialize(identity.Sites)}\n"
+                + $"Actual: {JsonSerializer.Serialize(observed.Sites)}");
+        }
     }
+
+    private static CurrentExpectation ReadCurrentExpectation()
+    {
+        var expected = JsonSerializer.Deserialize<CurrentExpectation>(File.ReadAllText(Path.Combine(
+            RepoRoot(), "tests", "TestData", "Binding", "calor0270-current-expectations.json")))!;
+        expected = expected with
+        {
+            Files = new SortedDictionary<string, FileExpectation>(expected.Files, StringComparer.Ordinal)
+        };
+        AssertOriginalInputs(expected);
+        return expected;
+    }
+
+    private static void AssertOriginalInputs(CurrentExpectation expected)
+    {
+        using var original = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot(),
+            "bench", "phase0-agent-native", "binder-source-coverage.json")));
+        var inputs = original.RootElement.EnumerateObject()
+            .OrderBy(property => property.Name, StringComparer.Ordinal).ToArray();
+        Assert.Equal(OriginalInputCount, inputs.Length);
+        Assert.Equal(inputs.Select(input => input.Name), expected.Files.Keys);
+        foreach (var input in inputs)
+            Assert.Equal(input.Value.GetProperty("SourceHash").GetString(), expected.Files[input.Name].SourceHash);
+    }
+
+    private const int OriginalInputCount = 364;
+
+    /// <summary>
+    /// The current fixture's volumes, restated.
+    /// <para><b>0.30 refresh: 260 diagnostics / 48 modules / 364 bound became
+    /// 14 / 7 / 204 bound + 160 refused.</b> Every move has one of three causes.</para>
+    /// <list type="number">
+    /// <item><b>160 refusals (222 diagnostics over 37 modules leave).</b> Since
+    /// 92b4d8c42 a file whose <c>using</c> directives sit inside its namespace converts
+    /// under Lossy/SelectActiveBranchLossy only if its original C# compiles in the
+    /// per-file semantic model and the result is fully native and compiles as Calor;
+    /// otherwise the converter returns no Calor. 141 fail the source validation
+    /// (siblings, package types or generated code missing from a one-file model),
+    /// 6 are not fully native or fail the Calor/C# re-check, and 13 have a
+    /// namespace topology no native module header can express. Each refused file
+    /// is pinned by name and cause; none is silently dropped. Giving each file the
+    /// project context <c>calor migrate</c> uses (evaluated Compile items, references,
+    /// defines, language version) was measured on 2026-11-17: 14 recover and 4 newly
+    /// refuse (150 refused); adding FluentValidation's source-generator output lowers
+    /// that to about 133. Most refusals are the strict lossy path itself, not missing
+    /// context, so the legs keep their one-file options.</item>
+    /// <item><b>Positions only.</b> LoggerSinkConfiguration, LogContext,
+    /// FailureAwareBatchScheduler, CallableConfigurationMethodFinder,
+    /// SettingValueConversions and one ServiceRegistrar <c>type</c> receiver keep the
+    /// same span text and message at new lines: the 0.30 emitter (af5d914ab) writes
+    /// indentation-only native blocks without closer lines.</item>
+    /// <item><b>38 → 14 in 7 converted files, each by a named change.</b>
+    /// (a) fb2b3fe06 resolves primitive metadata property results, so bool and long
+    /// member reads stop reporting: 4 <c>i.IsGenericType</c> (MediatrServiceConfiguration),
+    /// <c>x.IsGenericType</c>, <c>type.IsClass</c>, <c>type.IsAbstract</c>,
+    /// <c>type.IsGenericType</c> (ServiceRegistrar) and <c>Stopwatch.Frequency</c>
+    /// (TimeProvider): -9. (b) af5d914ab prints LINQ chains natively instead of
+    /// hoisting <c>_chain</c> temporaries, so the local keeps its declared type
+    /// (<c>IEnumerable&lt;Type&gt;</c>, <c>List&lt;Type[]&gt;</c>) and the receiver
+    /// resolves: 4 <c>implementedGenericInterfaces</c> and 1
+    /// <c>constraintsForEachParameter</c>: -5. The same change makes a former dotted
+    /// name a native member read, whose struct result is outside the supported scalar
+    /// reads: <c>cts . Token</c> (ServiceRegistrar) and <c>DateTime . UtcNow</c>
+    /// (SelfLog): +2. (c) 015ee950f keeps AddMediatRClasses and
+    /// ConnectImplementationsToTypesClosing as C# (<c>default-expression</c>), so their
+    /// receivers are not bound: -7. (d) 047dd14b8 (<c>class-unresolved-base-kind</c>)
+    /// keeps PropertyValueConverter, ReusableStringWriter and KeyValuePairSettings as C#
+    /// classes: -5. Total 38 - 9 - 5 + 2 - 7 - 5 = 14. Attributed by diffing this
+    /// leg's output at 2cc3cf3e5 (where the fixture was pinned) against the current
+    /// output, file by file.</item>
+    /// </list>
+    /// <para><b>0.30 follow-up refresh (after i8): 14 / 7 / 204 bound + 160 refused became
+    /// 13 / 6 / 206 bound + 158 refused.</b> Attributed by running this leg's converter and
+    /// binder at 75a17bd5a (where the fixture was pinned; it reproduces the fixture exactly)
+    /// and at every later merge on <c>milestone-0.30</c>, file by file. Nine files move:</para>
+    /// <list type="number">
+    /// <item><b>Two refusals end (160 → 158; FluentValidation 69/147 → 71/145).</b> Both had
+    /// cause <c>scoped-namespace-fidelity</c> and convert with zero sites.
+    /// TestMessages.Designer.cs: its getters call <c>ResourceManager</c>, and a getter could
+    /// not declare a row (h1, 06f6f63fc, lets accessors declare one). CultureScope.cs: the
+    /// converter hoisted a constructor-initializer argument into a temporary with no
+    /// statement position (CS0103); i5 (5427061f0) keeps such arguments inline.</item>
+    /// <item><b>One site leaves (serilog 12/6 → 11/5).</b> SelfLog <c>DateTime . UtcNow</c>:
+    /// its method, WriteLine, is now kept as C#. Its native form called
+    /// <c>_nullcond.Value.Invoke(…)</c> on a delegate, which does not compile; i5
+    /// (5427061f0) adds <c>.Value</c> only for a <c>Nullable&lt;T&gt;</c> struct and
+    /// otherwise preserves the member. The receiver is no longer bound, so no Info.</item>
+    /// <item><b>Spelling only.</b> ServiceRegistrar <c>cts . Token</c> is now <c>cts.Token</c>,
+    /// same line, column and message: i7 (a9f260a6f) prints member access unspaced.</item>
+    /// <item><b>Positions only</b> (same span text and message):
+    /// SettingValueConversions +1 line and FailureAwareBatchScheduler +2: h1 (06f6f63fc)
+    /// writes a type's static-initialization row and accessor rows (<c>! unknown</c>).
+    /// LogContext +3 (h1), -1 (i7: a dotted read of <c>EnricherStack.Empty</c> charged
+    /// nothing, so a <c>! unknown</c> row became <c>!</c>), +1 (i8, b19dccc4d, charges that
+    /// read again and restores the row): net +3. CallableConfigurationMethodFinder -3:
+    /// i5 inlines an untyped hoisted lambda (<c>let _lam = …</c> is CS8917).
+    /// LoggerSinkConfiguration -20: i5 keeps <c>Sink(ILogEventSink, …)</c> as C# because
+    /// its native form built <c>new object(…)</c> for a target-typed <c>new</c> (CS1729).
+    /// ServiceRegistrar's <c>type</c> moves by offset only: i5 inlines a foreach lambda
+    /// whose hoisted temporary had been dropped (CS0103), and i7 unspaces member access.</item>
+    /// </list>
+    /// </summary>
+    [Fact]
+    public void CurrentExpectation_PinsOriginalInputsAndExactVolumes()
+    {
+        var expected = ReadCurrentExpectation();
+        Assert.Equal(13, expected.Volume.AggregateDiagnostics);
+        Assert.Equal(6, expected.Volume.AggregateModulesWithDiagnostics);
+        Assert.Equal(206, expected.Volume.AggregateModulesBound);
+        Assert.Equal(new[]
+        {
+            new SubjectVolume("MediatR", 2, 1, 24, 12),
+            new SubjectVolume("serilog", 11, 5, 111, 1),
+            new SubjectVolume("FluentValidation", 0, 0, 71, 145)
+        }, expected.Volume.PerSubject);
+        // The 158 refusals, by cause. Each is a file the converter returns no Calor for
+        // under the legs' options (see the 0.30 note on AggregateDiagnostics below).
+        Assert.Equal(new Dictionary<string, int>
+        {
+            ["namespace-topology"] = 13,
+            ["scoped-namespace-fidelity"] = 4,
+            ["scoped-namespace-source-validation"] = 141,
+        }, expected.Files.Values.Where(file => file.Refusal != null)
+            .GroupBy(file => file.Refusal!).ToDictionary(group => group.Key, group => group.Count()));
+        foreach (var subject in expected.Volume.PerSubject)
+        {
+            var allFiles = expected.Files.Where(pair => pair.Key.StartsWith(subject.Subject + "/",
+                StringComparison.Ordinal)).Select(pair => pair.Value).ToArray();
+            Assert.Equal(subject.ModulesNotMeasured, allFiles.Count(file => file.Refusal != null));
+            Assert.All(allFiles.Where(file => file.Refusal != null), file => Assert.Empty(file.Sites));
+            var files = allFiles.Where(file => file.Refusal == null).ToArray();
+            Assert.Equal(subject.ModulesBound, files.Length);
+            Assert.Equal(subject.Diagnostics, files.Sum(file => file.Sites.Count));
+            Assert.Equal(subject.ModulesWithDiagnostics, files.Count(file => file.Sites.Count > 0));
+            Assert.All(files.SelectMany(file => file.Sites), site =>
+            {
+                Assert.Equal(DiagnosticCode.SignatureUnresolved, site.Code);
+                Assert.Equal(site.End - site.Start, site.SpanText.Length);
+                Assert.True(site.Start >= 0 && site.Line > 0 && site.Column > 0);
+                Assert.NotEmpty(site.Message);
+                Assert.NotEmpty(site.SpanText);
+            });
+        }
+        AssertCurrentMeasurement(expected, expected);
+    }
+
+    [Theory]
+    [InlineData("counts-only")]
+    [InlineData("moved-site")]
+    [InlineData("wrong-code")]
+    [InlineData("wrong-message")]
+    [InlineData("wrong-text")]
+    [InlineData("wrong-line")]
+    [InlineData("wrong-column")]
+    [InlineData("missing-site")]
+    [InlineData("extra-site")]
+    [InlineData("changed-input")]
+    [InlineData("missing-zero-site-file")]
+    [InlineData("extra-file")]
+    [InlineData("wrong-file")]
+    [InlineData("wrong-volume")]
+    [InlineData("refused-to-converted")]
+    [InlineData("converted-to-refused")]
+    [InlineData("wrong-refusal-cause")]
+    public void CurrentExpectation_RejectsCountPreservingAndInputMutations(string mutation)
+    {
+        var expected = ReadCurrentExpectation();
+        var files = new SortedDictionary<string, FileExpectation>(expected.Files, StringComparer.Ordinal);
+        var (file, identity) = files.First(pair => pair.Value.Sites.Count > 0);
+        var sites = identity.Sites.ToList();
+        var first = sites[0];
+        var volume = expected.Volume;
+        switch (mutation)
+        {
+            case "counts-only":
+                foreach (var key in files.Keys.ToArray())
+                    files[key] = files[key] with { Sites = [] };
+                break;
+            case "moved-site": sites[0] = first with { Start = first.Start + 1, End = first.End + 1 }; break;
+            case "wrong-code": sites[0] = first with { Code = DiagnosticCode.UndefinedReference }; break;
+            case "wrong-message": sites[0] = first with { Message = first.Message + " changed" }; break;
+            case "wrong-text": sites[0] = first with { SpanText = first.SpanText + " changed" }; break;
+            case "wrong-line": sites[0] = first with { Line = first.Line + 1 }; break;
+            case "wrong-column": sites[0] = first with { Column = first.Column + 1 }; break;
+            case "missing-site": sites.RemoveAt(0); break;
+            case "extra-site": sites.Add(first); break;
+            case "changed-input": files[file] = identity with { SourceHash = "changed" }; break;
+            case "missing-zero-site-file": files.Remove(files.First(pair => pair.Value.Sites.Count == 0).Key); break;
+            case "extra-file": files.Add("MediatR/src/extra.cs", new FileExpectation("extra", [])); break;
+            case "wrong-file":
+                var zero = files.First(pair => pair.Value.Sites.Count == 0).Key;
+                files[zero] = files[zero] with { Sites = sites };
+                files[file] = identity with { Sites = [] };
+                break;
+            case "wrong-volume": volume = volume with { AggregateDiagnostics = volume.AggregateDiagnostics + 1 }; break;
+            case "refused-to-converted":
+                var refused = files.First(pair => pair.Value.Refusal != null).Key;
+                files[refused] = files[refused] with { Refusal = null };
+                break;
+            case "converted-to-refused":
+                var converted = files.First(pair => pair.Value.Refusal == null && pair.Value.Sites.Count == 0).Key;
+                files[converted] = files[converted] with { Refusal = "namespace-topology" };
+                break;
+            case "wrong-refusal-cause":
+                var cause = files.First(pair => pair.Value.Refusal != null).Key;
+                files[cause] = files[cause] with { Refusal = files[cause].Refusal + ",changed" };
+                break;
+            default: throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        if (mutation is "moved-site" or "wrong-code" or "wrong-message" or "wrong-text"
+            or "wrong-line" or "wrong-column" or "missing-site" or "extra-site")
+            files[file] = identity with { Sites = sites };
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertCurrentMeasurement(expected, new CurrentExpectation(volume, files)));
+    }
+
+    [Theory]
+    [InlineData("changed-hash")]
+    [InlineData("missing-key")]
+    [InlineData("renamed-key")]
+    public void CurrentExpectation_CannotRedefineOriginalInputs(string mutation)
+    {
+        var expected = ReadCurrentExpectation();
+        var files = new SortedDictionary<string, FileExpectation>(expected.Files, StringComparer.Ordinal);
+        var (file, identity) = files.First();
+        if (mutation == "changed-hash")
+            files[file] = identity with { SourceHash = "changed" };
+        else
+        {
+            files.Remove(file);
+            if (mutation == "renamed-key")
+                files.Add(file + ".renamed", identity);
+        }
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertOriginalInputs(expected with { Files = files }));
+    }
+
+    [Fact]
+    [Trait("Category", "CorpusRequired")]
+    public void CurrentSource_ChangedInputWithIdenticalSitesStillFails()
+    {
+        const string file = "FluentValidation/src/CommonAssemblyInfo.cs";
+        var path = Path.Combine(RepoRoot(), "bench", "corpus", file);
+        var source = File.ReadAllText(path);
+        var expected = ReadCurrentExpectation();
+        var changed = MeasureSource(source + "\n// changed input\n", path);
+        Assert.Equal(expected.Files[file].Sites, changed.Identity.Sites);
+        Assert.NotEqual(expected.Files[file].SourceHash, changed.Identity.SourceHash);
+        var files = new SortedDictionary<string, FileExpectation>(expected.Files, StringComparer.Ordinal)
+        {
+            [file] = changed.Identity
+        };
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertCurrentMeasurement(expected, expected with { Files = files }));
+    }
+
+    [Theory]
+    [Trait("Category", "CorpusRequired")]
+    [InlineData("FluentValidation/src/FluentValidation.Tests/DependencyInjectionExtensions/ServiceCollectionExtensionsTests.cs",
+        "services", 2)]
+    [InlineData("FluentValidation/src/FluentValidation/Internal/CollectionPropertyRule.cs", "validators", 2)]
+    [InlineData("FluentValidation/src/FluentValidation/ValidatorOptions.cs", "chain", 1)]
+    [InlineData("serilog/src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs", "rawMemberName", 1)]
+    [InlineData("serilog/src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs", "shortAccessorTypeName", 1)]
+    [InlineData("serilog/src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs", "extraQualifiers", 1)]
+    public void CurrentSource_UnresolvedReceiversRetainActualProducersAndCalls(
+        string file, string receiver, int warningCount)
+    {
+        var observed = MeasureFile(Path.Combine(RepoRoot(), "bench", "corpus", file));
+        if (AssertPinnedRefusal(file, observed))
+            return;
+        var source = CSharpSyntaxTree.ParseText(observed.Source, new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
+        var emitted = CSharpSyntaxTree.ParseText(
+            new Compiler.CodeGen.CSharpEmitter().Emit(observed.Module!)).GetRoot();
+        var originalBindings = Bindings(source);
+        var currentBindings = Bindings(emitted);
+        Assert.NotEmpty(originalBindings);
+        Assert.Equal(originalBindings.Length, currentBindings.Length);
+        Assert.Equal(originalBindings.Select(binding => ScopedOperationShape(binding.Initializer!.Value)),
+            currentBindings.Select(binding => ScopedOperationShape(binding.Initializer!.Value)));
+        Assert.All(currentBindings, binding =>
+            Assert.Equal("var", Assert.IsType<VariableDeclarationSyntax>(binding.Parent).Type.ToString()));
+
+        var originalCalls = Calls(source);
+        Assert.NotEmpty(originalCalls);
+        Assert.Equal(originalCalls, Calls(emitted));
+        Assert.Equal(warningCount, observed.Identity.Sites.Count(site => site.SpanText == receiver));
+        Assert.All(observed.Identity.Sites.Where(site => site.SpanText == receiver), site =>
+            Assert.StartsWith($"Receiver '{receiver}' is an inferred local", site.Message));
+        Assert.Equal(ReadCurrentExpectation().Files[file].Sites, observed.Identity.Sites);
+
+        VariableDeclaratorSyntax[] Bindings(SyntaxNode root) => root.DescendantNodes()
+            .OfType<VariableDeclaratorSyntax>().Where(binding => binding.Identifier.ValueText == receiver).ToArray();
+        string[] Calls(SyntaxNode root) => root.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Where(call => call.Expression is MemberAccessExpressionSyntax
+                { Expression: IdentifierNameSyntax identifier } && identifier.Identifier.ValueText == receiver)
+            .Select(call => ScopedOperationShape(call.Expression)).OrderBy(shape => shape, StringComparer.Ordinal).ToArray();
+    }
+
+    [Theory]
+    [Trait("Category", "CorpusRequired")]
+    [InlineData("FluentValidation/src/FluentValidation.Tests/AccessorCacheTests.cs", "s", "Elapsed", 1)]
+    [InlineData("MediatR/src/MediatR/Mediator.cs", "i", "IsGenericType", 2)]
+    public void CurrentSource_UnsupportedMetadataReadsRetainActualReceiverAndMember(
+        string file, string receiver, string member, int warningCount)
+    {
+        var observed = MeasureFile(Path.Combine(RepoRoot(), "bench", "corpus", file));
+        if (AssertPinnedRefusal(file, observed))
+            return;
+        var source = CSharpSyntaxTree.ParseText(observed.Source, new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
+        var emitted = CSharpSyntaxTree.ParseText(
+            new Compiler.CodeGen.CSharpEmitter().Emit(observed.Module!)).GetRoot();
+        var originalReads = Reads(source);
+        Assert.Equal(warningCount, originalReads.Length);
+        Assert.Equal(originalReads, Reads(emitted));
+        var diagnostics = observed.Identity.Sites.Where(site => site.SpanText == $"{receiver}.{member}").ToArray();
+        Assert.Equal(warningCount, diagnostics.Length);
+        Assert.All(diagnostics, site => Assert.Equal(
+            "Metadata member resolution incomplete: The member result is outside supported scalar reference reads.",
+            site.Message));
+        Assert.Equal(ReadCurrentExpectation().Files[file].Sites, observed.Identity.Sites);
+
+        string[] Reads(SyntaxNode root) => root.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+            .Where(read => read.Expression is IdentifierNameSyntax identifier
+                && identifier.Identifier.ValueText == receiver && read.Name.Identifier.ValueText == member)
+            .Select(ScopedOperationShape).ToArray();
+    }
+
+    /// <summary>
+    /// A named-site row whose file the converter now refuses under the legs' options
+    /// has no emitted C# to compare. The row stays: it asserts the refusal is the
+    /// pinned one, and its producer/call checks resume when the file converts again
+    /// (the refusal pin then fails and the expectation must be re-adjudicated).
+    /// </summary>
+    private static bool AssertPinnedRefusal(string file, FileMeasurement observed)
+    {
+        var expected = ReadCurrentExpectation().Files[file];
+        Assert.Equal(expected.Refusal, observed.Identity.Refusal);
+        Assert.Equal(expected, observed.Identity with { Sites = expected.Sites });
+        if (expected.Refusal == null)
+            return false;
+        Assert.Null(observed.Module);
+        Assert.Empty(observed.Identity.Sites);
+        return true;
+    }
+
+    private static string ScopedOperationShape(SyntaxNode node) =>
+        string.Join("/", node.Ancestors().OfType<MethodDeclarationSyntax>()
+            .Select(method => method.Identifier.ValueText).Reverse()) + "|" + OperationShape(node);
+
+    private static string OperationShape(SyntaxNode node) =>
+        node is ParenthesizedExpressionSyntax parenthesized
+            ? OperationShape(parenthesized.Expression)
+            : node.Kind() + "[" + string.Join(",", node.ChildNodesAndTokens().Select(child =>
+                child.IsNode ? OperationShape(child.AsNode()!) : child.Kind() + ":" + child.AsToken().ValueText)) + "]";
 
     /// <summary>
     /// The ledger's aggregate, restated so that a change of schema or of rule is
@@ -228,8 +646,11 @@ public class Calor0270CorpusVolumeTests
     // converted once: FluentValidation 330 -> 235, MediatR 29 -> 27, modules unchanged: 377/47 -> 280/47.
     // #1588/#1686: explicit preservation reduces serilog 18 -> 13 and FluentValidation
     // 235 -> 210, not binding precision. All 364 converted modules still parse and bind.
-    private const int AggregateDiagnostics = 250;
-    private const int AggregateModulesWithDiagnostics = 45;
+    // 0.30 named-constructor support exposes Serilog's Logger(configureLogger, ...) body:
+    // its unresolved lc.CreateLogger receiver adds one Info, 250/45 -> 251/46.
+    // This is native-body visibility, not improved type resolution or Length precision.
+    private const int AggregateDiagnostics = 251;
+    private const int AggregateModulesWithDiagnostics = 46;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>
@@ -237,10 +658,9 @@ public class Calor0270CorpusVolumeTests
     /// schema field. This ledger's numbers are NOT regenerated by K1, so the pin
     /// is: the bind rule is recorded, it is this ledger's own rule
     /// (<c>"parsed"</c>), it is not the Calor0425 ledger's rule, and the
-    /// aggregate the rule produced is unchanged from the pre-K1 file. Runs
-    /// without the corpus submodules — it reads the committed JSON. See
-    /// <see cref="PreK1AggregateModulesBound"/> for when these constants are
-    /// expected to move and which PR must move them.
+    /// aggregate remains the immutable historical pin. Runs without the corpus
+    /// submodules — it reads the committed JSON. Current-volume adjudication
+    /// must not rewrite this historical schema or its aggregate.
     /// </summary>
     [Fact]
     public void Calor0270Ledger_NamesItsBindRule_AndIsNotRegeneratedByK1()
@@ -256,7 +676,8 @@ public class Calor0270CorpusVolumeTests
         Assert.Equal(PreK1AggregateModulesBound, committed.AggregateModulesBound);
     }
 
-    private static SubjectVolume MeasureSubject(string name, string srcRoot)
+    private static SubjectVolume MeasureSubject(string name, string srcRoot,
+        SortedDictionary<string, FileExpectation> measuredFiles)
     {
         var files = Directory
             .EnumerateFiles(srcRoot, "*.cs", SearchOption.AllDirectories)
@@ -265,66 +686,97 @@ public class Calor0270CorpusVolumeTests
             .OrderBy(file => file, StringComparer.Ordinal)
             .ToArray();
 
-        var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
-            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
-            Microsoft.CodeAnalysis.DocumentationMode.Parse,
-            Microsoft.CodeAnalysis.SourceCodeKind.Regular,
-            preprocessorSymbols: Array.Empty<string>());
-
-        int diagnostics = 0, modulesWithDiagnostics = 0, modulesBound = 0, notMeasured = 0;
+        int diagnostics = 0, modulesWithDiagnostics = 0, modulesBound = 0, modulesNotMeasured = 0;
         foreach (var file in files)
         {
-            Compiler.Migration.ConversionResult conversion;
-            try
+            var observed = MeasureFile(file);
+            measuredFiles.Add(name + "/src/" + Path.GetRelativePath(srcRoot, file).Replace('\\', '/'), observed.Identity);
+            if (observed.Identity.Refusal != null)
             {
-                conversion = new Compiler.Migration.CSharpToCalorConverter(
-                    new Compiler.Migration.ConversionOptions
-                    {
-                        Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
-                        PreprocessorMode = Compiler.Migration.PreprocessorConversionMode
-                            .SelectActiveBranchLossy,
-                        ParseOptions = parseOptions,
-                        DefinedSymbols = Array.Empty<string>(),
-                        ModuleName = "Calor0270Leg",
-                        GracefulFallback = true,
-                        AutoGenerateIds = true
-                    }).Convert(File.ReadAllText(file), Path.GetFileName(file));
-            }
-            catch
-            {
-                notMeasured++;
+                // Counted separately and pinned by name: never a silent denominator shrink.
+                modulesNotMeasured++;
                 continue;
             }
-
-            if (string.IsNullOrEmpty(conversion.CalorSource))
-            {
-                notMeasured++;
-                continue;
-            }
-
-            var parseDiagnostics = new DiagnosticBag();
-            var module = new Parser(
-                new Lexer(conversion.CalorSource.Replace("\r\n", "\n"), parseDiagnostics)
-                    .TokenizeAllForParser(),
-                parseDiagnostics).Parse();
-            if (parseDiagnostics.HasErrors)
-            {
-                notMeasured++;
-                continue;
-            }
-
-            var bindDiagnostics = new DiagnosticBag();
-            new Binder(bindDiagnostics).Bind(module);
             modulesBound++;
-
-            var count = bindDiagnostics.Count(d => d.Code == DiagnosticCode.SignatureUnresolved);
+            var count = observed.Identity.Sites.Count;
             diagnostics += count;
             if (count > 0)
                 modulesWithDiagnostics++;
         }
 
-        return new SubjectVolume(name, diagnostics, modulesWithDiagnostics, modulesBound, notMeasured);
+        return new SubjectVolume(name, diagnostics, modulesWithDiagnostics, modulesBound, modulesNotMeasured);
     }
+
+    private static FileMeasurement MeasureFile(string file) => MeasureSource(File.ReadAllText(file), file);
+
+    private static FileMeasurement MeasureSource(string source, string file)
+    {
+        var parseOptions = new CSharpParseOptions(LanguageVersion.Preview, DocumentationMode.Parse,
+            SourceCodeKind.Regular, preprocessorSymbols: Array.Empty<string>());
+        var conversion = new Compiler.Migration.CSharpToCalorConverter(
+            new Compiler.Migration.ConversionOptions
+            {
+                Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
+                PreprocessorMode = Compiler.Migration.PreprocessorConversionMode.SelectActiveBranchLossy,
+                ParseOptions = parseOptions,
+                DefinedSymbols = Array.Empty<string>(),
+                ModuleName = "Calor0270Leg",
+                GracefulFallback = true,
+                AutoGenerateIds = true
+            }).Convert(source, Path.GetFileName(file));
+        // Match the original source-coverage input identity, not platform checkout line endings.
+        var sourceHash = Convert.ToHexStringLower(SHA256.HashData(
+            Encoding.UTF8.GetBytes(source.Replace("\r\n", "\n"))));
+        if (string.IsNullOrEmpty(conversion.CalorSource))
+            return new FileMeasurement(source, null, new FileExpectation(sourceHash, [], RefusalOf(conversion, file)));
+
+        var serialized = RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
+        var parseDiagnostics = new DiagnosticBag();
+        var module = new Parser(
+            new Lexer(serialized, parseDiagnostics).TokenizeAllForParser(),
+            parseDiagnostics).Parse();
+        Assert.False(parseDiagnostics.HasErrors,
+            $"Converted corpus input failed parsing: {file}\n{string.Join("\n", parseDiagnostics)}");
+
+        var bindDiagnostics = new DiagnosticBag();
+        new Binder(bindDiagnostics).Bind(module);
+        var sites = CaptureSites(bindDiagnostics, serialized);
+        return new FileMeasurement(source, module, new FileExpectation(sourceHash, sites));
+    }
+
+    /// <summary>
+    /// A file the converter refuses under the legs' options produces no Calor. It is
+    /// pinned by name with the sorted, distinct features of its conversion errors
+    /// (for example <c>scoped-namespace-fidelity</c>), so a refusal that appears,
+    /// disappears or changes cause is a visible ledger move rather than a smaller
+    /// denominator.
+    /// </summary>
+    private static string RefusalOf(Compiler.Migration.ConversionResult conversion, string file)
+    {
+        var features = conversion.Issues
+            .Where(issue => issue.Severity == Compiler.Migration.ConversionIssueSeverity.Error)
+            .Select(issue => issue.Feature ?? "unattributed")
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.True(features.Length > 0, $"Empty conversion without a conversion error: {file}");
+        return string.Join(",", features);
+    }
+
+    private static List<DiagnosticSite> CaptureSites(DiagnosticBag diagnostics, string serialized) =>
+        diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCode.SignatureUnresolved)
+            .Select(diagnostic => new DiagnosticSite(diagnostic.Code, diagnostic.Span.Start,
+                diagnostic.Span.End, diagnostic.Span.Line, diagnostic.Span.Column, diagnostic.Message,
+                serialized.Substring(diagnostic.Span.Start, diagnostic.Span.Length)))
+            .OrderBy(site => site.Start).ThenBy(site => site.End).ThenBy(site => site.Message, StringComparer.Ordinal)
+            .ToList();
+
+    private sealed record DiagnosticSite(
+        string Code, int Start, int End, int Line, int Column, string Message, string SpanText);
+    /// <summary><paramref name="Refusal"/> is null for a converted, bound module.</summary>
+    private sealed record FileExpectation(string SourceHash, List<DiagnosticSite> Sites, string? Refusal = null);
+    private sealed record CurrentExpectation(Ledger Volume, SortedDictionary<string, FileExpectation> Files);
+    private sealed record FileMeasurement(string Source, Compiler.Ast.ModuleNode? Module, FileExpectation Identity);
 
     private sealed record SubjectVolume(
         string Subject,

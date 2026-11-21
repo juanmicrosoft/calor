@@ -1,0 +1,9 @@
+module AbsModule AbsModule
+  module AbsModuleModule
+    func Abs public (int:x) → int
+      !
+      => result >= 0
+      if x >= 0
+        return x
+      else
+        return 0 - x

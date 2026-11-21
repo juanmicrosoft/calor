@@ -260,13 +260,12 @@ This should be preserved.
     }
 
     [Fact]
-    public void AgentsMdTemplate_ContainsTypeMappings()
+    public void AgentsMdTemplate_PointsToSharedSyntaxReference()
     {
         var template = EmbeddedResourceHelper.ReadTemplate("AGENTS.md.template");
 
-        // Should contain type mapping table
-        Assert.Contains("| C# | Calor |", template);
-        Assert.Contains("i32", template);
-        Assert.Contains("str", template);
+        Assert.Contains("calor://primer", template);
+        Assert.Contains("calor_help", template);
+        Assert.DoesNotContain("| C# | Calor |", template);
     }
 }

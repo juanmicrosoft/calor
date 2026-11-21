@@ -6,6 +6,7 @@ using Calor.Compiler.Formatting;
 using Calor.Compiler.Ids;
 using Calor.Compiler.Init;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Commands;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -18,27 +19,42 @@ public sealed class CheckTool : McpToolBase
     public override string Name => "calor_check";
 
     public override string Description =>
-        "Run code quality checks on Calor source code — diagnostics, lint, typecheck, or snippet validation";
+        "Run Calor quality checks and snippet validation: diagnose, lint, typecheck, validate, or loop (build, execute tests and verify a path snapshot; failures only). Loop runs arbitrary test code.";
 
-    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
+    public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = false, IdempotentHint = false };
+
+    public override int TimeoutSeconds => 1800;
 
     protected override string GetInputSchemaJson() => """
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
-                    "enum": ["diagnose", "lint", "typecheck", "validate"],
-                    "description": "Quality check to perform. diagnose=machine-readable diagnostics, lint=format compliance, typecheck=type checking, validate=validate a code snippet",
+                    "enum": ["diagnose", "lint", "typecheck", "validate", "loop"],
+                    "description": "diagnose=diagnostics, lint=format compliance, typecheck=types, validate=snippet, loop=build+tests+contracts for path",
                     "default": "diagnose"
                 },
                 "source": {
                     "type": "string",
                     "description": "Calor source code to check (used as snippet for validate action)"
                 },
+                "path": {
+                    "type": "string",
+                    "description": "File or directory to snapshot, build, test (tests/*.cs xUnit) and verify (loop only). Executes arbitrary tests; does not edit sources."
+                },
+                "timeoutSeconds": {
+                    "type": "integer", "minimum": 1, "maximum": 600, "default": 600,
+                    "description": "Per build/test process timeout (loop only)."
+                },
+                "verificationTimeoutMs": {
+                    "type": "integer", "minimum": 1, "default": 5000,
+                    "description": "Solver timeout per contract (loop only)."
+                },
                 "apply": {
                     "type": "boolean",
-                    "description": "When true, automatically apply all available fix edits and return the fixed source alongside diagnostics; if errors remain, a source-level heal (indentation + structural-closer repair) is attempted (diagnose action, default: false)"
+                    "description": "Apply deterministic safe patches and return fixed source with freshly computed diagnostics. Heuristic suggestions are not applied (diagnose action, default: false)."
                 },
                 "strictApi": {
                     "type": "boolean",
@@ -102,7 +118,10 @@ public sealed class CheckTool : McpToolBase
                     "description": "Include token stream in output (validate action)"
                 }
             },
-            "required": ["source"]
+            "anyOf": [
+                { "required": ["source"] },
+                { "required": ["action", "path"], "properties": { "action": { "const": "loop" } } }
+            ]
         ,
 
         "additionalProperties": false
@@ -120,8 +139,22 @@ public sealed class CheckTool : McpToolBase
             "lint" => HandleLint(arguments),
             "typecheck" => HandleTypecheck(arguments, cancellationToken),
             "validate" => HandleValidate(arguments),
-            _ => Task.FromResult(McpToolResult.Error($"Unknown action: {action}. Valid actions: diagnose, lint, typecheck, validate"))
+            "loop" => HandleLoopAsync(arguments, cancellationToken),
+            _ => Task.FromResult(McpToolResult.Error($"Unknown action: {action}. Valid actions: diagnose, lint, typecheck, validate, loop"))
         };
+    }
+
+    private static async Task<McpToolResult> HandleLoopAsync(JsonElement? arguments, CancellationToken cancellationToken)
+    {
+        var path = GetString(arguments, "path");
+        if (string.IsNullOrWhiteSpace(path))
+            return McpToolResult.Error("Missing required parameter: path");
+        if (GetBool(arguments, "apply"))
+            return McpToolResult.Error("loop does not apply fixes; use diagnose with apply explicitly.");
+        var result = await TestCommand.RunLoopAsync(path, GetInt(arguments, "timeoutSeconds", 600),
+            GetInt(arguments, "verificationTimeoutMs", 5000), cancellationToken,
+            GetBool(arguments, "implicitSystem", true));
+        return McpToolResult.Json(result, isError: !result.Success);
     }
 
     // ===== Diagnose =====
@@ -142,46 +175,23 @@ public sealed class CheckTool : McpToolBase
         {
             var compileOptions = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 StrictApi = strictApi,
                 RequireDocs = requireDocs,
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp-input.calr", compileOptions);
+            var filePath = GetString(arguments, "filePath") ?? "mcp-input.calr";
+            var result = Program.Compile(source, filePath, compileOptions);
             var (diagnostics, hints) = BuildDiagnoseDiagnostics(result, source);
 
             string? fixedSource = null;
             var fixesApplied = 0;
-            bool healed = false;
             if (applyFixes)
             {
-                fixedSource = ApplyFixes(source, result.Diagnostics.DiagnosticsWithFixes, out fixesApplied);
-
-                // Auto-heal: if errors remain after applying the targeted fix
-                // edits, run the source-level healer (same transform as
-                // `calor format --heal`) and keep the result when it strictly
-                // reduces the error count. This lets agent check→fix loops
-                // self-heal indentation/closer thrash without a round-trip.
-                if (result.HasErrors)
-                {
-                    var candidate = new SourceHealer().Heal(fixedSource);
-                    if (candidate != fixedSource)
-                    {
-                        var recheck = Program.Compile(candidate, "mcp-input.calr", compileOptions);
-                        if (recheck.Diagnostics.Errors.Count < result.Diagnostics.Errors.Count)
-                        {
-                            fixedSource = candidate;
-                            healed = true;
-
-                            // The response must describe the state of
-                            // fixedSource, not the pre-heal input: replace the
-                            // diagnostics (so coordinates match fixedSource)
-                            // and derive success/isError from the recheck.
-                            result = recheck;
-                            (diagnostics, hints) = BuildDiagnoseDiagnostics(recheck, candidate);
-                        }
-                    }
-                }
+                fixedSource = DiagnosticFixes.Repair(source, filePath, compileOptions,
+                    out result, out fixesApplied, initialResult: result);
+                (diagnostics, hints) = BuildDiagnoseDiagnostics(result, fixedSource);
             }
 
             var output = new DiagnoseOutput
@@ -193,7 +203,7 @@ public sealed class CheckTool : McpToolBase
                 Hints = hints.Count > 0 ? hints : null,
                 FixedSource = fixedSource,
                 FixesApplied = applyFixes ? fixesApplied : null,
-                Healed = healed ? true : null
+                Healed = null
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: result.HasErrors));
@@ -242,50 +252,6 @@ public sealed class CheckTool : McpToolBase
         }
 
         return (entries, hints);
-    }
-
-    private static string ApplyFixes(string source, IReadOnlyList<DiagnosticWithFix> diagnosticsWithFixes, out int fixesApplied)
-    {
-        var allEdits = diagnosticsWithFixes
-            .SelectMany(d => d.Fix.Edits)
-            .OrderByDescending(e => e.StartLine)
-            .ThenByDescending(e => e.StartColumn)
-            .ToList();
-
-        fixesApplied = 0;
-        if (allEdits.Count == 0) return source;
-
-        var lines = source.Split('\n');
-
-        foreach (var edit in allEdits)
-        {
-            var startLine = edit.StartLine - 1;
-            var startCol = edit.StartColumn - 1;
-            var endLine = edit.EndLine - 1;
-            var endCol = edit.EndColumn - 1;
-
-            if (startLine < 0 || startLine >= lines.Length) continue;
-            if (endLine < 0 || endLine >= lines.Length) continue;
-
-            var beforeEdit = startCol >= 0 && startCol <= lines[startLine].Length
-                ? lines[startLine][..startCol]
-                : lines[startLine];
-            var afterEdit = endCol >= 0 && endCol <= lines[endLine].Length
-                ? lines[endLine][endCol..]
-                : "";
-
-            var newContent = beforeEdit + edit.NewText + afterEdit;
-            var newLines = newContent.Split('\n');
-
-            var lineList = lines.ToList();
-            lineList.RemoveRange(startLine, endLine - startLine + 1);
-            lineList.InsertRange(startLine, newLines);
-            lines = lineList.ToArray();
-
-            fixesApplied++;
-        }
-
-        return string.Join('\n', lines);
     }
 
     private static readonly Lazy<JsonDocument?> ErrorSuggestions = new(LoadErrorSuggestions);
@@ -375,7 +341,9 @@ public sealed class CheckTool : McpToolBase
                 Issues = result.Issues.Select(i => new LintIssueOutput
                 {
                     Line = i.Line,
-                    Message = i.Message
+                    Message = i.Message,
+                    Code = i.Code,
+                    Fix = i.Fix
                 }).ToList(),
                 ParseErrors = result.ParseErrors,
                 FixedCode = fix ? result.FixedContent : null,
@@ -399,16 +367,9 @@ public sealed class CheckTool : McpToolBase
 
     private static LintResult LintSource(string source, bool attemptFix)
     {
-        var issues = new List<LintIssue>();
-        var trimmableTrailingWhitespace =
-            LosslessSourceDocument.GetTrimmableTrailingWhitespaceLines(source);
-        foreach (var lineNum in trimmableTrailingWhitespace.Order())
-        {
-            issues.Add(new LintIssue(lineNum, "Line has trailing whitespace"));
-        }
-
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath("mcp-input.calr");
+        var diagnostics = LosslessSourceDocument.DiagnoseTrailingWhitespace(source, "mcp-input.calr");
+        var issues = DiagnosticEnvelope.Build(diagnostics).Select(diagnostic =>
+            new LintIssue(diagnostic.Location.Line, diagnostic.Message, diagnostic.Code, diagnostic.Fix)).ToList();
 
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -441,6 +402,10 @@ public sealed class CheckTool : McpToolBase
                 FixDiagnostics = new List<EnvelopeDiagnostic>()
             };
         }
+
+        diagnostics.AddRange(LosslessSourceDocument.DiagnoseCanonicalUsage(source, "mcp-input.calr", ast));
+        issues = DiagnosticEnvelope.Build(diagnostics).Select(diagnostic =>
+            new LintIssue(diagnostic.Location.Line, diagnostic.Message, diagnostic.Code, diagnostic.Fix)).ToList();
 
         if (!attemptFix)
         {
@@ -498,13 +463,18 @@ public sealed class CheckTool : McpToolBase
                 "mcp-input.calr")));
         }
 
+        var fixedContent = formatResult.Formatted;
+        if (fixSuppressedReason == null)
+            fixedContent = DiagnosticFixes.Repair(fixedContent, "mcp-input.calr",
+                new CompilationOptions(), out _, out _);
+
         return new LintResult
         {
             ParseSuccess = true,
             ParseErrors = new List<EnvelopeDiagnostic>(),
             Issues = issues,
             OriginalContent = source,
-            FixedContent = formatResult.Formatted,
+            FixedContent = fixedContent,
             FixDiagnostics = fallbackDiagnostics,
             FixSuppressedReason = fixSuppressedReason
         };
@@ -534,6 +504,7 @@ public sealed class CheckTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
@@ -855,7 +826,7 @@ public sealed class CheckTool : McpToolBase
         public string? FixSuppressedReason { get; init; }
     }
 
-    private sealed record LintIssue(int Line, string Message);
+    private sealed record LintIssue(int Line, string Message, string Code, EnvelopeFix? Fix);
 
     private sealed class LintOutput
     {
@@ -896,6 +867,13 @@ public sealed class CheckTool : McpToolBase
 
         [JsonPropertyName("message")]
         public required string Message { get; init; }
+
+        [JsonPropertyName("code")]
+        public required string Code { get; init; }
+
+        [JsonPropertyName("fix")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public EnvelopeFix? Fix { get; init; }
     }
 
     // --- TypeCheck ---
@@ -1023,127 +1001,91 @@ internal sealed class SnippetWrapper
     public int FirstLineColumnOffset { get; }
 
     /// <summary>
+    /// Column offset for every snippet line after the first: the indent the wrapper added
+    /// to place those lines in their block (0 when continuation lines are copied as is).
+    /// </summary>
+    public int ContinuationColumnOffset { get; }
+
+    /// <summary>
     /// Warnings about context configuration issues.
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
 
-    private SnippetWrapper(string wrappedSource, int snippetStartLine, int snippetEndLine, int firstLineColumnOffset = 0, IReadOnlyList<string>? warnings = null)
+    private SnippetWrapper(string wrappedSource, int snippetStartLine, int snippetEndLine, int firstLineColumnOffset,
+        int continuationColumnOffset, IReadOnlyList<string>? warnings = null)
     {
         WrappedSource = wrappedSource;
         SnippetStartLine = snippetStartLine;
         SnippetEndLine = snippetEndLine;
         FirstLineColumnOffset = firstLineColumnOffset;
+        ContinuationColumnOffset = continuationColumnOffset;
         Warnings = warnings ?? [];
     }
 
+    private const string ModuleHeader = "module SnippetCheck";
+    private const string ModuleIndent = "  ";
+    private const string BodyIndent = "    ";
+    private const string ExpressionPrefix = BodyIndent + "let _result = ";
+
     /// <summary>
-    /// Wraps the snippet in appropriate synthetic code based on context.
+    /// Wraps the snippet in native synthetic code based on context: a module, and for every
+    /// location except <c>module_body</c> a private function whose header carries the context's
+    /// parameters and return type. Block structure is indentation, so each snippet line is
+    /// indented into its block (an expression's continuation lines are copied as is).
     /// </summary>
     public static SnippetWrapper Wrap(string snippet, SnippetContext context)
     {
         var sb = new StringBuilder();
         var warnings = new List<string>();
-        int currentLine = 1;
-        int firstLineColumnOffset = 0;
+        var lines = snippet.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
 
-        // Module header
-        sb.AppendLine("§M{_:_snippet_}");
-        currentLine++;
+        sb.Append(ModuleHeader).Append('\n');
+        var snippetStart = 2;
 
         if (context.Location == SnippetLocation.ModuleBody)
         {
             if (context.Parameters.Count > 0)
-            {
                 warnings.Add("Context 'parameters' ignored for module_body location");
-            }
             if (context.ReturnType != null)
-            {
                 warnings.Add("Context 'returnType' ignored for module_body location");
-            }
             if (context.SurroundingCode != null)
-            {
                 warnings.Add("Context 'surroundingCode' ignored for module_body location");
-            }
 
-            int snippetStart = currentLine;
-            sb.Append(snippet);
-            int snippetLines = CountLines(snippet);
-            currentLine += snippetLines;
-            int snippetEnd = currentLine - 1;
-
-            if (!snippet.EndsWith('\n'))
-            {
-                sb.AppendLine();
-                currentLine++;
-            }
-
-            return new SnippetWrapper(sb.ToString(), snippetStart, snippetEnd, 0, warnings);
+            AppendIndented(sb, lines, ModuleIndent);
+            return new SnippetWrapper(sb.ToString(), snippetStart, snippetStart + lines.Length - 1,
+                ModuleIndent.Length, ModuleIndent.Length, warnings);
         }
 
-        // Function header
-        sb.AppendLine("§F{_:_validate_:pri}");
-        currentLine++;
+        var parameters = string.Join(", ", context.Parameters.Select(p => $"{p.Type}:{p.Name}"));
+        var returnType = context.ReturnType is null or "unit" ? "void" : context.ReturnType;
+        sb.Append(ModuleIndent).Append($"func _validate_ private ({parameters}) → {returnType}").Append('\n');
+        snippetStart++;
 
-        // Parameters
-        foreach (var param in context.Parameters)
-        {
-            sb.AppendLine($"  §I{{{param.Type}:{param.Name}}}");
-            currentLine++;
-        }
-
-        // Return type
-        var returnType = context.ReturnType ?? "unit";
-        sb.AppendLine($"  §O{{{returnType}}}");
-        currentLine++;
-
-        // Surrounding code if any
         if (!string.IsNullOrEmpty(context.SurroundingCode))
         {
-            sb.Append("  ");
-            sb.AppendLine(context.SurroundingCode);
-            currentLine += CountLines(context.SurroundingCode);
+            var surrounding = context.SurroundingCode.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
+            AppendIndented(sb, surrounding, BodyIndent);
+            snippetStart += surrounding.Length;
         }
 
-        int snippetStartLine = currentLine;
-
-        switch (context.Location)
+        if (context.Location == SnippetLocation.Expression)
         {
-            case SnippetLocation.Expression:
-                const string expressionPrefix = "  §B{_result} ";
-                sb.Append(expressionPrefix);
-                sb.Append(snippet);
-                firstLineColumnOffset = expressionPrefix.Length;
-                break;
-
-            case SnippetLocation.Statement:
-            case SnippetLocation.FunctionBody:
-            default:
-                const string statementIndent = "  ";
-                var lines = snippet.Split('\n');
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    sb.Append(statementIndent);
-                    sb.Append(lines[i]);
-                    if (i < lines.Length - 1)
-                    {
-                        sb.AppendLine();
-                    }
-                }
-                firstLineColumnOffset = statementIndent.Length;
-                break;
+            sb.Append(ExpressionPrefix).Append(lines[0]).Append('\n');
+            foreach (var line in lines.Skip(1))
+                sb.Append(line).Append('\n');
+            return new SnippetWrapper(sb.ToString(), snippetStart, snippetStart + lines.Length - 1,
+                ExpressionPrefix.Length, 0, warnings);
         }
 
-        int snippetLines2 = CountLines(snippet);
-        int snippetEndLine = snippetStartLine + snippetLines2 - 1;
-        currentLine += snippetLines2;
+        AppendIndented(sb, lines, BodyIndent);
+        return new SnippetWrapper(sb.ToString(), snippetStart, snippetStart + lines.Length - 1,
+            BodyIndent.Length, BodyIndent.Length, warnings);
+    }
 
-        if (!snippet.EndsWith('\n'))
-        {
-            sb.AppendLine();
-            currentLine++;
-        }
-
-        return new SnippetWrapper(sb.ToString(), snippetStartLine, snippetEndLine, firstLineColumnOffset, warnings);
+    private static void AppendIndented(StringBuilder sb, IEnumerable<string> lines, string indent)
+    {
+        foreach (var line in lines)
+            sb.Append(line.Length > 0 ? indent + line : line).Append('\n');
     }
 
     /// <summary>
@@ -1184,35 +1126,11 @@ internal sealed class SnippetWrapper
     /// </summary>
     public int AdjustColumn(int line, int column)
     {
-        if (FirstLineColumnOffset == 0)
-        {
-            return column;
-        }
-
         if (line == SnippetStartLine)
         {
             return Math.Max(1, column - FirstLineColumnOffset);
         }
 
-        if (FirstLineColumnOffset == 2)
-        {
-            return Math.Max(1, column - 2);
-        }
-
-        return column;
-    }
-
-    private static int CountLines(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-            return 1;
-
-        int count = 1;
-        for (int i = 0; i < text.Length; i++)
-        {
-            if (text[i] == '\n')
-                count++;
-        }
-        return count;
+        return Math.Max(1, column - ContinuationColumnOffset);
     }
 }

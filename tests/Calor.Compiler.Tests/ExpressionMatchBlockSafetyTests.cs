@@ -9,21 +9,21 @@ namespace Calor.Compiler.Tests;
 public class ExpressionMatchBlockSafetyTests
 {
     [Theory]
-    [InlineData("§P \"must execute\"\n§R INT:7")]
-    [InlineData("§C{trace.Add} §A INT:1 §/C\n§R INT:7")]
-    [InlineData("§B{answer:i32} INT:7\n§R answer")]
-    [InlineData("§IF{if1} (> x INT:0)\n  §R INT:7\n§EL\n  §R INT:8")]
-    [InlineData("§P \"must not become default\"")]
+    [InlineData("System.Console.WriteLine(\"must execute\")\nreturn 7")]
+    [InlineData("trace.Add(1)\nreturn 7")]
+    [InlineData("let int:answer = 7\nreturn answer")]
+    [InlineData("if x > 0\n  return 7\nelse\n  return 8")]
+    [InlineData("System.Console.WriteLine(\"must not become default\")")]
     public void UnsupportedExpressionArms_AreRejectedWithoutDiscardingStatements(string body)
     {
         var source = $$"""
-            §M{m1:MatchSafety}
-              §F{f1:Probe:pub} (i32:x, List<i32>:trace) -> i32
-                §E{cw,mut}
-                §R §W{w1} x
-                  §K 1
+            module MatchSafety
+              func Probe public (int:x, List<int>:trace) → int
+                ! cw,mut
+                return match x
+                  case 1
             {{Indent(body, 8)}}
-                  §K _ → INT:0
+                  case _ → 0
             """;
         foreach (var mode in new[] { ContractMode.Off, ContractMode.Debug })
         {
@@ -40,15 +40,15 @@ public class ExpressionMatchBlockSafetyTests
     public void LambdaNestedArms_AreRejectedEvenWithoutOptionalTypeChecking(bool typeChecking)
     {
         const string source = """
-            §M{m1:MatchSafety}
-              §F{f1:Factory:pub} () -> Func<i32>
-                §R §LAM{l1}
-                  §R §W{w1} INT:1
-                    §K 1
-                      §P "must execute"
-                      §R INT:7
-                    §K _ → INT:0
-                §/LAM{l1}
+            module MatchSafety
+              func Factory public () → Func<int> ! unknown
+                !
+                return () =>
+                  return match 1
+                    case 1
+                      System.Console.WriteLine("must execute")
+                      return 7
+                    case _ → 0
             """;
         var result = Program.Compile(source, "lambda-match.calr", new CompilationOptions
         {
@@ -82,13 +82,13 @@ public class ExpressionMatchBlockSafetyTests
     public void SingleReturnExpressionArms_ExecuteBothSourceForms()
     {
         const string source = """
-            §M{m1:MatchSafety}
-              §F{f1:Probe:pub} (i32:x) -> i32
-                §E{}
-                §R §W{w1} x
-                  §K 1
-                    §R INT:7
-                  §K _ → INT:0
+            module MatchSafety
+              func Probe public (int:x) → int
+                !
+                return match x
+                  case 1
+                    return 7
+                  case _ → 0
             """;
         foreach (var (input, expected) in new[] { (1, 7), (2, 0) })
         {
@@ -102,21 +102,21 @@ public class ExpressionMatchBlockSafetyTests
     public void StatementMatchBlocks_KeepPrintMutationBindingsAndNestedReturns()
     {
         const string source = """
-            §M{m1:MatchSafety}
-              §F{f1:Probe:pub} (i32:x, List<i32>:trace) -> i32
-                §E{cw,mut}
-                §W{w1} x
-                  §K 1
-                    §P "must execute"
-                    §C{trace.Add} §A x §/C
-                    §B{answer:i32} INT:7
-                    §IF{if1} (> x INT:0)
-                      §R answer
-                    §EL
-                      §R INT:8
-                  §K _
-                    §R INT:0
-                §R INT:-1
+            module MatchSafety
+              func Probe public (int:x, List<int>:trace) → int
+                ! cw,mut
+                match x
+                  case 1
+                    System.Console.WriteLine("must execute")
+                    trace.Add(x)
+                    let int:answer = 7
+                    if x > 0
+                      return answer
+                    else
+                      return 8
+                  case _
+                    return 0
+                return -1
             """;
         foreach (var (input, expected) in new[] { (1, 7), (2, 0) })
         {

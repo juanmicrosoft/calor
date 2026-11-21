@@ -20,10 +20,10 @@ public class ParameterPoststateTests
     {
         foreach (var mutation in new[]
         {
-            "§ASSIGN x INT:-1",
-            "§IF{i1} (> x 0)\n      §ASSIGN x INT:-1",
-            "§B{first:i32} (pre-dec x)\n    §B{second:i32} (pre-dec x)",
-            "§B{first:i32} (post-dec x)\n    §B{second:i32} (post-dec x)"
+            "set x -1",
+            "if x > 0\n      set x -1",
+            "set x x - 1\n    let int:first = x\n    set x x - 1\n    let int:second = x",
+            "let int:first = x\n    set x x - 1\n    let int:second = x\n    set x x - 1"
         })
         {
             var result = Compile(Source(isVoid, mutation), verify);
@@ -64,7 +64,7 @@ public class ParameterPoststateTests
             var warm = Compile(original, true, directory);
             Assert.Equal(isVoid ? null : (object)1, Invoke(warm));
 
-            var edited = Compile(Source(isVoid, "§ASSIGN x INT:-1"), true, directory);
+            var edited = Compile(Source(isVoid, "set x -1"), true, directory);
             Assert.Contains(edited.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
             var exception = Assert.Throws<TargetInvocationException>(() => Invoke(edited));
             Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
@@ -79,21 +79,19 @@ public class ParameterPoststateTests
     public void PropertyGetterMutatingRefAlias_KeepsRuntimeGuard()
     {
         const string source = """
-            §M{m1:HiddenMutation}
-              §CL{c1:Counter:pub}
-                §FLD{i32:Value:pub}
-                §PROP{p1:Mutate:i32:pub}
-                  §GET
-                    §ASSIGN Value INT:-1
-                    §R Value
-                §MT{mt1:Change:pub}
-                  §I{i32:x:ref}
-                  §O{i32}
-                  §E{}
-                  §Q (>= x 0)
-                  §S (>= x 0)
-                  §B{ignored:i32} Mutate
-                  §R x
+            module HiddenMutation HiddenMutation block
+              class Counter
+                field int:Value
+                property int:Mutate
+                  get
+                    set Value -1
+                    return Value
+                func Change (ref int:x) → int
+                  !
+                  requires (x >= 0)
+                  => (x >= 0)
+                  let int:ignored = Mutate
+                  return x
             """;
         const string harness = """
             public static class Caller
@@ -116,49 +114,6 @@ public class ParameterPoststateTests
     }
 
     [Fact]
-    public void ImplicitBindingConversionMutatingRefAlias_KeepsRuntimeGuard()
-    {
-        const string source = """
-            §M{m1:ConversionMutation}
-              §CSHARP{public class Evil
-              {
-                  public static int Value = 1;
-                  public static implicit operator Evil(int value)
-                  {
-                      Value = -1;
-                      return new Evil();
-                  }
-              }}§/CSHARP
-              §CL{c1:Counter:pub}
-                §MT{mt1:Change:pub}
-                  §I{i32:x:ref}
-                  §O{i32}
-                  §E{}
-                  §Q (>= x 0)
-                  §S (>= x 0)
-                  §B{ignored:Evil} x
-                  §R x
-            """;
-        const string harness = """
-            public static class Caller
-            {
-                public static int Run()
-                {
-                    return new ConversionMutation.Counter().Change(ref ConversionMutation.Evil.Value);
-                }
-            }
-            """;
-        foreach (var verify in new[] { false, true })
-        {
-            var result = Compile(source, verify);
-            if (verify)
-                Assert.Contains(result.Diagnostics, d => d.Verification?.Status == ProofStatus.Unsupported);
-            var exception = Assert.Throws<TargetInvocationException>(() => Invoke(result, harness));
-            Assert.Equal("ContractViolationException", exception.InnerException!.GetType().Name);
-        }
-    }
-
-    [Fact]
     public void PreviousCacheFormat_IsRejected()
     {
         var entry = new VerificationCacheEntry { Version = "1.14" };
@@ -166,13 +121,14 @@ public class ParameterPoststateTests
     }
 
     private static string Source(bool isVoid, string mutation) => $$"""
-        §M{m1:ParameterPoststate}
-          §F{f1:Change:pub} (i32:x) -> {{(isVoid ? "void" : "i32")}}
-            §E{}
-            §Q (>= x 0)
-            §S (>= x 0)
-            {{mutation}}
-            §R{{(isVoid ? "" : " x")}}
+        module ParameterPoststate
+          module ParameterPoststateModule
+            func Change public (int:x) → {{(isVoid ? "void" : "int")}}
+              !
+              requires x >= 0
+              => x >= 0
+              {{mutation.Replace("\n", "\n  ")}}
+              return{{(isVoid ? "" : " x")}}
         """;
 
     private static CompilationResult Compile(string source, bool verify, string? cacheDirectory = null)

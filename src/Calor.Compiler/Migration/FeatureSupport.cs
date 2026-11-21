@@ -48,7 +48,7 @@ public static class FeatureSupport
         {
             Name = "class",
             Support = SupportLevel.Full,
-            Description = "Classes are converted to Calor class definitions"
+            Description = "Instance classes become class definitions; static classes become named modules with static functions and members, preserving their C# type names and lexical namespace scopes"
         },
         ["interface"] = new FeatureInfo
         {
@@ -57,16 +57,12 @@ public static class FeatureSupport
             Description = "Public abstract signature-only methods, properties, and indexers are native; interfaces with non-representable contract members are preserved whole as counted C# interop",
             Workaround = "Keep default, static abstract/virtual, private, event, and nested-type interface contracts as exact C# interop"
         },
-        // #773: honest downgrade — the native conversion emitted a positional
-        // record as a class with getter-only properties and NO constructor
-        // (broken output). The converter consults this level and preserves
-        // records verbatim as §CSHARP interop while it is not Full.
         ["record"] = new FeatureInfo
         {
             Name = "record",
-            Support = SupportLevel.NotSupported,
-            Description = "Records are not natively supported; record declarations are preserved verbatim as §CSHARP interop blocks (counted as a conversion loss)",
-            Workaround = "Rewrite the record as an explicit class before migration, or keep it as a §CSHARP interop block"
+            Support = SupportLevel.Full,
+            Description = "Record classes preserve positional constructors, init properties, record identity, copying, equality and member bodies through native record declarations. Record structs, partial or nested declarations, positional parameter attributes/modifiers, conditional and unrepresented members preserve exact C# with an explicit reason.",
+            Workaround = null
         },
         ["struct"] = new FeatureInfo
         {
@@ -120,7 +116,7 @@ public static class FeatureSupport
         {
             Name = "for",
             Support = SupportLevel.Partial,
-            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations are preserved inline; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
+            Description = "Proven constant int loops use native ranges. Other loops use scoped native while lowering that reevaluates conditions and preserves continue/finally/disposal order. Order-sensitive header expressions and operations keep the containing member as C# interop; ref locals, pattern/out header variables and tuple headers use explicit loop interop."
         },
         ["foreach"] = new FeatureInfo
         {
@@ -211,7 +207,7 @@ public static class FeatureSupport
         {
             Name = "string-interpolation-hole",
             Support = SupportLevel.Partial,
-            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as §CS{...} inside the hole, with assumed effects",
+            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) have no native form since 0.30 retired inline raw C# holes; the containing member is preserved as C# interop",
             Workaround = "Move the expression into a local before the interpolated string to convert it natively"
         },
         ["null-coalescing"] = new FeatureInfo
@@ -239,14 +235,14 @@ public static class FeatureSupport
         {
             Name = "conditional-expression-hoisting",
             Support = SupportLevel.Partial,
-            Description = "Conditional increments, calls and throw expressions remain in their native evaluation region. Assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop",
+            Description = "Conditional calls and throw expressions remain in their native evaluation region. Update/assignment operands and conversions requiring unsafe eager preludes preserve the original expression as counted C# interop; updates use assignment nodes when lowered to statements",
             Workaround = "Keep the counted interop, or express conditional side effects as explicit statements before converting"
         },
         ["array-element-block"] = new FeatureInfo
         {
             Name = "array-element-block",
             Support = SupportLevel.NotSupported,
-            Description = "An array element that Calor writes as a block (a collection initializer, or a multi-line element such as an anonymous object in a rectangular array row) preserves its statement as counted C# interop",
+            Description = "Statement-only array elements require counted C# preservation when inline emission or safe typed hoisting is unavailable. Anonymous objects and ordinary collection initializers use inline native syntax",
             Workaround = "Bind the element to a local first, then use the local in the array"
         },
         ["linq-method"] = new FeatureInfo
@@ -259,7 +255,7 @@ public static class FeatureSupport
         {
             Name = "linq-query",
             Support = SupportLevel.Partial,
-            Description = "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. Complex or unresolved selectors remain inline and deferred."
+            Description = "Single-from enumerable queries and simple terminal join-select queries use method chains; group retains both key and element selectors. Query providers/unresolved invocation sources, typed ranges, nonidentity continuations and transparent-identifier scopes (let, complex joins and additional from) are explicitly preserved as C# interop. A complex or unresolved selector keeps the containing member as C# interop so it stays deferred."
         },
         ["array-initializer"] = new FeatureInfo
         {
@@ -271,7 +267,7 @@ public static class FeatureSupport
         {
             Name = "object-initializer",
             Support = SupportLevel.Full,
-            Description = "Object initializers of plain Name = value assignments are converted to Calor §NEW with property assignments; other shapes are preserved (initializer-interop)"
+            Description = "Object initializers of plain Name = value assignments are represented by object-creation nodes with property assignments; other shapes are preserved (initializer-interop)"
         },
         ["initializer-interop"] = new FeatureInfo
         {
@@ -283,40 +279,41 @@ public static class FeatureSupport
         {
             Name = "dictionary-initializer",
             Support = SupportLevel.Partial,
-            Description = "Literal Add-style Dictionary initializers in direct local bindings and returns use §DICT. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as inline C# interop to retain their operations, type initialization order and evaluation timing."
+            Description = "Literal Add-style Dictionary initializers in direct local bindings and returns use dictionary-literal nodes. Other contexts, index setters, constructor/comparer arguments, nonliteral entries, target-typed initializers and other concrete dictionary types are explicitly preserved as converter-owned inline C# interop to retain their operations, type initialization order and evaluation timing."
         },
         ["list-initializer"] = new FeatureInfo
         {
             Name = "list-initializer",
             Support = SupportLevel.Full,
-            Description = "List initializers are converted to Calor §LIST nodes"
+            Description = "List initializers are represented by list-literal nodes"
         },
         ["hashset-initializer"] = new FeatureInfo
         {
             Name = "hashset-initializer",
             Support = SupportLevel.Full,
-            Description = "HashSet initializers are converted to Calor §SET nodes"
+            Description = "HashSet initializers are represented by set-literal nodes"
         },
         ["anonymous-type"] = new FeatureInfo
         {
             Name = "anonymous-type",
             Support = SupportLevel.Full,
-            Description = "Anonymous types are converted to Calor §ANON blocks"
+            Description = "Anonymous objects use native new { Name = expression } syntax and anonymous-object nodes, retaining initializer order and allocation effects"
         },
         ["foreach-index"] = new FeatureInfo
         {
             Name = "foreach-index",
             Support = SupportLevel.Full,
-            Description = "Indexed foreach via §EACH with optional index variable"
+            Description = "Foreach nodes can carry an optional index variable"
         },
         ["ref-parameter"] = new FeatureInfo
         {
             Name = "ref-parameter",
             Support = SupportLevel.Partial,
             // #943 (D1 RO-REP-1, RO-UNS-1): native ref parameters and §A{ref} arguments; no tuple form.
-            Description = "ref parameters and ref arguments convert natively (§A{ref}) and pass the caller's storage, never a copy. " +
+            Description = "ref parameters and ref arguments convert natively and pass the caller's storage, never a copy. " +
                 "Ref locals and returns, conditional refs, scoped and ref readonly parameters, this-ref extensions, " +
-                "by-reference delegates, constructor and indexer arguments, and method-generic by-reference parameters are preserved as C#",
+                "by-reference delegates, constructor and indexer arguments, and method-generic out/in or nullable-type-parameter ref declarations are preserved as C#. " +
+                "Plain ref T method parameters use the same native storage-preserving form",
             Workaround = "Keep the preserved member as C# interop; no tuple or wrapper form is equivalent"
         },
         ["out-parameter"] = new FeatureInfo
@@ -324,9 +321,9 @@ public static class FeatureSupport
             Name = "out-parameter",
             Support = SupportLevel.Partial,
             // #943 (D1 RO-REP-1, RO-NULL-3/4): native out parameters and §A{out} arguments.
-            Description = "out parameters and out arguments convert natively (§A{out}, out _ discards). Flow attributes such as " +
+            Description = "out parameters and out arguments convert natively, including out _ discards. Flow attributes such as " +
                 "[NotNullWhen] are copied but inert. Method-generic out parameters are preserved as C#",
-            Workaround = "Keep the preserved member as C# interop; no tuple or Result<T, E> form is equivalent"
+            Workaround = "Keep the preserved member as C# interop; no return-value-only form is equivalent"
         },
         ["pattern-matching-advanced"] = new FeatureInfo
         {
@@ -366,43 +363,52 @@ public static class FeatureSupport
         {
             Name = "generic-type-constraint",
             Support = SupportLevel.Full,
-            Description = "Generic type constraints are supported via §WHERE syntax"
+            Description = "Generic type constraints are represented by constraint clauses"
         },
         ["goto"] = new FeatureInfo
         {
             Name = "goto",
             Support = SupportLevel.Full,
-            Description = "Goto statements are converted to §GOTO{label} nodes"
+            Description = "Goto statements are represented by goto nodes"
         },
         ["labeled-statement"] = new FeatureInfo
         {
             Name = "labeled-statement",
             Support = SupportLevel.Full,
-            Description = "Labeled statements are converted to §LABEL{name} nodes"
+            Description = "Labeled statements are represented by label nodes"
         },
         ["unsafe"] = new FeatureInfo
         {
             Name = "unsafe",
             Support = SupportLevel.Full,
-            Description = "Unsafe code blocks are converted to §UNSAFE blocks"
+            Description = "Unsafe code blocks are represented by unsafe block nodes"
         },
         ["pointer"] = new FeatureInfo
         {
             Name = "pointer",
-            Support = SupportLevel.Full,
-            Description = "Pointer types (int*) are supported with §ADDR and §DEREF"
+            Support = SupportLevel.NotSupported,
+            Description = "Address-of (&x) and pointer dereference (*p) have no native Calor form yet; the containing member is preserved as C# interop",
+            Workaround = "Keep pointer code in a C# member, or use Span<T> and indexing"
         },
         ["stackalloc"] = new FeatureInfo
         {
             Name = "stackalloc",
-            Support = SupportLevel.Full,
-            Description = "Stackalloc expressions are converted to §SALLOC nodes"
+            Support = SupportLevel.NotSupported,
+            Description = "stackalloc has no native Calor form yet; the containing member is preserved as C# interop",
+            Workaround = "Keep the stackalloc in a C# member, or allocate an array"
+        },
+        ["event-subscription"] = new FeatureInfo
+        {
+            Name = "event-subscription",
+            Support = SupportLevel.NotSupported,
+            Description = "Event subscription and unsubscription (e += h, e -= h) have no native Calor statement; the statement is preserved as C# interop",
+            Workaround = "Keep the subscription as a raw C# statement"
         },
         ["fixed"] = new FeatureInfo
         {
             Name = "fixed",
             Support = SupportLevel.Full,
-            Description = "Fixed statements are converted to §FIXED blocks"
+            Description = "Fixed statements are represented by fixed statement nodes"
         },
         ["volatile"] = new FeatureInfo
         {
@@ -422,19 +428,19 @@ public static class FeatureSupport
         {
             Name = "operator-overload",
             Support = SupportLevel.Full,
-            Description = "Operator overloads are fully supported via §OP tags and converted to op_ CIL-convention methods"
+            Description = "Operator overload declarations generate op_ CIL-convention methods"
         },
         ["implicit-conversion"] = new FeatureInfo
         {
             Name = "implicit-conversion",
             Support = SupportLevel.Full,
-            Description = "Implicit conversions are fully supported via §OP tags and converted to op_Implicit methods"
+            Description = "Implicit conversion declarations generate op_Implicit methods"
         },
         ["explicit-conversion"] = new FeatureInfo
         {
             Name = "explicit-conversion",
             Support = SupportLevel.Full,
-            Description = "Explicit conversions are fully supported via §OP tags and converted to op_Explicit methods"
+            Description = "Explicit conversion declarations generate op_Explicit methods"
         },
 
         // Additional features based on agent feedback
@@ -454,14 +460,14 @@ public static class FeatureSupport
         {
             Name = "generic-method-expression",
             Support = SupportLevel.Partial,
-            Description = "Generic method calls like Option<T>.Some() in expressions may have issues",
+            Description = "Generic method calls like Factory<T>.Create() in expressions may have issues",
             Workaround = "Assign generic method results to intermediate variables before use"
         },
         ["equals-operator"] = new FeatureInfo
         {
             Name = "equals-operator",
             Support = SupportLevel.Full,
-            Description = "Custom == and != operators are fully supported via §OP tags and converted to op_Equality/op_Inequality methods"
+            Description = "Custom == and != operator declarations generate op_Equality/op_Inequality methods"
         },
         ["primary-constructor"] = new FeatureInfo
         {
@@ -474,13 +480,13 @@ public static class FeatureSupport
         {
             Name = "range-expression",
             Support = SupportLevel.Full,
-            Description = "Range expressions (0..5, ..5, 5..) are converted to §RANGE nodes"
+            Description = "Range expressions (0..5, ..5, 5..) are represented by range-expression nodes"
         },
         ["index-from-end"] = new FeatureInfo
         {
             Name = "index-from-end",
             Support = SupportLevel.Full,
-            Description = "Index from end expressions (^1) are converted to §^ nodes"
+            Description = "Index from end expressions (^1) are represented by index-from-end nodes"
         },
         ["target-typed-new"] = new FeatureInfo
         {
@@ -500,7 +506,7 @@ public static class FeatureSupport
         {
             Name = "named-argument",
             Support = SupportLevel.Full,
-            Description = "Named arguments (param: value) are supported in both statement and expression contexts"
+            Description = "Named arguments (param: value) are supported on method and constructor calls, including target-typed new"
         },
         ["declaration-pattern"] = new FeatureInfo
         {
@@ -512,7 +518,7 @@ public static class FeatureSupport
         {
             Name = "throw-expression",
             Support = SupportLevel.Full,
-            Description = "Throw expressions are converted to §ERR nodes"
+            Description = "Throw expressions retain their expression evaluation region"
         },
         ["nameof"] = new FeatureInfo
         {
@@ -550,9 +556,9 @@ public static class FeatureSupport
             Name = "in-parameter",
             Support = SupportLevel.Full,
             // #943 (D1 RO-LV-3, RO-CALL-3): the parameter form is native; some call sites are preserved.
-            Description = "in parameters and §A{in} arguments convert natively (a C# ref argument to an in parameter becomes §A{in}). " +
+            Description = "in parameters and in arguments convert natively (a C# ref argument to an in parameter becomes an in argument). " +
                 "A call statement that omits in, or whose by-reference operand contains a call, creation, assignment or ++/-- or " +
-                "indexes a non-array, stays C# (§RAW); in indexer parameters preserve the member"
+                "indexes a non-array, stays converter-owned C# interop; in indexer parameters preserve the member"
         },
         ["checked-block"] = new FeatureInfo
         {
@@ -560,11 +566,23 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "checked/unchecked wrapper stripped, body statements fully preserved"
         },
+        ["checked-expression"] = new FeatureInfo
+        {
+            Name = "checked-expression",
+            Support = SupportLevel.Full,
+            Description = "checked expressions retain their lexical overflow scope, including nested overrides and casts"
+        },
+        ["unchecked-expression"] = new FeatureInfo
+        {
+            Name = "unchecked-expression",
+            Support = SupportLevel.Full,
+            Description = "unchecked expressions retain their lexical overflow scope, including nested overrides and casts"
+        },
         ["with-expression"] = new FeatureInfo
         {
             Name = "with-expression",
             Support = SupportLevel.Full,
-            Description = "with expressions (record copying) are converted to §WITH blocks"
+            Description = "with expressions (record copying) are represented by record-copy nodes"
         },
         ["init-accessor"] = new FeatureInfo
         {
@@ -604,7 +622,7 @@ public static class FeatureSupport
         {
             Name = "lock-statement",
             Support = SupportLevel.Full,
-            Description = "Lock statements are converted to §SYNC blocks with full semantics"
+            Description = "Lock statements are represented by lock nodes with full semantics"
         },
         ["await-foreach"] = new FeatureInfo
         {
@@ -660,7 +678,7 @@ public static class FeatureSupport
         {
             Name = "preprocessor-directive",
             Support = SupportLevel.Partial,
-            Description = "Default conversion preserves all #if/#elif/#else branches as explicit §PP AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
+            Description = "Default conversion preserves all #if/#elif/#else branches as explicit conditional-compilation AST across module declarations/usings, class and struct members, statements, nesting, and partial declarations",
             Workaround = "Interface and enum member-level directives may use verbatim interop; review those counted preservation boundaries"
         },
         ["conditional-declaration"] = new FeatureInfo
@@ -674,14 +692,14 @@ public static class FeatureSupport
         {
             Name = "conditional-member",
             Support = SupportLevel.NotSupported,
-            Description = "Class and struct member branches are native §PP AST; interface and enum member branches may require verbatim interop",
+            Description = "Class and struct member branches use conditional-compilation AST; interface and enum member branches may require verbatim interop",
             Workaround = "Review interface and enum member-level conditional blocks"
         },
         ["conditional-statement"] = new FeatureInfo
         {
             Name = "conditional-statement",
             Support = SupportLevel.NotSupported,
-            Description = "Method block statement branches preserve #if/#elif/#else nesting as §PP AST; unsupported statement shapes remain explicit interop",
+            Description = "Method block statement branches preserve #if/#elif/#else nesting as conditional-compilation AST; unsupported statement shapes remain explicit interop",
             Workaround = "Review counted interop inside complex switch/accessor/lambda directive placements"
         },
         ["conditional-unmodeled-placement"] = new FeatureInfo
@@ -782,13 +800,20 @@ public static class FeatureSupport
             Description = "Compilation units with extern aliases preserve the complete source verbatim",
             Workaround = "Preserve the compilation unit and aliased references as C# interop"
         },
+        ["alias-qualified-value"] = new FeatureInfo
+        {
+            Name = "alias-qualified-value",
+            Support = SupportLevel.NotSupported,
+            Description = "Value references with global:: or a namespace alias qualifier preserve their containing C# member and qualifier. Qualified types, imports, constraints and nameof keep their existing conversion paths.",
+            Workaround = "Keep the original C# member as counted interop; native value expressions do not admit :: qualifiers"
+        },
 
         ["namespace"] = new FeatureInfo
         {
             Name = "namespace",
             Support = SupportLevel.Partial,
             Description = "Single namespace scopes convert natively; lossless conversion preserves multiple, nested, or mixed global/namespace topologies as whole-file C# interop",
-            Workaround = "Use lossy mode for native §NS topology, or keep the lossless whole-file interop boundary"
+            Workaround = "Explicitly choose lossy mode to convert namespace topology, or retain the converter's lossless whole-file interop boundary"
         },
 
         ["namespace-single-scope"] = new FeatureInfo
@@ -803,20 +828,18 @@ public static class FeatureSupport
             Name = "namespace-topology",
             Support = SupportLevel.Partial,
             Description = "Multiple, nested, or mixed global/namespace scopes convert natively only in explicit lossy mode; default lossless mode uses whole-file interop",
-            Workaround = "Review the recorded namespace-topology interop loss or explicitly choose lossy native §NS conversion"
+            Workaround = "Review the recorded namespace-topology interop loss or explicitly choose lossy namespace-topology conversion"
         },
 
         // #777 (WS-W4 D4): local functions are never hoisted to module level — the
         // call site build-breaks or silently rebinds to a same-named member.
-        // 0.25 F3 (#847): the bounded slice converts natively IN PLACE as a nested
-        // §F (a C# static local function). Every other local function preserves its
-        // whole member as §CSHARP interop (a counted loss), as before.
+        // #1600: only faithful same-point lambda bindings are native.
         ["local-function"] = new FeatureInfo
         {
             Name = "local-function",
             Support = SupportLevel.Partial,
-            Description = "A non-capturing local function declared directly in a method body, without attributes, type parameters, async/unsafe/extern, yield, nested local functions, or ref/out/in/params/default parameters, converts in place to a nested §F (a C# static local function). A member with any other local function is preserved verbatim as a §CSHARP interop block",
-            Workaround = "Make the local function static (pass captured values as parameters) and non-generic, or keep the member as a §CSHARP interop block"
+            Description = "A non-capturing, non-generic local function with direct calls after its declaration converts at the same point to a typed lambda binding. Direct self-recursion additionally requires a pure body proved over resolved built-in scalar operations; its lambda captures only an initialized internal self binding. Forward/mutual calls, method-group uses, captures, explicit checked/unchecked regions in recursive bodies, named local-call arguments, unused locals, attributes, async/unsafe/extern, yield, nested locals, ref-like signatures and ref/out/in/params/default parameters preserve the containing member as converter-owned C# interop",
+            Workaround = "Use an existing lambda binding with calls after its declaration, or let the converter preserve the original C# member"
         },
 
         // #1139: a property or indexer accessor that yields is a C# iterator.
@@ -826,8 +849,8 @@ public static class FeatureSupport
         {
             Name = "iterator-accessor",
             Support = SupportLevel.NotSupported,
-            Description = "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as a §CSHARP interop block; Calor has no iterator accessors (Calor0209)",
-            Workaround = "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"
+            Description = "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as converter-owned C# interop; Calor has no iterator accessors (Calor0209)",
+            Workaround = "Move the iterator body into a method and have the accessor return its result, or let the converter preserve the original C# member"
         },
 
         // #1139: Calor has no partial property or indexer. A native defining
@@ -836,11 +859,19 @@ public static class FeatureSupport
         {
             Name = "partial-property",
             Support = SupportLevel.NotSupported,
-            Description = "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as a §CSHARP interop block; Calor has no partial members",
-            Workaround = "Merge the defining and implementing declarations into one ordinary property before migration, or keep both as §CSHARP interop blocks"
+            Description = "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as converter-owned C# interop; Calor has no partial members",
+            Workaround = "Merge the defining and implementing declarations into one ordinary property before migration, or let the converter preserve both original C# declarations"
         },
 
         // Phase 4 features (C# 11-13)
+        ["untyped-block-lambda"] = new FeatureInfo
+        {
+            Name = "untyped-block-lambda",
+            Support = SupportLevel.NotSupported,
+            Description = "A block-bodied lambda passed as an argument is bound to a temp before the call; when a parameter type cannot be inferred the temp has no C# delegate type, so the containing member is preserved as C# interop",
+            Workaround = "Declare the lambda parameter types, or keep the counted interop"
+        },
+
         ["default-lambda-parameter"] = new FeatureInfo
         {
             Name = "default-lambda-parameter",
@@ -892,15 +923,15 @@ public static class FeatureSupport
         {
             Name = "unsupported-binary-operator",
             Support = SupportLevel.NotSupported,
-            Description = "Binary operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never substituted with +)",
-            Workaround = "Rewrite using a supported operator or keep the member as §CSHARP interop"
+            Description = "Binary operator has no Calor mapping; the containing member is preserved as converter-owned C# interop (never substituted with +)",
+            Workaround = "Rewrite using a supported operator or let the converter preserve the original C# member"
         },
         ["unsupported-compound-assignment"] = new FeatureInfo
         {
             Name = "unsupported-compound-assignment",
             Support = SupportLevel.NotSupported,
-            Description = "Compound assignment operator (e.g. >>>=) has no Calor mapping; the containing member is preserved as §CSHARP interop (never emitted as a plain assignment)",
-            Workaround = "Rewrite as x = x OP y with a supported operator, or keep the member as §CSHARP interop"
+            Description = "Compound assignment operator (e.g. >>>=) has no Calor mapping; the containing member is preserved as converter-owned C# interop (never emitted as a plain assignment)",
+            Workaround = "Rewrite as x = x OP y with a supported operator, or let the converter preserve the original C# member"
         },
         // #1574: an assignment used as a value is hoisted before its statement only where the
         // hoist runs it once and in C#'s order; every other position keeps the statement as C#.
@@ -947,29 +978,29 @@ public static class FeatureSupport
         {
             Name = "unsupported-switch-label",
             Support = SupportLevel.NotSupported,
-            Description = "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as §CSHARP interop (never broadened to a wildcard)",
-            Workaround = "Rewrite as a constant case label or if/else chain, or keep the member as §CSHARP interop"
+            Description = "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as converter-owned C# interop (never broadened to a wildcard)",
+            Workaround = "Rewrite as a constant case label or if/else chain, or let the converter preserve the original C# member"
         },
         ["unsupported-pattern-operator"] = new FeatureInfo
         {
             Name = "unsupported-pattern-operator",
             Support = SupportLevel.NotSupported,
-            Description = "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never defaulted to ==/&&)",
-            Workaround = "Rewrite the pattern with supported operators, or keep the member as §CSHARP interop"
+            Description = "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as converter-owned C# interop (never defaulted to ==/&&)",
+            Workaround = "Rewrite the pattern with supported operators, or let the converter preserve the original C# member"
         },
         ["unsupported-prefix-operator"] = new FeatureInfo
         {
             Name = "unsupported-prefix-operator",
             Support = SupportLevel.NotSupported,
-            Description = "Prefix unary operator (e.g. unary +) has no Calor node; the containing member is preserved as §CSHARP interop (never substituted with negation)",
-            Workaround = "Drop the redundant unary + or keep the member as §CSHARP interop"
+            Description = "Built-in numeric unary + converts through a native cast preserving numeric promotion and nullable lifting. User-defined, dynamic or unresolved unary + is preserved as converter-owned C# interop (never dropped or substituted with negation)",
+            Workaround = "Keep user-defined or unresolved unary + as C# interop"
         },
         ["unsupported-slice-subpattern"] = new FeatureInfo
         {
             Name = "unsupported-slice-subpattern",
             Support = SupportLevel.NotSupported,
-            Description = "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as §CSHARP interop (never broadened by dropping the sub-pattern)",
-            Workaround = "Match the remaining elements explicitly, or keep the member as §CSHARP interop"
+            Description = "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as converter-owned C# interop (never broadened by dropping the sub-pattern)",
+            Workaround = "Match the remaining elements explicitly, or let the converter preserve the original C# member"
         },
         ["type-pattern"] = new FeatureInfo
         {
@@ -987,15 +1018,15 @@ public static class FeatureSupport
         {
             Name = "generic-delegate",
             Support = SupportLevel.NotSupported,
-            Description = "Generic delegate declarations are preserved verbatim as counted §CSHARP interop so type parameters and constraints remain exact",
-            Workaround = "Use Func<>/Action<> or keep the delegate as §CSHARP interop"
+            Description = "Generic delegate declarations are preserved verbatim as counted converter-owned C# interop so type parameters and constraints remain exact",
+            Workaround = "Use Func<>/Action<> or let the converter preserve the original C# delegate"
         },
         ["conversion-error"] = new FeatureInfo
         {
             Name = "conversion-error",
             Support = SupportLevel.NotSupported,
-            Description = "The converter crashed on this construct; the containing statement/member is preserved as §CSHARP interop",
-            Workaround = "Simplify the construct or keep it as §CSHARP interop"
+            Description = "The converter crashed on this construct; the containing statement/member is preserved as converter-owned C# interop",
+            Workaround = "Simplify the construct or let the converter preserve the original C# statement/member"
         },
 
         // Fallback features (for explain mode)
@@ -1072,7 +1103,7 @@ public static class FeatureSupport
         {
             Name = "default-parameter",
             Support = SupportLevel.Full,
-            Description = "Default parameter values are converted to §I{type:name} = value syntax"
+            Description = "Default parameter values are retained on parameter declarations"
         },
 
         // Issue #325: Language gap features
@@ -1140,7 +1171,7 @@ public static class FeatureSupport
         {
             Name = "multidim-array",
             Support = SupportLevel.Full,
-            Description = "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializers (§ROW), element " +
+            Description = "Rectangular arrays (int[,], int[,,]) convert natively: sized creation, nested initializer rows, element " +
                 "access, and new[,] of a known type. new[,] of an unknown type, and an element that cannot be written in place " +
                 "(a collection initializer or a multi-line element, array-element-block), are preserved as C#"
         },
@@ -1150,19 +1181,19 @@ public static class FeatureSupport
         {
             Name = "refinement-type",
             Support = SupportLevel.Full,
-            Description = "Refinement types (§RTYPE) define base types constrained by predicates; erased to base types in C#"
+            Description = "Refinement-type nodes define base types constrained by predicates; erased to base types in C#"
         },
         ["proof-obligation"] = new FeatureInfo
         {
             Name = "proof-obligation",
             Support = SupportLevel.Full,
-            Description = "Proof obligations (§PROOF) declare conditions to be verified; emitted as comments or runtime checks"
+            Description = "Proof-obligation nodes declare conditions to be verified; emitted as comments or runtime checks"
         },
         ["indexed-type"] = new FeatureInfo
         {
             Name = "indexed-type",
             Support = SupportLevel.Full,
-            Description = "Indexed types (§ITYPE) define size-parameterized types for bounds checking; erased to base types in C#"
+            Description = "Indexed-type nodes define size-parameterized types for bounds checking; erased to base types in C#"
         },
         ["index-bounds"] = new FeatureInfo
         {
@@ -1188,7 +1219,7 @@ public static class FeatureSupport
         {
             Name = "verbatim-identifier",
             Support = SupportLevel.Full,
-            Description = "C# @keyword identifiers mapped to backtick syntax in Calor"
+            Description = "C# @keyword identifiers retain @ escaping in Calor"
         },
         ["pragma"] = new FeatureInfo
         {
@@ -1201,7 +1232,7 @@ public static class FeatureSupport
         {
             Name = "conditional-using",
             Support = SupportLevel.Full,
-            Description = "Using directives inside #if blocks supported via §PP wrapping §U"
+            Description = "Using directives inside #if blocks are represented inside conditional-compilation nodes"
         },
         ["nullable-directive"] = new FeatureInfo
         {
@@ -1246,6 +1277,20 @@ public static class FeatureSupport
             Description = "ref expressions never convert natively: members with ref locals, ref returns (block or expression " +
                 "bodied), conditional refs or ref assignments are preserved as C#, with a ref-parameter warning"
         },
+        ["typed-reference"] = new FeatureInfo
+        {
+            Name = "typed-reference",
+            Support = SupportLevel.NotSupported,
+            Description = "__makeref, __refvalue and __reftype preserve the complete containing C# member",
+            Workaround = "Keep typed-reference operations in C#; preservation does not provide native effect enforcement"
+        },
+        ["varargs"] = new FeatureInfo
+        {
+            Name = "varargs",
+            Support = SupportLevel.NotSupported,
+            Description = "__arglist signatures and expressions preserve the complete containing C# member",
+            Workaround = "Keep CLR varargs in C#; preservation does not provide native effect enforcement"
+        },
         ["global-qualified-name"] = new FeatureInfo
         {
             Name = "global-qualified-name",
@@ -1285,13 +1330,269 @@ public static class FeatureSupport
         int SpanStart,
         int SpanLength);
 
+    internal enum PreservationDecisionKind
+    {
+        StillRequired,
+        NowNative,
+        UnknownOrMismatch,
+        InsufficientContext,
+        ChangedBoundary
+    }
+
+    internal sealed record PreservationDecision(
+        PreservationDecisionKind Kind,
+        string Explanation,
+        string? RequiredFeature = null);
+
+    // Producer keys, not support levels or evidence that a marker is applicable.
+    // These require semantic, conditional-ownership or failed-pipeline context.
+    private static readonly IReadOnlySet<string> ContextualPreservationReasons =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "alias-qualified-value", "array-element-block", "async-return-signature", "attributes",
+            "checked-block", "class", "class-unresolved-base-kind", "collection-expression", "compilation-unit-attribute",
+            "compilation-unit-using-ordering", "compiler-directive-placement",
+            "complex-declaration", "complex-is-pattern", "complex-recursive-pattern",
+            "compound-assignment-narrowing", "compound-assignment-order",
+            "conditional-access-shape", "conditional-declaration-header",
+            "conditional-delegate-placement", "conditional-enum-member",
+            "conditional-enum-placement", "conditional-expression-fragment",
+            "conditional-expression-hoisting", "conditional-interface-member",
+            "conditional-interface-placement", "conditional-top-level-statement",
+            "conditional-type-placement", "conditional-unmodeled-placement",
+            "conversion-error", "csharp-script", "default-expression", "default-member-collision",
+            "delegate", "dictionary-initializer", "embedded-assignment", "enum", "event-definition",
+            "event-subscription", "pointer", "stackalloc",
+            "explicit-interface", "extern-alias", "foreach-collection-order", "in-parameter",
+            "initializer-interop", "interface", "iterator-accessor",
+            "labeled-statement", "line-directive", "linq-query", "local-function",
+            "multidim-array", "named-argument", "namespace-topology", "null-forgiving-expression", "out-parameter",
+            "out-var", "partial-property", "post-validation-fallback", "postfix-operator",
+            "preprocessor-disabled", "preprocessor-member", "preprocessor-ownership-fallback",
+            "preprocessor-unparsed-remainder", "record-base-argument-metadata",
+            "record-conditional-members", "record-nested-declaration", "record-unresolved-base-kind",
+            "ref-parameter", "string-interpolation-formattable-constant",
+            "string-interpolation-handler", "string-interpolation-hole", "struct",
+            "symbol-directive", "top-level-directive-ordering", "unknown-expression",
+            "unknown-literal", "unknown-pattern", "unsupported-binary-operator",
+            "unsupported-compound-assignment", "unsupported-initializer",
+            "unsupported-pattern-operator", "unsupported-prefix-operator",
+            "unsupported-slice-subpattern", "unsupported-switch-label", "untyped-block-lambda",
+            "whole-file-preservation"
+        };
+
+    private static readonly IReadOnlySet<string> SyntaxDerivedPreservationReasons =
+        Enum.GetValues<SyntaxKind>()
+            .Where(kind => kind.ToString().EndsWith("Declaration", StringComparison.Ordinal))
+            .SelectMany(kind => new[] { GetMemberFallbackFeature(kind), "record-member-" + kind })
+            .Concat(Enum.GetValues<SyntaxKind>()
+                .Where(kind => kind.ToString().EndsWith("Statement", StringComparison.Ordinal))
+                .Select(GetStatementFallbackFeature))
+            .Concat(["incompletemember", "record-member-IncompleteMember"])
+            .ToHashSet(StringComparer.Ordinal);
+
+    internal static bool IsKnownPreservationReason(string featureName)
+        => ContextualPreservationReasons.Contains(featureName)
+            || SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(featureName)
+            || featureName is "record-struct" or "record-partial"
+                or "record-positional-parameter-metadata" or "unsafe" or "for" or "tuple-deconstruction"
+            || featureName is "binary pattern (and)" or "binary pattern (or)"
+            || SyntaxDerivedPreservationReasons.Contains(featureName);
+
+    /// <summary>
+    /// Rechecks an existing pure guard at caller-resolved original syntax, not at
+    /// a reparsed payload. This is not marker authentication or a complete native
+    /// conversion query. NowNative requires that separate query; a missing guard
+    /// never establishes it.
+    /// </summary>
+    internal static PreservationDecision AssessPreservation(
+        string? featureName,
+        SyntaxNode? originalGuardNode,
+        SyntaxNode? originalBoundary)
+    {
+        const string guidance = "Resolve the exact original C# context and run calor convert; do not edit reason markers.";
+        if (string.IsNullOrWhiteSpace(featureName) || !IsKnownPreservationReason(featureName))
+            return new(PreservationDecisionKind.UnknownOrMismatch, $"Unknown preservation reason. {guidance}");
+        if (originalGuardNode == null || originalBoundary == null)
+            return new(PreservationDecisionKind.InsufficientContext, $"Original syntax and boundary are required. {guidance}");
+        if (!ReferenceEquals(originalGuardNode.SyntaxTree, originalBoundary.SyntaxTree)
+            || originalGuardNode.SyntaxTree.GetRoot() is not CompilationUnitSyntax root
+            || !originalGuardNode.AncestorsAndSelf().Any(node => ReferenceEquals(node, originalBoundary)))
+        {
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"Original syntax and boundary must have the same enclosing source tree and owner. {guidance}");
+        }
+        if (root.ContainsDiagnostics || root.ContainsDirectives
+            || root.AttributeLists.Count > 0 || root.Externs.Count > 0
+            || root.SyntaxTree.Options.Kind == SourceCodeKind.Script
+            || CSharpToCalorConverter.RequiresWholeFileNamespaceInterop(root))
+        {
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"Parse, conditional or whole-unit preservation context needs revalidation. {guidance}");
+        }
+        foreach (var owner in originalGuardNode.Ancestors().OfType<TypeDeclarationSyntax>())
+        {
+            if (SyntaxCapabilityClassifier.FindDeclaredTypeModifier(owner) is { } ownerRequirement)
+                return new(PreservationDecisionKind.ChangedBoundary,
+                    $"The enclosing declaration has a required preservation guard. {guidance}",
+                    ownerRequirement.FeatureName);
+            if (owner is RecordDeclarationSyntax || owner.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"The enclosing record or unsafe declaration needs its own conversion context. {guidance}");
+        }
+
+        string? requiredFeature;
+        if (originalGuardNode is RecordDeclarationSyntax record
+            && featureName is "record-struct" or "file-scoped-type" or "record-partial"
+                or "unsafe" or "record-positional-parameter-metadata")
+        {
+            if (record.Parent is TypeDeclarationSyntax)
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"Nested records use a different preservation producer. {guidance}");
+            requiredFeature = GetRecordHeaderPreservationFeature(record);
+        }
+        else if (originalGuardNode is ForStatementSyntax loop
+            && featureName is "for" or "tuple-deconstruction")
+        {
+            var callable = loop.Ancestors().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault();
+            if (callable == null
+                || callable.ParameterList.Parameters.Any(parameter => parameter.Modifiers.Count > 0)
+                || callable.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any()
+                || loop.Ancestors().TakeWhile(node => !ReferenceEquals(node, callable))
+                    .OfType<AnonymousFunctionExpressionSyntax>().Any()
+                || callable.Modifiers.Any(SyntaxKind.AsyncKeyword)
+                || callable.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+            {
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"The enclosing callable needs semantic and local-function preflight context. {guidance}");
+            }
+            if (SyntaxCapabilityClassifier.FindFirst(callable) is { } enclosingRequirement)
+                return new(PreservationDecisionKind.ChangedBoundary,
+                    $"The enclosing member has a required preservation guard. {guidance}",
+                    enclosingRequirement.FeatureName);
+            if (callable.Body is { } body && FindBlockByReferencePreservation(body) != null)
+                return new(PreservationDecisionKind.ChangedBoundary,
+                    $"The enclosing block requires by-reference preservation before loop conversion. {guidance}",
+                    "ref-parameter");
+            requiredFeature = GetForHeaderPreservationFeature(loop);
+            if (requiredFeature == null)
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"Other loop preservation decisions need semantic and evaluation-order context. {guidance}");
+        }
+        else if (ContextualPreservationReasons.Contains(featureName)
+            || !SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(featureName))
+        {
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"This producer reason needs its original semantic, ownership or validation context. {guidance}");
+        }
+        else
+        {
+            if (originalGuardNode is MethodDeclarationSyntax or ConstructorDeclarationSyntax
+                && originalGuardNode.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any())
+            {
+                return new(PreservationDecisionKind.InsufficientContext,
+                    $"Member preflight depends on the local-function conversion decision. {guidance}");
+            }
+            requiredFeature = originalGuardNode switch
+            {
+                InterfaceDeclarationSyntax declaration =>
+                    SyntaxCapabilityClassifier.FindUnsupportedInterface(declaration)?.FeatureName,
+                BaseTypeDeclarationSyntax declaration when featureName is "file-scoped-type" or "ref-struct" =>
+                    SyntaxCapabilityClassifier.FindDeclaredTypeModifier(declaration)?.FeatureName,
+                DelegateDeclarationSyntax declaration =>
+                    SyntaxCapabilityClassifier.FindFirst(declaration)?.FeatureName,
+                MemberDeclarationSyntax member when member.Parent is InterfaceDeclarationSyntax =>
+                    SyntaxCapabilityClassifier.GetUnsupportedInterfaceFeature(member),
+                MethodDeclarationSyntax or ConstructorDeclarationSyntax
+                    when !originalGuardNode.DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any() =>
+                    SyntaxCapabilityClassifier.FindFirst(originalGuardNode)?.FeatureName,
+                GlobalStatementSyntax global =>
+                    SyntaxCapabilityClassifier.FindFirst(global.Statement)?.FeatureName,
+                _ => null
+            };
+        }
+
+        if (requiredFeature != featureName && featureName == "interface-member")
+            return new(PreservationDecisionKind.InsufficientContext,
+                $"This reason can also come from interface-member rescue; its failed conversion context is required. {guidance}");
+        if (requiredFeature != featureName)
+            return new(PreservationDecisionKind.UnknownOrMismatch,
+                $"The original guard does not establish this reason; native support is not proven. {guidance}",
+                requiredFeature);
+        if (!ReferenceEquals(originalGuardNode, originalBoundary))
+            return new(PreservationDecisionKind.ChangedBoundary,
+                $"The guard's source boundary differs from the mapped preserved boundary. {guidance}",
+                requiredFeature);
+        return new(PreservationDecisionKind.StillRequired,
+            "The existing pure converter guard still requires preservation at this original boundary.",
+            requiredFeature);
+    }
+
+    internal static string? GetRecordHeaderPreservationFeature(RecordDeclarationSyntax node)
+    {
+        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
+            return "record-struct";
+        if (node.Modifiers.Any(SyntaxKind.FileKeyword))
+            return "file-scoped-type";
+        if (node.Modifiers.Any(SyntaxKind.PartialKeyword))
+            return "record-partial";
+        if (node.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+            return "unsafe";
+        return node.ParameterList?.Parameters.Any(parameter =>
+            parameter.AttributeLists.Count > 0 || parameter.Modifiers.Count > 0) == true
+                ? "record-positional-parameter-metadata"
+                : null;
+    }
+
+    internal static string? GetForHeaderPreservationFeature(ForStatementSyntax node)
+    {
+        if (node.Initializers.Concat(node.Incrementors)
+            .Any(expression => expression.DescendantNodesAndSelf()
+                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment))
+            || node.Condition?.DescendantNodesAndSelf()
+                .OfType<AssignmentExpressionSyntax>().Any(IsTupleAssignment) == true)
+            return "tuple-deconstruction";
+        return node.Declaration?.Type is RefTypeSyntax
+            || node.ChildNodes().Where(part => part != node.Statement)
+                .SelectMany(part => part.DescendantNodesAndSelf())
+                .Any(part => part is DeclarationExpressionSyntax or SingleVariableDesignationSyntax)
+                ? "for"
+                : null;
+    }
+
+    internal static bool IsTupleAssignment(AssignmentExpressionSyntax assignment)
+        => assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+            && (assignment.Left is TupleExpressionSyntax
+                || assignment.Left is DeclarationExpressionSyntax
+                {
+                    Designation: ParenthesizedVariableDesignationSyntax
+                });
+
+    internal static SyntaxNode? FindBlockByReferencePreservation(BlockSyntax block)
+        => block.DescendantNodes().FirstOrDefault(node =>
+            node is RefExpressionSyntax or RefTypeSyntax
+            || node is ParameterSyntax parameter && parameter.Parent?.Parent is AnonymousFunctionExpressionSyntax
+                && IsByReferenceParameter(parameter)
+            || node is ArgumentSyntax { RefKindKeyword.RawKind: not (int)SyntaxKind.None } argument
+                && argument.Parent?.Parent is not InvocationExpressionSyntax);
+
+    internal static bool IsByReferenceParameter(ParameterSyntax parameter)
+        => parameter.Modifiers.Any(modifier =>
+            modifier.Kind() is SyntaxKind.RefKeyword or SyntaxKind.OutKeyword or SyntaxKind.InKeyword);
+
+    internal static string GetMemberFallbackFeature(SyntaxKind kind)
+        => kind.ToString().Replace("Declaration", "").Replace("Syntax", "").ToLowerInvariant();
+
+    internal static string GetStatementFallbackFeature(SyntaxKind kind)
+        => kind.ToString().Replace("Statement", "").ToLowerInvariant();
+
     /// <summary>
     /// Central classifier for syntax whose semantics require exact C# interop
     /// preservation rather than native Calor conversion.
     /// </summary>
     public static class SyntaxCapabilityClassifier
     {
-        /// <summary>The modern syntax features this classifier guarantees to detect.</summary>
+        /// <summary>The syntax features this classifier guarantees to detect.</summary>
         public static IReadOnlySet<string> RequiredUnsupportedFeatures { get; } =
             new HashSet<string>(StringComparer.Ordinal)
             {
@@ -1307,7 +1608,9 @@ public static class FeatureSupport
                 "interface-property-semantics",
                 "interface-indexer-semantics",
                 "interface-member",
-                "delegate-semantics"
+                "delegate-semantics",
+                "typed-reference",
+                "varargs"
             };
 
         /// <summary>
@@ -1323,6 +1626,15 @@ public static class FeatureSupport
             {
                 switch (current)
                 {
+                    case MakeRefExpressionSyntax or RefValueExpressionSyntax or RefTypeExpressionSyntax:
+                        Add(detections, current, "typed-reference");
+                        break;
+                    case LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.ArgListExpression):
+                        Add(detections, literal, "varargs");
+                        break;
+                    case ParameterSyntax parameter when parameter.Identifier.IsKind(SyntaxKind.ArgListKeyword):
+                        Add(detections, parameter, "varargs");
+                        break;
                     case InterfaceDeclarationSyntax interfaceDeclaration:
                         AddTypeModifierDetection(interfaceDeclaration, detections);
                         if (!IsRepresentableInterfaceDeclaration(interfaceDeclaration))
@@ -1429,7 +1741,7 @@ public static class FeatureSupport
             }
         }
 
-        private static string? GetUnsupportedInterfaceFeature(
+        internal static string? GetUnsupportedInterfaceFeature(
             MemberDeclarationSyntax member)
             => member switch
             {
@@ -1444,11 +1756,11 @@ public static class FeatureSupport
                     => "interface-indexer-semantics",
                 MethodDeclarationSyntax or PropertyDeclarationSyntax
                     or IndexerDeclarationSyntax => null,
-                RecordDeclarationSyntax => "record",
+                RecordDeclarationSyntax => "record-nested-declaration",
                 _ => "interface-member"
             };
 
-        private static bool IsRepresentableInterfaceMethod(
+        internal static bool IsRepresentableInterfaceMethod(
             MethodDeclarationSyntax method)
             => method.Body == null
                 && method.ExpressionBody == null
@@ -1457,7 +1769,7 @@ public static class FeatureSupport
                 && method.ReturnType is not RefTypeSyntax
                 && HasOnlyAbstractPublicModifiers(method.Modifiers);
 
-        private static bool IsRepresentableInterfaceProperty(
+        internal static bool IsRepresentableInterfaceProperty(
             PropertyDeclarationSyntax property)
             => property.ExpressionBody == null
                 && property.Initializer == null
@@ -1469,7 +1781,7 @@ public static class FeatureSupport
                     && accessor.SemicolonToken.IsKind(SyntaxKind.SemicolonToken))
                 && HasOnlyAbstractPublicModifiers(property.Modifiers);
 
-        private static bool IsRepresentableInterfaceIndexer(
+        internal static bool IsRepresentableInterfaceIndexer(
             IndexerDeclarationSyntax indexer)
             => indexer.ExpressionBody == null
                 && indexer.ExplicitInterfaceSpecifier == null
@@ -1491,8 +1803,10 @@ public static class FeatureSupport
         /// </summary>
         public static bool IsRepresentableInterfaceDeclaration(
             InterfaceDeclarationSyntax node)
-            => node.Modifiers.Count == 1
-                && node.Modifiers[0].IsKind(SyntaxKind.PublicKeyword);
+            => node.Modifiers.All(modifier => modifier.IsKind(SyntaxKind.PublicKeyword)
+                || modifier.IsKind(SyntaxKind.InternalKeyword)
+                || modifier.IsKind(SyntaxKind.PrivateKeyword)
+                || modifier.IsKind(SyntaxKind.ProtectedKeyword));
 
         /// <summary>
         /// Returns whether the delegate surface can be represented exactly by the
@@ -1575,9 +1889,12 @@ public static class FeatureSupport
     {
         if (!Features.TryGetValue(featureName, out var info))
             return null;
-        return info.Workaround
-            ?? (info.Support == SupportLevel.NotSupported
-                ? "Preserve the complete C# boundary as explicit interop."
-                : null);
+        return GetWorkaroundText(info);
     }
+
+    internal static string? GetWorkaroundText(FeatureInfo info) =>
+        info.Workaround
+            ?? (info.Support == SupportLevel.NotSupported
+                ? "Run calor convert on the original C# and retain its converter-marked fallback; do not handwrite passthrough."
+                : null);
 }

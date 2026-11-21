@@ -24,7 +24,7 @@ public sealed class NullabilityDocumentationTests
         foreach (Match example in examples)
         {
             var source = example.Groups["source"].Value.Replace("\r\n", "\n");
-            var name = Regex.Match(source, @"§M\{m1:(\w+)\}").Groups[1].Value;
+            var name = Regex.Match(source, @"\Amodule (\w+)").Groups[1].Value;
             Assert.NotEmpty(name);
             // The fence annotation self-check enforces (#1143) must agree with this test's table.
             Assert.Equal(ExpectedDiagnostic(name).Code is { Length: > 0 } code ? $" expect={code}" : "",
@@ -36,9 +36,9 @@ public sealed class NullabilityDocumentationTests
 
     private static (string Code, int Line, int Column) ExpectedDiagnostic(string name) => name switch
     {
-        "InitRejected" => (Code: "Calor0272", Line: 4, Column: 22),
-        "ReturnRejected" => (Code: "Calor0273", Line: 4, Column: 8),
-        "ArgumentRejected" => (Code: "Calor0274", Line: 6, Column: 17),
+        "InitRejected" => (Code: "Calor0272", Line: 4, Column: 27),
+        "ReturnRejected" => (Code: "Calor0273", Line: 4, Column: 12),
+        "ArgumentRejected" => (Code: "Calor0274", Line: 6, Column: 10),
         _ => (Code: "", Line: 0, Column: 0)
     };
 

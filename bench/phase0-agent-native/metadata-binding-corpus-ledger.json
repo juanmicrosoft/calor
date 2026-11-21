@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "aggregateResolvedFraction": 95.91,
-  "aggregateResolved": 1197,
-  "aggregateCandidates": 1248,
+  "aggregateResolvedFraction": 96.26,
+  "aggregateResolved": 1594,
+  "aggregateCandidates": 1656,
   "perSubject": [
     {
       "subject": "MediatR",
@@ -20,11 +20,11 @@
     {
       "subject": "Serilog",
       "sha": "0597ddfbd4ec594d9c42edd745fe728a2198bad9",
-      "candidateCount": 113,
-      "resolvedCount": 110,
-      "resolvedFraction": 97.35,
+      "candidateCount": 521,
+      "resolvedCount": 507,
+      "resolvedFraction": 97.31,
       "unresolvedByClass": {
-        "No overload matches the supplied argument types.": 3
+        "No overload matches the supplied argument types.": 14
       },
       "filesScanned": 112,
       "filesSkipped": 0

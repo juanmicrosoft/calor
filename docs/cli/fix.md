@@ -7,114 +7,83 @@ nav_order: 11
 
 # calor fix
 
-`calor fix` applies **bulk, mechanically safe, byte-reversible** rewrites
-across every `.calr` file under a root directory.
+`calor fix --apply` applies deterministic safe diagnostic patches to a `.calr`
+file or directory (current directory by default). It rechecks after each patch
+batch, up to three batches, and reports remaining diagnostics with a nonzero exit
+when errors remain. It does not choose types, effect contracts, fuzzy name matches
+or ambiguous control flow for you.
 
-Each operation writes a `migration.log.json` that records the exact
-bytes it removed. Passing the log back with `--revert` restores the
-original file contents byte-for-byte.
+Known missing effects can offer a native `!` row edit for manual review.
+These edits change a declaration's contract, so safe repair never applies them.
+Unknown call effects offer no row edit: resolve the call's effect contract first.
 
----
-
-## Subcommands
-
-| Flag | What it does |
-|:-----|:-------------|
-| `--drop-structural-ids` | Legacy pre-Phase-4d migration: strip `{id}` from structural closing tags (removed in Phase 4d). |
-| `--revert` | Reverse a prior `--drop-structural-ids` operation using `--log`. |
-| `--log <file>` | Write (without `--revert`) or read (with `--revert`) the migration log. |
-| `--dry-run`, `-n` | Report what would change without writing files. |
-| `--format`, `-f` | Output format: `text` (default) or `json` (envelope v1.1). |
-
----
-
-## `--drop-structural-ids`
-
-Legacy structural closing-tag IDs (`§/M{m001}`, `§/F{f001}`, `§/L{for1}`,
-`§/I{if1}`, …) were an intermediate pre-Phase-4d form (removed in Phase 4d).
-This subcommand removes those IDs in older source as a historical migration
-step; modern Calor uses indentation and has no structural closing tags.
+`Calor1305` offers a conditional return for two branches returning matching
+primitive literals. Safe repair checks the declared return type, leaves comments
+and nonliteral branches alone, and retains blank lines to preserve later source
+mappings. Whitespace edits are applied before an overlapping structural patch.
+Both steps recompile and must retain identical generated C#.
 
 ```bash
-calor fix --drop-structural-ids src/                # rewrite in place
-calor fix --drop-structural-ids src/ --dry-run      # report only
-calor fix --drop-structural-ids src/ \
-    --log .calor/migration.log.json                 # also write a log
+calor fix --apply
+calor fix src/Broken.calr --apply --dry-run --format json
+calor fix src/ --apply
 ```
 
-### What it rewrites
+Edits use 1-based, end-exclusive UTF-16 line/column spans. Invalid spans,
+overlapping edits and cross-file patches are rejected before applying a batch.
+Writes use the same atomic, stale-source-checked path as formatting and preserve
+the source encoding, BOM and permissions. Files are replaced individually, not
+as a directory-wide transaction. A dry run leaves files unchanged and returns
+their original diagnostics, including fix payloads, with proposed change counts.
+`editsApplied` counts individual text edits, not diagnostics.
 
-The migrator targets only the recognized closing-tag shape and only
-when the contents inside `{…}` are an ID-shaped token (ULID-style,
-short test ID like `f001`, or compact). It leaves everything else
-alone — legacy closing tags without an ID block are skipped (idempotent),
-and opening tags are never touched.
+The explicit migration modes below instead perform byte-reversible rewrites.
+Select exactly one operation; they cannot be combined with `--apply`:
 
-### Output
+| Flag | Operation |
+|:-----|:----------|
+| `--heal-closers` | Remove legacy structural closers so blocks end by dedenting. |
+| `--elide-call-closers` | Archived call-closer elision; retired source is rejected by today's compiler. |
 
-```
-drop-structural-ids: files_changed=42 removals=178
-wrote .calor/migration.log.json
-```
+These modes describe archived section-tag syntax, not native-source conversion.
+`--heal-closers` removes only structural closing tags; the remaining archived
+headers and expressions still fail today's lexer. Call elision needs a compiler
+that accepts the archive: today's `--elide-call-closers` rejects retired syntax,
+returns a nonzero exit code, and leaves the source and any existing recovery log
+unchanged.
 
-With `--format json`, the summary is emitted as an
-[envelope schema v1.1](/calor/cli/envelope-schema/) document instead
-(the `migration.log.json` file is unchanged — the envelope's `data`
-mirrors it at file granularity):
-
-```json
-{
-  "version": "1.1",
-  "command": "fix",
-  "diagnostics": [],
-  "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
-  "data": {
-    "operation": "drop-structural-ids",
-    "dryRun": false,
-    "fixedFiles": 42,
-    "totalFixes": 178,
-    "fixes": [
-      { "file": "src/math.calr", "count": 12 },
-      { "file": "src/utils.calr", "count": 7 }
-    ],
-    "log": "/abs/path/.calor/migration.log.json"
-  }
-}
-```
-
-Exit codes: `0` on success, `2` on usage error.
-
----
-
-## Reverting
+The original 23 elision/healing tests run unchanged with their recorded compiler:
 
 ```bash
-calor fix --drop-structural-ids src/ \
-    --revert --log .calor/migration.log.json
+python3 scripts/registered_ledger_historical_replay.py archived-closers
 ```
 
-The revert re-inserts the removed byte ranges at their original
-offsets. The result is **byte-identical** to the pre-rewrite source —
-the `BytePreservationVerifier` covering the migrator's tests asserts
-exactly this property on every change.
+This replay builds compiler `d82f3ae95175ecd09581c6922701706be72b0ca9` from Git
+history, requires .NET 10 and verified Z3 assets, and fails on missing history,
+failed tests, or skipped/empty results. It does not enable legacy syntax in the
+current compiler. The compiler test suite marks this replay `HistoricalReplay`;
+current byte-preservation and retired-syntax rejection tests run separately.
 
----
+`--drop-structural-ids` and `--compact-ids` have been removed. They are not
+compatibility options.
 
-## Why use it
+```bash
+calor fix src/ --heal-closers --dry-run
+calor fix src/ --heal-closers --log migration.log.json
+calor fix src/ --heal-closers --revert --log migration.log.json
+```
 
-Before Phase 4d, the legacy closing-tag ID was redundant: the parser
-already knew which opener it paired with via structural nesting. Dropping
-it shrank files, removed a class of "I changed the opener ID but forgot
-the closer" bugs, and made diffs smaller when IDs changed.
+| Option | Meaning |
+|:-------|:--------|
+| `--log <file>` | Write a migration log, or read it with `--revert`. |
+| `--revert` | Restore the removed byte ranges from an existing log. |
+| `--dry-run`, `-n` | Report changes without rewriting source files. |
+| `--format`, `-f` | `text` (default) or `json` (envelope schema 2.0). |
 
-In legacy source, if a closing-tag ID is left behind, the opt-in lint
-[`Calor0820 LegacyStructuralId`](/calor/ids/#9-diagnostics) flags it
-and emits a `fix` patch that points back at this command.
+The log records exact removed bytes. Reversion restores those bytes, not a
+reformatted approximation. JSON mode emits one envelope with operation counts
+and diagnostics. Exit codes are `0` for success, `1` for remaining errors or
+failed diagnostic writes, and `2` for incompatible operation options.
 
----
-
-## See also
-
-- [ID Specification](/calor/ids/) — full rules for opener IDs.
-- [`calor ids`](/calor/cli/ids/) — check, assign, and re-index opener IDs.
-- [`calor format`](/calor/cli/format/) — canonicalize whitespace, attribute order, etc.
+See [`calor format`](/calor/cli/format/) for canonical formatting and
+[`calor ids`](/calor/cli/ids/) for declaration ID management.

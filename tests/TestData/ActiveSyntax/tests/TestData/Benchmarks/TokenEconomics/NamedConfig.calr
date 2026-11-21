@@ -1,0 +1,9 @@
+module NamedConfig NamedConfig
+  module NamedConfigModule
+    func Build public (int:port, string:host) → int
+      !
+      return port
+
+    func Run public () → int
+      !
+      return Build(port: 8080, host: "localhost")

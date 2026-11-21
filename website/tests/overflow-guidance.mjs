@@ -44,10 +44,12 @@ foreach (var value in new[] { 46340, 46341 })
   for (const page of ['philosophy/static-verification', 'benchmarking/metrics/contract-verification']) {
     const doc = (await readFile(`content/${page}.mdx`, 'utf8')).replace(/\r/g, '');
     const example = [...doc.matchAll(/```calor\n([\s\S]*?)```/g)]
-      .map(match => match[1]).find(source => /^§F\{[^}\n]*:Square:/.test(source));
+      .map(match => match[1]).find(source => /^\s*func Square\s/m.test(source));
     assert.ok(example, `Missing published Square example in ${page}`);
-    await writeFile(path.join(workspace, 'Snippet.calr'),
-      `§M{m1:DocsSquare}\n${example.trimEnd().split('\n').map(line => `  ${line}`).join('\n')}\n`);
+    const source = example.startsWith('module ')
+      ? example
+      : `module DocsSquare\n${example.trimEnd().split('\n').map(line => `  ${line}`).join('\n')}\n`;
+    await writeFile(path.join(workspace, 'Snippet.calr'), source);
     for (const mode of ['debug', 'off']) {
       for (const verify of [false, true]) {
         run([compiler, '--input', 'Snippet.calr', '--output', 'Snippet.g.cs',
@@ -63,7 +65,7 @@ foreach (var value in new[] { 46340, 46341 })
   assert.equal(original, '46340:2147395600\n46341:-2147479015');
   await writeFile(path.join(workspace, 'Original.cs'), csharp);
   run([compiler, 'convert', 'Original.cs', '--output', 'Imported.calr', '--validate']);
-  assert.match(await readFile(path.join(workspace, 'Imported.calr'), 'utf8'), /overflow=unchecked/);
+  assert.match(await readFile(path.join(workspace, 'Imported.calr'), 'utf8'), /^module .* overflow unchecked$/m);
   run([compiler, '--input', 'Imported.calr', '--output', 'Snippet.g.cs']);
   assert.equal(execute(), original);
   console.log('Published Square examples trap in debug/off with verification on/off; converted C# preserves unchecked results.');

@@ -20,12 +20,13 @@ public class TupleTests
     public void Parse_TupleReturnType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
-                §MT{m002:GetMinMax:pub:stat} (i32:a, i32:b) -> (i32, i32)
-                  §IF{if003} (< a b)
-                    §R (a, b)
-                  §R (b, a)
+            module TupleType TupleType block
+              module Tuples
+                func GetMinMax (int:a, int:b) → (int, int)
+                  !
+                  if (a < b)
+                    return (a, b)
+                  return (b, a)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -43,10 +44,11 @@ public class TupleTests
     public void Parse_NamedTupleReturnType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
-                §MT{m002:GetPerson:pub:stat} () -> (str Name, i32 Age)
-                  §R ("Alice", 30)
+            module TupleType TupleType block
+              module Tuples
+                func GetPerson () → (string Name, int Age)
+                  !
+                  return ("Alice", 30)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -62,10 +64,11 @@ public class TupleTests
     public void Parse_TupleParameterType_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
-                §MT{m002:GetFirst:pub:stat} ((i32, i32):tuple) -> i32
-                  §R tuple.Item1
+            module TupleType TupleType block
+              module Tuples
+                func GetFirst ((int, int):tuple) → int
+                  !
+                  return tuple.Item1
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -86,10 +89,11 @@ public class TupleTests
     public void Parse_TupleReturnExpression_ProducesTupleLiteralNode()
     {
         var calor = """
-            §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
-                §MT{m002:MakeTuple:pub:stat} (i32:a, i32:b) -> (i32, i32)
-                  §R (a, b)
+            module TupleType TupleType block
+              module Tuples
+                func MakeTuple (int:a, int:b) → (int, int)
+                  !
+                  return (a, b)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -112,10 +116,11 @@ public class TupleTests
     public void Parse_TupleWithLiterals_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
-                §MT{m002:GetPair:pub:stat} () -> (i32, i32)
-                  §R (10, 20)
+            module TupleType TupleType block
+              module Tuples
+                func GetPair () → (int, int)
+                  !
+                  return (10, 20)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -131,10 +136,11 @@ public class TupleTests
     public void Parse_TupleWithStringAndInt_EmitsCorrectCSharp()
     {
         var calor = """
-            §M{m001:TupleType}
-              §CL{c001:Tuples:pub:stat}
-                §MT{m002:GetPerson:pub:stat} () -> (str, i32)
-                  §R ("Alice", 30)
+            module TupleType TupleType block
+              module Tuples
+                func GetPerson () → (string, int)
+                  !
+                  return ("Alice", 30)
             """;
 
         var result = Program.Compile(calor, "tuple-test.calr", new CompilationOptions
@@ -184,8 +190,8 @@ public class TupleTests
         var calrText = calrEmitter.Emit(convertResult.Ast!);
 
         // Verify the Calor text contains tuple syntax
-        Assert.Contains("(i32, i32)", calrText);
-        Assert.Contains("(str Name, i32 Age)", calrText);
+        Assert.Contains("(int, int)", calrText);
+        Assert.Contains("(string Name, int Age)", calrText);
 
         // Calor text → Parse → Compile → C#
         var compileResult = Program.Compile(calrText, "round-trip.calr", new CompilationOptions

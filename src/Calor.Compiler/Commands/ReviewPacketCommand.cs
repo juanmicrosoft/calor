@@ -61,7 +61,7 @@ public static class ReviewPacketCommand
 
         var referenceOption = new Option<FileInfo[]>(
             aliases: ["--reference", "-r"],
-            description: "Assembly reference used to validate generated C# (repeatable)")
+            description: "Assembly reference: calls on its types bind to their metadata, and generated C# is validated against it (repeatable)")
         {
             AllowMultipleArgumentsPerToken = true
         };

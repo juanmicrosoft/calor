@@ -1,0 +1,21 @@
+{
+  "featureKey": "local-function",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": null,
+  "expectedLossKinds": ["InteropPreserved"],
+  "allowedLossKinds": ["InteropPreserved"],
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 31620,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 31620,
+  "convertedExpectedDefinedInt": 31620,
+  "definedSymbols": [],
+  "currentObservation": {
+    "inputContract": "current-compiler-active-syntax",
+    "reason": "#1600 requires recursive and forward-called local functions to preserve their containing member, not become recursive or forward-bound lambdas.",
+    "fullyNative": false,
+    "nativeConversionCount": 2,
+    "interopFeatureCounts": { "method": 1 },
+    "requiredIssueFeatures": ["local-function", "method"]
+  }
+}

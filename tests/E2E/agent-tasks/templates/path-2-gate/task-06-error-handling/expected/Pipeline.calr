@@ -1,15 +1,15 @@
-§M{m001:Pipeline}
-  §F{f001:FetchAndStore:pub} (str:url) -> i32
-    §B{~closed} false
-    §TR{t1}
-      §B{data} §C{FetchRemote} §A url §/C
-      §B{rc} §C{WriteRecord} §A data §/C
-      §R rc
-    §CA{NetworkError:ne}
-      §R -1
-    §CA{IoError:ie}
-      §R -2
-    §FI
-      §B{~closed} true
-    §R 0
-
+module Pipeline Pipeline block
+  func FetchAndStore (string:url) → int
+    !
+    var closed = false
+    try
+      let data = FetchRemote(url)
+      let rc = WriteRecord(data)
+      return rc
+    catch NetworkError:ne
+      return -1
+    catch IoError:ie
+      return -2
+    finally
+      var closed = true
+    return 0

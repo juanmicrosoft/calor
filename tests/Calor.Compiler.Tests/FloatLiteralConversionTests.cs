@@ -18,6 +18,54 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public sealed class FloatLiteralConversionTests
 {
+    [Theory]
+    [InlineData("1.5f")]
+    [InlineData("42f")]
+    [InlineData("-0f")]
+    [InlineData("1e2f")]
+    [InlineData("-2.5e-2f")]
+    [InlineData("1_234.5_6f")]
+    [InlineData("3.4028235e38f")]
+    [InlineData("1.4e-45f")]
+    public void BareSingleLiterals_PreserveRuntimeWidthAndValue(string literal)
+    {
+        var source = $$"""
+            module Singles Singles block
+              module Migrated
+                func Probe () → object
+                  !
+                  return {{literal}}
+            """;
+        var compiled = Program.Compile(source, "single.calr",
+            new CompilationOptions { EnableTypeChecking = true, EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        var expected = Observe($"public class Migrated {{ public static object Probe() => {literal}; }}", typed: true);
+        Assert.StartsWith("Single:", expected);
+        Assert.Equal(expected, Observe(compiled.GeneratedCode, typed: true));
+
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var expression = Assert.IsType<ReturnStatementNode>(module.Classes[0].Methods[0].Body[0]).Expression!;
+        var single = expression is UnaryOperationNode unary ? unary.Operand : expression;
+        Assert.True(Assert.IsType<FloatLiteralNode>(single).IsSingle);
+        var formatted = new CalorEmitter().Emit(module);
+        var reformatted = Program.Compile(formatted, "single-formatted.calr",
+            new CompilationOptions { EnableTypeChecking = true, EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(reformatted.HasErrors, string.Join("\n", reformatted.Diagnostics.Errors));
+        Assert.Equal(expected, Observe(reformatted.GeneratedCode, typed: true));
+    }
+
+    [Theory]
+    [InlineData("3.5e38f")]
+    [InlineData("1e+f")]
+    public void InvalidSingleLiteral_ReportsAnError(string literal)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(literal, diagnostics).TokenizeAll();
+        Assert.True(diagnostics.HasErrors);
+        Assert.Equal(TokenKind.Error, tokens[0].Kind);
+    }
+
     public static TheoryData<string, string> FloatCases => new()
     {
         { "int n = 5; return n / 2.0;", "Double:2.5" },
@@ -34,6 +82,10 @@ public sealed class FloatLiteralConversionTests
         { "int n = 1; return n / 3f;", "Single:0.33333334" },
         { "int n = 5; return n / 2.0m;", "Decimal:2.5" },
         { "int n = 5; return $\"{n / 2.0}\";", "String:2.5" },
+        { "return $\"{1,4:D2}\";", "String:  01" },
+        { "return $\"{1,-4:D2} literal=${{0}}\";", "String:01   literal=${0}" },
+        { "return \"${0} ${name}\";", "String:${0} ${name}" },
+        { "return $\"{1 + 2}:{\"${0}\"}\";", "String:3:${0}" },
         // Negative control: an integer literal keeps integer division.
         { "int n = 5; return n / 2;", "Int32:2" },
     };
@@ -75,7 +127,7 @@ public sealed class FloatLiteralConversionTests
     [InlineData(100.0, false, "100.0")]
     [InlineData(1e20, false, "1E+20")]
     [InlineData(0.5, false, "0.5")]
-    [InlineData(2.0, true, "SINGLE:2")]
+    [InlineData(2.0, true, "2f")]
     public void FloatLiteral_EmitsLexerFloatForm(double value, bool single, string expected)
     {
         var node = new FloatLiteralNode(new TextSpan(0, 0, 1, 1), value) { IsSingle = single };
@@ -85,7 +137,13 @@ public sealed class FloatLiteralConversionTests
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(emitted, diagnostics).TokenizeAll();
         Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
-        Assert.Equal(TokenKind.FloatLiteral, tokens[0].Kind);
+        if (value < 0)
+        {
+            Assert.Equal(TokenKind.Minus, tokens[0].Kind);
+            Assert.Equal(TokenKind.FloatLiteral, tokens[1].Kind);
+        }
+        else
+            Assert.Equal(TokenKind.FloatLiteral, tokens[0].Kind);
     }
 
     [Theory]
@@ -97,7 +155,7 @@ public sealed class FloatLiteralConversionTests
     {
         var emitted = new CalorEmitter().Visit(new FloatLiteralNode(new TextSpan(0, 0, 1, 1), value));
         var diagnostics = new DiagnosticBag();
-        var expression = new Parser(new Lexer($"§M{{m:R}}\n  §F{{f:V:pub}} () -> f64\n    §R {emitted}", diagnostics)
+        var expression = new Parser(new Lexer($"module R R block\n  func V () → double\n    !\n    return {emitted}", diagnostics)
             .TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, emitted + ": " + string.Join(Environment.NewLine, diagnostics.Errors));
         var returned = Assert.IsType<ReturnStatementNode>(Assert.Single(expression.Functions).Body[0]).Expression;

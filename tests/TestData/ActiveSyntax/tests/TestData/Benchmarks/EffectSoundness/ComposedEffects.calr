@@ -1,0 +1,14 @@
+module ComposedService ComposedService
+  module ComposedServiceModule
+    func FetchAndLog public (string:url) → string
+      ! cw
+      System.Console.WriteLine(url)
+      return url
+
+    func ReadAndStore public (string:path) → void
+      ! db
+      System.Console.WriteLine(path)
+
+    func PureHelper public (string:data) → int
+      !
+      return 0

@@ -16,15 +16,15 @@ grep -q "ExistsTarget" "$OUTPUT_FILE" || { echo "Missing ExistsTarget function";
 grep -q "ImplicationTest" "$OUTPUT_FILE" || { echo "Missing ImplicationTest function"; exit 1; }
 grep -q "MatrixSymmetry" "$OUTPUT_FILE" || { echo "Missing MatrixSymmetry function"; exit 1; }
 
-# Check for forall generating Enumerable.Range().All()
-grep -q "Enumerable.Range" "$OUTPUT_FILE" || { echo "Missing Enumerable.Range for quantifier"; exit 1; }
+# Check finite-domain lowering through the runtime's checked range helper.
+grep -q "Calor.Runtime.ContractQuantifier.Range" "$OUTPUT_FILE" || { echo "Missing contract range for quantifier"; exit 1; }
 grep -q "\.All(" "$OUTPUT_FILE" || { echo "Missing .All() for forall quantifier"; exit 1; }
 
 # Check for exists generating Enumerable.Range().Any()
 grep -q "\.Any(" "$OUTPUT_FILE" || { echo "Missing .Any() for exists quantifier"; exit 1; }
 
-# Check for implication translated as !p || q (with nested parens)
-grep -q "!((" "$OUTPUT_FILE" && grep -q ")) ||" "$OUTPUT_FILE" || { echo "Missing implication translation (!p || q)"; exit 1; }
+# Check the native implication expression.
+grep -Fq '!(x > 0) || x >= 0' "$OUTPUT_FILE" || { echo "Missing implication translation (!p || q)"; exit 1; }
 
 # Check for nested quantifier (two variables in MatrixSymmetry)
 # This should generate nested All calls

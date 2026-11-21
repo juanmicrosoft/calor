@@ -1,0 +1,7 @@
+module DeadStoreExample DeadStoreExample
+  module DeadStoreExampleModule
+    func Compute public (int:x) → int
+      !
+      var int:temp = x + 1
+      var int:temp = x * 2
+      return temp

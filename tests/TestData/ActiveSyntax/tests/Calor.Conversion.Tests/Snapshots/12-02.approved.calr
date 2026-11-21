@@ -1,0 +1,13 @@
+module Test_12_02 Test_12_02 overflow unchecked
+  class Parser public
+    func TryParse public (string:input, out int:result) → bool
+      !
+      set result 0
+      if string.IsNullOrEmpty(input)
+        return false
+      set result int.Parse(input)
+      return true
+
+    func Increment public (ref int:value)
+      !
+      set value value + 1

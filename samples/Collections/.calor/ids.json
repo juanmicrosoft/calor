@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Files": [
+    "collections.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_kqt28pz58jt7",
+      "File": "collections.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Collections",
+      "Signature": ""
+    },
+    {
+      "Id": "f_sprzbznjbc8f",
+      "File": "collections.calr",
+      "Container": "Collections",
+      "Kind": 1,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

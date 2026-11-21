@@ -19,6 +19,13 @@ calor watch src/ --format json
 Root compile supports `-f`; on lint, spell out `--format` because `-f` means
 `--fix`. Watch produces NDJSON: one compact envelope per line for every rebuild.
 
+Default text uses one line per diagnostic: `file:line:col code short-message`.
+Warnings and informational messages retain `warning:` and `info:` prefixes
+after the code. Embedded line breaks are escaped. Unknown messages are preserved,
+not truncated. A clean non-verbose compile prints one status line for all inputs.
+Long explanations for common diagnostics are available through MCP `calor_help`
+with `action: "error"` and the diagnostic code.
+
 ## Envelope Shape
 
 ```json illustrative
@@ -31,7 +38,7 @@ Root compile supports `-f`; on lint, spell out `--format` because `-f` means
       "message": "Postcondition refuted",
       "severity": "warning",
       "location": { "file": "Math.calr", "line": 4, "column": 5 },
-      "declarationId": "f001",
+      "declarationId": "f_a1b2c3d4e5f6",
       "verification": {
         "status": "refuted",
         "counterexample": {
@@ -48,6 +55,17 @@ Root compile supports `-f`; on lint, spell out `--format` because `-f` means
 Fields that do not apply are omitted. `diagnostics[].fix.edits[]` carries
 machine-applicable, 1-based, end-exclusive source edits when a diagnostic has a
 fix. Command-specific results live under `data`.
+`fix.isSafeToApply` distinguishes deterministic patches from suggestions that
+need review. `calor fix --apply` and MCP `calor_check` with `apply: true` apply
+only safe patches and return fresh diagnostics. Structured messages and
+verification payloads are unchanged.
+
+`declarationId` comes from the project's `.calor/ids.json` sidecar, not the
+source text or a parser-local handle. MCP can attribute a broken function's
+body diagnostics when its valid declaration header exactly matches an existing
+sidecar entry. This read-only lookup does not rename declarations or allocate
+IDs. Invalid or ambiguous headers and source-only inputs have no persistent
+declaration ID; corrupt sidecars produce an explicit identity error.
 
 ## Conversion Output
 
@@ -62,7 +80,7 @@ The C# → Calor surfaces report in three shapes:
 | MCP `calor_batch` (`action: "convert"`) | The tool's own result object | `files[].issues[]` | `files[].conversionPaths` |
 
 `conversionPaths.outcome` (`native`, `preserved`, `lossy`, `unverified`, `refused`) is the field
-to test. `unverified` means the file was written under `--lossy` but its C# failed
+to test. `unverified` means exact original C# was preserved and written but failed
 the round-trip compile check; `conversionPaths.roundTrip` says whether that check
 ran (`verified`, `failed`, `deferred`, `not-run`). The native construct counts (`nativeConversionCount`,
 `lossSummary.nativeConversions`) also count constructs of a type a rescue later

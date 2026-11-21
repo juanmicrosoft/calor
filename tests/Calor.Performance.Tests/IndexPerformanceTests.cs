@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Calor.Compiler.Tests;
 using Calor.Compiler.Indexing;
 using Xunit;
 using Xunit.Abstractions;
@@ -24,15 +25,34 @@ namespace Calor.Performance.Tests;
 /// second, smaller data point. Measuring the C# line count would have reported a
 /// scale the index never sees.
 /// </summary>
-public sealed class IndexPerformanceFixture
+public sealed class IndexPerformanceFixture : IDisposable
 {
     // Built once and shared. Each build costs ~0.4s on the project-scale corpus,
     // and the suite carries a ratcheted total-duration ceiling — rebuilding per
     // test would spend that budget on setup rather than on coverage.
     public IndexPerformanceFixture()
     {
-        Root = FindFixtureRoot();
+        var originalRoot = FindFixtureRoot();
+        var repository = ActiveSyntaxInputs.RepositoryRoot;
+        var currentSources = ProjectIndexBuilder.DiscoverSources(originalRoot)
+            .Select(source => ActiveSyntaxInputs.ForCurrentCompiler(repository, source)).ToArray();
+        var currentRoot = Path.Combine(repository, ActiveSyntaxInputs.RelativeRoot,
+            Path.GetRelativePath(repository, originalRoot));
+        Assert.All(currentSources, source => Assert.StartsWith(currentRoot + Path.DirectorySeparatorChar, source));
+        Assert.Equal(currentSources.Order(StringComparer.Ordinal),
+            ProjectIndexBuilder.DiscoverSources(currentRoot).Order(StringComparer.Ordinal));
+        // Indexing initializes identities; keep those writes outside registered fixtures.
+        Root = Path.Combine(Path.GetTempPath(), $"calor-index-performance-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Root);
+        foreach (var source in currentSources)
+        {
+            var destination = Path.Combine(Root, Path.GetRelativePath(currentRoot, source));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(source, destination);
+        }
         Sources = ProjectIndexBuilder.DiscoverSources(Root);
+        Assert.Equal(currentSources.Select(source => Path.GetRelativePath(currentRoot, source)),
+            Sources.Select(source => Path.GetRelativePath(Root, source)));
         Options = new ProjectIndexBuilder.Options(Root, "perf-gate", Sources);
         Index = ProjectIndexBuilder.Build(Options);
     }
@@ -41,6 +61,8 @@ public sealed class IndexPerformanceFixture
     public IReadOnlyList<string> Sources { get; }
     public ProjectIndexBuilder.Options Options { get; }
     public ProjectIndex Index { get; }
+
+    public void Dispose() => Directory.Delete(Root, recursive: true);
 
     private static string FindFixtureRoot()
     {

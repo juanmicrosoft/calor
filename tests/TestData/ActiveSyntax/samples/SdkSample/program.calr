@@ -1,0 +1,9 @@
+module SdkSample SdkSample
+  func Main public () → void
+    ! cw
+    Console.WriteLine("=== Calor SDK Sample ===")
+    Console.WriteLine("")
+    Console.WriteLine("This project was built using the Calor MSBuild SDK!")
+    Console.WriteLine("The .calor files are automatically compiled to C# during build.")
+    Console.WriteLine("")
+    Console.WriteLine("Build command: dotnet build SdkSample.csproj")

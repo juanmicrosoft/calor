@@ -229,18 +229,6 @@ public class GeminiFormatTests
         Assert.Equal(0, exitCode2);
     }
 
-    [Fact]
-    public void ValidateCalrContent_WarningIsHumanReadable()
-    {
-        var json = """{"file_path": "test.calr", "content": "module Test {}"}""";
-
-        var (_, warning) = HookCommand.ValidateCalrContent(json);
-
-        Assert.NotNull(warning);
-        Assert.Contains("REMINDER", warning);
-        Assert.Contains("§SEMVER", warning);
-    }
-
     #endregion
 
     #region ValidateIds Format Tests

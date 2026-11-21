@@ -1,0 +1,7 @@
+{
+  "IncompleteCount": 0,
+  "ParsedFiles": 514,
+  "ParseFailures": 15,
+  "ExpressionsBound": 7425,
+  "Note": "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no longer parse; all other in-repo inputs are bound in native syntax. Incomplete diagnostics remain zero. ExpressionsBound is informational. Follow-up: the 3 added parsed inputs are the ES-04 bystander.calr steps (h3); ExpressionsBound 7386 to 7425 is 3 bystander expressions, 4 fewer in the re-seeded null-deref benchmark (h2) and 40 more from i7 member-access parsing of x.Field."
+}

@@ -1,0 +1,18 @@
+module Collections Collections block
+  module CollectionsModule
+    func Main () → void
+      ! cw, mut, alloc
+      let numbers = new List<int> { 1, 2, 3 }
+      Console.WriteLine("Created list with elements")
+      numbers.Add(4)
+      let ages = new Dictionary<string,int> { { "alice", 30 }, { "bob", 25 } }
+      Console.WriteLine("Created dictionary with entries")
+      set ages["charlie"] 35
+      let fruits = new HashSet<string> { "apple", "banana" }
+      Console.WriteLine("Created set with fruits")
+      fruits.Add("cherry")
+      numbers.Insert(0, 0)
+      set numbers[1] 10
+      fruits.Remove("apple")
+      ages.Clear()
+      Console.WriteLine("All collection tests passed!")

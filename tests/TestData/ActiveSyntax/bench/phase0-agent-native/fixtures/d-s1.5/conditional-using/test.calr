@@ -1,0 +1,17 @@
+module FixtureTest FixtureTest
+  pp FEATURE
+    using Number = System.Int32
+  pp else
+    using Number = System.Int32
+
+  module ConditionalValue
+    pp FEATURE
+      func Get () → Number
+        !
+        => result == 41
+        return 41
+    pp else
+      func Get () → Number
+        !
+        => result == 42
+        return 42

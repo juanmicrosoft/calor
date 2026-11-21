@@ -1,0 +1,109 @@
+{
+  "cli-convert": {
+    "command": "calor convert Counter.cs -o Counter.calr",
+    "exit": 0,
+    "stdout": [
+      "✓ Conversion successful",
+      "Output: <dir>/Counter.calr"
+    ],
+    "stderr": [],
+    "calor": "module Counter overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      !\n      set Count (Count + 1)\n      return Count\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Counter.cs -o Counter.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 8,
+    "interopPreservationCount": 0,
+    "lossCount": 0,
+    "losses": [],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": []
+  },
+  "cli-convert-json-verbose": {
+    "command": "calor convert Counter.cs -o Counter.calr --format json --verbose",
+    "stdoutIsOneJsonDocument": true,
+    "firstStdoutLine": "{"
+  },
+  "cli-compile": {
+    "command": "calor --input Counter.calr --output Counter.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 8,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [],
+    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      !\n      set Count (Count + 1)\n      return Count\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 8,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [],
+    "calorSource": "module ConvertedModule overflow unchecked\n  class Counter\n    field int:count private static\n\n    property int:Count private static\n      get private\n        return count\n      set private\n        set count value\n\n    func Next () → int\n      !\n      set Count (Count + 1)\n      return Count\n\n\n"
+  }
+}

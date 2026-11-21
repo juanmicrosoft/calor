@@ -4,313 +4,265 @@ section: "syntax-reference"
 order: 3
 ---
 
-The `§B` tag introduces a local binding (Calor's equivalent of a
-C# `var` declaration). The binder accepts four forms; in three of them
-the **type is inferred** from the initializer expression.
-
-Code blocks here are fragments inside a module or function. Complete checked
-nullable-reference examples are in the
-[nullability guide](/docs/guides/nullability-and-dotnet-interop/).
-
-> **Reference for RFC** `v0.6-bind-inference-formalization`. The
-> behavior on this page is what the binder does today and is pinned
-> by `tests/Calor.Semantics.Tests/BindInferenceDocsTests.cs`.
-
----
+Use `let` for an immutable local binding and `var` for a mutable one.
+An explicit type precedes the name, as it does in a function parameter.
+Use `set` to assign a new value to mutable storage.
 
 ## Syntax
 
-```calor
-§B{name}                    // (1) requires an initializer (see Rules)
-§B{name} initializer        // (2) immutable, type inferred from initializer
-§B{name:type}               // (3) immutable, declared type, no initializer
-§B{name:type} initializer   // (4) immutable, declared type wins
-
-§B{~name} initializer       // (2') mutable variant of (2)
-§B{~name:type}              // (3') mutable variant of (3)
-§B{~name:type} initializer  // (4') mutable variant of (4)
+```calor-fragment
+let name = expression
+let Type:name = expression
+var name = expression
+var Type:name = expression
+var Type:name
+set name expression
 ```
 
-The `~` prefix marks the binding as **mutable**; without `~` the
-binding is immutable (cannot be reassigned).
+An inferred binding requires `= expression` on its declaration. A declared
+type supplies the receiving boundary; it does not make an incompatible value
+valid. Explicit types use C# spellings such as `int`, `long`, `double`,
+`string`, and `string?`.
 
----
+An explicitly typed mutable local can be declared before it is initialized,
+but every path to a read must assign it first. Generated C# validation still
+checks definite assignment. A local declaration is not a class field; use
+`field` for fields.
 
-## Rules
+<a id="inference-table"></a>
+<a id="examples"></a>
 
-1. **Either a `:type` annotation or an initializer is required.**
-   `§B{x}` with neither is a hard error (`Calor0250`,
-   [diagnostics](#diagnostics) below).
-2. **An explicit `:type` wins over inference.** Form (4) does not
-   re-infer; the declared type supplies the receiving boundary. The
-   Calor 0.22 compiler rejects supported possibly-null initializers for non-null
-   destinations with `Calor0272`. Ordinary type checking also checks type
-   compatibility; an annotation does not make an incompatible value valid.
-3. **Without `:type`, the bound type is `initializer.TypeName`.**
-   This is "shallow" inference: the binder reads the type the
-   initializer's bound node reports and uses it directly. There is no
-   bidirectional flow, no widening, no constraint solving.
-4. **The reported type is the binder's internal name.** Literal
-   initializers produce `INT`, `STRING`, `BOOL`, `FLOAT`. Calling code
-   that needs to write the equivalent type annotation uses the
-   user-facing names instead — see [Types](/docs/syntax-reference/types/)
-   for the mapping (`i32`, `str`, `bool`, `f64`, …).
-5. **Inferred bindings emit `var` in C#; explicit bindings emit the
-   named type.** Writing `§B{x} INT:0` produces `var x = 0;`; writing
-   `§B{x:i32} INT:0` produces `int x = 0;`. Both compile to the same
-   IL, but the source-level distinction is preserved end-to-end.
-6. **A bare binding takes a next-line expression as its initializer.**
-   A binding with nothing after its header on its line, such as
-   `§B{~n:i32}`, reads an expression that starts on the next line as
-   its initializer, even at the same indent, where it looks like a
-   separate statement. Changing this would change the meaning of valid
-   programs, so the reading stays and the compiler warns with
-   `Calor0121` when the expression starts at the binding's own indent.
-   Put the initializer on the `§B` line, or write an explicit one such
-   as `` `default` `` when the next line is a separate statement. The
-   C# converter always writes an explicit initializer.
+## Inferred bindings
 
----
+The binder uses the initializer's bound type. Literal examples include
+`42` (`int`), `"Calor"` (`string`), `true` (`bool`), and `3.14` (`double`).
+An identifier retains its declared type; a call retains its resolved return
+type; an operator supplies the result type, not necessarily an operand's type.
+Internal tool output may use names such as `INT` and `STRING`; these are not
+the type spellings to write in source.
 
-## Inference table
-
-For each initializer shape on the left, the resulting bound type when
-no `:type` annotation is present is on the right.
-
-| Initializer | Bound type | Notes |
-|:------------|:-----------|:------|
-| `INT:42` (or `42`) | `INT` | `BoundIntLiteral`. Values outside the 32-bit range are bound as `LONG`. |
-| `STR:"hello"` | `STRING` | `BoundStringLiteral` |
-| `BOOL:true` / `BOOL:false` | `BOOL` | `BoundBoolLiteral` |
-| `FLOAT:3.14` | `FLOAT` | `BoundFloatLiteral` |
-| `(+ a b)` etc. | result type of the binary op | `BoundBinaryExpression.TypeName` — type of the result, not the operands |
-| an identifier `x` | declared type of `x` | through `BoundVariableExpression` |
-| `§C{Foo.bar} … §/C` | declared return type of `Foo.bar` | the binder uses the call's bound return type |
-| `null` or untyped `§NN` | **inference fails** by default | `Calor0251`; provide an appropriate explicit nullable or Option type |
-
-The literal-type names on the right (`INT`, `STRING`, …) are the
-binder's internal type identifiers. They appear in tool output and
-diagnostics. The corresponding [type annotation](/docs/syntax-reference/types/)
-you would write in source is the lowercase user-facing name
-(`i32`, `str`, `bool`, `f64`).
-
----
-
-## Examples
-
-### Inferred, immutable
+Inferred locals emit C# `var`; explicitly typed locals emit the declared
+type. An annotation is not silently discarded during emission.
 
 ```calor
-§B{score} INT:85               // score: i32 = 85
-§B{name} STR:"Calor"           // name: str = "Calor"
-§B{active} BOOL:true           // active: bool = true
-§B{pi} FLOAT:3.14              // pi: f64 = 3.14
+module BindingExamples
+  func Main () → int
+    !
+    let score = 85
+    let name = "Calor"
+    let active = true
+    let pi = 3.14
+    var counter = 0
+    var total = 0
+    for i from 1 to 10 step 1
+      set counter counter + 1
+      set total total + i
+    return score + counter + total
 ```
 
-### Inferred, mutable
+`Main()` returns `150`: the loop runs ten times and the sum of `1` through
+`10` is `55`. The counted-loop variable `i` is read-only.
+
+## Explicit types and initialization
+
+An annotation can request a supported implicit conversion, such as `int` to
+`long`. It cannot turn a string into an integer or erase nullable input.
+When an initializer spans lines, put `=` on the declaration line and indent
+its continuation.
 
 ```calor
-§B{~counter} INT:0             // mutable, starts at 0
-§B{~total} INT:0
-§L{i:1:10:1}
-  §SET counter (+ counter INT:1)
-  §SET total   (+ total i)
+module ExplicitBindings
+  func Pick (bool:first) → int
+    !
+    var int:value
+    if first
+      set value 7
+    else
+      set value 9
+    let long:wide = value
+    let double:fraction = wide
+    return value
+
+  func Main () → int
+    !
+    return Pick(true) + Pick(false)
 ```
 
-### Explicit type, no initializer
-
-```calor
-§B{retries:i32}                // declared but uninitialized — initialise before use
-§B{user:str}
-```
-
-These forms are typically used where a value is assigned in every
-branch of a subsequent `§IF` / `§W`, or where the binding is for a
-field initialized in a constructor body.
-
-### Explicit type with initializer
-
-When you want the declared type to **drive** the conversion of the
-initializer (rather than be inferred from it), give an annotation:
-
-```calor
-§B{count:i64} INT:42           // i64 binding initialised from an i32 literal
-§B{x:f64}     INT:0            // f64 binding initialised from an integer literal
-```
-
-### Inferred from a call expression
-
-```calor
-§B{user} §C{repo.FindUser} §A id §/C
-// user: User (declared return type of repo.FindUser)
-```
-
-### Inferred from a binary op
-
-```calor
-§B{sum} (+ a b)                // sum: result type of (+ a b)
-§B{half} (/ x FLOAT:2.0)       // half: f64
-```
-
----
+`Main()` returns `16`. Both branches initialize `value` before it is read.
+Give a binding an explicit initializer when it can be initialized immediately.
 
 ## Diagnostics
 
-### Calor0272 — possibly-null initialization
+### Missing inferred initializer
 
-Calor 0.22 rejects a possibly-null initializer at a supported non-null
-receiving boundary. Inference retains supported initializer nullability:
-omitting `:str` does not make a nullable call result non-null. Initializing a
-mutable binding is checked, but later assignment/rebinding is outside this
-guarantee. Constructor results and constructor inputs are separate: the latter
-are not covered. See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
-for the support table and complete rejected/default/throw/pattern examples.
-`Calor0273` checks native returns and `Calor0274` checks method inputs.
-The strict-inference opt-out below does not disable these binding errors.
+The native parser reports `Calor0100` for an inferred binding without
+`= expression`. It rejects the declaration before the binder's historical
+`Calor0250` missing-type-or-initializer check can run.
 
-### Calor0250 — `BindRequiresTypeOrInitializer`
-
-A `§B{name}` declaration must carry **either** a `:type` annotation
-**or** an initializer expression. With neither, the binder cannot
-choose a type for the new symbol.
-
-```calor
-§F{f001:Foo:pub} () -> i32
-  §B{x}            // Calor0250: §B{x} requires :type or initializer
-  §R INT:0
+```calor expect=Calor0100
+module MissingInitializer
+  func Main () → void
+    let value
 ```
 
-Fix by adding one or the other:
+### Read-only storage
 
-```calor
-§B{x:i32}          // explicit type
-§B{x} INT:0        // initializer (inferred)
+Writing an immutable `let` local or a counted-loop variable reports
+`Calor0213`, including writes through `ref` or `out`. Declare a reassigned
+local with `var`. If a loop body must change its counter, use a mutable
+binding with `while` instead of assigning the counted-loop variable.
+
+```calor expect=Calor0213
+module ReadOnlyBinding
+  func Main () → int
+    !
+    let value = 1
+    set value 2
+    return value
 ```
 
-**Pre-v0.6 behavior:** the binder silently defaulted to `INT` in this
-case, producing wrong-typed code with no diagnostic. The diagnostic
-was added in v0.6 and is enforced through the root `calor -i` compile
-pipeline by `BindValidationPass`.
+### Strict inference
 
-### Strict-mode diagnostics (default-on since v0.6.3)
+Strict binding inference is enabled by default. `Calor0251` rejects an
+inferred bare `null`; supply an appropriate nullable type instead.
 
-The following diagnostics are reserved in the `Calor0250-0259` range
-and are enforced **by default** as of v0.6.3 (RFC §6). To opt out
-during migration, pass `--no-strict-bind-inference` to the root compile command
-or set `CompilationOptions.StrictBindInference = false`.
-
-| Code | Title | Fires on |
-|:-----|:------|:---------|
-| `Calor0251` | `BindCannotInferNullLiteral` | `§B{x} §NN` (untyped None) or `§B{x} null` |
-| `Calor0252` | `BindCannotInferGenericReturn` | `§B{x} §C{Vec.empty} §/C` and other well-known generic factory targets (`Vec.empty`, `List.empty`, `Array.empty`, `Set.empty`, `Map.empty`, …) |
-| `Calor0253` | `BindAmbiguousNumeric` | `§B{x} (+ INT:0 FLOAT:0.0)` — a binary op mixing integer and floating-point literal operands |
-
-Each fires only when the binding lacks an explicit `:type` annotation;
-adding the annotation always silences the diagnostic.
-
-```calor
-§B{x:Option<i32>} §NN              // silences Calor0251
-§B{x:Vec<i32>} §C{Vec.empty} §/C   // silences Calor0252
-§B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
+```calor expect=Calor0251
+module InferredNull
+  func Main () → void
+    !
+    let value = null
 ```
 
-### Calor0213 — `WriteToReadOnlyLocal`
+`Calor0253` rejects ambiguous inference from mixed integer and floating-point
+literal operands. An explicit receiving type makes the intended conversion
+clear.
 
-A hard error for any write to a local that Calor declares read-only: an
-immutable `§B` binding (no `~`) or a `§L` loop variable. Every write form is
-refused: `§ASSIGN`, compound assignment, `(inc x)`/`(dec x)`, a `§A{ref}` or
-`§A{out}` argument, and a mutable rebind (`§B{~i}`) of a loop variable. Before
-0.27 these compiled silently, because the generated C# local is not `readonly`.
-
-```calor
-§B{x:i32} 1
-§ASSIGN x 2          // Calor0213: 'x' is an immutable binding
-
-§L{l1:i:0:9:1}
-  §ASSIGN i 5        // Calor0213: 'i' is a §L loop variable
+```calor expect=Calor0253
+module MixedNumericInference
+  func Main () → void
+    !
+    let value = 0 + 0.0
 ```
 
-Declare the binding mutable with `~` (`§B{~x:i32} 1`). For a loop whose
-counter the body changes, use a `§WH` loop over a mutable binding. Statement
-forms that declare a collection (`§LIST`, `§ARR`, `§DICT`, `§HSET`) have no
-mutability marker and stay assignable.
+`Calor0252` covers unsupported generic-return inference. A type annotation
+does not create a missing generic method or fix an invalid call.
 
-### Bindings inside `§PP`
+The CLI option `--no-strict-bind-inference`, or
+`CompilationOptions.StrictBindInference = false`, disables the strict
+inference checks. It does not disable ordinary type compatibility or
+supported nullability-boundary errors.
 
-A statement-level `§PP{COND}` block (C# `#if`) is bound like any other code:
-both branches are checked, including every branch of an `#elif` chain
-(a `§PP` nested in `§PPE`). Each branch is checked on its own, so one branch
-never sees another branch's bindings.
+### Nullable initialization
 
-`#if` opens no C# scope. The emitter writes a branch's statements straight
-into the enclosing block, so a binding declared at the top of a branch is
-still visible after the block, as it is in C#. When two branches declare
-the same name, a later write is checked against the strictest declaration:
-if any branch declares the name immutable, it stays immutable afterwards.
+`Calor0272` rejects a supported possibly-null initializer at a non-null
+receiving boundary:
 
-```calor
-§PP{DEBUG}
-  §B{x:i32} 1
-§PPE
-  §B{~x:i32} 2
-§ASSIGN x 3          // Calor0213: 'x' is immutable in the DEBUG branch
-§B{~x} 4             // Calor0260: same reason
+```calor expect=Calor0272
+module NullableBinding
+  func Main () → void
+    !
+    let string?:input = null
+    let string:value = input
 ```
 
-A branch binding that reuses a name already declared in the enclosing block
-is `Calor0258`, because C# rejects it (CS0128) whenever that branch is active.
-Branches that declare the same name must give it the same type; otherwise it
-is `Calor0201`, because the code after the block sees one variable. A branch
-binding that hides a field, parameter or outer local must be declared in every
-branch (a `§PP` without `§PPE` has an empty second branch); otherwise it is
-`Calor0201`, because after the block the name would mean the outer variable
-whenever the other branch is active. A branch kept as verbatim C# (`§RAW`)
-counts as declaring it.
-Before 0.27 the bodies were only scanned, so a write to a `§PP` binding that
-shared a field's name, a write after a nested `§PP`, and a `§B{~x}` after a
-`§PP` that declared an immutable `x` all compiled.
+Inference retains supported initializer nullability; omitting an annotation
+does not make a nullable call result non-null. Initializing a mutable binding
+is checked, but later assignment is outside this bounded guarantee.
+Constructor inputs are a separate, uncovered boundary.
+See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
+for complete safe and rejected examples. Native returns and method inputs
+use `Calor0273` and `Calor0274`.
 
-### Calor0123 — `TypeFirstBindingHeader`
+## Conditional declarations
 
-A two-field header `§B{a:b}` is read **name-first** unless `a` is a
-recognizable type spelling (a built-in such as `i32`, or a PascalCase name
-such as `Widget`) and `b` is not. A one-letter or all-caps type does not
-qualify, so `§B{W:t}` used to declare a variable `W` of type `t`, silently
-swapping the two. When the first field looks like a type (an upper-case
-name, a keyword type such as `long`, or an array, pointer or nullable form
-such as `T[]` or `i32?`) and the second like a variable (a lower-case
-identifier that is not a type), the parser now reports `Calor0123`. A
-third field other than `const` or `mut` (for example the legacy
-`§B{id:name:type}` spelling) is `Calor0123` too, because it used to be
-ignored:
+Statement-level `pp condition`, `pp elif condition`, and `pp else` branches
+are checked independently. One branch cannot read another branch's bindings.
+Conditional compilation does not itself introduce a C# scope, so a binding
+declared at the top of a branch can remain visible after the conditional.
 
-```calor
-§B{W:t} §NEW{W}      // Calor0123: write §B{t:W}
-§B{t:W} §NEW{W}      // OK: name first
+When branches declare the same name, later writes respect the strictest
+mutability: if any branch declares it with `let`, it remains read-only.
+Writing it reports `Calor0213`, even when the mutable branch is selected.
+
+```calor expect=Calor0213
+module ConditionalBinding
+  func Main () → int
+    !
+    pp DEBUG
+      let value = 1
+    pp else
+      var value = 2
+    set value 3
+    return value
 ```
 
-The C# converter writes the spelling the parser reads back unchanged.
+Redeclaring a local from the surrounding statement scope reports
+`Calor0258`, because `pp` does not introduce a C# scope. Incompatible
+branch types, or a declaration that conditionally changes which outer
+symbol a name refers to, report `Calor0201`. A type annotation is not a
+way to bypass these checks.
 
----
+## Collection compatibility and scope
+
+An array can implement `IEnumerable<T>` or `IList<T>` without being a
+`List<T>`. `Calor0254` catches supported array-to-concrete-collection
+mismatches in bindings, returns, assignments and same-module call arguments.
+Known array-returning framework calls and declared source return types supply
+this information; a method's name alone does not establish its type.
+
+Normal type checking reports `Calor0202` for this resolved source return type:
+
+```calor expect=Calor0202
+module ArrayIsNotList
+  func Values () → int[]
+    ! alloc
+    return new int[]{1, 2}
+
+  func Main () → void
+    ! alloc
+    let List<int>:items = Values()
+```
+
+Do not treat this targeted diagnostic as complete signature resolution for
+every constructor, operator, external method or lambda. Ordinary compatibility
+checks and generated C# validation still apply. Earlier type checking can
+report `Calor0202` before the targeted pass runs. In particular, a direct array
+initializer assigned to `List<int>` currently reaches generated C# validation
+and reports `Calor1002`, rather than the targeted `Calor0254`.
+
+`Calor0255` rejects a new local that shadows an enclosing local, parameter or
+loop variable. Sibling blocks can independently reuse names, and a local can
+hide a field.
+
+```calor expect=Calor0255
+module ShadowedBinding
+  func Main (int:value) → int
+    !
+    if value > 0
+      let int:value = 1
+    return value
+```
+
+A `var` binding whose name already exists in a live scope reassigns that
+storage rather than shadowing it. Prefer `set` when reassignment is intended.
+Its type stays fixed: incompatible mutable rebinds report `Calor0256`, and
+rebinding an immutable local reports `Calor0260`. `Calor0258` rejects duplicate
+immutable declarations in one scope. `Calor0257` rejects writes to
+collection-iteration variables. A type annotation cannot change the type of
+storage that already exists.
 
 ## Round-trip
 
-Both forms round-trip stably through `calor convert` and `calor format`:
-
-- A C# `var x = 42;` becomes `§B{x} INT:42` (inferred form).
-- A C# `int x = 42;` becomes `§B{x:i32} INT:42` (explicit form).
-- Going back, `§B{x} INT:42` becomes `var x = 42;`; `§B{x:i32} INT:42`
-  becomes `int x = 42;`.
-
-The emitter never **adds** an annotation that the source did not
-already have, and the binder never **drops** an annotation that the
-source did have.
-
----
+A C# `var x = 42;` converts to `let x = 42` when immutable, and an explicitly
+typed declaration retains its type as `let int:x = 42`. Mutable declarations
+use `var`, with later assignments written as `set x expression`.
+The C# emitter uses `var` for inferred declarations and the named type for
+explicit ones. Formatting does not add a type annotation that was absent.
+The converter chooses mutability from the source writes, not from the C#
+`var` keyword alone.
 
 ## See also
 
-- [Types](/docs/syntax-reference/types/) — primitive type names and their C# equivalents
-- [Structure Tags](/docs/syntax-reference/structure-tags/) — `§F`, `§I`, `§O` and the surrounding function structure
-- [Expressions](/docs/syntax-reference/expressions/) — initializer expressions in Lisp-prefix form
-- [Calls](/docs/syntax-reference/calls/) — `§C` calls as binding initializers
+- [Types](/docs/syntax-reference/types/) — C# type spellings.
+- [Expressions](/docs/syntax-reference/expressions/) — initializer expressions and precedence.
+- [Calls](/docs/syntax-reference/calls/) — resolved return types and by-reference arguments.

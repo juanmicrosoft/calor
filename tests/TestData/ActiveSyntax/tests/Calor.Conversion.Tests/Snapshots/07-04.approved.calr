@@ -1,0 +1,17 @@
+module Test_07_04 Test_07_04 overflow unchecked
+  using System
+  using System.Linq
+
+  module BlockLambdaDemo public
+    func Run public ()
+      !
+      let _lam005 = () =>
+        let _chainRange004 = Enumerable.Range(1, 5)
+        let nums = _chainRange004.ToArray()
+        let int:total = nums.Sum()
+        return total
+      Handle("/x", _lam005)
+
+    func Handle public (string:route, Func<int>:handler ! unknown)
+      !
+      return

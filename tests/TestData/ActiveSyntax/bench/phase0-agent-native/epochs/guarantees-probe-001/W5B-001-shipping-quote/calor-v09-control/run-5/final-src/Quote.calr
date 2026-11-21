@@ -1,0 +1,34 @@
+module Quote Quote block
+  module QuoteModule public
+    func BaseFee (int:weight) → int
+      !
+      return (weight * 3)
+
+    func DistanceFee (int:distance) → int
+      !
+      return (distance * 2)
+
+    func QuoteWithSurcharge (int:baseAmount, int:surcharge, int:cap) → int
+      !
+      => (result <= cap)
+      let int:total = (baseAmount + surcharge)
+      if (total > cap)
+        return cap
+      return total
+
+    func QuoteTotal (int:weight, int:distance, int:cap) → int
+      !
+      let int:baseAmount = BaseFee(weight)
+      let int:extra = DistanceFee(distance)
+      return QuoteWithSurcharge(baseAmount, extra, cap)
+
+    func QuoteWithFloor (int:baseAmount, int:surcharge, int:cap, int:floor) → int
+      !
+      let int:capped = QuoteWithSurcharge(baseAmount, surcharge, cap)
+      if (capped < floor)
+        return floor
+      return capped
+
+    func FormatQuote (int:amount) → string
+      !
+      return ("quote: " + amount)

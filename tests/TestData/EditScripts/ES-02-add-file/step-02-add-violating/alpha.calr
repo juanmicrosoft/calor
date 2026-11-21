@@ -1,4 +1,4 @@
-§M{m001:Alpha}
-  §F{f001:Greet:pub} () -> void
+§M{Alpha}
+  §F{Greet:pub} () -> void
     §E{cw}
     §P "hello"

@@ -75,6 +75,9 @@ This means if you declare `fs:rw` on a function, it can call methods that requir
       "setters": {
         "PropertyName": ["effect"]
       },
+      "fields": {
+        "FieldName": ["effect"]
+      },
       "constructors": {
         "(ParamType1,ParamType2)": ["effect"],
         "()": []
@@ -105,6 +108,7 @@ This means if you declare `fs:rw` on a function, it can call methods that requir
 | `methods` | Method-specific effects (`"*"` for wildcard) |
 | `getters` | Property getter effects |
 | `setters` | Property setter effects |
+| `fields` | Field read effects, including any type initialization a static read runs |
 | `constructors` | Constructor effects (keyed by parameter signature) |
 
 ## Resolution Order
@@ -117,6 +121,36 @@ When resolving effects for a method call, the resolver checks these sources in o
 4. **`defaultEffects` on type** - Type-level default
 5. **`namespaceDefaults`** - Namespace pattern match
 6. **Unknown** - Method effects are unknown
+
+For a metadata-selected extension call, lookup uses the actual static provider and
+its full constructed signature, including the receiver parameter. For example,
+`values.Count()` selects `System.Linq.Enumerable.Count<int>(IEnumerable<int>)`,
+not an instance method on `IEnumerable<int>`. A name match alone cannot authorize
+an unresolved overload such as `values.Where()`. Receiver and argument evaluation
+effects still count; delegate arguments also contribute their own effect rows.
+An unknown callback row remains unknown even when the provider has a contract.
+Contextual lambda calls can reuse the selected invocation from Calor's annotated
+C# emission only when its native origin and all active configurations are valid.
+The compiler does not guess a `Func` signature to choose a lambda overload.
+
+The built-in manifest declares the `System.Linq.Enumerable` operators pure,
+including through a `System.Linq` namespace default, as Calor 0.29 did. This is
+an approximation: enumeration can call user-defined enumerators, callbacks and
+comparers. Delegate arguments still contribute their own effect rows, so a
+lambda that writes to the console is charged where it is passed. Exact,
+sound contracts are tracked as a separate issue.
+
+A `fields` entry answers only a read of that exact field, after the binder has
+selected the field from metadata. It never falls back to `defaultEffects`, a
+wildcard, a namespace default, a getter of the same name, or IL analysis. A
+field without an entry stays unknown. The built-in manifest declares
+`System.String.Empty` pure.
+
+Constructor and field lookups use the type's CLR metadata name
+(`System.Object`, ``System.Collections.Generic.List`1``), not its C# display
+name (`object`, `List<T>`). Only constructor lookups map a C# keyword such as
+`object` to its `System` type: a method key on an `object`-typed receiver names
+a virtual call such as `Equals`, which may run a user override.
 
 ## Manifest Search Locations
 

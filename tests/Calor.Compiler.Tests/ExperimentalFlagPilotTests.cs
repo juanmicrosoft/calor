@@ -12,9 +12,10 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ExperimentalFlagPilotTests
 {
-    private const string MinimalSource = @"§M{m001:Test}
-  §F{f001:Noop:pub}
-      §O{void}
+    private const string MinimalSource = @"module Test Test block
+  func Noop () → void
+    !
+    return
 ";
 
     [Fact]

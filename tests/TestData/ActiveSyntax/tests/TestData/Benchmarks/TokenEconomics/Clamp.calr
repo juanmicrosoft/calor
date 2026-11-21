@@ -1,0 +1,13 @@
+module ValueOps ValueOps
+  module ValueOpsModule
+    func Clamp public (int:value, int:min, int:max) → int
+      !
+      requires min <= max
+      => result >= min
+      => result <= max
+      if value < min
+        return min
+      else if value > max
+        return max
+      else
+        return value

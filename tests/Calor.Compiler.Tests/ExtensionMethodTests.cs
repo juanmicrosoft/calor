@@ -66,7 +66,7 @@ public class ExtensionMethodTests
             {
                 public static T FirstOrDefault<T>(this IEnumerable<T> source, T defaultValue)
                 {
-                    return default;
+                    return defaultValue;
                 }
             }
             """;
@@ -163,11 +163,10 @@ public class ExtensionMethodTests
     {
         // §I{string:input:this} — third position is semantic/modifier
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Reverse:pub}
-                    §I{string:input:this}
-                    §O{string}
-                    §R input
+            module TestModule TestModule block
+              func Reverse (this string:input) → string
+                !
+                return input
             """;
 
         var module = Parse(source, out var diagnostics);

@@ -1,0 +1,11 @@
+module Test_08_01 Test_08_01 overflow unchecked
+  class UserDto public
+    property string:Name public required
+      get
+      set
+    property int:Age public required
+      get
+      set
+    property string?:Email public
+      get
+      set

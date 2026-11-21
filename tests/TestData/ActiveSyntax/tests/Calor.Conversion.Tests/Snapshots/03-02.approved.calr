@@ -1,0 +1,19 @@
+module Test_03_02 Test_03_02 overflow unchecked
+  class Loops public
+    func Sum public (int:n) → int
+      !
+      var int:total = 0
+      if true
+        var int:i = 0
+        var bool:_forFirst003 = true
+        while true
+          if _forFirst003
+            set _forFirst003 false
+          else
+            set i i + 1
+          if i < n
+          else
+            break
+          if true
+            set total total + i
+      return total

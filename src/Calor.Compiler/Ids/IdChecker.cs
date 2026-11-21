@@ -75,7 +75,10 @@ public static class IdChecker
         foreach (var entry in entries)
         {
             var isTestPath = IdValidator.IsTestPath(entry.FilePath);
-            var result = IdValidator.Validate(entry.Id, entry.Kind, isTestPath || allowTestIds);
+            var result = entry.AllocationKind is { } allocated
+                && !DeclarationIdentityStore.IsSupportedKindMigration(allocated, entry.Kind)
+                ? IdValidationResult.WrongPrefix
+                : IdValidator.Validate(entry.Id, entry.AllocationKind ?? entry.Kind, isTestPath || allowTestIds);
 
             switch (result)
             {

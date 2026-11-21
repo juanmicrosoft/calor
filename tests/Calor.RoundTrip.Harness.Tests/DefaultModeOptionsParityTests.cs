@@ -22,10 +22,10 @@ public class DefaultModeOptionsParityTests
     private static readonly string[] KnownConvertOptions =
     [
         "--benchmark", "--configuration", "--define", "--documentation-mode",
-        "--explain", "--explicit-call-closers", "--feature", "--format",
-        "--framework", "--language-version", "--lossy", "--no-fallback",
+        "--explain", "--feature", "--format",
+        "--framework", "--language-version", "--no-fallback", "--no-implicit-system",
         "--output", "--passthrough", "--reference",
-        "--select-active-preprocessor-branch-lossy", "--source-kind",
+        "--source-kind",
         "--timeout", "--validate", "--verbose",
     ];
 
@@ -160,10 +160,10 @@ public class DefaultModeOptionsParityTests
     /// A CLI run with a flag that changes the options must NOT match the harness.
     /// </summary>
     [Theory]
-    [InlineData("--lossy", "Fidelity")]
+    [InlineData("--define=PARITY_NEGATIVE_CONTROL", "DefinedSymbols")]
     [InlineData("--passthrough", "PassthroughOnError")]
     [InlineData("--no-fallback", "GracefulFallback")]
-    [InlineData("--explicit-call-closers", "UseImplicitCallCloser")]
+    [InlineData("--no-implicit-system", "IncludeImplicitSystemUsing")]
     public async Task CliRunWithAFlag_DoesNotMatchDefaultMode(string flag, string changedOption)
     {
         var cli = Snapshot(await CaptureCliOptionsAsync(flag));

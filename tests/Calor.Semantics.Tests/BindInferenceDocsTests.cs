@@ -8,27 +8,37 @@ namespace Calor.Semantics.Tests;
 
 /// <summary>
 /// Characterization tests pinning the binder's current handling of
-/// <c>§B{name}</c> without a type annotation. These tests document
+/// <c>let name</c> without a type annotation. These tests document
 /// the behavior referenced by the v0.6 bind-inference RFC
 /// (<c>docs/plans/v0.6-bind-inference-formalization.md</c>, §1.2 table).
 ///
-/// The "no type and no initializer" case currently silently defaults
-/// to <c>INT</c> (see <c>Binder.cs:259</c>). RFC §3.2 promotes this
-/// to a hard error (<c>Calor0250</c>). The corresponding test below
-/// (<see cref="NoTypeNoInitializer_SilentlyDefaultsToInt"/>) will be
-/// updated to expect <c>Calor0250</c> when that change lands.
+/// Missing both type and initializer is a native parser error. The recovered
+/// AST also exercises the binder's Calor0250 guard and INT recovery type,
+/// retaining the v0.6 regression rather than accepting an invalid declaration.
 /// </summary>
 public class BindInferenceDocsTests
 {
-    private static BoundModule Bind(string source, out DiagnosticBag diagnostics)
+    private static BoundModule Bind(
+        string source, out DiagnosticBag diagnostics, bool expectMissingInitializer = false)
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
-        Assert.False(diagnostics.HasErrors,
-            $"Source failed to parse: {string.Join("; ", diagnostics.Errors.Select(e => e.Message))}");
+        if (expectMissingInitializer)
+        {
+            // Native syntax rejects the declaration before binding; also verify the
+            // existing Calor0250 recovery guard against that actual recovered AST.
+            var error = Assert.Single(diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+            Assert.Equal("An inferred binding requires '= expression'.", error.Message);
+        }
+        else
+        {
+            Assert.False(diagnostics.HasErrors,
+                $"Source failed to parse: {string.Join("; ", diagnostics.Errors.Select(e => e.Message))}");
+        }
         var binder = new Binder(diagnostics);
         return binder.Bind(module);
     }
@@ -43,11 +53,11 @@ public class BindInferenceDocsTests
     public void IntLiteralInitializer_InfersInt()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{i32}
-      §B{x} INT:42
-      §R x
+module Test Test
+  func Foo () → int
+    !
+    let x = 42
+    return x
 """;
         var bound = Bind(source, out var diags);
         Assert.False(diags.HasErrors);
@@ -59,11 +69,11 @@ public class BindInferenceDocsTests
     public void StringLiteralInitializer_InfersString()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{str}
-      §B{s} STR:"hello"
-      §R s
+module Test Test
+  func Foo () → string
+    !
+    let s = "hello"
+    return s
 """;
         var bound = Bind(source, out var diags);
         Assert.False(diags.HasErrors);
@@ -75,11 +85,11 @@ public class BindInferenceDocsTests
     public void BoolLiteralInitializer_InfersBool()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{bool}
-      §B{b} BOOL:true
-      §R b
+module Test Test
+  func Foo () → bool
+    !
+    let b = true
+    return b
 """;
         var bound = Bind(source, out var diags);
         Assert.False(diags.HasErrors);
@@ -91,11 +101,11 @@ public class BindInferenceDocsTests
     public void FloatLiteralInitializer_InfersFloat()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{f64}
-      §B{x} FLOAT:3.14
-      §R x
+module Test Test
+  func Foo () → double
+    !
+    let x = 3.14
+    return x
 """;
         var bound = Bind(source, out var diags);
         Assert.False(diags.HasErrors);
@@ -106,52 +116,45 @@ public class BindInferenceDocsTests
     [Fact]
     public void ExplicitTypeAnnotation_OverridesInference()
     {
-        // §B{x:i32} INT:0 — explicit annotation wins, AND the binder
-        // currently normalizes the lowercase form ("i32") to the
-        // uppercase canonical name ("INT") that bound literals use.
-        // This is the behavior the RFC §1.2 table footnote calls out.
+        // Native declarations retain the C# spelling; literal inference still uses INT.
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{i32}
-      §B{x:i32} INT:0
-      §R x
+module Test Test
+  func Foo () → int
+    !
+    let int:x = 0
+    return x
 """;
         var bound = Bind(source, out var diags);
         Assert.False(diags.HasErrors);
         var bind = FirstBind(bound);
-        Assert.Equal("INT", bind.Variable.TypeName);
+        Assert.Equal("int", bind.Variable.TypeName);
+        var result = SemanticsTestHarness.Execute(source, "Foo");
+        Assert.True(result.Succeeded, $"Execution failed: {result.Exception?.Message}");
+        Assert.Equal(0, Assert.IsType<int>(result.ReturnValue));
     }
 
     /// <summary>
-    /// CURRENT BEHAVIOR (latent bug): <c>§B{x}</c> with no type and no
-    /// initializer silently binds <c>x</c> as <c>INT</c>. RFC
-    /// <c>docs/plans/v0.6-bind-inference-formalization.md</c> §3.2 proposes
-    /// promoting this to a hard error (<c>Calor0250 BindRequiresTypeOrInitializer</c>).
-    ///
-    /// Calor0250 IS NOW IMPLEMENTED — see the companion test
-    /// <see cref="NoTypeNoInitializer_ReportsCalor0250"/> below.
-    /// This test is kept to document the pre-RFC behavior for review history;
-    /// it now asserts the new error code.
+    /// Retains the historical test identity while requiring rejection by the
+    /// native parser and Calor0250 from binding its recovered AST. INT is only
+    /// the recovery type, not evidence that the invalid source was accepted.
     /// </summary>
     [Fact]
     public void NoTypeNoInitializer_SilentlyDefaultsToInt()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{i32}
-      §B{x}
-      §R INT:0
+module Test Test
+  func Foo () → int
+    let x
+    return 0
 """;
-        var bound = Bind(source, out var diags);
+        var bound = Bind(source, out var diags, expectMissingInitializer: true);
 
         // After Calor0250: the binder now reports an error for this case.
         // The bound tree is still produced (with INT fallback) so downstream
         // passes can continue surfacing diagnostics, but compilation fails
         // because of the new error.
         Assert.True(diags.HasErrors,
-            "Calor0250 must fire for §B{x} with no type and no initializer.");
+            "Calor0250 must fire for let x with no type and no initializer.");
         Assert.Contains(diags.Errors, d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
         var bind = FirstBind(bound);
         // Fallback type is still INT so the rest of the bound tree remains usable.
@@ -162,30 +165,30 @@ public class BindInferenceDocsTests
     public void NoTypeNoInitializer_ReportsCalor0250()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{i32}
-      §B{counter}
-      §R INT:0
+module Test Test
+  func Foo () → int
+    let counter
+    return 0
 """;
-        var bound = Bind(source, out var diags);
+        var bound = Bind(source, out var diags, expectMissingInitializer: true);
 
         Assert.True(diags.HasErrors);
         var err = Assert.Single(diags.Errors,
             d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
         Assert.Contains("counter", err.Message);
-        Assert.Contains(":i32", err.Message);  // suggested-fix hint in message
+        Assert.Contains("int:name", err.Message);
+        Assert.DoesNotContain("§B", err.Message);
     }
 
     [Fact]
     public void MutableBinding_WithInferredType_IsMutable()
     {
         var source = """
-§M{m001:Test}
-  §F{f001:Foo:pub}
-      §O{i32}
-      §B{~counter} INT:0
-      §R counter
+module Test Test
+  func Foo () → int
+    !
+    var counter = 0
+    return counter
 """;
         var bound = Bind(source, out var diags);
         Assert.False(diags.HasErrors);

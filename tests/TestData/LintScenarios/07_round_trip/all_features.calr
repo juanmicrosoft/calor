@@ -1,31 +1,31 @@
-§M{m1:AllFeatures}
-  §F{f1:Main:pub} () -> void
-    §E{cw}
-    §P "Starting"
-    §B{x} 10
-    §B{~y} 0
-    §L{l1:i:1:10:1}
-      §IF{i1} (> i 5)
-        §P "high"
-      §EI (== i 5)
-        §P "middle"
-      §EL
-        §P "low"
-      §B{~y} (+ y i)
-    §P y
+module AllFeatures AllFeatures block
+  func Main () → void
+    ! cw
+    Console.WriteLine("Starting")
+    let x = 10
+    var y = 0
+    for i from 1 to 10 step 1
+      if (i > 5)
+        Console.WriteLine("high")
+      else if (i == 5)
+        Console.WriteLine("middle")
+      else
+        Console.WriteLine("low")
+      var y = (y + i)
+    Console.WriteLine(y)
 
-  §F{f2:Calculate:pub} (i32:a, i32:b) -> i32
-    §Q (> a 0)
-    §Q (> b 0)
-    §S (> result 0)
-    §B{sum} (+ a b)
-    §B{product} (* a b)
-    §R (+ sum product)
+  func Calculate (int:a, int:b) → int
+    !
+    requires (a > 0)
+    requires (b > 0)
+    => (result > 0)
+    let sum = (a + b)
+    let product = (a * b)
+    return (sum + product)
 
-  §F{f3:Divide:priv} (i32:x, i32:y) -> i32
-    §Q (!= y 0)
-    §TR{t1}
-      §R (/ x y)
-    §CA{Exception:e}
-      §R 0
-
+  func Divide private (int:x, int:y) → int
+    requires (y != 0)
+    try
+      return (x / y)
+    catch Exception:e
+      return 0

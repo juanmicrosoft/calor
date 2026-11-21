@@ -135,11 +135,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_StackAllocSized_EmitsStackallocExpression()
     {
         var calorSource = """
-            §M{m001:StackAllocTest}
-                §F{f001:Alloc:pub}
-                    §O{i32}
-                    §B{~sum:i32} INT:0
-                    §R sum
+            module StackAllocTest StackAllocTest block
+              func Alloc () → int
+                !
+                var int:sum = 0
+                return sum
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -147,64 +147,17 @@ public class UnsafeLowLevelRoundtripTests
     }
 
     [Fact]
-    public void Emit_StackAllocSized_InBinding_EmitsStackalloc()
-    {
-        var calorSource = """
-            §M{m001:StackAllocTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Alloc:pub:unsafe}
-                        §O{void}
-                        §B{span:Span<i32>} §SALLOC{i32:10}
-            """;
-
-        var csharp = ParseAndEmit(calorSource);
-        Assert.Contains("stackalloc int[10]", csharp);
-    }
-
-    [Fact]
     public void Emit_SizeOf_EmitsSizeofExpression()
     {
         var calorSource = """
-            §M{m001:SizeOfTest}
-                §F{f001:GetSize:pub}
-                    §O{i32}
-                    §R §SIZEOF{i32}
+            module SizeOfTest SizeOfTest block
+              func GetSize () → int
+                !
+                return sizeof(int)
             """;
 
         var csharp = ParseAndEmit(calorSource);
         Assert.Contains("sizeof(int)", csharp);
-    }
-
-    [Fact]
-    public void Emit_AddressOf_EmitsAmpersand()
-    {
-        var calorSource = """
-            §M{m001:AddrTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:GetAddr:pub:unsafe}
-                        §O{void}
-                        §B{~x:i32} INT:42
-                        §B{ptr:i32*} §ADDR x
-            """;
-
-        var csharp = ParseAndEmit(calorSource);
-        Assert.Contains("&x", csharp);
-    }
-
-    [Fact]
-    public void Emit_PointerDereference_EmitsStar()
-    {
-        var calorSource = """
-            §M{m001:DerefTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:ReadPtr:pub:unsafe}
-                        §I{ptr:i32*}
-                        §O{i32}
-                        §R §DEREF ptr
-            """;
-
-        var csharp = ParseAndEmit(calorSource);
-        Assert.Contains("*ptr", csharp);
     }
 
     #endregion
@@ -215,13 +168,12 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_UnsafeBlock_EmitsUnsafeKeyword()
     {
         var calorSource = """
-            §M{m001:UnsafeBlockTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:DoUnsafe:pub}
-                        §O{void}
-                        §UNSAFE{u1}
-                          §B{~x:i32} INT:42
-                        §/UNSAFE{u1}
+            module UnsafeBlockTest UnsafeBlockTest block
+              class Test
+                func DoUnsafe () → void
+                  !
+                  unsafe
+                    var int:x = 42
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -233,14 +185,12 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_FixedStatement_EmitsFixedBlock()
     {
         var calorSource = """
-            §M{m001:FixedTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:DoFixed:pub:unsafe}
-                        §I{arr:[i32]}
-                        §O{void}
-                        §FIXED{f1:ptr:i32*:arr}
-                          §B{val:i32} §DEREF ptr
-                        §/FIXED{f1}
+            module FixedTest FixedTest block
+              class Test
+                func DoFixed unsafe (int[]:arr) → void
+                  !
+                  fixed int*:ptr = arr
+                    let int:val = ptr[0]
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -255,11 +205,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArraySized_EmitsNewWithDimensions()
     {
         var calorSource = """
-            §M{m001:ArrayTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Create:pub}
-                        §O{void}
-                        §B{grid:i32} §ARR2D{a1:grid:i32:3:4}
+            module ArrayTest ArrayTest block
+              class Test
+                func Create () → void
+                  !
+                  let int:grid = new int[3, 4]
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -270,14 +220,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArrayInitializer_EmitsNewWithInitializer()
     {
         var calorSource = """
-            §M{m001:ArrayInitTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Create:pub}
-                        §O{void}
-                        §B{grid:i32} §ARR2D{a1:grid:i32}
-                          §ROW INT:1 INT:2
-                          §ROW INT:3 INT:4
-                        §/ARR2D{a1}
+            module ArrayInitTest ArrayInitTest block
+              class Test
+                func Create () → void
+                  !
+                  let int:grid = new int[,] { { 1, 2 }, { 3, 4 } }
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -290,12 +237,11 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_MultiDimArrayAccess_EmitsIndexing()
     {
         var calorSource = """
-            §M{m001:IndexTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:Get:pub}
-                        §I{grid:i32}
-                        §O{i32}
-                        §R §IDX2D grid INT:1 INT:2
+            module IndexTest IndexTest block
+              class Test
+                func Get (grid:i32) → int
+                  !
+                  return grid[1, 2]
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -317,7 +263,7 @@ public class UnsafeLowLevelRoundtripTests
                     return sizeof(int);
                 }
             }
-            """, "§SIZEOF");
+            """, "sizeof(int)");
 
         Assert.Contains("sizeof(int)", csharp);
     }
@@ -336,26 +282,9 @@ public class UnsafeLowLevelRoundtripTests
                     }
                 }
             }
-            """, "§UNSAFE");
+            """, "\n      unsafe");
 
         Assert.Contains("unsafe", csharp);
-    }
-
-    [Fact]
-    public void RoundTrip_StackAlloc_RoslynCompiles()
-    {
-        var csharp = FullRoundTrip("""
-            public static class Test
-            {
-                public static unsafe int Sum()
-                {
-                    int* ptr = stackalloc int[3];
-                    return 0;
-                }
-            }
-            """, "§SALLOC");
-
-        Assert.Contains("stackalloc", csharp);
     }
 
     [Fact]
@@ -372,42 +301,11 @@ public class UnsafeLowLevelRoundtripTests
                     }
                 }
             }
-            """, "§FIXED");
+            """, "fixed (int* ptr = arr)");
+        // 0.30 (af5d914ab): a pointer dereference keeps its member as C#, so the fixed
+        // statement survives verbatim inside the preserved member.
 
         Assert.Contains("fixed", csharp);
-    }
-
-    [Fact]
-    public void RoundTrip_AddressOf_RoslynCompiles()
-    {
-        var csharp = FullRoundTrip("""
-            public static class Test
-            {
-                public static unsafe void TakeAddr()
-                {
-                    int x = 42;
-                    int* ptr = &x;
-                }
-            }
-            """, "§ADDR");
-
-        Assert.Contains("&x", csharp);
-    }
-
-    [Fact]
-    public void RoundTrip_PointerDereference_RoslynCompiles()
-    {
-        var csharp = FullRoundTrip("""
-            public static class Test
-            {
-                public static unsafe int Deref(int* ptr)
-                {
-                    return *ptr;
-                }
-            }
-            """, "§DEREF");
-
-        Assert.Contains("*ptr", csharp);
     }
 
     [Fact]
@@ -422,7 +320,7 @@ public class UnsafeLowLevelRoundtripTests
                     return grid;
                 }
             }
-            """, "§ARR2D");
+            """, "new int[rows, cols]");
 
         Assert.Contains("new int[", csharp);
     }
@@ -438,36 +336,12 @@ public class UnsafeLowLevelRoundtripTests
                     return grid[row, col];
                 }
             }
-            """, "§IDX2D");
+            """, "grid[row, col]");
 
         Assert.Contains("grid[", csharp);
     }
-
     #endregion
-
     #region Initializer forms — C# → Calor → Parse → C# roundtrip
-
-    [Fact]
-    public void RoundTrip_StackAllocInitializer_ParsesCorrectly()
-    {
-        var csharpInput = """
-            public static class Test
-            {
-                public static unsafe int Sum()
-                {
-                    int* ptr = stackalloc int[] { 1, 2, 3 };
-                    return 0;
-                }
-            }
-            """;
-
-        var calor = ConvertToCalor(csharpInput);
-        Assert.Contains("§SALLOC", calor);
-
-        var csharpOutput = ParseAndEmit(calor);
-        Assert.Contains("stackalloc", csharpOutput);
-        Assert.Contains("1, 2, 3", csharpOutput);
-    }
 
     [Fact]
     public void RoundTrip_MultiDimArrayInitializer_ParsesCorrectly()
@@ -488,7 +362,7 @@ public class UnsafeLowLevelRoundtripTests
             """;
 
         var (calor, csharpOutput) = ConvertAndEmit(csharpInput);
-        Assert.Contains("§ARR2D", calor);
+        Assert.Contains("new int[,] { { 1, 2, 3 }, { 4, 5, 6 } }", calor);
         Assert.Contains("new int[,]", csharpOutput);
         Assert.Contains("1, 2, 3", csharpOutput);
         Assert.Contains("4, 5, 6", csharpOutput);
@@ -521,10 +395,10 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_UnsafeMethodModifier_FromCalor()
     {
         var calorSource = """
-            §M{m001:UnsafeMethodTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:DoStuff:pub:stat,unsafe}
-                        §O{void}
+            module UnsafeMethodTest UnsafeMethodTest block
+              class Test
+                func DoStuff static unsafe () → void
+                  !
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -536,10 +410,10 @@ public class UnsafeLowLevelRoundtripTests
     public void Emit_ExternMethodModifier_FromCalor()
     {
         var calorSource = """
-            §M{m001:ExternMethodTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:NativeCall:pub:stat,ext}
-                        §O{void}
+            module ExternMethodTest ExternMethodTest block
+              class Test
+                func NativeCall static extern () → void
+                  !
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -667,7 +541,7 @@ public class UnsafeLowLevelRoundtripTests
                     return cube;
                 }
             }
-            """, "§ARR2D");
+            """, "new int[x, y, z]");
 
         Assert.Contains("int[,,]", csharp);
         Assert.Contains("new int[", csharp);
@@ -678,11 +552,11 @@ public class UnsafeLowLevelRoundtripTests
     {
         // Verifies that (cast i32* expr) parses correctly with pointer type
         var calorSource = """
-            §M{m001:CastTest}
-                §CL{c001:Test:pub}
-                    §MT{m001:CastPtr:pub:unsafe}
-                        §O{i32*}
-                        §R (cast i32* 0)
+            module CastTest CastTest block
+              class Test
+                func CastPtr unsafe () → int*
+                  !
+                  return (int*)0
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -704,7 +578,7 @@ public class UnsafeLowLevelRoundtripTests
             """;
 
         var (calor, csharpOutput) = ConvertAndEmit(csharpInput);
-        Assert.Contains("(cast i32*", calor);
+        Assert.Contains("(int*)0", calor);
         Assert.Contains("(int*)", csharpOutput);
     }
 

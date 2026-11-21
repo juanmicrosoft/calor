@@ -13,8 +13,19 @@ public class BulkBenchmarkCompilationTests
 {
     private static readonly HashSet<string> KnownGeneratedCSharpFailures =
     [
+        "DesignPatterns/TemplateMethod.calr",
+    ];
+
+    /// <summary>
+    /// 0.30 i1: benchmarks whose `float` (the original's `f32`) receives a `double` value, such
+    /// as `celsius + 273.15`. They were known generated-C# failures (CS0266/CS0664, Calor1002) and
+    /// are now rejected earlier by the type checker (Calor0202 at the Calor expression). Like the
+    /// Calor0213 set they are registered B1 inputs and stay byte for byte. HashMap also writes an
+    /// immutable local (Calor0213, a later phase); the type checker now stops it first.
+    /// </summary>
+    private static readonly HashSet<string> KnownNumericNarrowing =
+    [
         "TokenEconomics/TemperatureConverter.calr",
-        "TokenEconomics/Power.calr",
         "DesignPatterns/Factory.calr",
         "TokenEconomics/Average.calr",
         "TokenEconomics/CelsiusToKelvin.calr",
@@ -27,13 +38,13 @@ public class BulkBenchmarkCompilationTests
         "DomainProblems/ScoreBoard.calr",
         "DomainProblems/TaxCalculator.calr",
         "DomainProblems/CurrencyConverter.calr",
-        "DesignPatterns/Visitor.calr",
-        "DesignPatterns/TemplateMethod.calr",
-        "EffectSoundness/NetworkEffect.calr",
-        "InteropEffectCoverage/PureFunctions.calr",
         "OOPGenerics/InterfaceImpl.calr",
         "OOPGenerics/Composition.calr",
         "OOPGenerics/Polymorphism.calr",
+        "DataStructures/HashMap.calr",
+        // 0.30 i7: `return expr.Value` (a double field, a float return) is now the typed
+        // member read, so the narrowing is caught here instead of as CS0266 (Calor1002).
+        "DesignPatterns/Visitor.calr",
     ];
 
     /// <summary>
@@ -88,7 +99,8 @@ public class BulkBenchmarkCompilationTests
     public void BenchmarkFile_HasExpectedValidatedOutcome(string id, string name, string category, string calorFile)
     {
         var benchmarksDir = GetBenchmarksDir();
-        var fullPath = Path.Combine(benchmarksDir, calorFile);
+        var fullPath = ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(),
+            Path.Combine(benchmarksDir, calorFile));
 
         Assert.True(File.Exists(fullPath), $"Missing .calr file: {calorFile}");
 
@@ -102,6 +114,20 @@ public class BulkBenchmarkCompilationTests
         };
 
         var result = Program.Compile(source, fullPath, options);
+
+        if (KnownNumericNarrowing.Contains(calorFile))
+        {
+            Assert.True(result.HasErrors, $"Known narrowing fixture unexpectedly validated: {calorFile}");
+            Assert.All(
+                result.Diagnostics.Where(d => d.IsError),
+                diagnostic =>
+                {
+                    Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticCode.TypeMismatch, diagnostic.Code);
+                    Assert.Contains("Cannot implicitly convert", diagnostic.Message);
+                });
+            _output.WriteLine($"KNOWN NARROWING [{id}] {category}/{name}");
+            return;
+        }
 
         if (KnownWriteToReadOnlyLocal.Contains(calorFile))
         {

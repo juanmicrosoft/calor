@@ -1,0 +1,25 @@
+module Calculator Calculator
+  module CalculatorModule
+    func Add public (int:a, int:b) → int
+      !
+      requires a >= 0
+      requires b >= 0
+      return a + b
+
+    func Subtract public (int:a, int:b) → int
+      !
+      requires a >= 0
+      requires b >= 0
+      return a - b
+
+    func Multiply public (int:a, int:b) → int
+      !
+      requires a >= 0
+      requires b >= 0
+      return a * b
+
+    func Divide public (int:a, int:b) → int
+      !
+      requires a >= 0
+      requires b > 0
+      return a / b

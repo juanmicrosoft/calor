@@ -6,13 +6,14 @@ using Calor.Compiler.Migration.Project;
 using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// Tests for preprocessor directive (#if/#else/#endif) conversion from C# to Calor.
-/// Validates that trivia-based preprocessor regions are correctly wrapped in §PP blocks.
+/// Validates that trivia-based preprocessor regions retain native pp blocks and their branches.
 /// </summary>
 public class PreprocessorConversionTests
 {
@@ -45,6 +46,23 @@ public class PreprocessorConversionTests
         return string.Join("\n", result.Issues.Select(i => $"[{i.Severity}] {i.Message}"));
     }
 
+    private static void AssertPreprocessorBlock(string calor, string condition)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(calor, diagnostics).TokenizeAll();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Contains(tokens, token => token.Kind == TokenKind.Preprocessor
+            && token.Value is string text
+            && (text.Trim() == condition || text.Trim() == "elif " + condition));
+        var directives = CSharpSyntaxTree.ParseText(CompileCalorToCSharp(calor))
+            .GetRoot().DescendantTrivia().Select(trivia => trivia.GetStructure())
+            .OfType<DirectiveTriviaSyntax>();
+        var start = Assert.Single(directives, directive =>
+            directive is IfDirectiveTriviaSyntax first && first.Condition.ToString() == condition
+            || directive is ElifDirectiveTriviaSyntax next && next.Condition.ToString() == condition);
+        Assert.IsType<EndIfDirectiveTriviaSyntax>(start.GetRelatedDirectives().Last());
+    }
+
     [Fact]
     public void Converter_SimpleIfEndif_ProducesPreprocessorBlock()
     {
@@ -59,8 +77,7 @@ public class Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§/PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
     }
 
     [Fact]
@@ -79,9 +96,8 @@ public class Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§PPE", calor);
-        Assert.Contains("§/PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
+        Assert.Contains("pp else", calor);
     }
 
     [Fact]
@@ -98,8 +114,7 @@ public class Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{NET8_0_OR_GREATER}", calor);
-        Assert.Contains("§/PP{NET8_0_OR_GREATER}", calor);
+        AssertPreprocessorBlock(calor, "NET8_0_OR_GREATER");
     }
 
     [Fact]
@@ -107,13 +122,12 @@ public class Test
     {
         // Verify the Calor parser and C# emitter can round-trip preprocessor blocks
         var calor = @"
-§M{m1:Test}
-    §CL{c1:Test}
-        §MT{mt1:M:pub}
-            §O{void}
-            §PP{DEBUG}
-              §B{x} INT:1
-            §/PP{DEBUG}
+module Test Test
+  class Test
+    func M () → void
+      !
+      pp DEBUG
+        let x = 1
 ";
         var csharp = CompileCalorToCSharp(calor);
         Assert.Contains("#if DEBUG", csharp);
@@ -124,7 +138,7 @@ public class Test
     public void Converter_FullyDisabledIf_RecoverBodyFromTrivia()
     {
         // When no symbol is defined and there's no #else, the entire #if body
-        // is DisabledTextTrivia — verify it's recovered as a §PP block
+        // is DisabledTextTrivia — verify it's recovered as a native pp block
         var csharp = @"
 public class Test
 {
@@ -136,10 +150,9 @@ public class Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{SOME_UNDEFINED_SYMBOL}", calor);
-        Assert.Contains("§/PP{SOME_UNDEFINED_SYMBOL}", calor);
+        AssertPreprocessorBlock(calor, "SOME_UNDEFINED_SYMBOL");
         // The body should contain a reference to x (may be raw text or bind depending on trivia recovery)
-        Assert.True(calor.Contains("§B{x}") || calor.Contains("var x") || calor.Contains("x = 42"),
+        Assert.True(calor.Contains("let x") || calor.Contains("var x") || calor.Contains("x = 42"),
             $"Expected disabled block to contain x declaration. Output: {calor}");
     }
 
@@ -164,8 +177,7 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
         // Should have an outer PP block for NET8_0_OR_GREATER
-        Assert.Contains("§PP{NET8_0_OR_GREATER}", calor);
-        Assert.Contains("§/PP{NET8_0_OR_GREATER}", calor);
+        AssertPreprocessorBlock(calor, "NET8_0_OR_GREATER");
     }
 
     [Fact]
@@ -185,8 +197,8 @@ public class Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§PPE", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
+        Assert.Contains("pp else", calor);
         var generated = CompileCalorToCSharp(calor);
         Assert.Contains("return 1", generated);
         Assert.Contains("return 2", generated);
@@ -195,7 +207,7 @@ public class Test
     [Fact]
     public void Converter_IfElifEndif_ProducesNestedPreprocessorBlocks()
     {
-        // #if/#elif/#endif → nested §PP blocks
+        // #if/#elif/#endif retain the conditional branch chain.
         var csharp = @"
 public class Test
 {
@@ -211,17 +223,14 @@ public class Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        // Should have outer §PP{DEBUG} with nested §PP{TRACE} in its else
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§PP{TRACE}", calor);
-        Assert.Contains("§/PP{DEBUG}", calor);
-        Assert.Contains("§/PP{TRACE}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
+        AssertPreprocessorBlock(calor, "TRACE");
     }
 
     [Fact]
     public void Converter_IfElifElseEndif_PreservesAllBranches()
     {
-        // #if/#elif/#else/#endif → nested §PP with all 3 branches preserved
+        // #if/#elif/#else/#endif retain all three branches.
         var csharp = @"
 public class Test
 {
@@ -237,8 +246,8 @@ public class Test
     }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{NET8_0_OR_GREATER}", calor);
-        Assert.Contains("§PP{NET6_0_OR_GREATER}", calor);
+        AssertPreprocessorBlock(calor, "NET8_0_OR_GREATER");
+        AssertPreprocessorBlock(calor, "NET6_0_OR_GREATER");
         var generated = CompileCalorToCSharp(calor);
         Assert.Contains("return 1", generated);
         Assert.Contains("return 2", generated);
@@ -248,21 +257,19 @@ public class Test
     [Fact]
     public void Converter_IfElifElseEndif_RoundTripsCalorToCSharp()
     {
-        // Verify nested §PP round-trips back to C# #if/#else/#endif
+        // Verify nested pp blocks round-trip back to C# #if/#else/#endif.
         var calor = @"
-§M{m1:Test}
-    §CL{c1:Test}
-        §MT{mt1:M:pub}
-            §O{i32}
-            §PP{NET8_0_OR_GREATER}
-              §R INT:1
-            §PPE
-              §PP{NET6_0_OR_GREATER}
-                §R INT:2
-              §PPE
-                §R INT:3
-              §/PP{NET6_0_OR_GREATER}
-            §/PP{NET8_0_OR_GREATER}
+module Test Test
+  class Test
+    func M () → int
+      !
+      pp NET8_0_OR_GREATER
+        return 1
+      pp else
+        pp NET6_0_OR_GREATER
+          return 2
+        pp else
+          return 3
 ";
         var csharp = CompileCalorToCSharp(calor);
         // The C# output should have the nested #if structure
@@ -288,8 +295,7 @@ public class Test
 #endif
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§/PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
     }
 
     [Fact]
@@ -305,9 +311,8 @@ public class Test
 #endif
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§PPE", calor);
-        Assert.Contains("§/PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
+        Assert.Contains("pp else", calor);
     }
 
     [Fact]
@@ -323,8 +328,7 @@ public class Test
     public void AlwaysPresent() { }
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§/PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
         // The always-present method should NOT be inside the PP block
         Assert.Contains("AlwaysPresent", calor);
     }
@@ -346,10 +350,8 @@ public class Test
         var result = new CSharpToCalorConverter().Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
         var calor = new CalorEmitter().Emit(result.Ast!);
-        Assert.Contains("§PP{NET8_0_OR_GREATER}", calor);
-        Assert.Contains("§PP{NET6_0_OR_GREATER}", calor);
-        Assert.Contains("§/PP{NET8_0_OR_GREATER}", calor);
-        Assert.Contains("§/PP{NET6_0_OR_GREATER}", calor);
+        AssertPreprocessorBlock(calor, "NET8_0_OR_GREATER");
+        AssertPreprocessorBlock(calor, "NET6_0_OR_GREATER");
     }
 
     [Fact]
@@ -365,20 +367,18 @@ public class Test
 #endif
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{SOME_UNDEFINED_SYMBOL}", calor);
-        Assert.Contains("§/PP{SOME_UNDEFINED_SYMBOL}", calor);
+        AssertPreprocessorBlock(calor, "SOME_UNDEFINED_SYMBOL");
     }
 
     [Fact]
     public void Converter_MemberLevelPP_RoundTripsCalorToCSharp()
     {
         var calor = @"
-§M{m1:Test}
-    §CL{c1:Test}
-        §PP{DEBUG}
-          §MT{mt1:DebugMethod:pub}
-              §O{void}
-        §/PP{DEBUG}
+module Test Test
+  class Test
+    pp DEBUG
+      func DebugMethod () → void
+        !
 ";
         var csharp = CompileCalorToCSharp(calor);
         Assert.Contains("#if DEBUG", csharp);
@@ -398,8 +398,7 @@ public struct TestStruct
     public int AlwaysValue;
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
-        Assert.Contains("§/PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
         Assert.Contains("AlwaysValue", calor);
     }
 
@@ -423,8 +422,10 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
         // Should have PP blocks at both member and statement level
-        var ppCount = calor.Split("§PP{DEBUG}").Length - 1;
-        Assert.True(ppCount >= 2, $"Expected at least 2 §PP{{DEBUG}} blocks, got {ppCount}. Output:\n{calor}");
+        var ppCount = new Lexer(calor, new DiagnosticBag()).TokenizeAll()
+            .Count(token => token.Kind == TokenKind.Preprocessor
+                && token.Value is string text && text.Trim() == "DEBUG");
+        Assert.True(ppCount >= 2, $"Expected at least 2 native pp DEBUG blocks, got {ppCount}. Output:\n{calor}");
     }
 
     [Fact]
@@ -443,9 +444,8 @@ public class Test
 #endif
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{true}", calor);
-        Assert.Contains("§PPE", calor);
-        Assert.Contains("§/PP{true}", calor);
+        AssertPreprocessorBlock(calor, "true");
+        Assert.Contains("pp else", calor);
         // Active members should be present
         Assert.Contains("ActiveField", calor);
         Assert.Contains("ActiveMethod", calor);
@@ -466,8 +466,7 @@ public class Test
     public int AlwaysField;
 }";
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{true}", calor);
-        Assert.Contains("§/PP{true}", calor);
+        AssertPreprocessorBlock(calor, "true");
         Assert.Contains("ConditionalField", calor);
         Assert.Contains("AlwaysField", calor);
     }
@@ -537,9 +536,8 @@ public static class NumberToWordsExtension
         var calor = ConvertToCalor(csharp);
 
         // Should have member-level PP block
-        Assert.Contains("§PP{NET6_0_OR_GREATER}", calor);
-        Assert.Contains("§/PP{NET6_0_OR_GREATER}", calor);
-        Assert.Contains("§PPE", calor);
+        AssertPreprocessorBlock(calor, "NET6_0_OR_GREATER");
+        Assert.Contains("pp else", calor);
 
         // Unconditional members should still be present
         Assert.Contains("UnitsMap", calor);
@@ -575,7 +573,7 @@ public class Test
         // The primary assertion: conversion completes without hanging (10s timeout)
         var calor = ConvertToCalor(csharp);
         // At least the first #if should be captured
-        Assert.Contains("§PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
     }
 
     [Fact]
@@ -625,7 +623,7 @@ public class Test
 }";
         // The primary assertion: conversion completes without hanging (10s timeout)
         var calor = ConvertToCalor(csharp);
-        Assert.Contains("§PP{DEBUG}", calor);
+        AssertPreprocessorBlock(calor, "DEBUG");
         Assert.Contains("Always", calor);
     }
 
@@ -661,7 +659,7 @@ public class Test
     public void Converter_NestedMemberAndStatementPP_BothLevelsCompose()
     {
         // Member-level #if wrapping a method whose body contains a statement-level #if.
-        // Both levels should produce independent §PP blocks that compose correctly.
+        // Both levels must retain their conditional ownership.
         var csharp = @"
 public class Test
 {
@@ -680,7 +678,7 @@ public class Test
 
         // Nested conditional ownership is conservatively retained in one complete
         // type boundary rather than detached nested blocks.
-        Assert.Contains("§CSHARP", calor);
+        Assert.Contains("raw ", calor);
         Assert.Contains("#if NET6_0_OR_GREATER", calor);
         Assert.Contains("#if DEBUG", calor);
 
@@ -711,8 +709,8 @@ public class Test
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.Equal(PreprocessorConversionMode.PreserveAllBranches, result.Metadata.PreprocessorMode);
-        Assert.Contains("§PP{false}", result.CalorSource);
-        Assert.Contains("§PPE", result.CalorSource);
+        AssertPreprocessorBlock(result.CalorSource!, "false");
+        Assert.Contains("pp else", result.CalorSource);
         var generated = CompileCalorToCSharp(result.CalorSource!);
         Assert.Contains("return 1", generated);
         Assert.Contains("return 2", generated);
@@ -778,7 +776,9 @@ public class Test
         Assert.Contains("Selected", result.CalorSource);
         Assert.DoesNotContain("Other", result.CalorSource);
         Assert.DoesNotContain("Fallback", result.CalorSource);
-        Assert.DoesNotContain("§PP", result.CalorSource);
+        Assert.DoesNotContain(
+            new Lexer(result.CalorSource!, new DiagnosticBag()).TokenizeAll(),
+            token => token.Kind == TokenKind.Preprocessor);
         Assert.Equal(4, result.Losses.Count(
             loss => loss.Kind == ConversionLossKind.PreprocessorStripped));
         Assert.Equal(
@@ -872,7 +872,7 @@ public class Test
 
         var result = new CSharpToCalorConverter().Convert(csharp, "Interface.cs");
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains("§PP{FEATURE}", result.CalorSource);
+        AssertPreprocessorBlock(result.CalorSource!, "FEATURE");
         var generated = CompileCalorToCSharp(result.CalorSource!);
         Assert.Contains("FeatureValue", generated);
         Assert.Contains("FallbackValue", generated);
@@ -1124,7 +1124,7 @@ public class Test
             Assert.DoesNotContain(
                 result.Losses,
                 loss => loss.Kind == ConversionLossKind.InteropPreserved);
-            Assert.Contains("§CDIR{", result.CalorSource);
+            Assert.Contains("raw directive:", result.CalorSource);
         }
     }
 
@@ -1137,7 +1137,7 @@ public class Test
             "ErrorDirective.cs");
 
         Assert.False(result.Success);
-        Assert.Contains("§CDIR{", result.CalorSource);
+        Assert.Contains("raw directive:error-directive", result.CalorSource);
         Assert.Contains(
             result.Ast!.Items,
             item => item is CompilerDirectiveNode node
@@ -1990,8 +1990,8 @@ public class Test
         var debug = await MigrateConfigurationAsync("Debug", "DEBUG_BRANCH");
         var release = await MigrateConfigurationAsync("Release", "RELEASE_BRANCH");
 
-        Assert.Contains("§PP{DEBUG_BRANCH}", debug.Calor);
-        Assert.Contains("§PP{DEBUG_BRANCH}", release.Calor);
+        AssertPreprocessorBlock(debug.Calor, "DEBUG_BRANCH");
+        AssertPreprocessorBlock(release.Calor, "DEBUG_BRANCH");
         Assert.Contains("DEBUG_BRANCH", debug.Metadata.DefinedSymbols);
         Assert.Contains("RELEASE_BRANCH", release.Metadata.DefinedSymbols);
         Assert.Equal("Debug", debug.Metadata.Configuration);
@@ -2345,10 +2345,8 @@ public class Test
         Assert.DoesNotContain(
             "__CALOR_OPAQUE_BOUNDARY__",
             conversion.CalorSource);
-        Assert.Contains(
-            conversion.Losses,
-            loss => loss.Kind
-                == ConversionLossKind.InteropPreserved);
+        Assert.Empty(conversion.Losses);
+        Assert.True(Assert.Single(Assert.Single(conversion.Ast!.TypePreprocessorBlocks).Classes).IsRecord);
         Assert.Equal(
             SupportLevel.Partial,
             FeatureSupport.GetSupportLevel(
@@ -2364,6 +2362,53 @@ public class Test
         Assert.False(
             compilation.HasErrors,
             string.Join("\n", compilation.Diagnostics));
+        foreach (var symbols in new[] { Array.Empty<string>(), new[] { "FEATURE" } })
+        {
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(compilation.GeneratedCode, "conditional-record.g.cs")],
+                new GeneratedCSharpCompilationContext { PreprocessorSymbols = symbols });
+            Assert.True(validation.CompilationSuccess, string.Join("\n", validation.FormattedCompilationErrors));
+        }
+    }
+
+    // A type declared in both arms of `#if`/`#else` has two declarations with one name, so the
+    // effect pass cannot pick one by name. Inside its own members the name means that type: the
+    // record's synthesized constructor stores `this.Value` through its own init accessor (it was
+    // charged `unknown`, Calor0422). Outside both arms the name stays ambiguous and is charged
+    // `unknown`, even though both getters are pure: the control below.
+    [Fact]
+    public void SameNameTypesInIfElseArms_ResolveTheirOwnAccessors_OutsideCallersStayUnknown()
+    {
+        const string arms = """
+            module ConditionalApi
+              pp FEATURE
+                record ConditionalApi (int:Value)
+
+              pp else
+                class ConditionalApi sealed
+                  property int:Value
+                    get public
+
+                  ctor (int:value)
+                    set Value value
+
+            """;
+        var options = new CompilationOptions { StatusWriter = TextWriter.Null, DeferGeneratedOutputValidation = true };
+        var own = Program.Compile(arms, "arms.calr", options);
+        Assert.False(own.HasErrors, string.Join("\n", own.Diagnostics));
+        Assert.DoesNotContain(own.Diagnostics, diagnostic => diagnostic.Code is "Calor0411" or "Calor0422");
+
+        var outside = Program.Compile(arms + """
+              module Use
+                func Touch (ConditionalApi:api) → int
+                  !
+                  return api.Value
+
+            """, "outside.calr", options);
+        Assert.Contains(outside.Diagnostics, diagnostic =>
+            diagnostic.Code == "Calor0411" && diagnostic.Message.Contains("ConditionalApi.get_Value"));
+        Assert.Contains(outside.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == "Calor0410" && diagnostic.Message.Contains("'Touch'"));
     }
 
     [Fact]
@@ -2594,7 +2639,7 @@ public class Test
             csharp,
             "SharedSuffix.cs");
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("raw ", result.CalorSource);
         Assert.Contains("return 1", result.CalorSource);
         Assert.Contains("return 2", result.CalorSource);
         var generated = CompileCalorToCSharp(result.CalorSource!);
@@ -2780,14 +2825,15 @@ public class Test
     public void NestedType_RestoresOuterEmitterAndParserContext()
     {
         const string calor = """
-            §M{m001:NestedContext}
-              §CL{c001:Outer:pub}
-                §CL{c002:Inner:pub}
-                  §FLD{i32:Value:pub}
-                §CTOR{ctor001:pub}
-                §FLD{i32:Value:pub}
-                §MT{m001:Get:pub} () -> i32
-                  §R Value
+            module NestedContext NestedContext
+              class Outer
+                class Inner
+                  field int:Value public
+                ctor ()
+                field int:Value public
+                func Get () → int
+                  !
+                  return Value
             """;
 
         var module = ParseCalor(calor);
@@ -2955,8 +3001,11 @@ public class Test
             var preserveAmbiguousFile = Assert.Single(
                 preserveAmbiguous.FileResults);
             Assert.Equal(
-                FileMigrationStatus.Failed,
+                FileMigrationStatus.Partial,
                 preserveAmbiguousFile.Status);
+            Assert.Equal("preserved", preserveAmbiguousFile.ConversionPaths!.Outcome);
+            Assert.Equal("verified", preserveAmbiguousFile.ConversionPaths.RoundTrip);
+            Assert.True(File.Exists(outputPath));
             Assert.Contains(
                 preserveAmbiguousFile.Issues,
                 issue => issue.Feature == "preprocessor-project-selection"
@@ -2996,8 +3045,16 @@ public class Test
             Assert.Equal("net10.0", selectedFile.Metadata!.TargetFramework);
             Assert.Contains("NET10", selectedFile.Metadata.DefinedSymbols);
             var calor = await File.ReadAllTextAsync(outputPath);
-            Assert.Contains("§R 10", calor);
-            Assert.DoesNotContain("§PP", calor);
+            Assert.Contains("return 10", calor);
+            Assert.DoesNotContain(
+                new Lexer(calor, new DiagnosticBag()).TokenizeAll(),
+                token => token.Kind == TokenKind.Preprocessor);
+
+            // 0.30: a lossless refresh refuses an output whose conversion receipt does not
+            // match it (it may hold hand edits). The lossy runs above rewrote the output
+            // without updating the first run's receipt, so this run starts from a fresh one.
+            foreach (var stale in new[] { outputPath, outputPath + ".conversion.json", outputPath + ".conversion.lock" })
+                File.Delete(stale);
 
             var preserveSelected = await new ProjectMigrator(
                 new MigrationPlanOptions
@@ -4161,7 +4218,7 @@ public class Test
             csharp,
             "AttributedNullable.cs");
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("raw ", result.CalorSource);
         Assert.Contains("[System.Obsolete]", result.CalorSource);
         Assert.Contains("#nullable disable", result.CalorSource);
         Assert.Contains(

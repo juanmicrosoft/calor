@@ -1,0 +1,22 @@
+module MaxHeap MaxHeap
+  module MaxHeapModule
+    func Parent public (int:index) → int
+      !
+      requires index > 0
+      return (index - 1) / 2
+
+    func LeftChild public (int:index) → int
+      !
+      return (2 * index) + 1
+
+    func RightChild public (int:index) → int
+      !
+      return (2 * index) + 2
+
+    func ShouldSwapUp public (int:child, int:parent) → bool
+      !
+      return child > parent
+
+    func HasChild public (int:childIndex, int:size) → bool
+      !
+      return childIndex < size

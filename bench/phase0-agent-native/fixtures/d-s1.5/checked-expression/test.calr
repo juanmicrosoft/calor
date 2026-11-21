@@ -1,0 +1,19 @@
+module CheckedExpressionTest CheckedExpressionTest overflow unchecked
+  module CheckedFixture
+    func Run () → int
+      !
+      => result == 124
+      let int:max = 2147483647
+      let int:big = 300
+      var int:caughtAdd = 0
+      try
+        set caughtAdd checked((max + 1))
+      catch System.OverflowException
+        set caughtAdd 1
+      var int:caughtCast = 0
+      try
+        set caughtCast checked(((byte)big))
+      catch System.OverflowException
+        set caughtCast 2
+      let int:inner = checked(((unchecked((max + 1)) == -2147483648) ? 4 : 0))
+      return (((caughtAdd * 100) + (caughtCast * 10)) + inner)

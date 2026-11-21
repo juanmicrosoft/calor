@@ -6,7 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
 
 namespace TypeSystem
 {
@@ -15,42 +14,36 @@ namespace TypeSystem
         public static void Main()
         {
             Console.WriteLine("=== Calor Type System Demo ===");
-            Console.WriteLine("");
-            Console.WriteLine("Testing Option.Some(42)...");
-            TestSome();
-            Console.WriteLine("");
-            Console.WriteLine("Testing Option.None()...");
-            TestNone();
-            Console.WriteLine("");
-            Console.WriteLine("Testing Result.Ok(100)...");
-            TestOk();
-            Console.WriteLine("");
-            Console.WriteLine("Testing Result.Err(error)...");
-            TestErr();
+            TestNullable();
+            int quotient = Divide(100, 2);
+            Console.WriteLine(quotient);
+            try
+            {
+                Divide(100, 0);
+            }
+            catch (ArgumentException)
+            {
+                Console.WriteLine("Division by zero was caught");
+            }
+
         }
 
-        private static void TestSome()
+        private static void TestNullable()
         {
-            var opt = Calor.Runtime.Option.Some(42);
-            Console.WriteLine("  Created Some(42)");
+            string? present = "hello";
+            string? missing = null;
+            Console.WriteLine(present ?? "fallback");
+            Console.WriteLine(missing ?? "fallback");
         }
 
-        private static void TestNone()
+        private static int Divide(int a, int b)
         {
-            var opt = Calor.Runtime.Option<int>.None();
-            Console.WriteLine("  Created None");
-        }
+            if (b == 0)
+            {
+                throw new ArgumentException("Division by zero");
+            }
 
-        private static void TestOk()
-        {
-            var result = Calor.Runtime.Result.Ok<int, string>(100);
-            Console.WriteLine("  Created Ok(100)");
-        }
-
-        private static void TestErr()
-        {
-            var result = Calor.Runtime.Result.Err<object, string>("Something went wrong");
-            Console.WriteLine("  Created Err(Something went wrong)");
+            return a / b;
         }
 
     }

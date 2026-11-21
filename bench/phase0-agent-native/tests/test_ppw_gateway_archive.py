@@ -99,7 +99,7 @@ class GatewayArchiveTests(unittest.TestCase):
         return self.gateway.validate_archive(self.epoch, pins or self.pins, self.selected)
 
     def test_synthetic_current_source_and_accounting_reach_registered_analyzer_readonly(self):
-        with self.assertRaisesRegex(ValueError, "analysis artifact changed: ppw-budget-gateway.py"):
+        with self.assertRaisesRegex(ValueError, r"analysis artifact changed: (harness-capture|ppw-budget-gateway)\.py"):
             analysis.validate_analysis_registration()
         manifest = synthetic_current_analysis_manifest(analysis, self.root)
         original_is_file = Path.is_file

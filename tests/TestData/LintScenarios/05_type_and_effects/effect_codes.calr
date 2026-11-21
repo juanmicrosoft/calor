@@ -1,9 +1,8 @@
-§M{m1:Effects}
-  §F{f1:PrintHello:pub} () -> void
-    §E{cw}
-    §P "Hello"
+module Effects Effects block
+  func PrintHello () → void
+    ! cw
+    Console.WriteLine("Hello")
 
-  §F{f2:ReadInput:pub} () -> str
-    §E{cr}
-    §R "input"
-
+  func ReadInput () → string
+    ! cr
+    return "input"

@@ -1,0 +1,47 @@
+module Generics Generics
+  interface IRepository<T>
+    where T : class
+    func Add (T:item) → void
+      !
+    func GetAll () → IReadOnlyList<T>
+      !
+
+  class Pair<T,U> public
+    field T:First public
+    field U:Second public
+    ctor public (T:first, U:second)
+      set First first
+      set Second second
+
+  class Repository<T> public
+    where T : class
+    field List<T>:_items private
+    ctor public ()
+      set _items new List<T>()
+    func Add public (T:item) → void
+      ! mut
+      _items.Add(item)
+    func GetAll public () → IReadOnlyList<T>
+      !
+      return _items
+    func Count public () → int
+      !
+      return _items . Count
+
+  func Identity<T> public (T:value) → T
+    !
+    return value
+
+  func GetCount<T> public (List<T>:items) → int
+    !
+    return items . Count
+
+  func Main public () → void
+    ! cw
+    Console.WriteLine("Generics sample - compilation test")
+    Console.WriteLine("Features demonstrated:")
+    Console.WriteLine("  - Generic functions with type parameters")
+    Console.WriteLine("  - Generic classes (Pair<T,U>, Repository<T>)")
+    Console.WriteLine("  - Generic interfaces (IRepository<T>)")
+    Console.WriteLine("  - WHERE constraints (T : class)")
+    Console.WriteLine("  - Generic type references (List<T>, IReadOnlyList<T>)")

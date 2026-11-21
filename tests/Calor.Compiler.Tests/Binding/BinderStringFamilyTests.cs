@@ -96,8 +96,11 @@ public class BinderStringFamilyTests
     [InlineData(StringBuilderOp.Length, "INT")]
     public void StringBuilderOperation_DerivesResultType_PerOp(StringBuilderOp op, string expected)
     {
-        var (expr, diags) = BindReturn(new StringBuilderOperationNode(S, op,
-            new ExpressionNode[] { Str("x") }));
+        // Append binds a receiver and a value; the other operations take one operand.
+        var operands = op == StringBuilderOp.Append
+            ? new ExpressionNode[] { Str("x"), Str("y") }
+            : new ExpressionNode[] { Str("x") };
+        var (expr, diags) = BindReturn(new StringBuilderOperationNode(S, op, operands));
         var bound = Assert.IsType<BoundStructuralExpression>(expr);
         Assert.Equal(nameof(StringBuilderOperationNode), bound.NodeTypeName);
         Assert.Equal(expected, bound.Type.DisplayString);
@@ -111,8 +114,11 @@ public class BinderStringFamilyTests
     [InlineData(CharOp.ToUpperChar, "CHAR")]
     public void CharOperation_DerivesResultType_PerOp(CharOp op, string expected)
     {
-        var (expr, diags) = BindReturn(new CharOperationNode(S, op,
-            new ExpressionNode[] { Str("a") }));
+        // CharAt binds a string and an index; the other operations take one operand.
+        var operands = op == CharOp.CharAt
+            ? new ExpressionNode[] { Str("a"), new IntLiteralNode(S, 0) }
+            : new ExpressionNode[] { Str("a") };
+        var (expr, diags) = BindReturn(new CharOperationNode(S, op, operands));
         var bound = Assert.IsType<BoundStructuralExpression>(expr);
         Assert.Equal(nameof(CharOperationNode), bound.NodeTypeName);
         Assert.Equal(expected, bound.Type.DisplayString);
@@ -143,10 +149,10 @@ public class BinderStringFamilyTests
         // The family's span-anchored e2e pin: /0 nested in a string-op argument must
         // produce the real Calor0920 pointing at the right line. ((str x) = ToString.)
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} () -> void
-    §E{cw}
-    §P (contains STR:""ab"" (str (/ 10 0)))";
+module Test Test block
+  func Trap () → void
+    ! cw
+    Console.WriteLine((""ab"").Contains(((10 / 0)).ToString()))";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
         {

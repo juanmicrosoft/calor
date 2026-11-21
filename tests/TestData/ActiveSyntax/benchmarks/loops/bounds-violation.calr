@@ -1,0 +1,78 @@
+// Loop Benchmark: Array Bounds Violation Detection
+// Tests bug pattern analysis for array index out of bounds
+
+module BoundsViolationBenchmark BoundsViolationBenchmark
+  func VulnerableArrayAccess public (int:index, int[]:items) → int
+    !
+    // BUG: Array access with unchecked index
+    // EXPECTED: Calor0921 Index Out of Bounds
+    return items[index]
+
+  func SafeBoundsCheck public (int:index, int[]:items) → int
+    !
+    // SAFE: Bounds check before access
+    // EXPECTED: No warnings
+    let int:len = items.Length
+    if index >= 0 && index < len
+      return items[index]
+    else
+      return -1
+
+  func VulnerableLoopBeyondLength public (int:n, int[]:items) → int
+    !
+    // BUG: Loop can exceed array bounds
+    // EXPECTED: Calor0921 Index Out of Bounds
+    var int:sum = 0
+    for i from 0 to n step 1
+      let int:val = items[i]
+      set sum sum + val
+    return sum
+
+  func SafeLoopWithinBounds public (int[]:items) → int
+    !
+    // SAFE: Loop bounded by array length
+    // EXPECTED: No warnings
+    let int:len = items.Length
+    let int:upper = len - 1
+    var int:sum = 0
+    for i from 0 to upper step 1
+      let int:val = items[i]
+      set sum sum + val
+    return sum
+
+  func VulnerableNegativeIndex public (int:offset, int:startIndex, int[]:items) → int
+    !
+    // BUG: Index can be negative
+    // EXPECTED: Calor0921 Index Out of Bounds
+    let int:index = startIndex - offset
+    return items[index]
+
+  func SafeClampedIndex public (int:index, int[]:items) → int
+    !
+    // SAFE: Index clamped to valid range
+    // EXPECTED: No warnings
+    requires items.Length > 0
+    let int:len = items.Length
+    let int:minIdx = System.Math.Max(index, 0)
+    let int:safeIdx = System.Math.Min(minIdx, len - 1)
+    return items[safeIdx]
+
+  func VulnerableOffByOne public (int[]:items) → int
+    !
+    // BUG: Classic off-by-one error
+    // EXPECTED: Calor0921 Index Out of Bounds
+    let int:len = items.Length
+    var int:sum = 0
+    let int:end = len + 1
+    for i from 0 to end step 1
+      let int:val = items[i]
+      set sum sum + val
+    return sum
+
+  func SafeWithPrecondition public (int:index, int[]:items) → int
+    !
+    // SAFE: Precondition guarantees valid index
+    // EXPECTED: No warnings
+    requires index >= 0
+    requires index < items.Length
+    return items[index]

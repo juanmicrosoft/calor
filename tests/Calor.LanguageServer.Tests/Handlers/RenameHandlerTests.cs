@@ -14,14 +14,146 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class RenameHandlerTests
 {
     [Fact]
+    public async Task ClassRenameKeepsSelfTypedMemberIdentityAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var source = "module Demo\n  class A\n    func Echo (A:value) → A\n      !\n      return value\n";
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            var before = store.Sync([file]);
+            var originalSidecar = File.ReadAllText(store.SidecarPath);
+            var uri = DocumentUri.FromFileSystemPath(file);
+            var workspace = new WorkspaceState();
+            workspace.GetOrCreate(uri, source, version: 3);
+            var edit = await RenameAtAsync(workspace, uri, source, "A\n", "B",
+                supportsTransactionalEdits: true);
+            var changes = edit!.DocumentChanges!.ToArray();
+            var sidecarEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit?.TextDocument.Uri.GetFileSystemPath() == store.SidecarPath)).TextDocumentEdit!;
+            var sourceEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit is { } documentEdit && documentEdit.TextDocument.Uri == uri));
+            var updated = ApplySingleDocumentEdit(source, new WorkspaceEdit
+            {
+                DocumentChanges = new Container<WorkspaceEditDocumentChange>(sourceEdit)
+            });
+            Assert.Contains("(B:value) → B", updated);
+            Assert.Equal(source, File.ReadAllText(file));
+            Assert.Equal(originalSidecar, File.ReadAllText(store.SidecarPath));
+            File.WriteAllText(file, updated);
+            File.WriteAllText(store.SidecarPath, Assert.Single(sidecarEdit.Edits).NewText);
+            var after = store.Sync();
+            Assert.Equal(before.Declarations.Single(d => d.Name == "Echo").Id,
+                after.Declarations.Single(d => d.Name == "Echo").Id);
+            Assert.Equal(before.Declarations.Single(d => d.Name == "A").Id,
+                after.Declarations.Single(d => d.Name == "B").Id);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task SidecarRenameRefusesNontransactionalClientsAndUnsavedBuffersExplicitlyAsync(
+        bool unsaved, bool transactional)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string source = "module Demo\n  func Compute () → int\n    !\n    return 42\n";
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            store.Sync([file]);
+            var sidecar = File.ReadAllText(store.SidecarPath);
+            var buffer = unsaved ? source.Replace("42", "43") : source;
+            var uri = DocumentUri.FromFileSystemPath(file);
+            var workspace = new WorkspaceState();
+            workspace.GetOrCreate(uri, buffer, version: 2);
+            var error = await Assert.ThrowsAsync<OmniSharp.Extensions.JsonRpc.Server.RequestFailedException>(
+                () => RenameAtAsync(workspace, uri, buffer, "Compute", "Calculate",
+                    supportsTransactionalEdits: transactional));
+            Assert.Contains(transactional ? "Save sidecar-backed" : "transactional", error.Message);
+            Assert.Equal(source, File.ReadAllText(file));
+            Assert.Equal(sidecar, File.ReadAllText(store.SidecarPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SidecarIdentitySurvivesLspRenameAndSaveWithoutSourceIdsAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string source = """
+                module Demo
+                  func Compute () → int
+                    !
+                    return 42
+                  func Use () → int
+                    !
+                    return Compute()
+                """;
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            var before = store.Sync([file]);
+            var expected = before.Declarations.Single(d => d.Name == "Compute").Id;
+            var uri = DocumentUri.FromFileSystemPath(file);
+            var workspace = new WorkspaceState();
+            var document = workspace.GetOrCreate(uri, source, version: 1);
+            var symbol = document.BoundModule!.SymbolsById.Values.Single(s => s.Name == "Compute").Id;
+            var refusal = await Assert.ThrowsAsync<OmniSharp.Extensions.JsonRpc.Server.RequestFailedException>(
+                () => RenameAtAsync(workspace, uri, source, "Compute", "Calculate"));
+            Assert.Contains("transactional", refusal.Message);
+            var edit = await RenameAtAsync(workspace, uri, source, "Compute", "Calculate",
+                supportsTransactionalEdits: true);
+            Assert.NotNull(edit);
+            var changes = edit!.DocumentChanges!.ToArray();
+            Assert.Equal(2, changes.Length);
+            var sidecarEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit?.TextDocument.Uri.GetFileSystemPath() == store.SidecarPath)).TextDocumentEdit!;
+            var sourceEdit = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit is { } documentEdit && documentEdit.TextDocument.Uri == uri));
+            Assert.Equal(expected, store.Preview([]).Declarations.Single(d => d.Name == "Compute").Id);
+            var updated = ApplySingleDocumentEdit(source, new WorkspaceEdit
+            {
+                DocumentChanges = new Container<WorkspaceEditDocumentChange>(sourceEdit)
+            });
+            File.WriteAllText(store.SidecarPath, Assert.Single(sidecarEdit.Edits).NewText);
+            File.WriteAllText(file, updated);
+            var reloaded = LspTestHarness.CreateDocument(updated, new Uri(file).AbsoluteUri);
+            Assert.Equal(expected, store.Sync().Declarations.Single(d => d.Name == "Calculate").Id);
+            Assert.Equal(symbol, reloaded.BoundModule!.SymbolsById.Values.Single(s => s.Name == "Calculate").Id);
+            Assert.DoesNotContain(expected, updated);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task RenameUsesVersionedDocumentChangesAndExactTokenRangesAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
-                §R 42
-              §F{f002:Use:pub} () -> i32
-                §R §C{Compute} §/C
+            module TestModule
+              func Compute () → int
+                !
+                return 42
+              func Use () → int
+                !
+                return Compute()
             """;
         var uri = DocumentUri.From("file:///rename.calr");
         var workspace = new WorkspaceState();
@@ -48,21 +180,27 @@ public class RenameHandlerTests
     public async Task RenameInheritedFieldAccessesEditsOnlyFieldIdentifiersAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c001:Base:pub}
-                §FLD{i32:shared:prot}
-              §CL{c002:Derived:Base:pub}
-                §MT{m001:Use:pub} () -> i32
-                  §R (+ §THIS.shared §BASE.shared)
+            module TestModule
+              class Base
+                field int:shared protected
+              class Derived extends Base
+                func Use () → int
+                  !
+                  return this.shared + base.shared
             """;
         var uri = DocumentUri.From("file:///rename-field.calr");
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
+        var state = workspace.GetOrCreate(uri, source);
+        Assert.False(state.Diagnostics.HasErrors, string.Join("\n", state.Diagnostics));
+        var field = workspace.ResolveOccurrence(uri, source.IndexOf("shared protected", StringComparison.Ordinal));
+        Assert.NotNull(field);
+        Assert.True(workspace.CanRenameSymbol(field.SymbolId));
+        Assert.Equal(3, workspace.FindSymbolOccurrences(field.SymbolId, includeDeclaration: true).Count);
         var edit = await RenameAtAsync(
             workspace,
             uri,
             source,
-            "shared:prot",
+            "shared protected",
             "renamed");
 
         Assert.NotNull(edit);
@@ -78,11 +216,11 @@ public class RenameHandlerTests
     public async Task RenameTypeDoesNotEditQualifiedExternalTypeAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c001:Exception:pub}
-              §CL{c002:Holder:pub}
-                §FLD{Exception:local:priv}
-                §FLD{System.Exception:external:priv}
+            module TestModule
+              class Exception
+              class Holder
+                field Exception:local private
+                field System.Exception:external private
             """;
         var uri = DocumentUri.From("file:///rename-qualified-type.calr");
         var workspace = new WorkspaceState();
@@ -91,7 +229,7 @@ public class RenameHandlerTests
             workspace,
             uri,
             source,
-            "Exception:pub",
+            "Exception",
             "LocalException");
 
         Assert.NotNull(edit);
@@ -111,9 +249,10 @@ public class RenameHandlerTests
     public async Task RenameModuleUsesStableModuleSymbolIdAndExactNameSpanAsync()
     {
         const string source = """
-            §M{m001:OriginalModule}
-              §F{f001:Run:pub} () -> i32
-                §R INT:1
+            module OriginalModule
+              func Run () → int
+                !
+                return 1
             """;
         var uri = DocumentUri.From("file:///rename-module.calr");
         var workspace = new WorkspaceState();
@@ -141,13 +280,14 @@ public class RenameHandlerTests
         try
         {
             const string definition = """
-                §M{m001:Models}
-                  §CL{c001:Widget:pub}
+                module Models
+                  class Widget
                 """;
             const string use = """
-                §M{m002:Models}
-                  §F{f001:Make:pub} () -> Widget
-                    §R §NEW{Widget} §/NEW
+                module Models
+                  func Make () → Widget
+                    !
+                    return new Widget()
                 """;
             var definitionPath = Path.Combine(root, "definition.calr");
             var usePath = Path.Combine(root, "use.calr");
@@ -160,7 +300,7 @@ public class RenameHandlerTests
                 workspace,
                 useUri,
                 use,
-                "Widget} §/NEW",
+                "Widget()",
                 "Gadget");
 
             Assert.NotNull(edit);
@@ -201,9 +341,10 @@ public class RenameHandlerTests
     public async Task RenameDoesNotResolveAdjacentOrWhitespaceCursorsAsync(int relativeOffset)
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
-                §R 42
+            module TestModule
+              func Compute () → int
+                !
+                return 42
             """;
         var uri = DocumentUri.From("file:///rename-cursor.calr");
         var workspace = new WorkspaceState();
@@ -227,20 +368,23 @@ public class RenameHandlerTests
     public async Task GenericModuleFunctionRefactoringUsesBaseIdentifierAndCompilesAsync()
     {
         const string source = """
-            §M{m001:GenericModule}
-              §F{f001:Identity<T>:pub} (T:value) -> T
-                §R value
-              §F{f002:Use:pub} () -> i32
-                §R §C{Identity<i32>} §A INT:1 §/C
+            module GenericModule
+              func Identity<T> (T:value) → T
+                !
+                return value
+              func Use () → int
+                !
+                return Identity<int>(1)
             """;
         var uri = DocumentUri.From("file:///generic-refactor.calr");
         var workspace = new WorkspaceState();
         var state = workspace.GetOrCreate(uri, source, version: 4);
         var function = Assert.Single(state.Ast!.Functions, function =>
-            function.Name == "Identity<T>");
+            function.Name == "Identity");
+        Assert.Equal("T", Assert.Single(function.TypeParameters).Name);
         Assert.Equal("Identity", source[function.IdentifierSpan.Start..function.IdentifierSpan.End]);
 
-        var callOffset = source.IndexOf("Identity<i32>", StringComparison.Ordinal);
+        var callOffset = source.IndexOf("Identity<int>", StringComparison.Ordinal);
         var (line, column) = LspTestHarness.GetLineColumn(source, callOffset);
         var definition = await new DefinitionHandler(workspace).Handle(
             new DefinitionParams
@@ -263,11 +407,11 @@ public class RenameHandlerTests
         Assert.Equal(2, references!.Count());
         Assert.All(references!, location => Assert.Equal("Identity", TextAt(source, location.Range)));
 
-        var edit = await RenameAtAsync(workspace, uri, source, "Identity<i32>", "Transform");
+        var edit = await RenameAtAsync(workspace, uri, source, "Identity<int>", "Transform");
         Assert.NotNull(edit);
         var updated = ApplySingleDocumentEdit(source, edit!);
-        Assert.Contains("§F{f001:Transform<T>:pub}", updated);
-        Assert.Contains("§C{Transform<i32>}", updated);
+        Assert.Contains("func Transform<T> ", updated);
+        Assert.Contains("Transform<int>(", updated);
         AssertRoslynClean(updated);
     }
 
@@ -275,29 +419,31 @@ public class RenameHandlerTests
     public async Task TypeRenamesCoverStaticCallsAndTypeBearingPositionsAsync()
     {
         const string source = """
-            §M{m001:TypeRefactor}
-              §IFACE{i001:IWidget}
-                §MT{m000:Marker} () -> void
-              §CL{c001:WidgetException:pub}
-                §EXT{System.Exception}
-                §IMPL{IWidget}
-                §MT{m001:Create:pub:static} () -> WidgetException
-                  §R §NEW{WidgetException} §/NEW
-                §MT{m002:Marker:pub} () -> void
-                  §P STR:"marker"
-              §CL{c002:DerivedException:pub}
-                §EXT{WidgetException}
-                §FLD{i32:Code:pub}
-              §F{f001:Use:pub} (object:value) -> WidgetException
-                §ARR{items:WidgetException:1}
-                §LIST{values:WidgetException}
-                  §NEW{WidgetException} §/NEW
-                §/LIST{values}
-                §TR{t001}
-                  §R (cast WidgetException value)
-                §CA{WidgetException:ex}
-                  §R §C{WidgetException.Create} §/C
-                §/TR{t001}
+            module TypeRefactor
+              using System.Collections.Generic
+              interface IWidget
+                func Marker () → void
+                  !
+              class WidgetException
+                extends System.Exception
+                implements IWidget
+                func Create static () → WidgetException
+                  ! alloc
+                  return new WidgetException()
+                func Marker () → void
+                  ! cw
+                  System.Console.WriteLine("marker")
+              class DerivedException
+                extends WidgetException
+                field int:Code
+              func Use (object:value) → WidgetException
+                ! alloc
+                let WidgetException[]:items = new WidgetException[1]
+                let List<WidgetException>:values = new List<WidgetException> {new WidgetException()}
+                try
+                  return (WidgetException)value
+                catch WidgetException:ex
+                  return WidgetException.Create()
             """;
         var uri = DocumentUri.From("file:///type-refactor.calr");
         var workspace = new WorkspaceState();
@@ -307,7 +453,7 @@ public class RenameHandlerTests
             string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
                 $"{diagnostic.Code}: {diagnostic.Message}")));
         var classOffset = source.IndexOf(
-            "WidgetException:pub",
+            "WidgetException",
             StringComparison.Ordinal);
         var classOccurrence = workspace.ResolveOccurrence(uri, classOffset);
         Assert.NotNull(classOccurrence);
@@ -329,7 +475,6 @@ public class RenameHandlerTests
                 Calor.Compiler.Ast.PositionalPatternNode value => value.TypeName,
                 Calor.Compiler.Ast.PropertyPatternNode value => value.TypeName,
                 Calor.Compiler.Ast.TypePatternNode value => value.TypeName,
-                Calor.Compiler.Ast.NoneExpressionNode value => value.TypeName,
                 Calor.Compiler.Ast.RecordCreationNode value => value.TypeName,
                 Calor.Compiler.Ast.FieldDefinitionNode value => value.TypeName,
                 Calor.Compiler.Ast.TypeConstraintNode value => value.TypeName,
@@ -383,16 +528,16 @@ public class RenameHandlerTests
             workspace,
             uri,
             source,
-            "WidgetException:pub",
+            "WidgetException",
             "RenamedException");
         Assert.NotNull(classEdit);
         var renamedClass = ApplySingleDocumentEdit(source, classEdit!);
         Assert.DoesNotContain("WidgetException", renamedClass);
-        Assert.Contains("§C{RenamedException.Create}", renamedClass);
-        Assert.Contains("§CA{RenamedException:ex}", renamedClass);
-        Assert.Contains("§ARR{items:RenamedException:1}", renamedClass);
-        Assert.Contains("§LIST{values:RenamedException}", renamedClass);
-        Assert.Contains("(cast RenamedException value)", renamedClass);
+        Assert.Contains("RenamedException.Create()", renamedClass);
+        Assert.Contains("catch RenamedException:ex", renamedClass);
+        Assert.Contains("new RenamedException[1]", renamedClass);
+        Assert.Contains("new List<RenamedException> {new RenamedException()}", renamedClass);
+        Assert.Contains("(RenamedException)value", renamedClass);
         AssertRoslynClean(renamedClass);
 
         workspace.Update(uri, renamedClass, version: 2);
@@ -400,14 +545,14 @@ public class RenameHandlerTests
             workspace,
             uri,
             renamedClass,
-            "IWidget}",
+            "IWidget",
             "IRenamedWidget");
         Assert.NotNull(interfaceEdit);
         var renamedInterface = ApplySingleDocumentEdit(
             renamedClass,
             interfaceEdit!);
-        Assert.Contains("§IFACE{i001:IRenamedWidget}", renamedInterface);
-        Assert.Contains("§IMPL{IRenamedWidget}", renamedInterface);
+        Assert.Contains("interface IRenamedWidget", renamedInterface);
+        Assert.Contains("implements IRenamedWidget", renamedInterface);
         AssertRoslynClean(renamedInterface);
     }
 
@@ -415,22 +560,23 @@ public class RenameHandlerTests
     public async Task ConditionalAlternativeReferencesRefuseDefinitionReferencesAndRenameAsync()
     {
         const string source = """
-            §M{m001:Conditional}
-              §CL{c001:Worker:pub}
-                §PP{FEATURE}
-                  §MT{m001:Pick:pub} () -> i32
-                    §R INT:1
-                §PPE
-                  §MT{m002:Pick:pub} () -> i32
-                    §R INT:2
-                §/PP{FEATURE}
-                §PP{FEATURE}
-                  §FLD{i32:value:pub}
-                §PPE
-                  §FLD{i32:value:pub}
-                §/PP{FEATURE}
-                §MT{m003:Run:pub} () -> i32
-                  §R (+ §C{Pick} §/C §THIS.value)
+            module Conditional
+              class Worker
+                pp FEATURE
+                  func Pick () → int
+                    !
+                    return 1
+                pp else
+                  func Pick () → int
+                    !
+                    return 2
+                pp FEATURE
+                  field int:value
+                pp else
+                  field int:value
+                func Run () → int
+                  !
+                  return Pick() + this.value
             """;
         var uri = DocumentUri.From("file:///conditional-refactor.calr");
         var workspace = new WorkspaceState();
@@ -457,9 +603,10 @@ public class RenameHandlerTests
             CancellationToken.None);
         Assert.Null(references);
 
-        Assert.Null(await RenameAtAsync(workspace, uri, source, "§C{Pick}", "Choose"));
-        Assert.Null(await RenameAtAsync(workspace, uri, source, "Pick:pub", "Choose"));
-        Assert.Null(await RenameAtAsync(workspace, uri, source, "§THIS.value", "renamed"));
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "Pick() +", "Choose"));
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "Pick ()", "Choose"));
+        Assert.Null(await RenameAtAsync(
+            workspace, uri, source, "this.value", "renamed", cursorOffset: "this.".Length));
     }
 
     [Theory]
@@ -470,9 +617,10 @@ public class RenameHandlerTests
     public async Task RenameRejectsCalorAndCSharpReservedWordsAsync(string newName)
     {
         const string source = """
-            §M{m001:Keywords}
-              §F{f001:Compute:pub} () -> i32
-                §R INT:1
+            module Keywords
+              func Compute () → int
+                !
+                return 1
             """;
         var uri = DocumentUri.From("file:///rename-keyword.calr");
         var workspace = new WorkspaceState();
@@ -485,19 +633,22 @@ public class RenameHandlerTests
     public async Task RenameRejectsDeclarationCollisionWithoutPartialEditsAsync()
     {
         const string source = """
-            §M{m001:Collisions}
-              §F{f001:First:pub} () -> i32
-                §R INT:1
-              §F{f002:Second:pub} () -> i32
-                §R INT:2
-              §F{f003:Use:pub} () -> i32
-                §R §C{First} §/C
+            module Collisions
+              func First () → int
+                !
+                return 1
+              func Second () → int
+                !
+                return 2
+              func Use () → int
+                !
+                return First()
             """;
         var uri = DocumentUri.From("file:///rename-collision.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
 
-        Assert.Null(await RenameAtAsync(workspace, uri, source, "First:pub", "Second"));
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "First ()", "Second"));
     }
 
     [Fact]
@@ -509,21 +660,23 @@ public class RenameHandlerTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["models.calr"] = """
-                    §M{m001:Models}
-                      §CL{c001:Widget:pub}
-                        §FLD{i32:Value:pub}
+                    module Models Models
+                      class Widget
+                        field int:Value
                     """,
                 ["services.calr"] = """
-                    §M{m002:Services}
-                      §U{Models}
-                      §F{f001:Make:pub} () -> Widget
-                        §R §NEW{Widget} §/NEW
+                    module Services
+                      using Models
+                      func Make () → Widget
+                        !
+                        return new Widget()
                     """,
                 ["app.calr"] = """
-                    §M{m003:App}
-                      §U{Models}
-                      §F{f002:Run:pub} () -> Widget
-                        §R §C{Make} §/C
+                    module App
+                      using Models
+                      func Run () → Widget
+                        !
+                        return Make()
                     """,
             };
             foreach (var (fileName, source) in sources)
@@ -541,7 +694,7 @@ public class RenameHandlerTests
                 workspace,
                 servicesUri,
                 sources["services.calr"],
-                "Make:pub",
+                "Make ()",
                 "Create");
 
             Assert.NotNull(edit);
@@ -567,8 +720,23 @@ public class RenameHandlerTests
             ApplyDocumentEdits(updated, documentEdits);
             var generated = AssertWorkspaceRoslynCleanWithProductionMap(updated);
             Assert.Contains(
-                "global::Services.ServicesModule.Create",
+                "return Create();",
                 generated[Path.Combine(root, "app.calr")]);
+            Assert.All(
+                new[] { "services.calr", "app.calr" },
+                fileName => Assert.Contains(
+                    "public static partial class GlobalModule",
+                    generated[Path.Combine(root, fileName)]));
+            var namespaced = updated.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value
+                    .Replace("module Services", "module Services Services", StringComparison.Ordinal)
+                    .Replace("module App", "module App App", StringComparison.Ordinal),
+                StringComparer.Ordinal);
+            var namespacedGenerated = AssertWorkspaceRoslynCleanWithProductionMap(namespaced);
+            Assert.Contains(
+                "global::Services.ServicesModule.Create",
+                namespacedGenerated[Path.Combine(root, "app.calr")]);
         }
         finally
         {
@@ -586,29 +754,33 @@ public class RenameHandlerTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definition.calr"] = """
-                    §M{m001:Split}
-                      §CL{c001:Worker:pub:partial}
-                        §MT{m001:Pick:pub} (i32:value) -> i32
-                          §R value
+                    module Split
+                      class Worker partial
+                        func Pick (int:value) → int
+                          !
+                          return value
                     """,
                 ["use.calr"] = """
-                    §M{m002:Split}
-                      §CL{c002:Worker:pub:partial}
-                        §MT{m002:Run:pub} () -> i32
-                          §R §C{Pick} §A INT:1 §/C
+                    module Split
+                      class Worker partial
+                        func Run () → int
+                          !
+                          return Pick(1)
                     """,
-                ["broken.calr"] = """
-                    §M{m003:Broken}
-                      §CSHARP{public static class BrokenProbe
+                ["broken.calr"] = ConvertInteropSupport("""
+                    public static class BrokenProbe
                     {
                         public static int Value => MissingValue;
-                    }}§/CSHARP
-                    """,
+                    }
+                    """, "broken.cs"),
             };
             foreach (var (fileName, source) in sources)
                 File.WriteAllText(Path.Combine(root, fileName), source);
 
-            Assert.Single(GetRoslynErrors(sources["broken.calr"]));
+            var baselineError = Assert.Single(GetRoslynErrors(sources["broken.calr"]));
+            Assert.Equal("CS0103", baselineError.Id);
+            Assert.Equal("MissingValue", (await baselineError.Location.SourceTree!.GetTextAsync())
+                .ToString(baselineError.Location.SourceSpan));
             AssertWorkspaceRoslynCleanWithProductionMap(
                 sources
                     .Where(pair => pair.Key != "broken.calr")
@@ -616,6 +788,9 @@ public class RenameHandlerTests
                         pair => Path.Combine(root, pair.Key),
                         pair => pair.Value,
                         StringComparer.Ordinal));
+            var combinedBaseline = Assert.Single(GetRoslynErrors(sources.Values.ToArray()));
+            Assert.Equal(baselineError.Id, combinedBaseline.Id);
+            Assert.Equal(baselineError.GetMessage(), combinedBaseline.GetMessage());
             var workspace = new WorkspaceState(root);
             var definitionPath = Path.Combine(root, "definition.calr");
             var definitionUri = DocumentUri.FromFileSystemPath(definitionPath);
@@ -628,10 +803,11 @@ public class RenameHandlerTests
                 workspace,
                 definitionUri,
                 sources["definition.calr"],
-                "Pick:pub",
+                "Pick (",
                 "Choose");
 
             Assert.NotNull(edit);
+            Assert.Equal(2, workspace.RenameValidationCompilationCount);
             var documentEdits = Assert.IsType<Container<WorkspaceEditDocumentChange>>(
                     edit.DocumentChanges)
                 .Select(change => Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit))
@@ -641,6 +817,25 @@ public class RenameHandlerTests
                 documentEdits,
                 documentEdit => documentEdit.TextDocument.Uri.ToUri().LocalPath
                     == Path.Combine(root, "broken.calr"));
+            var updated = sources.ToDictionary(
+                pair => Path.Combine(root, pair.Key),
+                pair => pair.Value,
+                StringComparer.Ordinal);
+            foreach (var documentEdit in documentEdits)
+            {
+                var textEdit = Assert.Single(documentEdit.Edits);
+                var original = updated[documentEdit.TextDocument.Uri.ToUri().LocalPath];
+                var start = PositionConverter.ToOffset(textEdit.Range.Start, original);
+                var end = PositionConverter.ToOffset(textEdit.Range.End, original);
+                Assert.Equal("Pick", original[start..end]);
+                Assert.Equal("Choose", textEdit.NewText);
+            }
+            ApplyDocumentEdits(updated, documentEdits);
+            Assert.Equal(sources["broken.calr"], updated[Path.Combine(root, "broken.calr")]);
+            var candidateError = Assert.Single(GetRoslynErrors(updated.Values.ToArray()));
+            Assert.Equal(baselineError.Id, candidateError.Id);
+            Assert.Equal(baselineError.GetMessage(), candidateError.GetMessage());
+            Assert.Equal(baselineError.Location.SourceSpan, candidateError.Location.SourceSpan);
         }
         finally
         {
@@ -652,54 +847,106 @@ public class RenameHandlerTests
     [Fact]
     public async Task RenameRejectsNewCompilationErrorWhenAbsoluteCountIsUnchangedAsync()
     {
-        const string source = """
-            §M{m001:SwapErrors}
-              §F{f001:Old:pub} () -> i32
-                §R INT:1
-              §CSHARP{public static class Probe
-            {
-                public static int Existing() => SwapErrorsModule.Old();
-                public static int Missing() => SwapErrorsModule.NewName();
-            }}§/CSHARP
+        var source = """
+            module SwapErrors
+              func Old () → int
+                !
+                return 1
             """;
+        const string supportingPayload = """
+            public static class Probe
+            {
+                public static int Existing() => GlobalModule.Old();
+                public static int Missing() => GlobalModule.NewName();
+            }
+            """;
+        var originalContext = CreateRoslynCompilation(source);
+        Assert.DoesNotContain(originalContext.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        // Keep the converter's whole-unit rescue intact, separate from the indexed Old declaration.
+        var support = ConvertInteropSupport(
+            supportingPayload, "probe.cs", originalContext.SyntaxTrees.ToArray());
         var candidate = source.Replace(
-            "§F{f001:Old:pub}",
-            "§F{f001:NewName:pub}",
+            "func Old ",
+            "func NewName ",
             StringComparison.Ordinal);
-        var baselineErrors = GetRoslynErrors(source);
-        var candidateErrors = GetRoslynErrors(candidate);
+        var baselineCompilation = CreateRoslynCompilation(source, support);
+        var candidateCompilation = CreateRoslynCompilation(candidate, support);
+        var baselineErrors = GetRoslynErrors(baselineCompilation);
+        var candidateErrors = GetRoslynErrors(candidateCompilation);
         var baselineError = Assert.Single(baselineErrors);
         var candidateError = Assert.Single(candidateErrors);
+        Assert.Equal("CS0117", baselineError.Id);
         Assert.Equal(baselineError.Id, candidateError.Id);
+        Assert.Contains("GlobalModule", baselineError.GetMessage());
+        Assert.Contains("GlobalModule", candidateError.GetMessage());
+        Assert.Equal("NewName", (await baselineError.Location.SourceTree!.GetTextAsync())
+            .ToString(baselineError.Location.SourceSpan));
+        Assert.Equal("Old", (await candidateError.Location.SourceTree!.GetTextAsync())
+            .ToString(candidateError.Location.SourceSpan));
+        Assert.Equal(supportingPayload.IndexOf("NewName", StringComparison.Ordinal),
+            baselineError.Location.SourceSpan.Start);
+        Assert.Equal(supportingPayload.IndexOf("Old", StringComparison.Ordinal),
+            candidateError.Location.SourceSpan.Start);
+        Assert.Equal(supportingPayload, (await baselineError.Location.SourceTree.GetTextAsync()).ToString());
+        Assert.Equal(supportingPayload, (await candidateError.Location.SourceTree.GetTextAsync()).ToString());
+        var originalOwner = baselineCompilation.GetTypeByMetadataName("GlobalModule");
+        var candidateOwner = candidateCompilation.GetTypeByMetadataName("GlobalModule");
+        Assert.NotNull(originalOwner);
+        Assert.NotNull(candidateOwner);
+        Assert.True(originalOwner.ContainingNamespace.IsGlobalNamespace);
+        Assert.True(candidateOwner.ContainingNamespace.IsGlobalNamespace);
+        Assert.True(Assert.Single(originalOwner.GetMembers("Old").OfType<IMethodSymbol>()).IsStatic);
+        Assert.True(Assert.Single(candidateOwner.GetMembers("NewName").OfType<IMethodSymbol>()).IsStatic);
+        Assert.NotNull(baselineCompilation.GetTypeByMetadataName("Probe"));
+        Assert.NotNull(candidateCompilation.GetTypeByMetadataName("Probe"));
         Assert.NotEqual(
             baselineError.Location.GetLineSpan().StartLinePosition.Line,
             candidateError.Location.GetLineSpan().StartLinePosition.Line);
 
         var uri = DocumentUri.From("file:///rename-error-identity.calr");
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
+        var document = workspace.GetOrCreate(uri, source);
+        var supportUri = DocumentUri.From("file:///rename-error-support.calr");
+        var supportingDocument = workspace.GetOrCreate(supportUri, support);
+        var originalSnapshot = document.Snapshot;
+        var supportSnapshot = supportingDocument.Snapshot;
+        var target = workspace.ResolveOccurrence(uri, source.IndexOf("Old ()", StringComparison.Ordinal));
+        Assert.NotNull(target);
+        var occurrence = Assert.Single(workspace.FindSymbolOccurrences(
+            target.SymbolId, includeDeclaration: true));
+        Assert.Equal(SymbolOccurrenceKind.Definition, occurrence.Kind);
+        Assert.Equal(uri.ToString(), occurrence.Doc.Uri.AbsoluteUri);
+        Assert.Equal("Old", source[occurrence.Span.Start..occurrence.Span.End]);
+        Assert.Equal(candidate, source[..occurrence.Span.Start] + "NewName" + source[occurrence.Span.End..]);
 
         Assert.Null(await RenameAtAsync(
             workspace,
             uri,
             source,
-            "Old:pub",
+            "Old ()",
             "NewName"));
+        Assert.Equal(2, workspace.RenameValidationCompilationCount);
+        Assert.Equal(source, document.Source);
+        Assert.Equal(support, supportingDocument.Source);
+        Assert.Equal(originalSnapshot.Version, document.Version);
+        Assert.Equal(supportSnapshot.Version, supportingDocument.Version);
     }
 
     [Fact]
     public async Task RenameRejectsFieldToParameterCaptureThatStillCompilesAsync()
     {
         const string source = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
-                §FLD{i32:stored:priv}
-                §MT{m001:Read:pub} (i32:value) -> i32
-                  §R stored
+            module Capture
+              class Box
+                field int:stored private
+                func Read (int:value) → int
+                  !
+                  return stored
             """;
         var candidate = source
-            .Replace("stored:priv", "value:priv", StringComparison.Ordinal)
-            .Replace("§R stored", "§R value", StringComparison.Ordinal);
+            .Replace("stored private", "value private", StringComparison.Ordinal)
+            .Replace("return stored", "return value", StringComparison.Ordinal);
         AssertRoslynClean(candidate);
         var uri = DocumentUri.From("file:///field-to-parameter-capture.calr");
         var workspace = new WorkspaceState();
@@ -709,7 +956,7 @@ public class RenameHandlerTests
             workspace,
             uri,
             source,
-            "stored:priv",
+            "stored private",
             "value"));
     }
 
@@ -717,15 +964,16 @@ public class RenameHandlerTests
     public async Task RenameRejectsParameterToFieldCaptureThatStillCompilesAsync()
     {
         const string source = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
-                §FLD{i32:value:priv}
-                §MT{m001:Read:pub} (i32:input) -> i32
-                  §R (+ input value)
+            module Capture
+              class Box
+                field int:value private
+                func Read (int:input) → int
+                  !
+                  return input + value
             """;
         var candidate = source
-            .Replace("i32:input", "i32:value", StringComparison.Ordinal)
-            .Replace("(+ input value)", "(+ value value)", StringComparison.Ordinal);
+            .Replace("int:input", "int:value", StringComparison.Ordinal)
+            .Replace("input + value", "value + value", StringComparison.Ordinal);
         AssertRoslynClean(candidate);
         var uri = DocumentUri.From("file:///parameter-to-field-capture.calr");
         var workspace = new WorkspaceState();
@@ -743,16 +991,17 @@ public class RenameHandlerTests
     public async Task RenameRejectsFieldLocalCaptureInBothDirectionsAsync()
     {
         const string fieldToLocal = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
-                §FLD{i32:stored:priv}
-                §MT{m001:Read:pub} () -> i32
-                  §B{value:i32} INT:2
-                  §R (+ stored value)
+            module Capture
+              class Box
+                field int:stored private
+                func Read () → int
+                  !
+                  let int:value = 2
+                  return stored + value
             """;
         var fieldToLocalCandidate = fieldToLocal
-            .Replace("stored:priv", "value:priv", StringComparison.Ordinal)
-            .Replace("(+ stored value)", "(+ value value)", StringComparison.Ordinal);
+            .Replace("stored private", "value private", StringComparison.Ordinal)
+            .Replace("stored + value", "value + value", StringComparison.Ordinal);
         AssertRoslynClean(fieldToLocalCandidate);
         var fieldUri = DocumentUri.From("file:///field-to-local-capture.calr");
         var fieldWorkspace = new WorkspaceState();
@@ -761,20 +1010,21 @@ public class RenameHandlerTests
             fieldWorkspace,
             fieldUri,
             fieldToLocal,
-            "stored:priv",
+            "stored private",
             "value"));
 
         const string localToField = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
-                §FLD{i32:value:priv}
-                §MT{m001:Read:pub} () -> i32
-                  §B{input:i32} INT:2
-                  §R (+ input value)
+            module Capture
+              class Box
+                field int:value private
+                func Read () → int
+                  !
+                  let int:input = 2
+                  return input + value
             """;
         var localToFieldCandidate = localToField
-            .Replace("input:i32", "value:i32", StringComparison.Ordinal)
-            .Replace("(+ input value)", "(+ value value)", StringComparison.Ordinal);
+            .Replace("int:input", "int:value", StringComparison.Ordinal)
+            .Replace("input + value", "value + value", StringComparison.Ordinal);
         AssertRoslynClean(localToFieldCandidate);
         var localUri = DocumentUri.From("file:///local-to-field-capture.calr");
         var localWorkspace = new WorkspaceState();
@@ -783,7 +1033,7 @@ public class RenameHandlerTests
             localWorkspace,
             localUri,
             localToField,
-            "input:i32",
+            "input =",
             "value"));
     }
 
@@ -791,11 +1041,12 @@ public class RenameHandlerTests
     public async Task RenameAllowsExplicitFieldAccessToShadowParameterSafelyAsync()
     {
         const string source = """
-            §M{m001:Capture}
-              §CL{c001:Box:pub}
-                §FLD{i32:stored:priv}
-                §MT{m001:Read:pub} (i32:value) -> i32
-                  §R (+ §THIS.stored value)
+            module Capture
+              class Box
+                field int:stored private
+                func Read (int:value) → int
+                  !
+                  return this.stored + value
             """;
         var uri = DocumentUri.From("file:///shadow-safe-field-rename.calr");
         var workspace = new WorkspaceState();
@@ -805,13 +1056,13 @@ public class RenameHandlerTests
             workspace,
             uri,
             source,
-            "stored:priv",
+            "stored private",
             "value");
 
         Assert.NotNull(edit);
         var candidate = ApplySingleDocumentEdit(source, edit!);
-        Assert.Contains("§FLD{i32:value:priv}", candidate);
-        Assert.Contains("§THIS.value", candidate);
+        Assert.Contains("field int:value private", candidate);
+        Assert.Contains("this.value", candidate);
         AssertRoslynClean(candidate);
     }
 
@@ -828,14 +1079,13 @@ public class RenameHandlerTests
                 "UnrelatedFlags",
                 preprocessorSymbolCount: 8,
                 includeRenameTarget: false);
-            unrelated += """
-
-                  §CSHARP{public static class IdentifierTextOnly
+            unrelated += "\n" + CreateRawMember("""
+                public static class IdentifierTextOnly
                 {
                     public const string Value = "Compute Calculate";
                     // Compute Calculate
-                }}§/CSHARP
-                """;
+                }
+                """);
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, source);
             File.WriteAllText(Path.Combine(root, "unrelated.calr"), unrelated);
@@ -849,7 +1099,7 @@ public class RenameHandlerTests
             var workspace = new WorkspaceState(root);
             var uri = DocumentUri.FromFileSystemPath(targetPath);
             workspace.GetOrCreate(uri, source, version: 1);
-            var targetOffset = source.IndexOf("Compute:pub", StringComparison.Ordinal);
+            var targetOffset = source.IndexOf("Compute ()", StringComparison.Ordinal);
             Assert.NotNull(workspace.ResolveOccurrence(uri, targetOffset));
             workspace.RefreshClosedDocuments();
             var target = workspace.ResolveOccurrence(uri, targetOffset);
@@ -869,7 +1119,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 source,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate");
 
             Assert.NotNull(edit);
@@ -891,18 +1141,19 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:ConditionalCollision}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Compute:pub} () -> i32
-                      §R INT:1
+                module ConditionalCollision
+                  class Worker partial
+                    func Compute () → int
+                      !
+                      return 1
                 """;
             const string conditional = """
-                §M{m002:ConditionalCollision}
-                  §CL{c002:Worker:pub:partial}
-                    §PP{COLLIDING_METHOD}
-                      §MT{m002:Calculate:pub} () -> i32
-                        §R INT:2
-                    §/PP{COLLIDING_METHOD}
+                module ConditionalCollision
+                  class Worker partial
+                    pp COLLIDING_METHOD
+                      func Calculate () → int
+                        !
+                        return 2
                 """;
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, target);
@@ -917,7 +1168,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate"));
             Assert.Equal(
                 4,
@@ -937,16 +1188,15 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:ConditionalCollision}
-                  §CL{c001:Worker:pub:partial}
-                    §FLD{i32:stored:pub}
+                module ConditionalCollision
+                  class Worker partial
+                    field int:stored
                 """;
             const string conditional = """
-                §M{m002:ConditionalCollision}
-                  §CL{c002:Worker:pub:partial}
-                    §PP{COLLIDING_FIELD}
-                      §FLD{i32:value:pub}
-                    §/PP{COLLIDING_FIELD}
+                module ConditionalCollision
+                  class Worker partial
+                    pp COLLIDING_FIELD
+                      field int:value
                 """;
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, target);
@@ -961,7 +1211,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "stored:pub",
+                "stored",
                 "value"));
             Assert.Equal(
                 4,
@@ -981,21 +1231,21 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:RawGuard}
-                  §F{f001:Compute:pub} () -> i32
-                    §R INT:1
+                module RawGuard
+                  func Compute () → int
+                    !
+                    return 1
                 """;
-            const string guardedReference = """
-                §M{m002:RawGuard}
-                  §CSHARP{public static class RawProbe
+            var guardedReference = "module RawGuard\n" + CreateRawMember("""
+                public static class RawProbe
                 {
                 #if PRIMARY_RAW
                     public static int ReadPrimary() => 0;
                 #elif RAW_REFERENCE
-                    public static int Read() => RawGuardModule.Compute();
+                    public static int Read() => GlobalModule.Compute();
                 #endif
-                }}§/CSHARP
-                """;
+                }
+                """);
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, target);
             File.WriteAllText(Path.Combine(root, "guarded-reference.calr"), guardedReference);
@@ -1013,7 +1263,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate"));
             Assert.Equal(
                 6,
@@ -1036,19 +1286,19 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:RawSpacing}
-                  §F{f001:Compute:pub} () -> i32
-                    §R INT:1
+                module RawSpacing
+                  func Compute () → int
+                    !
+                    return 1
                 """;
-            var guardedReference = $$$"""
-                §M{m002:RawSpacing}
-                  §CSHARP{public static class RawProbe
+            var guardedReference = "module RawSpacing\n" + CreateRawMember($$$"""
+                public static class RawProbe
                 {
                 {{{directive}}}
-                    public static int Read() => RawSpacingModule.Compute();
+                    public static int Read() => GlobalModule.Compute();
                 #endif
-                }}§/CSHARP
-                """;
+                }
+                """);
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, target);
             File.WriteAllText(Path.Combine(root, "guarded-reference.calr"), guardedReference);
@@ -1065,7 +1315,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate"));
             Assert.Equal(
                 4,
@@ -1085,23 +1335,23 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:RawCompound}
-                  §F{f001:Compute:pub} () -> i32
-                    §R INT:1
+                module RawCompound
+                  func Compute () → int
+                    !
+                    return 1
                 """;
-            const string guardedReference = """
-                §M{m002:RawCompound}
-                  §CSHARP{public static class RawProbe
+            var guardedReference = "module RawCompound\n" + CreateRawMember("""
+                public static class RawProbe
                 {
                 #if OUTER_RAW
                 #if PRIMARY_RAW
                     public static int ReadPrimary() => 0;
                 #elif INNER_RAW && SECONDARY_RAW
-                    public static int Read() => RawCompoundModule.Compute();
+                    public static int Read() => GlobalModule.Compute();
                 #endif
                 #endif
-                }}§/CSHARP
-                """;
+                }
+                """);
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, target);
             File.WriteAllText(Path.Combine(root, "guarded-reference.calr"), guardedReference);
@@ -1119,7 +1369,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate"));
             Assert.Equal(
                 24,
@@ -1139,25 +1389,30 @@ public class RenameHandlerTests
         bool includeTrailingContext)
     {
         var source = """
-            §M{m001:ListOps}
-              §F{f001:Sum:pub} (i32:a, i32:b) -> i32
-                §R (+ a b)
-              §F{f002:Count:pub} (i32:n) -> i32
-                §R n
-              §F{f003:FirstOrDefault:pub} (i32:value, i32:defaultVal, bool:hasElements) -> i32
-                §IF{if1} hasElements
-                  §R value
-                §EL
-                  §R defaultVal
-              §F{f004:Use:pub} () -> i32
-                §R §C{FirstOrDefault} §A INT:1 §A INT:0 §A BOOL:true §/C
+            module ListOps
+              func Sum (int:a, int:b) → int
+                !
+                return a + b
+              func Count (int:n) → int
+                !
+                return n
+              func FirstOrDefault (int:value, int:defaultVal, bool:hasElements) → int
+                !
+                if hasElements
+                  return value
+                else
+                  return defaultVal
+              func Use () → int
+                !
+                return FirstOrDefault(1, 0, true)
             """;
         if (includeTrailingContext)
         {
             source += """
 
-                  §F{f005:TrailingContext:pub} () -> i32
-                    §R INT:0
+                  func TrailingContext () → int
+                    !
+                    return 0
                 """;
         }
 
@@ -1169,7 +1424,7 @@ public class RenameHandlerTests
             workspace,
             uri,
             source,
-            "FirstOrDefault:pub",
+            "FirstOrDefault (",
             "First");
 
         Assert.NotNull(edit);
@@ -1186,20 +1441,21 @@ public class RenameHandlerTests
         try
         {
             const string target = """
-                §M{m001:ConditionalControl}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Compute:pub} () -> i32
-                      §R INT:1
-                    §FLD{i32:stored:pub}
+                module ConditionalControl
+                  class Worker partial
+                    func Compute () → int
+                      !
+                      return 1
+                    field int:stored
                 """;
             const string conditional = """
-                §M{m002:ConditionalControl}
-                  §CL{c002:Worker:pub:partial}
-                    §PP{UNRELATED_MEMBERS}
-                      §MT{m002:OtherMethod:pub} () -> i32
-                        §R INT:2
-                      §FLD{i32:otherField:pub}
-                    §/PP{UNRELATED_MEMBERS}
+                module ConditionalControl
+                  class Worker partial
+                    pp UNRELATED_MEMBERS
+                      func OtherMethod () → int
+                        !
+                        return 2
+                      field int:otherField
                 """;
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, target);
@@ -1214,7 +1470,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate"));
             Assert.Equal(
                 2,
@@ -1225,7 +1481,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "stored:pub",
+                "stored",
                 "value"));
             Assert.Equal(
                 2,
@@ -1253,7 +1509,7 @@ public class RenameHandlerTests
             workspace,
             uri,
             source,
-            "Compute:pub",
+            "Compute ()",
             "Calculate"));
         Assert.Equal(
             before,
@@ -1270,17 +1526,14 @@ public class RenameHandlerTests
                 "CombinedBudget",
                 preprocessorSymbolCount: 3);
             const string conditional = """
-                §M{m002:CombinedBudget}
-                  §CL{c002:OtherFlags:pub}
-                    §PP{OTHER_FLAG_0}
-                      §FLD{i32:Calculate:pub}
-                    §/PP{OTHER_FLAG_0}
-                    §PP{OTHER_FLAG_1}
-                      §FLD{i32:Field1:pub}
-                    §/PP{OTHER_FLAG_1}
-                    §PP{OTHER_FLAG_2}
-                      §FLD{i32:Field2:pub}
-                    §/PP{OTHER_FLAG_2}
+                module CombinedBudget
+                  class OtherFlags
+                    pp OTHER_FLAG_0
+                      field int:Calculate
+                    pp OTHER_FLAG_1
+                      field int:Field1
+                    pp OTHER_FLAG_2
+                      field int:Field2
                 """;
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, target);
@@ -1295,7 +1548,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 target,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate"));
             Assert.Equal(
                 before,
@@ -1324,9 +1577,9 @@ public class RenameHandlerTests
                 File.WriteAllText(
                     Path.Combine(root, $"unrelated-{index}.calr"),
                     $$"""
-                    §M{m100:Unrelated{{index}}}
-                      §CL{c100:Type{{index}}:pub}
-                        §FLD{i32:Value:pub}
+                    module Unrelated{{index}}
+                      class Type{{index}}
+                        field int:Value
                     """);
             }
 
@@ -1340,7 +1593,7 @@ public class RenameHandlerTests
                 workspace,
                 uri,
                 source,
-                "Compute:pub",
+                "Compute ()",
                 "Calculate",
                 cancellation.Token);
             Assert.True(SpinWait.SpinUntil(
@@ -1371,23 +1624,24 @@ public class RenameHandlerTests
     public async Task TypeRenameRefusesWhenSemanticCompletenessSignalFindsSpanlessConstraintAsync()
     {
         const string source = """
-            §M{m001:IncompleteTypeSpan}
-              §CL{c001:Widget:pub}
-                §FLD{i32:Value:pub}
-              §F{f001:Use:pub}<T> (T:value) -> T
-                §WHERE T : Widget
-                §R value
+            module IncompleteTypeSpan
+              class Widget
+                field int:Value
+              func Use<T> (T:value) → T
+                !
+                where T : Widget
+                return value
             """;
         var uri = DocumentUri.From("file:///rename-incomplete-type.calr");
         var workspace = new WorkspaceState();
         var state = workspace.GetOrCreate(uri, source);
         Assert.False(state.Diagnostics.HasErrors);
 
-        var offset = source.IndexOf("Widget:pub", StringComparison.Ordinal);
+        var offset = source.IndexOf("Widget", StringComparison.Ordinal);
         var occurrence = workspace.ResolveOccurrence(uri, offset);
         Assert.NotNull(occurrence);
         Assert.False(workspace.CanRenameSymbol(occurrence!.SymbolId));
-        Assert.Null(await RenameAtAsync(workspace, uri, source, "Widget:pub", "RenamedWidget"));
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "Widget", "RenamedWidget"));
     }
 
     [Fact]
@@ -1397,14 +1651,16 @@ public class RenameHandlerTests
         try
         {
             const string definitions = """
-                §M{m001:Definitions}
-                  §F{f001:Pick:pub} (i32:value) -> i32
-                    §R value
+                module Definitions
+                  func Pick (int:value) → int
+                    !
+                    return value
                 """;
             const string use = """
-                §M{m002:Use}
-                  §F{f002:Run:pub} () -> i32
-                    §R §C{Pick} §A INT:1 §/C
+                module Use
+                  func Run () → int
+                    !
+                    return Pick(1)
                 """;
             File.WriteAllText(Path.Combine(root, "definitions.calr"), definitions);
             var usePath = Path.Combine(root, "use.calr");
@@ -1431,17 +1687,268 @@ public class RenameHandlerTests
         }
     }
 
+    [Theory]
+    [InlineData(
+        "module First\n  class Worker partial\n    field int:Left",
+        "module Second\n  class Worker partial\n    field int:Right", true)]
+    [InlineData(
+        "module First Shared\n  class Worker partial\n    field int:Left",
+        "module Second Shared\n  class Worker partial\n    field int:Right", true)]
+    [InlineData(
+        "module Same Left\n  class Worker partial\n    field int:Left",
+        "module Same Right\n  class Worker partial\n    field int:Right", false)]
+    [InlineData(
+        "module Same\n  class Worker<T> partial\n    field int:Left",
+        "module Same\n  class Worker<T,U> partial\n    field int:Right", false)]
+    [InlineData(
+        "module Same\n  class OwnerA\n    class Worker partial\n      field int:Left",
+        "module Same\n  class OwnerB\n    class Worker partial\n      field int:Right", false)]
+    [InlineData(
+        "module Same\n  class Owner<T>\n    class Worker partial\n      field int:Left",
+        "module Same\n  class Owner<T,U>\n    class Worker partial\n      field int:Right", false)]
+    public async Task PartialTypeSplitProtectionUsesActualQualifiedIdentityAsync(
+        string first, string second, bool splitType)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var firstPath = Path.Combine(root, "first.calr");
+            var secondPath = Path.Combine(root, "second.calr");
+            File.WriteAllText(firstPath, first);
+            File.WriteAllText(secondPath, second);
+            var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [firstPath] = first,
+                [secondPath] = second,
+            };
+            AssertWorkspaceRoslynCleanWithProductionMap(sources);
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(firstPath);
+            var state = workspace.GetOrCreate(uri, first, version: 1);
+            Assert.False(state.Diagnostics.HasErrors, string.Join("\n", state.Diagnostics));
+            var symbol = Assert.Single(state.BoundModule!.SymbolsById.Values
+                .OfType<Calor.Compiler.Binding.TypeSymbol>().Where(symbol => symbol.Name == "Worker"));
+            workspace.RefreshClosedDocuments();
+            Assert.Equal(splitType, workspace.FindSymbolOccurrences(symbol.Id, includeDeclaration: true)
+                .Any(occurrence => occurrence.IsSplitDeclaration));
+            var edit = await RenameAtAsync(workspace, uri, first, "Worker", "Renamed");
+            Assert.Equal(first, File.ReadAllText(firstPath));
+            Assert.Equal(second, File.ReadAllText(secondPath));
+            if (splitType)
+            {
+                Assert.Null(edit);
+                return;
+            }
+            Assert.NotNull(edit);
+            var documentEdit = Assert.Single(edit!.DocumentChanges!).TextDocumentEdit!;
+            Assert.Equal(uri, documentEdit.TextDocument.Uri);
+            var textEdit = Assert.Single(documentEdit.Edits);
+            Assert.Equal("Worker", TextAt(first, textEdit.Range));
+            Assert.Equal("Renamed", textEdit.NewText);
+            sources[firstPath] = ApplySingleDocumentEdit(first, edit);
+            AssertWorkspaceRoslynCleanWithProductionMap(sources);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FileLabelRenamePreservesSidecarIdentityNamespaceAndClrOwnersAsync(bool importedNamespace)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var label = importedNamespace ? "Shared" : "Same";
+            var source = importedNamespace
+                ? "module Shared Shared\n  class LeftType\n    field int:Value\n"
+                : "module Same\n  class Worker partial\n    field int:Left\n";
+            var other = importedNamespace
+                ? "module Other\n  using Shared\n  class RightType\n    field LeftType:Value\n"
+                : "module Same\n  class Worker partial\n    field int:Right\n";
+            var file = Path.Combine(root, "target.calr");
+            var otherFile = Path.Combine(root, "other.calr");
+            File.WriteAllText(file, source);
+            File.WriteAllText(otherFile, other);
+            var store = new Calor.Compiler.Ids.DeclarationIdentityStore(root);
+            var before = store.Sync([file, otherFile]);
+            var originalSidecar = File.ReadAllText(store.SidecarPath);
+            var expected = before.Declarations.Single(declaration =>
+                declaration.File == "target.calr" && declaration.Name == label).Id;
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(file);
+            workspace.GetOrCreate(uri, source, version: 7);
+            var originalSymbol = workspace.ResolveOccurrence(uri, source.IndexOf(label, StringComparison.Ordinal))!.SymbolId;
+            var edit = await RenameAtAsync(workspace, uri, source, label, "Renamed",
+                supportsTransactionalEdits: true);
+            Assert.NotNull(edit);
+            Assert.Equal(source, File.ReadAllText(file));
+            Assert.Equal(other, File.ReadAllText(otherFile));
+            Assert.Equal(originalSidecar, File.ReadAllText(store.SidecarPath));
+            var changes = edit!.DocumentChanges!.ToArray();
+            Assert.Equal(2, changes.Length);
+            var sourceChange = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit is { } documentEdit && documentEdit.TextDocument.Uri == uri));
+            Assert.Equal(7, sourceChange.TextDocumentEdit!.TextDocument.Version);
+            var tokenEdit = Assert.Single(sourceChange.TextDocumentEdit.Edits);
+            Assert.Equal(label, TextAt(source, tokenEdit.Range));
+            var updated = ApplySingleDocumentEdit(source, new WorkspaceEdit
+            {
+                DocumentChanges = new Container<WorkspaceEditDocumentChange>(sourceChange)
+            });
+            var sidecarChange = Assert.Single(changes.Where(change =>
+                change.TextDocumentEdit?.TextDocument.Uri.GetFileSystemPath() == store.SidecarPath)).TextDocumentEdit!;
+            File.WriteAllText(file, updated);
+            File.WriteAllText(store.SidecarPath, Assert.Single(sidecarChange.Edits).NewText);
+            var after = store.Sync();
+            Assert.Equal(before.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal),
+                after.Declarations.Select(declaration => declaration.Id).Order(StringComparer.Ordinal));
+            foreach (var declaration in before.Declarations)
+            {
+                var retained = after.Declarations.Single(candidate => candidate.Id == declaration.Id);
+                Assert.Equal(declaration.Kind, retained.Kind);
+                Assert.Equal(declaration.File, retained.File);
+                Assert.Equal(declaration.Container, retained.Container);
+                Assert.Equal(declaration.Id == expected ? "Renamed" : declaration.Name, retained.Name);
+            }
+            Assert.Equal(other, File.ReadAllText(otherFile));
+            Assert.DoesNotContain(expected, updated);
+            var reloaded = new WorkspaceState(root);
+            reloaded.GetOrCreate(uri, updated, version: 8);
+            Assert.Equal(originalSymbol, reloaded.ResolveOccurrence(uri,
+                updated.IndexOf("Renamed", StringComparison.Ordinal))!.SymbolId);
+            AssertWorkspaceRoslynCleanWithProductionMap(
+                new Dictionary<string, string> { [file] = updated, [otherFile] = other },
+                compilation =>
+                {
+                    Assert.NotNull(compilation.GetTypeByMetadataName(importedNamespace ? "Shared.LeftType" : "Worker"));
+                    Assert.Null(compilation.GetTypeByMetadataName("Renamed.LeftType"));
+                    Assert.Null(compilation.GetTypeByMetadataName("Renamed.Worker"));
+                });
+            if (importedNamespace)
+            {
+                Assert.Contains("module Renamed Shared", updated);
+                Assert.Contains("using Shared", other);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("Shared.Tools", false)]
+    [InlineData("", true)]
+    [InlineData("Shared.Tools", true)]
+    public void FileLabelsDoNotPartitionPartialInheritanceDiagnostics(string namespaceName, bool nested)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var header = $"module Same{(namespaceName.Length == 0 ? "" : $" {namespaceName}")}\n";
+            if (nested)
+                header += "  class Outer<T> partial\n";
+            var indent = nested ? "    " : "  ";
+            var sources = new[]
+            {
+                $"{header}{indent}class A extends B",
+                $"{header}{indent}class B partial extends A\n{indent}  field int:Left",
+                $"{header}{indent}class B partial extends A\n{indent}  field int:Right",
+            };
+            for (var index = 0; index < sources.Length; index++)
+                File.WriteAllText(Path.Combine(root, $"{index}.calr"), sources[index]);
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(Path.Combine(root, "0.calr"));
+            workspace.GetOrCreate(uri, sources[0], version: 1);
+            var before = Cycles(workspace.CaptureSnapshot(refreshClosedDocuments: true));
+            Assert.Equal(3, before.Length);
+            File.WriteAllText(Path.Combine(root, "2.calr"),
+                sources[2].Replace("module Same", "module Other", StringComparison.Ordinal));
+            var after = workspace.CaptureSnapshot(refreshClosedDocuments: true);
+            Assert.Contains(after.Documents, document => document.Analysis.Source.StartsWith("module Other", StringComparison.Ordinal));
+            Assert.Equal(before, Cycles(after));
+
+            string[] Cycles(WorkspaceIndexSnapshot snapshot)
+                => snapshot.Documents.SelectMany(document => workspace.GetDiagnostics(snapshot, document)
+                        .Where(diagnostic => diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle)
+                        .Select(diagnostic => $"{document.Document.Uri}:{diagnostic.Message}"))
+                    .Order(StringComparer.Ordinal).ToArray();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ActualNamespacesKeepSameNamedInheritanceCyclesSeparate()
+    {
+        var workspace = new WorkspaceState();
+        foreach (var namespaceName in new[] { "Left", "Right" })
+        {
+            foreach (var (name, baseName) in new[] { ("A", "B"), ("B", "A") })
+            {
+                workspace.GetOrCreate(DocumentUri.From($"file:///{namespaceName}-{name}.calr"),
+                    $"module Same {namespaceName}\n  class {name} extends {baseName}");
+            }
+        }
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.Equal(4, snapshot.Documents.Length);
+        foreach (var document in snapshot.Documents)
+        {
+            var diagnostic = Assert.Single(workspace.GetDiagnostics(snapshot, document)
+                .Where(diagnostic => diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+            Assert.Equal("Inheritance cycle detected: A -> B -> A.", diagnostic.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CrossNamespaceInheritanceUsesNamespacesNotFileLabels(bool imports)
+    {
+        var workspace = new WorkspaceState();
+        var aBase = imports ? "B" : "Right.B";
+        var bBase = imports ? "A" : "Left.A";
+        var aImport = imports ? "  using Right\n" : "";
+        var bImport = imports ? "  using Left\n" : "";
+        workspace.GetOrCreate(DocumentUri.From("file:///left-a.calr"),
+            $"module Same Left\n{aImport}  class A extends {aBase}");
+        workspace.GetOrCreate(DocumentUri.From("file:///right-b.calr"),
+            $"module Same Right\n{bImport}  class B extends {bBase}");
+
+        var snapshot = workspace.CaptureSnapshot();
+        Assert.Equal(2, snapshot.Documents.Length);
+        foreach (var document in snapshot.Documents)
+        {
+            var diagnostic = Assert.Single(workspace.GetDiagnostics(snapshot, document)
+                .Where(diagnostic => diagnostic.Code == Calor.Compiler.Diagnostics.DiagnosticCode.InheritanceCycle));
+            Assert.Equal("Inheritance cycle detected: A -> B -> A.", diagnostic.Message);
+        }
+    }
+
     private static async Task<WorkspaceEdit?> RenameAtAsync(
         WorkspaceState workspace,
         DocumentUri uri,
         string source,
         string cursorText,
         string newName,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool supportsTransactionalEdits = false,
+        int cursorOffset = 0)
     {
         var offset = source.IndexOf(cursorText, StringComparison.Ordinal);
+        Assert.True(offset >= 0, $"Rename cursor marker '{cursorText}' was not found in the source.");
+        Assert.InRange(cursorOffset, 0, cursorText.Length - 1);
+        offset += cursorOffset;
         var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        return await new RenameHandler(workspace).Handle(
+        return await new RenameHandler(workspace) { SupportsTransactionalWorkspaceEdits = supportsTransactionalEdits }.Handle(
             new RenameParams
             {
                 TextDocument = new TextDocumentIdentifier(uri),
@@ -1498,28 +2005,72 @@ public class RenameHandlerTests
                 == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
     }
 
-    private static Microsoft.CodeAnalysis.Diagnostic[] GetRoslynErrors(string source)
-    {
-        var state = LspTestHarness.CreateDocument(source);
-        Assert.NotNull(state.Ast);
-        Assert.False(
-            state.Diagnostics.HasErrors,
-            string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
-                $"{diagnostic.Code}: {diagnostic.Message}")));
-        var tree = CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(state.Ast!));
-        var compilation = CSharpCompilation.Create(
-            "RenameBaselineErrors",
-            [tree],
-            GetPlatformReferences(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        return compilation.GetDiagnostics()
+    private static Microsoft.CodeAnalysis.Diagnostic[] GetRoslynErrors(params string[] sources)
+        => GetRoslynErrors(CreateRoslynCompilation(sources));
+
+    private static Microsoft.CodeAnalysis.Diagnostic[] GetRoslynErrors(CSharpCompilation compilation)
+        => compilation.GetDiagnostics()
             .Where(diagnostic => diagnostic.Severity
                 == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
             .ToArray();
+
+    private static CSharpCompilation CreateRoslynCompilation(params string[] sources)
+    {
+        var modules = sources.Select(source =>
+        {
+            var state = LspTestHarness.CreateDocument(source);
+            Assert.NotNull(state.Ast);
+            Assert.False(
+                state.Diagnostics.HasErrors,
+                string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code}: {diagnostic.Message}")));
+            return state.Ast!;
+        }).ToArray();
+        var crossModuleMap = modules.Length > 1
+            ? Calor.Compiler.CompilationDriver.BuildCrossModuleFunctionMap(modules)
+            : null;
+        var trees = modules.Select(module => CSharpSyntaxTree.ParseText(
+            new CSharpEmitter { CrossModuleFunctionModules = crossModuleMap }.Emit(module)));
+        return CSharpCompilation.Create(
+            "RenameBaselineErrors",
+            trees,
+            GetPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
-    private static Dictionary<string, string> AssertWorkspaceRoslynCleanWithProductionMap(
-        IReadOnlyDictionary<string, string> sources)
+    private static string ConvertInteropSupport(
+        string payload, string sourceFile, params SyntaxTree[] context)
+    {
+        var conversion = new Calor.Compiler.Migration.CSharpToCalorConverter(
+            new Calor.Compiler.Migration.ConversionOptions
+            {
+                // The converter parses at LanguageVersion.Preview; Roslyn rejects a compilation
+                // whose trees disagree on language version, so align the semantic context.
+                AdditionalSemanticSyntaxTrees = context
+                    .Select(tree => tree.WithRootAndOptions(
+                        tree.GetRoot(),
+                        new CSharpParseOptions(LanguageVersion.Preview)))
+                    .ToArray()
+            }).Convert(payload, sourceFile);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        // These are intentionally erroneous C# oracles, not native or verified conversion acceptance.
+        Assert.Equal(Calor.Compiler.Migration.ConversionRoundTrip.Failed, conversion.Context.RoundTrip);
+        Assert.NotNull(conversion.CalorSource);
+        var state = LspTestHarness.CreateDocument(conversion.CalorSource);
+        Assert.NotNull(state.Ast);
+        Assert.False(state.Diagnostics.HasErrors, string.Join(Environment.NewLine, state.Diagnostics));
+        var preserved = Assert.Single(state.Ast.InteropBlocks);
+        Assert.True(preserved.IsCompilationUnitPassthrough);
+        Assert.False(string.IsNullOrWhiteSpace(preserved.FeatureName));
+        Assert.False(string.IsNullOrWhiteSpace(preserved.Reason));
+        Assert.Equal(payload, preserved.CSharpCode);
+        Assert.Equal(payload, new CSharpEmitter().Emit(state.Ast));
+        return conversion.CalorSource;
+    }
+
+    internal static Dictionary<string, string> AssertWorkspaceRoslynCleanWithProductionMap(
+        IReadOnlyDictionary<string, string> sources,
+        Action<CSharpCompilation>? inspect = null)
     {
         var modules = sources
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
@@ -1566,6 +2117,7 @@ public class RenameHandlerTests
             compilation.GetDiagnostics(),
             diagnostic => diagnostic.Severity
                 == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        inspect?.Invoke(compilation);
         return generated;
     }
 
@@ -1595,27 +2147,31 @@ public class RenameHandlerTests
     {
         var lines = new List<string>
         {
-            $"§M{{m001:{moduleName}}}",
+            $"module {moduleName}",
         };
         if (preprocessorSymbolCount > 0)
         {
-            lines.Add("  §CL{c001:Flags:pub}");
+            lines.Add("  class Flags");
             for (var index = 0; index < preprocessorSymbolCount; index++)
             {
-                lines.Add($"    §PP{{FLAG_{index}}}");
-                lines.Add($"      §FLD{{i32:Field{index}:pub}}");
-                lines.Add($"    §/PP{{FLAG_{index}}}");
+                lines.Add($"    pp FLAG_{index}");
+                lines.Add($"      field int:Field{index}");
             }
         }
         if (includeRenameTarget)
         {
-            lines.Add("  §F{f001:Compute:pub} () -> i32");
-            lines.Add("    §R INT:1");
-            lines.Add("  §F{f002:Use:pub} () -> i32");
-            lines.Add("    §R §C{Compute} §/C");
+            lines.Add("  func Compute () → int");
+            lines.Add("    !");
+            lines.Add("    return 1");
+            lines.Add("  func Use () → int");
+            lines.Add("    !");
+            lines.Add("    return Compute()");
         }
         return string.Join(Environment.NewLine, lines);
     }
+
+    private static string CreateRawMember(string payload)
+        => $"  raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
 
     private static IEnumerable<MetadataReference> GetPlatformReferences()
     {
@@ -1707,46 +2263,54 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definitions.calr"] = """
-                    §M{defs:Collision}
-                      §CL{c001:Worker:pub:partial}
-                        §FLD{i32:value:pub}
-                        §MT{m001:Pick:pub} (i32:value) -> i32
-                          §IF{nested} (== value INT:0)
-                            §B{result:i32} INT:10
-                            §R result
-                          §EL
-                            §B{result:i32} value
-                            §R result
-                        §MT{m002:Pick:pub} (str:value) -> i32
-                          §R INT:2
-                        §MT{m003:Run:pub} () -> i32
-                          §B{value:i32} INT:3
-                          §R (+ value §THIS.value)
-                        §CL{c005:Nested:pub}
-                          §MT{m005:Run:pub} () -> i32
-                            §B{result:i32} INT:4
-                            §R result
+                    module Collision
+                      class Worker partial
+                        field int:value
+                        func Pick (int:value) → int
+                          !
+                          if value == 0
+                            let int:result = 10
+                            return result
+                          else
+                            let int:result = value
+                            return result
+                        func Pick (string:value) → int
+                          !
+                          return 2
+                        func Run () → int
+                          !
+                          let int:value = 3
+                          return value + this.value
+                        class Nested
+                          func Run () → int
+                            !
+                            let int:result = 4
+                            return result
                     """,
                 ["open-use.calr"] = """
-                    §M{openUse:Collision}
-                      §CL{c002:Worker:pub:partial}
-                        §MT{m010:UseOne:pub} () -> i32
-                          §R §C{Pick} §A INT:1 §/C
+                    module Collision
+                      class Worker partial
+                        func UseOne () → int
+                          !
+                          return Pick(1)
                     """,
                 ["closed-use.calr"] = """
-                    §M{closedUse:Collision}
-                      §CL{c003:Worker:pub:partial}
-                        §MT{m011:UseTwo:pub} () -> i32
-                          §R §C{Pick} §A INT:2 §/C
+                    module Collision
+                      class Worker partial
+                        func UseTwo () → int
+                          !
+                          return Pick(2)
                     """,
                 ["collisions.calr"] = """
-                    §M{other:Collision}
-                      §CL{c004:OtherType:pub}
-                        §FLD{i32:value:pub}
-                        §MT{m020:Pick:pub} (str:value) -> i32
-                          §R INT:3
-                        §MT{m021:Run:pub} (i32:value) -> i32
-                          §R value
+                    module Collision
+                      class OtherType
+                        field int:value
+                        func Pick (string:value) → int
+                          !
+                          return 3
+                        func Run (int:value) → int
+                          !
+                          return value
                     """,
             };
             foreach (var (fileName, source) in sources)
@@ -1805,12 +2369,12 @@ public sealed class ExactSpanRefactoringGateTests
             Assert.Equal(3, updated.Values.Sum(source => Count(source, "Choose")));
             Assert.Equal(
                 1,
-                Count(updated[Path.Combine(root, "definitions.calr")], ":Pick:pub"));
+                Count(updated[Path.Combine(root, "definitions.calr")], "func Pick ("));
             Assert.Equal(
                 1,
-                Count(updated[Path.Combine(root, "collisions.calr")], ":Pick:pub"));
-            Assert.Contains("§MT{m003:Run:pub}", updated[Path.Combine(root, "definitions.calr")]);
-            Assert.Contains("§MT{m021:Run:pub}", updated[Path.Combine(root, "collisions.calr")]);
+                Count(updated[Path.Combine(root, "collisions.calr")], "func Pick ("));
+            Assert.Contains("func Run (", updated[Path.Combine(root, "definitions.calr")]);
+            Assert.Contains("func Run (", updated[Path.Combine(root, "collisions.calr")]);
 
             var syntaxTrees = new List<SyntaxTree>();
             foreach (var (path, source) in updated.OrderBy(pair => pair.Key, StringComparer.Ordinal))
@@ -1852,17 +2416,14 @@ public sealed class ExactSpanRefactoringGateTests
         }
     }
 
-    // A module, and a type declared across several files, are one declaration in
-    // the language but one SymbolId per file in the index. Renaming from a
-    // file-local occurrence set edits a single part and splits the declaration —
-    // and Calor reports no error, so the break surfaces only in generated C#
-    // (CS0103 on the other part's members). Rename must refuse instead.
+    // File labels are independent, but a partial type is one CLR declaration.
     [Theory]
-    [InlineData("Collision", "Renamed")]
-    [InlineData("Worker", "Employee")]
-    public async Task RenameRefusesDeclarationsSplitAcrossFilesAsync(
+    [InlineData("Collision", "Renamed", false)]
+    [InlineData("Worker", "Employee", true)]
+    public async Task RenameDistinguishesFileLabelsFromSplitPartialTypesAsync(
         string cursorText,
-        string newName)
+        string newName,
+        bool splitType)
     {
         var root = CreateWorkspaceDirectory();
         try
@@ -1870,16 +2431,18 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["definitions.calr"] = """
-                    §M{defs:Collision}
-                      §CL{c001:Worker:pub:partial}
-                        §MT{m001:Pick:pub} (i32:value) -> i32
-                          §R value
+                    module Collision
+                      class Worker partial
+                        func Pick (int:value) → int
+                          !
+                          return value
                     """,
                 ["open-use.calr"] = """
-                    §M{openUse:Collision}
-                      §CL{c002:Worker:pub:partial}
-                        §MT{m010:UseOne:pub} () -> i32
-                          §R §C{Pick} §A INT:1 §/C
+                    module Collision
+                      class Worker partial
+                        func UseOne () → int
+                          !
+                          return Pick(1)
                     """,
             };
             foreach (var (fileName, source) in sources)
@@ -1888,14 +2451,39 @@ public sealed class ExactSpanRefactoringGateTests
             var workspace = new WorkspaceState(root);
             var openUri = DocumentUri.FromFileSystemPath(
                 Path.Combine(root, "definitions.calr"));
-            workspace.GetOrCreate(openUri, sources["definitions.calr"], version: 1);
+            var state = workspace.GetOrCreate(openUri, sources["definitions.calr"], version: 1);
+            Assert.False(state.Diagnostics.HasErrors, string.Join("\n", state.Diagnostics));
 
-            Assert.Null(await RenameAtAsync(
+            var edit = await RenameAtAsync(
                 workspace,
                 openUri,
                 sources["definitions.calr"],
                 cursorText,
-                newName));
+                newName);
+            if (splitType)
+                Assert.Null(edit);
+            else
+            {
+                Assert.NotNull(edit);
+                var change = Assert.Single(edit!.DocumentChanges!);
+                var documentEdit = Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit);
+                Assert.Equal(openUri, documentEdit.TextDocument.Uri);
+                var textEdit = Assert.Single(documentEdit.Edits);
+                Assert.Equal("Collision", TextAt(sources["definitions.calr"], textEdit.Range));
+                Assert.Equal(newName, textEdit.NewText);
+                var updated = sources.ToDictionary(
+                    pair => Path.Combine(root, pair.Key),
+                    pair => pair.Value,
+                    StringComparer.Ordinal);
+                var start = PositionConverter.ToOffset(textEdit.Range.Start, sources["definitions.calr"]);
+                var end = PositionConverter.ToOffset(textEdit.Range.End, sources["definitions.calr"]);
+                updated[Path.Combine(root, "definitions.calr")] = sources["definitions.calr"][..start]
+                    + textEdit.NewText + sources["definitions.calr"][end..];
+                RenameHandlerTests.AssertWorkspaceRoslynCleanWithProductionMap(updated, compilation =>
+                    Assert.NotNull(compilation.GetTypeByMetadataName("Worker")));
+            }
+            Assert.All(sources, pair => Assert.Equal(
+                pair.Value, File.ReadAllText(Path.Combine(root, pair.Key))));
 
             // The refusal must be specific to split declarations: a method declared
             // in one file still renames across the workspace.
@@ -1913,11 +2501,9 @@ public sealed class ExactSpanRefactoringGateTests
         }
     }
 
-    // A module emits a C# namespace that another file can import. Using directives
-    // are not indexed as occurrences, so renaming an imported module would leave the
-    // importer pointing at a namespace that no longer exists.
+    // An explicit namespace is not owned by a compilation-unit label with the same text.
     [Fact]
-    public async Task RenameRefusesModuleImportedByAnotherFileAsync()
+    public async Task RenameFileLabelPreservesAnExplicitImportedNamespaceAsync()
     {
         var root = CreateWorkspaceDirectory();
         try
@@ -1925,14 +2511,15 @@ public sealed class ExactSpanRefactoringGateTests
             var sources = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["models.calr"] = """
-                    §M{m001:Models}
-                      §CL{c001:Widget:pub}
+                    module Models Models
+                      class Widget
                     """,
                 ["app.calr"] = """
-                    §M{m002:App}
-                      §U{Models}
-                      §F{f001:Make:pub} () -> Widget
-                        §R §NEW{Widget} §/NEW
+                    module App
+                      using Models
+                      func Make () → Widget
+                        !
+                        return new Widget()
                     """,
             };
             foreach (var (fileName, source) in sources)
@@ -1942,12 +2529,30 @@ public sealed class ExactSpanRefactoringGateTests
             var openUri = DocumentUri.FromFileSystemPath(Path.Combine(root, "models.calr"));
             workspace.GetOrCreate(openUri, sources["models.calr"], version: 1);
 
-            Assert.Null(await RenameAtAsync(
+            var edit = await RenameAtAsync(
                 workspace,
                 openUri,
                 sources["models.calr"],
                 "Models",
-                "Domain"));
+                "Domain");
+            var documentEdit = Assert.IsType<TextDocumentEdit>(Assert.Single(edit!.DocumentChanges!).TextDocumentEdit);
+            Assert.Equal(openUri, documentEdit.TextDocument.Uri);
+            var textEdit = Assert.Single(documentEdit.Edits);
+            Assert.Equal("Models", TextAt(sources["models.calr"], textEdit.Range));
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, sources["models.calr"]);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, sources["models.calr"]);
+            var updated = sources.ToDictionary(pair => Path.Combine(root, pair.Key), pair => pair.Value);
+            updated[Path.Combine(root, "models.calr")] = sources["models.calr"][..start]
+                + textEdit.NewText + sources["models.calr"][end..];
+            Assert.Contains("module Domain Models", updated[Path.Combine(root, "models.calr")]);
+            Assert.Contains("using Models", updated[Path.Combine(root, "app.calr")]);
+            RenameHandlerTests.AssertWorkspaceRoslynCleanWithProductionMap(updated, compilation =>
+            {
+                Assert.NotNull(compilation.GetTypeByMetadataName("Models.Widget"));
+                Assert.Null(compilation.GetTypeByMetadataName("Domain.Widget"));
+                Assert.Equal("Models.Widget", compilation.GetTypeByMetadataName("GlobalModule")!
+                    .GetMembers("Make").OfType<IMethodSymbol>().Single().ReturnType.ToDisplayString());
+            });
 
             // The importing module is not imported anywhere, so it still renames.
             var appUri = DocumentUri.FromFileSystemPath(Path.Combine(root, "app.calr"));
@@ -1974,6 +2579,7 @@ public sealed class ExactSpanRefactoringGateTests
         string newName)
     {
         var offset = source.IndexOf(cursorText, StringComparison.Ordinal);
+        Assert.True(offset >= 0, $"Rename cursor marker '{cursorText}' was not found in the source.");
         var (line, column) = LspTestHarness.GetLineColumn(source, offset);
         return await new RenameHandler(workspace).Handle(
             new RenameParams

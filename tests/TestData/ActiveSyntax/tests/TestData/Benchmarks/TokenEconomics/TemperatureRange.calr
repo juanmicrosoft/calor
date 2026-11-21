@@ -1,0 +1,7 @@
+module TemperatureRange TemperatureRange
+  module TemperatureRangeModule
+    func RangeKelvin public (float:cMin, float:cMax) → float
+      !
+      let kMin = cMin + 273.15
+      let kMax = cMax + 273.15
+      return kMax - kMin

@@ -1,0 +1,16 @@
+module Reduce Reduce
+  module ReduceModule
+    func Sum public (int:acc, int:value) → int
+      !
+      return acc + value
+
+    func Product public (int:acc, int:value) → int
+      !
+      return acc * value
+
+    func Max public (int:acc, int:value) → int
+      !
+      if value > acc
+        return value
+      else
+        return acc

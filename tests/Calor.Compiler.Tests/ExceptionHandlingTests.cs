@@ -10,22 +10,20 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ExceptionHandlingTests
 {
+
     #region Code Generation Tests
 
     [Fact]
     public void CodeGen_BasicTryCatch_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:SafeDivide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §TR{t1}
-    §R (/ a b)
-    §CA{DivideByZeroException:ex}
-    §R 0
-    §/TR{t1}
+module Test Test block
+  func SafeDivide (int:a, int:b) → int
+    !
+    try
+      return (a / b)
+    catch DivideByZeroException:ex
+      return 0
 ";
 
         var result = ParseAndEmit(source);
@@ -40,17 +38,15 @@ public class ExceptionHandlingTests
     public void CodeGen_TryCatchFinally_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:WithFinally:pub}
-    §O{void}
-    §E{cw}
-    §TR{t1}
-    §P ""try""
-    §CA{Exception:e}
-    §P ""catch""
-    §FI
-    §P ""finally""
-    §/TR{t1}
+module Test Test block
+  func WithFinally () → void
+    ! cw
+    try
+      Console.WriteLine(""try"")
+    catch Exception:e
+      Console.WriteLine(""catch"")
+    finally
+      Console.WriteLine(""finally"")
 ";
 
         var result = ParseAndEmit(source);
@@ -64,19 +60,16 @@ public class ExceptionHandlingTests
     public void CodeGen_NestedTryCatch_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Nested:pub}
-    §I{i32:x}
-    §O{i32}
-    §TR{t1}
-    §TR{t2}
-    §R (/ 100 x)
-    §CA{DivideByZeroException:inner}
-    §R -1
-    §/TR{t2}
-    §CA{Exception:outer}
-    §R -2
-    §/TR{t1}
+module Test Test block
+  func Nested (int:x) → int
+    !
+    try
+      try
+        return (100 / x)
+      catch DivideByZeroException:inner
+        return -1
+    catch Exception:outer
+      return -2
 ";
 
         var result = ParseAndEmit(source);
@@ -94,19 +87,17 @@ public class ExceptionHandlingTests
     public void CodeGen_MultipleCatchClauses_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:MultiCatch:pub}
-    §I{i32:x}
-    §O{str}
-    §TR{t1}
-    §R (/ 100 x)
-    §CA{DivideByZeroException:e1}
-    §R ""divide by zero""
-    §CA{ArithmeticException:e2}
-    §R ""arithmetic error""
-    §CA{Exception:e3}
-    §R ""general error""
-    §/TR{t1}
+module Test Test block
+  func MultiCatch (int:x) → string
+    !
+    try
+      return (100 / x)
+    catch DivideByZeroException:e1
+      return ""divide by zero""
+    catch ArithmeticException:e2
+      return ""arithmetic error""
+    catch Exception:e3
+      return ""general error""
 ";
 
         var result = ParseAndEmit(source);
@@ -120,15 +111,13 @@ public class ExceptionHandlingTests
     public void CodeGen_CatchAll_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:CatchAll:pub}
-    §O{void}
-    §E{cw}
-    §TR{t1}
-    §P ""try""
-    §CA
-    §P ""caught""
-    §/TR{t1}
+module Test Test block
+  func CatchAll () → void
+    ! cw
+    try
+      Console.WriteLine(""try"")
+    catch
+      Console.WriteLine(""caught"")
 ";
 
         var result = ParseAndEmit(source);
@@ -142,17 +131,15 @@ public class ExceptionHandlingTests
     public void CodeGen_WhenFilter_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Filtered:pub}
-    §I{i32:code}
-    §O{str}
-    §TR{t1}
-    §TH ""Error""
-    §CA{Exception:ex} §WHEN (== code 42)
-    §R ""special""
-    §CA{Exception:ex}
-    §R ""general""
-    §/TR{t1}
+module Test Test block
+  func Filtered (int:code) → string
+    !
+    try
+      throw ""Error""
+    catch Exception:ex when (code == 42)
+      return ""special""
+    catch Exception:ex
+      return ""general""
 ";
 
         var result = ParseAndEmit(source);
@@ -164,16 +151,14 @@ public class ExceptionHandlingTests
     public void CodeGen_Rethrow_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Rethrow:pub}
-    §O{void}
-    §E{cw}
-    §TR{t1}
-    §TH ""Error""
-    §CA{Exception:ex}
-    §P ""caught""
-    §RT
-    §/TR{t1}
+module Test Test block
+  func Rethrow () → void
+    ! cw
+    try
+      throw ""Error""
+    catch Exception:ex
+      Console.WriteLine(""caught"")
+      throw
 ";
 
         var result = ParseAndEmit(source);
@@ -187,10 +172,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_StringWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §TH ""error message""
+module Test Test block
+  func Throw () → void
+    !
+    throw ""error message""
 ";
 
         var result = ParseAndEmit(source);
@@ -202,10 +187,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_IntLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §TH 42
+module Test Test block
+  func Throw () → void
+    !
+    throw 42
 ";
 
         var result = ParseAndEmit(source);
@@ -217,10 +202,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_BoolLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §TH true
+module Test Test block
+  func Throw () → void
+    !
+    throw true
 ";
 
         var result = ParseAndEmit(source);
@@ -232,10 +217,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_NewExceptionPassesThrough()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §TH §NEW{ArgumentException} §A ""bad arg"" §/NEW
+module Test Test block
+  func Throw () → void
+    !
+    throw new ArgumentException(""bad arg"")
 ";
 
         var result = ParseAndEmit(source);
@@ -248,11 +233,11 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_VariablePassesThrough()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §B{~ex} §NEW{InvalidOperationException} §A ""oops"" §/NEW
-    §TH ex
+module Test Test block
+  func Throw () → void
+    !
+    var ex = new InvalidOperationException(""oops"")
+    throw ex
 ";
 
         var result = ParseAndEmit(source);
@@ -265,10 +250,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_FloatLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §TH 3.14
+module Test Test block
+  func Throw () → void
+    !
+    throw 3.14
 ";
 
         var result = ParseAndEmit(source);
@@ -280,10 +265,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_DecimalLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §TH 18.00M
+module Test Test block
+  func Throw () → void
+    !
+    throw 18.00m
 ";
 
         var result = ParseAndEmit(source);
@@ -295,10 +280,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_CharLiteralWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §O{void}
-    §TH (char-lit ""x"")
+module Test Test block
+  func Throw () → void
+    !
+    throw 'x'
 ";
 
         var result = ParseAndEmit(source);
@@ -310,11 +295,10 @@ public class ExceptionHandlingTests
     public void CodeGen_ThrowStatement_InterpolatedStringWrapsInException()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Throw:pub}
-    §I{str:name}
-    §O{void}
-    §TH §INTERP ""Hello, "" §EXP name ""!"" §/INTERP
+module Test Test block
+  func Throw (string:name) → void
+    !
+    throw ""Hello, ${name}!""
 ";
 
         var result = ParseAndEmit(source);
@@ -326,15 +310,13 @@ public class ExceptionHandlingTests
     public void CodeGen_TryOnlyFinally_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:TryFinally:pub}
-    §O{void}
-    §E{cw}
-    §TR{t1}
-    §P ""try""
-    §FI
-    §P ""finally""
-    §/TR{t1}
+module Test Test block
+  func TryFinally () → void
+    ! cw
+    try
+      Console.WriteLine(""try"")
+    finally
+      Console.WriteLine(""finally"")
 ";
 
         var result = ParseAndEmit(source);
@@ -345,47 +327,28 @@ public class ExceptionHandlingTests
         var catchCount = CountOccurrences(result, "catch");
         Assert.Equal(0, catchCount);
     }
-
     #endregion
-
     #region Negative/Error Case Tests
 
     [Fact]
-    public void Parse_MismatchedTryId_ReportsError()
+    public void Parse_TryWithoutSourceId_ParsesSuccessfully()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
-    §O{void}
-    §TR{t1}
-    §P ""try""
-    §/TR{t2}
+module Test Test block
+  func Bad () → void
+    !
+    try
+      Console.WriteLine(""try"")
+    catch Exception:e
+      Console.WriteLine(""catch"")
 ";
 
         var module = Parse(source, out var diagnostics);
 
-        Assert.True(diagnostics.HasErrors);
-        var errorMessages = string.Join("\n", diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message));
-        Assert.Contains("does not match", errorMessages, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void Parse_MissingTryId_ReportsError()
-    {
-        var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
-    §O{void}
-    §TR
-    §P ""try""
-    §/TR
-";
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        var errorMessages = string.Join("\n", diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message));
-        Assert.Contains("id", errorMessages, StringComparison.OrdinalIgnoreCase);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors.Select(diagnostic => diagnostic.Message)));
+        var statement = Assert.IsType<Ast.TryStatementNode>(Assert.Single(module.Functions[0].Body));
+        Assert.Single(statement.TryBody);
+        Assert.Single(Assert.Single(statement.CatchClauses).Body);
     }
 
     [Fact]
@@ -393,13 +356,12 @@ public class ExceptionHandlingTests
     {
         // Empty try blocks are syntactically valid (though semantically questionable)
         var source = @"
-§M{m1:Test}
-  §F{f1:Empty:pub}
-    §O{void}
-    §TR{t1}
-    §CA{Exception:e}
-    §P ""catch""
-    §/TR{t1}
+module Test Test block
+  func Empty () → void
+    !
+    try
+    catch Exception:e
+      Console.WriteLine(""catch"")
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -408,23 +370,21 @@ public class ExceptionHandlingTests
     }
 
     [Fact]
-    public void Parse_TryWithoutCatchOrFinally_ParsesButMayWarn()
+    public void Parse_TryWithoutCatchOrFinally_IsRejected()
     {
-        // Try without catch or finally - syntactically allowed
+        // C# requires at least one catch or finally; the native parser reports it up front.
         var source = @"
-§M{m1:Test}
-  §F{f1:NoHandler:pub}
-    §O{void}
-    §E{cw}
-    §TR{t1}
-    §P ""try only""
-    §/TR{t1}
+module Test Test block
+  func NoHandler () → void
+    ! cw
+    try
+      Console.WriteLine(""try only"")
 ";
 
         var module = Parse(source, out var diagnostics);
 
-        // Should parse, but C# requires at least catch or finally
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        Assert.Contains(diagnostics.Errors, d =>
+            d.Message.Contains("A try statement requires a catch or finally clause", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -432,14 +392,13 @@ public class ExceptionHandlingTests
     {
         // Parser accepts any identifier as exception type (type checking is separate)
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
-    §O{void}
-    §TR{t1}
-    §P ""try""
-    §CA{NonExistentException:e}
-    §P ""catch""
-    §/TR{t1}
+module Test Test block
+  func Bad () → void
+    !
+    try
+      Console.WriteLine(""try"")
+    catch NonExistentException:e
+      Console.WriteLine(""catch"")
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -454,15 +413,13 @@ public class ExceptionHandlingTests
         // The parser now has a fallback for unknown Lisp operators (treats them as calls),
         // so (invalid.operator x) parses without errors.
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
-    §I{i32:x}
-    §O{void}
-    §TR{t1}
-    §P ""try""
-    §CA{Exception:e} §WHEN (invalid.operator x)
-    §P ""catch""
-    §/TR{t1}
+module Test Test block
+  func Bad (int:x) → void
+    !
+    try
+      Console.WriteLine(""try"")
+    catch Exception:e when invalid.@operator(x)
+      Console.WriteLine(""catch"")
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -475,10 +432,10 @@ public class ExceptionHandlingTests
     {
         // Parser allows rethrow anywhere, but it's semantically invalid outside catch
         var source = @"
-§M{m1:Test}
-  §F{f1:Bad:pub}
-    §O{void}
-    §RT
+module Test Test block
+  func Bad () → void
+    !
+    throw
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -495,17 +452,15 @@ public class ExceptionHandlingTests
     public void RoundTrip_TryCatchFinally_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:RoundTrip:pub}
-    §O{void}
-    §E{cw}
-    §TR{t1}
-    §P ""try""
-    §CA{Exception:e}
-    §P ""catch""
-    §FI
-    §P ""finally""
-    §/TR{t1}
+module Test Test block
+  func RoundTrip () → void
+    ! cw
+    try
+      Console.WriteLine(""try"")
+    catch Exception:e
+      Console.WriteLine(""catch"")
+    finally
+      Console.WriteLine(""finally"")
 ";
 
         // Parse original
@@ -525,17 +480,15 @@ public class ExceptionHandlingTests
     public void RoundTrip_WhenFilter_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:WhenRoundTrip:pub}
-    §I{i32:code}
-    §O{str}
-    §TR{t1}
-    §TH ""Error""
-    §CA{Exception:ex} §WHEN (== code 42)
-    §R ""special""
-    §CA{Exception:ex}
-    §R ""general""
-    §/TR{t1}
+module Test Test block
+  func WhenRoundTrip (int:code) → string
+    !
+    try
+      throw ""Error""
+    catch Exception:ex when (code == 42)
+      return ""special""
+    catch Exception:ex
+      return ""general""
 ";
 
         // Parse original
@@ -547,7 +500,7 @@ public class ExceptionHandlingTests
         var formatted = formatter.Format(module);
 
         // Verify when filter is preserved
-        Assert.Contains("§WHEN", formatted);
+        Assert.Contains("when (code == 42)", formatted);
 
         // Re-parse formatted output
         var module2 = Parse(formatted, out var diagnostics2);
@@ -558,16 +511,14 @@ public class ExceptionHandlingTests
     public void RoundTrip_Rethrow_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:RethrowRoundTrip:pub}
-    §O{void}
-    §E{cw}
-    §TR{t1}
-    §TH ""Error""
-    §CA
-    §P ""caught""
-    §RT
-    §/TR{t1}
+module Test Test block
+  func RethrowRoundTrip () → void
+    ! cw
+    try
+      throw ""Error""
+    catch
+      Console.WriteLine(""caught"")
+      throw
 ";
 
         // Parse original
@@ -579,7 +530,7 @@ public class ExceptionHandlingTests
         var formatted = formatter.Format(module);
 
         // Verify rethrow is preserved
-        Assert.Contains("§RT", formatted);
+        Assert.Contains("throw", formatted.Split('\n').Select(line => line.Trim()));
 
         // Re-parse formatted output
         var module2 = Parse(formatted, out var diagnostics2);
@@ -639,14 +590,11 @@ public class ExceptionHandlingTests
     public void CodeGen_UsingStatement_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:ReadFile:pub}
-    §I{str:path}
-    §O{void}
-    §E{cw}
-    §USE{u1:reader:StreamReader} §NEW{StreamReader} §A path
-      §P ""inside using""
-    §/USE{u1}
+module Test Test block
+  func ReadFile (string:path) → void
+    ! cw
+    using StreamReader:reader = new StreamReader(path)
+      Console.WriteLine(""inside using"")
 ";
 
         var result = ParseAndEmit(source);
@@ -659,14 +607,11 @@ public class ExceptionHandlingTests
     public void CodeGen_UsingStatementNoType_UsesVar()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:ReadFile:pub}
-    §I{str:path}
-    §O{void}
-    §E{cw}
-    §USE{u1:reader} §NEW{StreamReader} §A path
-      §P ""inside using""
-    §/USE{u1}
+module Test Test block
+  func ReadFile (string:path) → void
+    ! cw
+    using reader = new StreamReader(path)
+      Console.WriteLine(""inside using"")
 ";
 
         var result = ParseAndEmit(source);
@@ -678,44 +623,17 @@ public class ExceptionHandlingTests
     public void CodeGen_UsingStatementWithMethodCallResource_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f1:Process:pub}
-    §I{str:path}
-    §O{void}
-    §E{cw}
-    §USE{u1:stream:FileStream} §C{File.OpenRead} §A path §/C
-      §P ""reading""
-    §/USE{u1}
+module Test Test block
+  func Process (string:path) → void
+    ! cw
+    using FileStream:stream = File.OpenRead(path)
+      Console.WriteLine(""reading"")
 ";
 
         var result = ParseAndEmit(source);
 
         Assert.Contains("using (FileStream stream =", result);
         Assert.Contains("File.OpenRead(path)", result);
-    }
-
-    [Fact]
-    public void Parse_UsingStatementMismatchedId_ReportsError()
-    {
-        var source = @"
-§M{m1:Test}
-  §F{f1:ReadFile:pub}
-    §O{void}
-    §USE{u1:reader:StreamReader} §NEW{StreamReader} §A ""test""
-      §P ""inside""
-    §/USE{u2}
-";
-
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath("test.calr");
-
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        var parser = new Parser(tokens, diagnostics);
-        parser.Parse();
-
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     #endregion

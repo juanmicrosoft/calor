@@ -1,0 +1,17 @@
+module InlineSigs InlineSigs
+  module InlineSigsModule
+    func Add public (int:a, int:b) → int
+      !
+      return a + b
+
+    func Multiply public (int:a, int:b) → int
+      !
+      return a * b
+
+    func Negate public (int:x) → int
+      !
+      return 0 - x
+
+    func IsZero public (int:x) → bool
+      !
+      return x == 0

@@ -1,0 +1,93 @@
+module AllowlistAudit AllowlistAudit block
+  module AllowlistAuditModule
+    func StartsWith private (string:text, string:prefix) → bool
+      let int:n = prefix.Length
+      if (n > text.Length)
+        return false
+      return ((text).Substring(0, n) == prefix)
+
+    func EndsWith private (string:text, string:suffix) → bool
+      let int:n = suffix.Length
+      let int:m = text.Length
+      if (n > m)
+        return false
+      return ((text).Substring((m - n), n) == suffix)
+
+    func IsSkippable private (string:line) → bool
+      let string:t = (line).Trim()
+      if (t.Length == 0)
+        return true
+      return StartsWith(t, "#")
+
+    func IsPendingMarker private (string:line) → bool
+      let string:t = (line).Trim()
+      return StartsWith(t, "# pending")
+
+    func IsStructurallyExempt private (string:path) → bool
+      if StartsWith(path, "tests/")
+        return true
+      if StartsWith(path, "bench/")
+        return true
+      if StartsWith(path, "tools/Calor.RoundTrip.Harness/")
+        return true
+      return false
+
+    func Report private (string:entry, string:problem) → void
+      Console.WriteLine(("  " + (entry + (" — " + problem))))
+
+    func Main () → int
+      ! fs:r, cw, mut, alloc
+      let string:file = ".calor-csharp-allowlist"
+      let bool:present = File.Exists(file)
+      if (!present)
+        Console.WriteLine("allowlist-audit: .calor-csharp-allowlist not found (run from the repository root).")
+        return 2
+      let string[]:lines = File.ReadAllLines(file)
+      let List<string>:seen = new List<string>()
+      var int:findings = 0
+      var int:entries = 0
+      var bool:pending = false
+      Console.WriteLine("allowlist-audit: checking .calor-csharp-allowlist")
+      each @raw in lines
+        let bool:skip = IsSkippable(@raw)
+        if skip
+          set pending IsPendingMarker(@raw)
+        if (!skip)
+          let string:entry = (@raw).Trim()
+          set entries (entries + 1)
+          let bool:wild = (entry).Contains("*")
+          if wild
+            Report(entry, "contains a wildcard; the allowlist requires specific paths")
+            set findings (findings + 1)
+          let bool:isCs = EndsWith(entry, ".cs")
+          if (!isCs)
+            Report(entry, "is not a .cs path, so the guard can never match it")
+            set findings (findings + 1)
+          if seen.Contains(entry)
+            Report(entry, "is listed more than once")
+            set findings (findings + 1)
+          seen.Add(entry)
+          let bool:exempt = IsStructurallyExempt(entry)
+          if exempt
+            Report(entry, "is under a structurally exempt tree, so the entry grants nothing and misleads")
+            set findings (findings + 1)
+          if (!wild)
+            if isCs
+              let bool:onDisk = File.Exists(entry)
+              if onDisk
+                if pending
+                  Report(entry, "is marked pending but now exists; remove the pending marker")
+                  set findings (findings + 1)
+              if (!onDisk)
+                if pending
+                  Console.WriteLine(("  " + (entry + " — pending: pre-registered, file not merged yet")))
+                if (!pending)
+                  Report(entry, "does not exist; a stale entry keeps permission alive for a path nothing occupies")
+                  set findings (findings + 1)
+          set pending false
+      Console.WriteLine((((("allowlist-audit: " + entries) + " entries, ") + findings) + " finding(s)"))
+      if (findings > 0)
+        return 1
+      return 0
+
+

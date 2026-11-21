@@ -1,15 +1,18 @@
-§M{m001:Quotes}
-  §F{f001:Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module Quotes Quotes block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 
-  §F{f002:ClampToCap:pub} (i32:amount, i32:cap) -> i32
-    §IF{if1} (> amount cap)
-      §R cap
-    §R amount
+  func ClampToCap (int:amount, int:cap) → int
+    !
+    if (amount > cap)
+      return cap
+    return amount
 
-  §F{f003:QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
-    §S (<= result cap)
-    §B{total:i32} (+ baseAmount surcharge)
-    §IF{if2} (> total (+ cap 10))
-      §R cap
-    §R total
+  func QuoteWithSurchargeDefective (int:baseAmount, int:surcharge, int:cap) → int
+    !
+    => (result <= cap)
+    let int:total = (baseAmount + surcharge)
+    if (total > (cap + 10))
+      return cap
+    return total

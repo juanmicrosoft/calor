@@ -135,6 +135,11 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
 
         public void Visit(ModuleNode module)
         {
+            var lexer = new Lexer(_source, new Calor.Compiler.Diagnostics.DiagnosticBag());
+            foreach (var token in lexer.TokenizeAll().Where(t => t.Value is RawCSharpFrame))
+                PushToken(new TextSpan(token.Span.Start, 3,
+                    token.Span.Line, token.Span.Column), SemanticTokenType.Keyword);
+
             foreach (var func in module.Functions)
                 VisitFunction(func);
 
@@ -347,6 +352,9 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 case ReturnStatementNode ret:
                     if (ret.Expression != null) VisitExpression(ret.Expression);
                     break;
+                case ExpressionStatementNode expressionStatement:
+                    VisitExpression(expressionStatement.Expression);
+                    break;
                 case IfStatementNode ifStmt:
                     VisitExpression(ifStmt.Condition);
                     foreach (var s in ifStmt.ThenBody) VisitStatement(s);
@@ -457,6 +465,11 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     foreach (var arg in call.Arguments)
                         VisitExpression(arg);
                     break;
+                case ExpressionCallNode computedCall:
+                    VisitExpression(computedCall.TargetExpression);
+                    foreach (var argument in computedCall.Arguments)
+                        VisitExpression(argument);
+                    break;
                 case FieldAccessNode fieldAccess:
                     VisitExpression(fieldAccess.Target);
                     var fieldNameSpan = FindNameSpan(fieldAccess.Span, fieldAccess.FieldName);
@@ -484,6 +497,8 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     PushToken(newExpr.TypeNameSpan, SemanticTokenType.Class);
                     foreach (var arg in newExpr.Arguments)
                         VisitExpression(arg);
+                    foreach (var arg in newExpr.CollectionInitializers.SelectMany(entry => entry.Arguments))
+                        VisitExpression(arg);
                     break;
                 case ThisExpressionNode:
                 case BaseExpressionNode:
@@ -506,15 +521,6 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     break;
                 case AwaitExpressionNode awaitExpr:
                     VisitExpression(awaitExpr.Awaited);
-                    break;
-                case SomeExpressionNode some:
-                    VisitExpression(some.Value);
-                    break;
-                case OkExpressionNode ok:
-                    VisitExpression(ok.Value);
-                    break;
-                case ErrExpressionNode err:
-                    VisitExpression(err.Error);
                     break;
                 case ConditionalExpressionNode cond:
                     VisitExpression(cond.Condition);

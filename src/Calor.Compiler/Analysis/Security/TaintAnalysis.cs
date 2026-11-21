@@ -716,7 +716,7 @@ public sealed class TaintAnalysis
                 return EvaluateCall(TaintCallDescriptor.From(call), call.Arguments, call.Span, state);
 
             case BoundExpressionCall expressionCall:
-                return expressionCall.Arguments.SelectMany(argument => EvaluateExpression(argument, state));
+                return expressionCall.Children.SelectMany(child => EvaluateExpression(child, state));
 
             default:
                 return expression.Children.SelectMany(child => EvaluateExpression(child, state));

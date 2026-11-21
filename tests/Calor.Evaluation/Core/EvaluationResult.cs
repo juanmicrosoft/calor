@@ -62,6 +62,8 @@ public class EvaluationResult
     /// </summary>
     public List<Metrics.ErrorDetectionResult> BugDetectionResults { get; init; } = new();
 
+    public List<BugScenarioInputMetadata> BugScenarioInputs { get; init; } = new();
+
     /// <summary>
     /// Calculates and returns the overall Calor advantage ratio (geometric mean of all category ratios).
     /// </summary>
@@ -128,6 +130,8 @@ public class EvaluationSummary
 /// </summary>
 public class BenchmarkCaseResult
 {
+    public Dictionary<string, object> InputMetadata { get; init; } = new();
+
     /// <summary>
     /// Identifier for this benchmark case.
     /// </summary>
@@ -171,3 +175,8 @@ public class BenchmarkCaseResult
         ? Metrics.Average(m => m.AdvantageRatio)
         : 1.0;
 }
+
+public sealed record BugScenarioInputMetadata(
+    string BugId,
+    IReadOnlyDictionary<string, object> Buggy,
+    IReadOnlyDictionary<string, object> Fixed);

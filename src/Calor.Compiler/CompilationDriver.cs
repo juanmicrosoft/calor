@@ -252,6 +252,178 @@ internal static class GeneratedValidationScope
 }
 
 /// <summary>
+/// The warm-skip decision for multi-file builds, shared by
+/// <see cref="CompilationDriver.CompileAll"/> and the MSBuild <c>CompileCalor</c>
+/// task (#1732) so the two surfaces skip exactly the same files for the same
+/// inputs.
+///
+/// <para><b>Two fingerprints.</b> <see cref="MapHash"/> covers the
+/// cross-module function map, every declared type contract and every source's
+/// content hash (<see cref="CrossModuleTypeRegistry.Fingerprint"/>), so ANY edit
+/// in a multi-file build changes it. <see cref="FunctionMapHash"/> covers only
+/// the function map (call target → emitted namespace and class) and the sorted
+/// source paths: the inputs that decide how a cached output qualifies its
+/// cross-module calls.</para>
+///
+/// <para><b>Three outcomes</b> (<see cref="Mode"/>):</para>
+/// <list type="bullet">
+///   <item><see cref="CrossModuleReuseMode.Unchanged"/>: no prior state, a
+///     single-file build, or an unchanged <see cref="MapHash"/>. The ordinary
+///     per-file checks decide.</item>
+///   <item><see cref="CrossModuleReuseMode.Invalidated"/>: the function map, the
+///     source set, or the evidence below changed or is missing. Every cached
+///     output may carry stale qualification, so nothing is reused.</item>
+///   <item><see cref="CrossModuleReuseMode.RequiresIndependenceProof"/>: only
+///     source contents changed. A file whose own source is unchanged is reused
+///     only when <see cref="CanReuse"/> proves its cached output independent
+///     of the old AND new declarations of every other module
+///     (<see cref="CrossModuleTypeRegistry.CanReuseIndependentOutput"/>).</item>
+/// </list>
+///
+/// <para><b>Evidence.</b> The proof needs every module's previous output text.
+/// It comes from <see cref="BuildState.ValidatedOutputs"/>: the hash of each
+/// output the producing build published (warning-bearing ones included). Every
+/// output is re-read and re-hashed here; a missing, corrupted or unrecorded
+/// output turns the whole decision into <see cref="CrossModuleReuseMode.Invalidated"/>.
+/// Cross-module effect enforcement (Calor0410) never depends on this decision:
+/// it re-runs every build over fresh and cached effect summaries.</para>
+/// </summary>
+internal sealed class CrossModuleCacheReuse
+{
+    private readonly CrossModuleTypeRegistry? _types;
+    private readonly Dictionary<string, string>? _previousOutputs;
+    private readonly HashSet<string> _previousNativeGlobalModules;
+
+    private CrossModuleCacheReuse(
+        string? mapHash,
+        string? functionMapHash,
+        CrossModuleReuseMode mode,
+        CrossModuleTypeRegistry? types,
+        Dictionary<string, string>? previousOutputs,
+        HashSet<string> previousNativeGlobalModules)
+    {
+        MapHash = mapHash;
+        FunctionMapHash = functionMapHash;
+        Mode = mode;
+        _types = types;
+        _previousOutputs = previousOutputs;
+        _previousNativeGlobalModules = previousNativeGlobalModules;
+    }
+
+    internal string? MapHash { get; }
+    internal string? FunctionMapHash { get; }
+    internal CrossModuleReuseMode Mode { get; }
+
+    /// <summary>
+    /// Builds the decision. <paramref name="locate"/> maps a source's full path to
+    /// its cache key and output path, exactly as the calling surface stores them.
+    /// <paramref name="priorFiles"/> is the prior state's reusable entries after the
+    /// surface's own global checks (null when those already invalidated).
+    /// </summary>
+    internal static CrossModuleCacheReuse Evaluate(
+        IReadOnlyList<FileInfo> sources,
+        IReadOnlyDictionary<string, CrossModuleFunctionTarget>? map,
+        CrossModuleTypeRegistry? types,
+        BuildState? priorState,
+        IReadOnlyDictionary<string, BuildFileEntry>? priorFiles,
+        Func<string, (string Key, string OutputPath)> locate)
+    {
+        string? mapHash = null;
+        string? functionMapHash = null;
+        if (map is not null)
+        {
+            mapHash = CompilationDriver.ComputeCrossModuleMapHash(map, types);
+            functionMapHash = CompilationDriver.ComputeCrossModuleMapHash(map,
+                sourcePaths: sources.Select(file => file.FullName));
+        }
+        var nativeGlobal = new HashSet<string>(BuildStateCache.GetPathComparer());
+        // Compared UNCONDITIONALLY (#823 review m1): a single-file rebuild of a
+        // formerly-multi project (hash → null) must also invalidate — its cached
+        // output may carry qualification against modules no longer in the build.
+        if (priorFiles is null || priorState?.CrossModuleMapHash == mapHash)
+            return new(mapHash, functionMapHash, CrossModuleReuseMode.Unchanged, types, null, nativeGlobal);
+
+        CrossModuleCacheReuse Invalidated() =>
+            new(mapHash, functionMapHash, CrossModuleReuseMode.Invalidated, types, null, nativeGlobal);
+        // A changed emitted target still invalidates globally. Source-only
+        // changes may spare outputs proven independent of old AND new
+        // companion declarations; missing evidence remains a cache miss.
+        if (priorState?.CrossModuleFunctionMapHash != functionMapHash || types is null)
+            return Invalidated();
+
+        var previousOutputs = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
+        foreach (var source in sources)
+        {
+            var (key, outputPath) = locate(source.FullName);
+            var evidence = priorState?.ValidatedOutputs?.GetValueOrDefault(key);
+            var outputHash = evidence?.OutputContentHash
+                ?? (priorFiles.Count == sources.Count
+                    ? priorFiles.GetValueOrDefault(key)?.OutputContentHash : null);
+            if (string.IsNullOrEmpty(outputHash) || !File.Exists(outputPath))
+                return Invalidated();
+            byte[] bytes;
+            try
+            {
+                bytes = File.ReadAllBytes(outputPath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return Invalidated();
+            }
+            if (BuildStateCache.ComputeContentHash(bytes) != outputHash)
+                return Invalidated();
+            previousOutputs[source.FullName] = CompilationDriver.DecodeSource(bytes);
+            if (evidence?.IsNativeGlobalModule == true)
+                nativeGlobal.Add(source.FullName);
+        }
+        return new(mapHash, functionMapHash, CrossModuleReuseMode.RequiresIndependenceProof,
+            types, previousOutputs, nativeGlobal);
+    }
+
+    /// <summary>
+    /// Whether a cached output that already passed every per-file check (source,
+    /// output and effect-summary hashes) may be reused under this decision.
+    /// <paramref name="cachedOutput"/> is the verified output text.
+    /// </summary>
+    internal bool CanReuse(string sourcePath, string cachedOutput, ContractMode mode) => Mode switch
+    {
+        CrossModuleReuseMode.Unchanged => true,
+        CrossModuleReuseMode.RequiresIndependenceProof => _types!.CanReuseIndependentOutput(
+            sourcePath, cachedOutput, _previousOutputs!, mode, _previousNativeGlobalModules),
+        _ => false
+    };
+
+    /// <summary>Writes both fingerprints into the state the build will save.</summary>
+    internal void Record(BuildState state)
+    {
+        state.CrossModuleMapHash = MapHash;
+        state.CrossModuleFunctionMapHash = FunctionMapHash;
+    }
+
+    /// <summary>
+    /// The proof evidence for a published output, or null when the module is not
+    /// all native (raw C# carries no provenance the proof can use) and the next
+    /// source-only change must therefore invalidate globally.
+    /// </summary>
+    internal static ValidatedOutputEntry? Evidence(ModuleNode? ast, string generatedCode) =>
+        ast is not null && CrossModuleTypeRegistry.HasOnlyNativeNodes(ast)
+            ? new ValidatedOutputEntry
+            {
+                OutputContentHash = BuildStateCache.ComputeContentHash(
+                    System.Text.Encoding.UTF8.GetBytes(generatedCode)),
+                IsNativeGlobalModule = CrossModuleTypeRegistry.IsNativeGlobalModule(ast)
+            }
+            : null;
+}
+
+internal enum CrossModuleReuseMode
+{
+    Unchanged,
+    Invalidated,
+    RequiresIndependenceProof
+}
+
+/// <summary>
 /// Shared multi-file compile orchestration used by the top-level compile command
 /// (<see cref="Program"/>), <c>calor watch</c>, and <c>calor run</c> / <c>calor test</c>
 /// (<c>ExecutionWorkspace</c>). One place owns the loop semantics:
@@ -409,25 +581,25 @@ internal static class CompilationDriver
         // by effect variance. A changed base row must recheck cached overrides.
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
         CrossModuleTypeRegistry? crossModuleTypes = null;
-        string? crossModuleMapHash = null;
         if (sources.Count > 1)
-        {
             crossModuleMap = BuildCrossModuleFunctionMap(sources, out crossModuleTypes);
-            crossModuleMapHash = ComputeCrossModuleMapHash(crossModuleMap, crossModuleTypes);
-        }
+        // The reuse decision (both fingerprints, ValidatedOutputs evidence, the
+        // per-file independence proof) is shared with the MSBuild task.
+        var crossModuleReuse = CrossModuleCacheReuse.Evaluate(
+            sources, crossModuleMap, crossModuleTypes, priorState, priorFiles,
+            path => (BuildStateCache.ComputeRelativePathFromFullProjectDir(path, fullStateDir!).Item1,
+                cache!.OutputPathFor(new FileInfo(path))));
         if (newState != null)
-        {
-            newState.CrossModuleMapHash = crossModuleMapHash;
-        }
-        // Compared UNCONDITIONALLY (#823 review m1): a single-file rebuild of a
-        // formerly-multi project (hash → null) must also invalidate — its cached
-        // output may carry qualification against modules no longer in the build.
-        if (priorFiles != null && priorState?.CrossModuleMapHash != crossModuleMapHash)
-        {
-            // Map changed (module added/removed/renamed or ambiguity introduced):
-            // every cached output may carry stale qualification — full re-emit.
+            crossModuleReuse.Record(newState);
+        if (crossModuleReuse.Mode == CrossModuleReuseMode.Invalidated)
             priorFiles = null;
-        }
+
+        var compilationOptions = sources.ToDictionary(
+            file => file.FullName, optionsFactory, BuildStateCache.GetPathComparer());
+        var systemProfiles = compilationOptions.Values
+            .Select(options => options.IncludeImplicitSystemUsing).Distinct().ToList();
+        if (systemProfiles.Count > 1)
+            throw new ArgumentException("Files in one compilation must use the same implicit System context.");
 
         foreach (var file in sources)
         {
@@ -452,23 +624,28 @@ internal static class CompilationDriver
                     // the producing compile observed: a corrupted, truncated, or
                     // manually edited .g.cs must be a miss, not "Up-to-date".
                     var outputPath = cache.OutputPathFor(file);
-                    if (cachedEntry.OutputContentHash != null
-                        && File.Exists(outputPath)
-                        && BuildStateCache.ComputeFileHash(outputPath) == cachedEntry.OutputContentHash)
+                    if (cachedEntry.OutputContentHash != null && File.Exists(outputPath))
                     {
-                        newState.Files[relativeKey] = cachedEntry;
-                        skipped.Add(file);
-                        skippedGeneratedSources.Add(new GeneratedCSharpSource(
-                            File.ReadAllText(outputPath),
-                            outputPath,
-                            file.FullName));
-                        moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
-                        continue;
+                        var outputBytes = File.ReadAllBytes(outputPath);
+                        var generated = DecodeSource(outputBytes);
+                        if (BuildStateCache.ComputeContentHash(outputBytes) == cachedEntry.OutputContentHash
+                            && crossModuleReuse.CanReuse(file.FullName, generated,
+                                compilationOptions[file.FullName].ContractMode))
+                        {
+                            newState.Files[relativeKey] = cachedEntry;
+                            if (priorState?.ValidatedOutputs?.TryGetValue(relativeKey, out var evidence) == true)
+                                newState.ValidatedOutputs[relativeKey] = evidence;
+                            skipped.Add(file);
+                            skippedGeneratedSources.Add(new GeneratedCSharpSource(
+                                generated, outputPath, file.FullName));
+                            moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
+                            continue;
+                        }
                     }
                 }
             }
 
-            var options = optionsFactory(file);
+            var options = compilationOptions[file.FullName];
             options.CrossModuleFunctionModules = crossModuleMap;
             options.CrossModuleTypes = crossModuleTypes;
             options.DeferGeneratedOutputValidation = true;
@@ -525,7 +702,7 @@ internal static class CompilationDriver
             EffectSummary? summary = null;
             if (result.Ast != null && (crossModuleEnforcement || newState != null))
             {
-                summary = EffectSummaryBuilder.Build(result.Ast);
+                summary = EffectSummaryBuilder.Build(result.Ast, crossModuleMap);
                 moduleSummaries.Add((summary, file.FullName));
             }
 
@@ -533,6 +710,7 @@ internal static class CompilationDriver
                 file, result, options, relativeKey, statBeforeRead, sourceBytes, summary));
         }
 
+        crossModuleTypes?.EnsureSourceSnapshots();
         var generatedValidationFailed = false;
         // Generated-output validation runs over the outputs of THIS run's clean
         // files plus every cached output, as one Roslyn compilation. A file that
@@ -590,11 +768,17 @@ internal static class CompilationDriver
                     .Concat(skippedGeneratedSources),
                 owned,
                 out cascadeSuppressed);
-            var references = pending
-                .SelectMany(item => item.Options.ReferencedAssemblyPaths ?? [])
+            var references = compilationOptions.Values
+                .SelectMany(options => options.ReferencedAssemblyPaths ?? [])
                 .Distinct(BuildStateCache.GetPathComparer());
             var validation = generatedSources.Count > 0
-                ? GeneratedCSharpCompiler.Validate(generatedSources, references)
+                ? GeneratedCSharpCompiler.Validate(generatedSources,
+                    new GeneratedCSharpCompilationContext
+                    {
+                        ReferencePaths = references,
+                        IncludeImplicitSystemUsing = systemProfiles.Single(),
+                        AllowUnsafe = compilationOptions.Values.All(options => options.AllowUnsafeCode)
+                    })
                 : null;
             if (validation != null && !validation.CompilationSuccess)
             {
@@ -647,6 +831,7 @@ internal static class CompilationDriver
                     var (key, _) = BuildStateCache.ComputeRelativePathFromFullProjectDir(
                         file.FullName, fullStateDir);
                     newState.Files.Remove(key);
+                    newState.ValidatedOutputs.Remove(key);
                     skipped.Remove(file);
                     onFailed?.Invoke(file);
                 }
@@ -742,6 +927,12 @@ internal static class CompilationDriver
                 compiled.Add(new FileResult(item.File, item.Result));
                 onCompiled?.Invoke(item.File, item.Result);
 
+                if (newState != null && item.RelativeKey != null && !item.Options.UnsafeTranspileOnly
+                    && CrossModuleCacheReuse.Evidence(item.Result.Ast, item.Result.GeneratedCode) is { } evidence)
+                {
+                    newState.ValidatedOutputs[item.RelativeKey] = evidence;
+                }
+
                 // Only diagnostic-clean files are cached: a skipped file emits nothing,
                 // so caching a file with warnings/info would silently drop those
                 // diagnostics from warm builds.
@@ -788,7 +979,9 @@ internal static class CompilationDriver
         out CrossModuleTypeRegistry types)
     {
         var modules = new List<ModuleNode>();
+        var parsedSources = new List<(ModuleNode Module, string Path)>();
         var sourceHashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
+        var texts = new List<string>();
         foreach (var file in sources)
         {
             try
@@ -805,13 +998,18 @@ internal static class CompilationDriver
                     continue;
                 }
                 modules.Add(module);
+                parsedSources.Add((module, file.FullName));
+                texts.Add(text);
             }
             catch (IOException)
             {
             }
         }
+        // One reconciliation per identity store, not one per file (each re-parsed every source).
+        Ids.DeclarationIdentityStore.AttachAllIfRegistered(
+            parsedSources.Select((parsed, index) => (parsed.Path, texts[index], parsed.Module)));
 
-        types = CrossModuleTypeRegistry.Build(modules, sourceHashes);
+        types = CrossModuleTypeRegistry.Build(parsedSources, sourceHashes);
         return BuildCrossModuleFunctionMap(modules);
     }
 
@@ -841,6 +1039,10 @@ internal static class CompilationDriver
             IReadOnlyList<ModuleNode> modules,
             Func<FunctionNode, bool> includeFunction)
     {
+        var globalAliases = modules.SelectMany(module => module.Usings)
+            .Where(import => import.IsGlobal && import.Alias is not null)
+            .Select(import => import.Alias!)
+            .ToHashSet(StringComparer.Ordinal);
         var byName = new Dictionary<string, List<CrossModuleFunctionTarget>>(
             StringComparer.Ordinal);
         var byQualifiedName =
@@ -871,7 +1073,8 @@ internal static class CompilationDriver
 
                 void AddQualifiedTarget(string qualifier)
                 {
-                    if (string.IsNullOrEmpty(qualifier))
+                    if (string.IsNullOrEmpty(qualifier)
+                        || globalAliases.Contains(qualifier.Split('.')[0].TrimStart('@')))
                         return;
 
                     var qualifiedName = $"{qualifier}.{functionName}";
@@ -913,13 +1116,16 @@ internal static class CompilationDriver
 
     internal static string ComputeCrossModuleMapHash(
         IReadOnlyDictionary<string, CrossModuleFunctionTarget> map,
-        CrossModuleTypeRegistry? types = null)
+        CrossModuleTypeRegistry? types = null,
+        IEnumerable<string>? sourcePaths = null)
     {
         var canonical = string.Join(";", map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv =>
                 $"{kv.Key}={kv.Value.ModuleName}|{kv.Value.NamespaceIdentity}|{kv.Value.ModuleClassName}"));
-        if (types is { HasTypes: true })
+        if (types is not null)
             canonical += "\ntypes:" + types.Fingerprint;
+        if (sourcePaths is not null)
+            canonical += "\npaths:" + string.Join("\n", sourcePaths.Order(StringComparer.Ordinal));
         var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(bytes);
     }
@@ -929,7 +1135,7 @@ internal static class CompilationDriver
     /// (UTF-8 default, BOM detection) so the compiled text matches what a plain
     /// read would have produced while the cache hashes the raw bytes.
     /// </summary>
-    private static string DecodeSource(byte[] bytes)
+    internal static string DecodeSource(byte[] bytes)
     {
         using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
         return reader.ReadToEnd();

@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Calor.Evaluation.Benchmarks;
+using Calor.Evaluation.Core;
 using Calor.Evaluation.Metrics;
 using Xunit;
 
@@ -151,7 +151,13 @@ public class BenchmarkResultsTests
         return BenchmarkPacketValidator.ValidateBenchmarkResults(packet, results, pair =>
         {
             string Arm(string field) => Path.Combine(root, pair[field]!.GetValue<string>());
-            var context = TestDataAdapter.CreateContextFromFilesAsync(Arm("calorPath"), Arm("csharpPath")).GetAwaiter().GetResult();
+            // Pinned publication metrics use registered originals, never current-compiler mirrors.
+            var context = new EvaluationContext
+            {
+                CalorSource = File.ReadAllText(Arm("calorPath")),
+                CSharpSource = File.ReadAllText(Arm("csharpPath")),
+                FileName = Path.GetFileNameWithoutExtension(Arm("calorPath"))
+            };
             var metric = new TokenEconomicsCalculator().CalculateAsync(context).GetAwaiter().GetResult();
             return (metric.MetricName, metric.CalorScore, metric.CSharpScore, metric.AdvantageRatio);
         });

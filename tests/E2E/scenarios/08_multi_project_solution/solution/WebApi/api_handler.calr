@@ -1,11 +1,12 @@
-§M{m001:ApiHandler}
-  §F{f001:HandleRequest:pub} (i32:statusCode) -> i32
-    §E{cw}
-    §Q (>= statusCode 100)
-    §S (>= result 0)
-    §C{Console.WriteLine} §A "Handling request..." §/C
-    §R (+ statusCode 1)
+module ApiHandler ApiHandler block
+  module ApiHandlerModule
+    func HandleRequest (int:statusCode) → int
+      ! cw
+      requires statusCode >= 100
+      => result >= 0
+      Console.WriteLine("Handling request...")
+      return statusCode + 1
 
-  §F{f002:ValidateStatus:pub} (i32:code) -> bool
-    §R (&& (>= code 200) (< code 300))
-
+    func ValidateStatus (int:code) → bool
+      !
+      return code >= 200 && code < 300

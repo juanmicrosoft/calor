@@ -1,0 +1,226 @@
+==============================================================================
+CASE Z1-FLD-nextline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z1}
+  §CL{C:pub}
+    §FLD{i32:x:priv}
+    §E{cw}
+    §MT{M:pub} () -> void
+      §E{}
+------------------------------------------------------------------------------
+Z1-FLD-nextline-E.calr(4,5): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the 'x' field line, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
+
+==============================================================================
+CASE Z2-B-nextline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z2}
+  §F{Main:pub} () -> void
+    §E{}
+    §B{y:i32} INT:1
+    §E{cw}
+------------------------------------------------------------------------------
+Z2-B-nextline-E.calr(5,5): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the 'y' §B line, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
+
+==============================================================================
+CASE Z3-wrapped-inline-sig-E-inside-parens  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z3}
+  §F{Apply:pub} (
+      Func<i32,i32>:transform
+      §E{cw}
+    ) -> i32
+    §E{cw}
+    §R INT:0
+------------------------------------------------------------------------------
+Z3-wrapped-inline-sig-E-inside-parens.calr(4,7): error Calor0405: A §E{…} effect row must be on the same line as the type it annotates. Move it onto the end of the 'transform' parameter line, or — if this is meant to be the function's own effect declaration — onto its own line in the §F body.
+
+==============================================================================
+CASE Z4-typeparam-named-eff  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{Z4}
+  §F{M:pub}<eff> (eff:x) -> void
+    §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z4-typeparam-named-eff.g.cs
+
+==============================================================================
+CASE Z6-typeparam-named-cw  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{Z6}
+  §F{M:pub}<T, cw> (T:a, cw:b) -> void
+    §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z6-typeparam-named-cw.g.cs
+
+==============================================================================
+CASE Z6b-typeparam-named-fs  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{Z6}
+  §F{M:pub}<T, fs> (T:a, fs:b) -> void
+    §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z6b-typeparam-named-fs.g.cs
+
+==============================================================================
+CASE Z5-wrapped-inline-parameter-list  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{Z5}
+  §F{Apply:pub} (
+      i32:a,
+      i32:b
+    ) -> i32
+    §E{}
+    §R (+ a b)
+------------------------------------------------------------------------------
+Compilation successful: Z5-wrapped-inline-parameter-list.g.cs
+
+==============================================================================
+CASE Z7-class-typeparam-reaches-member  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{Z7}
+  §CL{Box:pub}<T>
+    §FLD{T:value:priv}
+    §MT{Get:pub} () -> T
+      §E{}
+      §R value
+------------------------------------------------------------------------------
+Compilation successful: Z7-class-typeparam-reaches-member.g.cs
+
+==============================================================================
+CASE Z8-DEL-typeparam-list  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z8}
+  §DEL{Handler}<T>
+    §I{T:x}
+    §O{void}
+    §E{}
+  §F{Main:pub} () -> void
+    §E{}
+------------------------------------------------------------------------------
+Z8-DEL-typeparam-list.calr(2,16): error Calor0100: Expected I, O, E, or END_DEL but found Less
+Z8-DEL-typeparam-list.calr(2,17): error Calor0100: Expected I, O, E, or END_DEL but found Identifier
+Z8-DEL-typeparam-list.calr(2,18): error Calor0100: Expected I, O, E, or END_DEL but found Greater
+
+==============================================================================
+CASE Z8b-LAM-typeparam-list  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z8}
+  §F{Main:pub} () -> void
+    §E{}
+    §B{f} §LAM{}<T> §R INT:1 §/LAM
+------------------------------------------------------------------------------
+Z8b-LAM-typeparam-list.calr(4,17): error Calor0100: Expected statement but found Less
+Z8b-LAM-typeparam-list.calr(4,21): error Calor0100: Expected operand after '>' but found Return
+Z8b-LAM-typeparam-list.calr(4,18): error Calor0100: A native expression statement must be an invocation.
+
+==============================================================================
+CASE Z7b-IFACE-typeparam-reaches-member  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{Z7}
+  §IFACE{IBox}<T>
+    §MT{Get} () -> T
+      §E{}
+------------------------------------------------------------------------------
+Compilation successful: Z7b-IFACE-typeparam-reaches-member.g.cs
+
+==============================================================================
+CASE Z9-arrow-void-sameline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z9}
+  §F{Log:pub} (i32:x) -> void §E{cw}
+    §P x
+------------------------------------------------------------------------------
+Z9-arrow-void-sameline-E.calr(2,31): error Calor0405: The return type 'VOID' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+
+==============================================================================
+CASE Z9b-I-i32-sameline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z9}
+  §F{Log:pub}
+    §I{i32:x} §E{cw}
+    §O{void}
+    §P x
+------------------------------------------------------------------------------
+Z9b-I-i32-sameline-E.calr(3,15): error Calor0405: 'x' has type 'INT', which is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+
+==============================================================================
+CASE Z9c-O-i32-sameline-E  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z9}
+  §F{Get:pub}
+    §O{i32} §E{cw}
+    §R INT:1
+------------------------------------------------------------------------------
+Z9c-O-i32-sameline-E.calr(3,13): error Calor0405: The return type 'INT' is not a function type, so it cannot carry an effect row. Remove the §E{…}, or — if this is the function's own effect declaration — move it onto its own line.
+
+==============================================================================
+CASE Z10-E-inside-call-arguments  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{Z10}
+  §F{Helper:pub} (i32:x) -> i32
+    §E{}
+    §R x
+  §F{Main:pub} () -> i32
+    §E{}
+    §R §C{Helper} §A INT:1 §E{cw} §/C
+------------------------------------------------------------------------------
+Z10-E-inside-call-arguments.calr(7,28): error Calor0100: Expected EndCall but found Effects
+Z10-E-inside-call-arguments.calr(7,28): error Calor0100: Expected statement but found Effects
+Z10-E-inside-call-arguments.calr(7,30): error Calor0100: Expected statement but found OpenBrace
+Z10-E-inside-call-arguments.calr(7,31): error Calor0100: A native expression statement must be an invocation.
+Z10-E-inside-call-arguments.calr(7,33): error Calor0100: Expected statement but found CloseBrace
+Z10-E-inside-call-arguments.calr(7,35): error Calor0100: Expected statement but found EndCall
+
+==============================================================================
+CASE W1a-IFACE-member-typeparams  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{W1}
+  §IFACE{IP}
+    §MT{Handle}<T> (T:r) -> T
+      §E{}
+------------------------------------------------------------------------------
+Compilation successful: W1a-IFACE-member-typeparams.g.cs
+
+==============================================================================
+CASE W1b-IFACE-and-impl-member-typeparams  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{W1}
+  §IFACE{IP}
+    §MT{Handle}<T> (T:r) -> T
+      §E{}
+  §CL{Logging:pub}
+    §IMPL{IP}
+    §MT{Handle:pub}<T> (T:r) -> T
+      §E{}
+      §R r
+------------------------------------------------------------------------------
+Compilation successful: W1b-IFACE-and-impl-member-typeparams.g.cs
+
+==============================================================================
+CASE W1c-IFACE-impl-member-typeparams-renamed  args: (none)  exit: 1
+------------------------------------------------------------------------------
+§M{W1}
+  §IFACE{IP}
+    §MT{Handle}<T> (T:r) -> T
+      §E{}
+  §CL{Logging:pub}
+    §IMPL{IP}
+    §MT{Handle:pub}<U> (U:r) -> U
+      §E{cw}
+      §P r
+      §R r
+------------------------------------------------------------------------------
+W1c-IFACE-impl-member-typeparams-renamed.calr(8,7): error Calor0421: Implementation 'Logging.Handle' of interface method 'IP.Handle' on class 'Logging' declares effect(s) [cw] not declared by the interface (interface declares: [pure]). Effect row cw does not fit the interface's row [pure]. An implementation may not broaden the interface's declared effect set — interface dispatch launders effects identically to overrides.
+
+==============================================================================
+CASE Z11-fallible-brace-form-full-output  args: (none)  exit: 0
+------------------------------------------------------------------------------
+§M{Z11}
+  §F{Parse:pub}
+    §I{?str:s}
+    §O{str}
+    §E{alloc,throw}
+    §R (?? s §TH §NEW{ArgumentException} §A "Missing value" §/NEW)
+------------------------------------------------------------------------------
+Compilation successful: Z11-fallible-brace-form-full-output.g.cs
+

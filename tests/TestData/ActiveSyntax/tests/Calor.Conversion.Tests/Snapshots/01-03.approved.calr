@@ -1,0 +1,12 @@
+module Test_01_03 Test_01_03 overflow unchecked
+  class Account public
+    field string:_id private readonly
+    field decimal:_balance private
+
+    ctor public (string:id, decimal:initialBalance)
+      set _id id
+      set _balance initialBalance
+
+    func GetBalance public () → decimal
+      !
+      return _balance

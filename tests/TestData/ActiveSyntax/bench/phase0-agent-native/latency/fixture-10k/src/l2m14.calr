@@ -1,0 +1,109 @@
+module L2M14 L2M14 block
+  module L2M14Module public
+
+    func l2m14_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M13.L3M13Module.l3m13_fn07(x, 60)
+      return (v1 + y)
+
+    func l2m14_fn02 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 22457)
+      let int:total = ((x * 2) + y)
+      if (total < 22457)
+        return 22457
+      else
+        return total
+
+    func l2m14_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22464)
+      let int:total = ((x * 5) + y)
+      if (total > 22464)
+        return 22464
+      return total
+
+    func l2m14_fn04 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22471)
+        return (acc + 22471)
+      else
+        return ((acc * 2) + 22471)
+
+    func l2m14_fn05 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22478)
+      if (x >= 22478)
+        return x
+      else
+        return 22478
+
+    func l2m14_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22485)
+      let int:total = ((x * 2) + y)
+      if (total > 22485)
+        return 22485
+      return total
+
+    func l2m14_fn07 public (int:x, int:y) → int
+      !
+      requires (x > 5)
+      => (x >= 6)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22492)
+        return (acc + 22492)
+      else
+        return ((acc * 2) + 22492)
+
+    func l2m14_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M13.L3M13Module.l3m13_fn09(x, 5)
+      let int:v2 = L3M17.L3M17Module.l3m17_fn07(x, 69)
+      return ((v1 + v2) + y)
+
+    func l2m14_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M04.L3M04Module.l3m04_fn09(x, 50)
+      return (v1 + y)
+
+    func l2m14_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22499)
+      let int:total = ((x * 3) + y)
+      if (total > 22499)
+        return 22499
+      return total
+
+    func l2m14_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M16.L3M16Module.l3m16_fn11(x, 46)
+      let int:v2 = L3M26.L3M26Module.l3m26_fn02(x, 8)
+      return ((v1 + v2) + y)
+
+    func l2m14_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 22506)
+      let int:total = ((x * 5) + y)
+      if (total < 22506)
+        return 22506
+      else
+        return total
+
+    func l2m14_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M23.L3M23Module.l3m23_fn10(x, 17)
+      let int:v2 = L3M28.L3M28Module.l3m28_fn11(x, 40)
+      return ((v1 + v2) + y)

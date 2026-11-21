@@ -51,9 +51,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "exitcoder.calr");
         File.WriteAllText(file, """
-            §M{m001:ExitCoder}
-              §F{f001:Main:pub} () -> i32
-                §R INT:3
+            module ExitCoder ExitCoder block
+              func Main () → int
+                !
+                return 3
             """);
 
         var (exitCode, stdOut, stdErr) = RunCli("run", file);
@@ -66,9 +67,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "broken.calr");
         File.WriteAllText(file, """
-            §M{m001:Broken}
-              §F{f001:Main:pub} () -> void
-                §P undefined_variable_xyz
+            module Broken Broken block
+              func Main () → void
+                !
+                Console.WriteLine(undefined_variable_xyz)
             """);
 
         var (exitCode, _, stdErr) = RunCli("run", file);
@@ -91,10 +93,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "hello.calr");
         File.WriteAllText(file, """
-            §M{m001:Hello}
-              §F{f001:Main:pub} () -> void
-                §E{cw}
-                §P "hello from calor run"
+            module Hello Hello block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello from calor run")
             """);
 
         var (exitCode, stdOut, stdErr) = RunCli("run", file, "--keep-temp");
@@ -118,17 +120,17 @@ public class RunTestCommandTests : IDisposable
         // A genuine ∀-proof (x in [0, 46340] ⇒ x*x >= 0) on a function that Main calls.
         var file = Path.Combine(_tempDir, "square.calr");
         File.WriteAllText(file, """
-            §M{m001:SquareApp}
-              §F{f002:Square:pub}
-                §I{i32:x}
-                §O{i32}
-                §Q (>= x 0)
-                §Q (<= x 46340)
-                §S (>= result 0)
-                §R (* x x)
-              §F{f001:Main:pub} () -> void
-                §E{cw}
-                §P §C{Square} §A INT:7 §/C
+            module SquareApp SquareApp block
+              func Square (int:x) → int
+                !
+                requires (x >= 0)
+                requires (x <= 46340)
+                => (result >= 0)
+                return (x * x)
+
+              func Main () → void
+                ! cw
+                Console.WriteLine(Square(7))
             """);
         return file;
     }
@@ -201,16 +203,16 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "unknowncharger.calr");
         File.WriteAllText(file, """
-            §M{m001:UnknownCharger}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
-                §E{e}
-                §R (+ §C{stage} §/C §C{stage} §/C)
+            module UnknownCharger UnknownCharger block
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return (stage() + stage())
 
-              §CL{c001:Holder:pub}
-                §FLD{Func<i32>:stage:pri} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
-                  §E{}
-                  §R §C{RunTwice} §A this.stage §/C
+              class Holder
+                field Func<int>:stage private ! cw
+                func Twice () → int
+                  !
+                  return RunTwice(this.stage)
             """);
         return file;
     }
@@ -220,10 +222,10 @@ public class RunTestCommandTests : IDisposable
         // Declares §E{} (pure) but prints — a forbidden 'cw' effect.
         var file = Path.Combine(_tempDir, "pureviolator.calr");
         File.WriteAllText(file, """
-            §M{m001:PureViolator}
-              §F{f001:Main:pub} () -> void
-                §E{}
-                §P "side effect!"
+            module PureViolator PureViolator block
+              func Main () → void
+                !
+                Console.WriteLine("side effect!")
             """);
         return file;
     }
@@ -234,7 +236,7 @@ public class RunTestCommandTests : IDisposable
         var (exitCode, _, stdErr) = RunCli("run", WritePureViolator());
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("error Calor04", stdErr);
+        Assert.Contains("Calor0410 Function", stdErr);
     }
 
     [Fact]
@@ -252,7 +254,7 @@ public class RunTestCommandTests : IDisposable
 
         Assert.True(exitCode != 0, $"expected a non-zero exit, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
         Assert.Contains("Calor0410", stdErr);
-        Assert.DoesNotContain("warning Calor0410", stdErr);
+        Assert.DoesNotContain("Calor0410 warning:", stdErr);
     }
 
     [Fact]
@@ -277,7 +279,7 @@ public class RunTestCommandTests : IDisposable
             "--input", file, "--enforce-effects", "--permissive-effects");
 
         Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
-        Assert.Contains("warning Calor04", stdErr);
+        Assert.Matches(@"Calor04\d{2} warning:", stdErr);
         Assert.Contains("Compilation successful", stdOut);
     }
 
@@ -291,9 +293,10 @@ public class RunTestCommandTests : IDisposable
         Directory.CreateDirectory(Path.Combine(dir, "tests"));
 
         File.WriteAllText(Path.Combine(dir, "mathutil.calr"), $$"""
-            §M{m001:MathUtil}
-              §F{f001:Add:pub} (i32:a, i32:b) -> i32
-                §R (+ a {{(withBug ? "(+ b INT:1)" : "b")}})
+            module MathUtil MathUtil block
+              func Add (int:a, int:b) → int
+                !
+                return (a + {{(withBug ? "(+ b INT:1)" : "b")}})
             """);
 
         File.WriteAllText(Path.Combine(dir, "tests", "MathUtilTests.cs"), """
@@ -339,9 +342,10 @@ public class RunTestCommandTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "lib.calr");
         File.WriteAllText(file, """
-            §M{m001:LibOnly}
-              §F{f001:Double:pub} (i32:x) -> i32
-                §R (* x INT:2)
+            module LibOnly LibOnly block
+              func Double (int:x) → int
+                !
+                return (x * 2)
             """);
 
         var (exitCode, stdOut, stdErr) = RunCli("test", file);
@@ -365,8 +369,10 @@ public class RunTestCommandTests : IDisposable
 
         var pairCopy = Path.Combine(_tempDir, "N1-003-csv-row");
         CopyDirectory(pairDir, pairCopy);
+        var original = Path.Combine(pairDir, "reference", "calor", "CsvRow.calr");
+        var originalBytes = File.ReadAllBytes(original);
         File.Copy(
-            Path.Combine(pairCopy, "reference", "calor", "CsvRow.calr"),
+            ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(), original),
             Path.Combine(pairCopy, "calor", "CsvRow.calr"),
             overwrite: true);
 
@@ -375,6 +381,8 @@ public class RunTestCommandTests : IDisposable
         Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
         Assert.Contains("skipping", stdErr);
         Assert.Contains("reference", stdErr);
+        Assert.Equal(originalBytes, File.ReadAllBytes(original));
+        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(pairCopy, "reference", "calor", "CsvRow.calr")));
     }
 
     private static void CopyDirectory(string source, string target)

@@ -7,7 +7,10 @@ order: 2
 
 Version: 2.0.0
 
-This document specifies how Calor semantics are versioned and how version compatibility is managed.
+The installed compiler implements semantics version 2.0.0. Native modules may
+declare `semver "2.0.0"` to check compatibility. The declaration is not the
+compiler package version and does not select an older execution mode.
+Pin the compiler package and test upgrades as well.
 
 ---
 
@@ -25,7 +28,8 @@ If these rules change between versions without clear versioning:
 2. Prompts that describe v1 behavior will mislead agents on v2
 3. Code that "worked before" will silently break
 
-**Stable versioning ensures that agents know exactly which rules apply.**
+A version pin identifies the compiler being used. It does not ensure that an
+agent followed its rules or that an upgrade preserves every program's behavior.
 
 ---
 
@@ -37,7 +41,7 @@ Calor semantics versions follow [Semantic Versioning 2.0.0](https://semver.org/)
 MAJOR.MINOR.PATCH
 ```
 
-- **MAJOR**: Breaking semantic changes (agents must be retrained)
+- **MAJOR**: Breaking semantic changes (review code and agent instructions)
 - **MINOR**: Backward-compatible semantic additions (old code still works)
 - **PATCH**: Clarifications, bug fixes in semantics (no behavior change)
 
@@ -83,6 +87,9 @@ policy for those shapes. See the
 [nullability guide](/docs/guides/nullability-and-dotnet-interop/) for complete
 examples and mode behavior.
 
+Merely changing the declaration to `string?` preserves possible absence and
+moves the obligation to consumers; it does not prove those consumers safe.
+
 General mutation, member writes, constructor inputs, and outer generic-container
 enforcement remain excluded; array annotations do not prove every slot initialized.
 These checks do not establish whole-program non-nullness. The D3/D12/D14 safeguards
@@ -93,31 +100,34 @@ that demote conditional proofs and retain their runtime guards remain in place.
 
 ## Version Declaration
 
-A module declares the semantics version it was written for with a `§SEMVER`
-directive, usually the first line of the module body:
+Native declarations check compatibility with the installed compiler.
+This complete program uses the current rules;
+`Next(41)` returns `42`:
 
 ```calor
-§M{m001:MyModule}
-  §SEMVER{2.0.0}
-  §F{f001:Main:pub} () -> void
-    §E{}
-    §R
+module InstalledSemantics
+  semver "2.0.0"
+  func Next public (int:value) → int
+    !
+    return value + 1
 ```
 
 ### Syntax
 
-Exactly one spelling is accepted: `§SEMVER{MAJOR.MINOR.PATCH}` with three
-numeric parts and nothing else between the braces, for example
-`§SEMVER{2.0.0}`. Caret (`^2.0.0`), range (`>=2.0.0 <3.0.0`), and shortened
-(`2`, `2.0`) forms are rejected with `Calor0702`; so are a leading sign or any
-whitespace (`+2.0.0`, `{ 2.0.0 }`), the bracket form `§SEMVER[2.0.0]`, a `{`
-not closed on its line, and a second `§SEMVER` in the same module.
+Use one `semver "MAJOR.MINOR.PATCH"` line per module. The argument is a plain
+single-line string with three runs of ASCII digits separated by dots.
+Malformed or duplicate declarations report `Calor0702`. Interpolation,
+UTF-8 suffixes, escapes, ranges and trailing tokens are not accepted.
+Retired section tags remain errors.
 
 ### Modules That Declare Nothing
 
-A module without `§SEMVER` takes the compiler's own version (currently 2.0.0)
-and gets no diagnostic. The `calor hook` write-time reminder suggests adding
-`§SEMVER{2.0.0}`.
+Ordinary native modules do not need a version declaration. The write hook
+recommends pinning the compiler instead of adding retired syntax.
+`calor hook validate-calr-content` reports current lexer/parser errors in the
+supplied content without blocking the write. Parser diagnostics include version
+compatibility. The hook does not check types, effects or runtime behavior;
+full compilation remains a separate step.
 
 ---
 
@@ -125,22 +135,24 @@ and gets no diagnostic. The `calor hook` write-time reminder suggests adding
 
 ### Patch Version Changes (x.y.Z)
 
-**Fully compatible.** Changes include:
+The versioning policy reserves patch changes for compatible corrections:
 - Documentation clarifications
 - Specification bug fixes
 - Test additions
 
-**Example:** 2.0.0 to 2.0.1 is safe.
+The compatibility helper classifies 2.0.0 and 2.0.1 as compatible. Run regression
+tests when upgrading the compiler; that classification is not a behavioral proof.
 
 ### Minor Version Changes (x.Y.z)
 
-**Backward compatible.** Changes include:
+The policy reserves minor changes for backward-compatible additions:
 - New constructs added
 - New operators added
 - New optional behaviors
 - Extended standard library
 
-**Example:** Code written for 2.0.0 will compile and run correctly under 2.1.0.
+The helper classifies an older minor within the same major as compatible.
+This does not prove that an arbitrary source program compiles or behaves identically.
 
 ### Major Version Changes (X.y.z)
 
@@ -152,19 +164,20 @@ and gets no diagnostic. The `calor hook` write-time reminder suggests adding
 - Default behavior changes
 - Removed constructs
 
-**Example:** Code written for 1.x is refused by a 2.x compiler.
+The parser rejects a declaration of 1.x or 3.x on the 2.x compiler with
+`Calor0701`.
 
 ---
 
 ## Compiler Behavior
 
-The major must match exactly. A module that declares an **older** major (for
-example `§SEMVER{1.0.0}` on the 2.0.0 compiler) is refused rather than quietly
-read under the newer rules. The error calls for manual review and migration
-to current semantics before declaring `§SEMVER{2.0.0}`. Changing the declaration
-alone is not a migration. There is no legacy `Info` compilation mode, and
-`Calor0272/0273/0274` are binder/editor diagnostics rather than production
-CLI rejection gates. See
+The parser checks native declarations through `SemanticsVersion.ReportDeclaredVersion`.
+Compilation, language-server parsing, documentation checks and MCP compilation
+therefore share the same compatibility verdict. Retired syntax remains rejected.
+
+There is no dual-semantics or legacy `Info` compilation mode. Nullability
+severity and production routing are distinct; see the current bounded checks
+and historical correction above, and
 [#1084](https://github.com/juanmicrosoft/calor/issues/1084).
 
 ### Diagnostic Codes
@@ -173,18 +186,17 @@ CLI rejection gates. See
 |:-----|:---------|:----------|
 | Calor0700 | Warning | Same major, declared minor newer than the compiler's (might work) |
 | Calor0701 | Error | Declared major differs from the compiler's — older or newer |
-| Calor0702 | Error | `§SEMVER` is not `MAJOR.MINOR.PATCH`, or appears more than once |
+| Calor0702 | Error | Declaration is malformed or duplicated |
 
 ### Compatibility Matrix (2.0.0 compiler)
 
-| Module declares | Result |
+| Declared version | Result |
 |:----------------|:-------|
-| (nothing) | Compatible — takes 2.0.0, no diagnostic |
 | 2.0.0, 2.0.5 | Compatible |
-| 2.1.0 | Warning (Calor0700), compiles |
+| 2.1.0 | Possibly incompatible; declaration helper reports Calor0700 |
 | 1.0.0, 1.9.9, 0.9.0 | Error (Calor0701) with migration pointer to #1084 |
 | 3.0.0 | Error (Calor0701), "upgrade the compiler" |
-| `^1.0.0`, `2`, `2.0`, second `§SEMVER` | Error (Calor0702) |
+| `^1.0.0`, `2`, `2.0` | Declaration helper reports Calor0702 |
 
 ---
 
@@ -195,12 +207,14 @@ CLI rejection gates. See
 The v0.14 bump changed binder diagnostic severity. The v0.14.0 promise of
 legacy `Info` severity was a future plan, not a shipped mode. The severity
 helper's lower-major branch does not make older modules compatible.
-The `§SEMVER` parser and fail-closed refusal arrived in
+The historical declaration parser and fail-closed refusal arrived in
 [#1087](https://github.com/juanmicrosoft/calor/commit/4ac335d5932383bcf6590b34fdc2ad73ff96afbb):
 that commit is not an ancestor of v0.14.0-v0.14.2, but is an ancestor of
 [v0.15.0 (`3bb2601e`)](https://github.com/juanmicrosoft/calor/tree/3bb2601e3ff83597ddf2f27dcc334b6399ab97ea).
-Modules declaring `1.x` or `0.x` are now refused with `Calor0701`, not compiled
-in an `Info` mode. This correction adds no automated semantics migration tool.
+That historical parser refused modules declaring `1.x` or `0.x` with
+`Calor0701`, rather than compiling in an `Info` mode. Native source now exposes
+that compatibility gate through `semver "MAJOR.MINOR.PATCH"`. No automated
+semantics migration tool is supplied.
 
 ### Version 1.0.0
 
@@ -263,21 +277,21 @@ When upgrading a module to a new semantics version:
 
 1. **Review changelog** for breaking changes
 2. **Run tests** with new compiler version
-3. **Update `§SEMVER`** declaration
+3. **Pin the compiler version** used by the build and agent tooling
 4. **Test edge cases** related to changed semantics
 
-For 1.x to 2.0.0, manually review the current semantics and the module's
-null-handling choices before changing the declaration to `§SEMVER{2.0.0}`.
-Test the migrated code; a version edit or successful compile alone does not
-establish null safety. `Calor0272/0273/0274` can appear in binder/editor
-diagnostics but do not establish production CLI rejection. Other passes may
-reject independently. An older-major declaration still produces `Calor0701`.
+For historical 1.x source, manually review current semantics, convert retired
+syntax, and test null-handling choices. A version pin or successful compile
+alone does not establish null safety. Use the current
+[nullability guide](/docs/guides/nullability-and-dotnet-interop/) for the actual
+receiving boundaries and diagnostics; do not infer them from the helper's
+version comparison alone.
 
 ### Mixed-Version Projects
 
-There is no dual-semantics mode. Every module in a compilation must declare
-the compiler's major (or declare nothing); a `§SEMVER{1.0.0}` module is
-refused until it is migrated.
+There is no dual-semantics mode. Native modules in one compilation use the
+same installed compiler. A source comment or retired declaration cannot
+select an older implementation for an individual module.
 
 ---
 

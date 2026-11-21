@@ -5,10 +5,13 @@ namespace Calor.Compiler.Migration;
 /// </summary>
 public static class TypeMapper
 {
+    /// <summary>Renders parser and converter types using the measured C# surface spellings.</summary>
+    public static string ToSurfaceType(string type) => CalorToCSharp(type);
+
     /// <summary>
     /// Maps C# type names to Calor type names.
     /// </summary>
-    private static readonly Dictionary<string, string> CSharpToCalorMap = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> CSharpToCalorMap = new(StringComparer.Ordinal)
     {
         // Numeric types
         ["int"] = "i32",
@@ -117,9 +120,8 @@ public static class TypeMapper
 
     /// <summary>
     /// Maps Calor type names to C# type names.
-    /// Also handles uppercase C# type names for backward compatibility.
     /// </summary>
-    private static readonly Dictionary<string, string> CalorToCSharpMap = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, string> CalorToCSharpMap = new(StringComparer.Ordinal)
     {
         // Calor numeric types
         ["i32"] = "int",
@@ -163,14 +165,18 @@ public static class TypeMapper
         // Boolean
         ["bool"] = "bool",
         ["boolean"] = "bool",
+        ["BOOL"] = "bool",
 
         // String and char
         ["str"] = "string",
         ["string"] = "string",
+        ["STRING"] = "string",
         ["char"] = "char",
+        ["CHAR"] = "char",
 
         // Void
         ["void"] = "void",
+        ["VOID"] = "void",
 
         // Object
         ["any"] = "object",
@@ -289,10 +295,10 @@ public static class TypeMapper
         if (csharpType.Contains("INT[bits=", StringComparison.Ordinal))
             csharpType = CompactCanonicalIntAliases(csharpType);
 
-        // Compact OPTION[inner=T] → ?T only when it appears in the input
+        // Compact NULLABLE[inner=T] → ?T only when it appears in the input
         // (avoid running regex on every type for performance)
-        if (csharpType.Contains("OPTION["))
-            csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"OPTION\[inner=([^\]\)]+)\]", "?$1");
+        if (csharpType.Contains("NULLABLE["))
+            csharpType = System.Text.RegularExpressions.Regex.Replace(csharpType, @"NULLABLE\[inner=([^\]\)]+)\]", "?$1");
 
         // Strip C-style block comments /* ... */ from Roslyn trivia
         if (csharpType.Contains("/*"))
@@ -391,7 +397,7 @@ public static class TypeMapper
 
     /// <summary>
     /// Adds a nullable-reference annotation to an already mapped Calor type
-    /// without changing value-nullable or <c>Option&lt;T&gt;</c> semantics.
+    /// without changing value-nullable semantics.
     /// </summary>
     public static string AnnotateNullableReference(string calorType)
     {
@@ -416,24 +422,16 @@ public static class TypeMapper
         if (string.IsNullOrWhiteSpace(calorType))
             return calorType;
 
-        // Nullable annotations include the historical OPTION[inner=...] parser spelling.
-        // Explicit Option<T> is handled as a runtime generic below.
-        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(calorType, out var nullableReferent))
+        // Peel ranks before expanded scalar attributes, which also contain brackets.
+        var rankStart = calorType.LastIndexOf('[');
+        if (rankStart > 0 && calorType.EndsWith(']')
+            && calorType[(rankStart + 1)..^1].All(c => c == ','))
         {
-            return $"{CalorToCSharp(nullableReferent)}?";
+            return CalorToCSharp(calorType[..rankStart]) + calorType[rankStart..];
         }
 
-        // Handle expanded RESULT format: RESULT[ok=T][err=E] -> Calor.Runtime.Result<T, E>
-        if (calorType.StartsWith("RESULT[ok=", StringComparison.Ordinal))
-        {
-            var (okType, errType) = ExtractResultTypes(calorType);
-            if (okType != null && errType != null)
-            {
-                var mappedOk = CalorToCSharp(okType);
-                var mappedErr = CalorToCSharp(errType);
-                return $"Calor.Runtime.Result<{mappedOk}, {mappedErr}>";
-            }
-        }
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(calorType, out var nullableReferent))
+            return $"{CalorToCSharp(nullableReferent)}?";
 
         // Handle expanded INT format: INT[bits=N][signed=B] -> sbyte/short/int/long/byte/ushort/uint/ulong
         // Must check for "bits=" to avoid matching multi-dim array types like INT[,]
@@ -478,21 +476,6 @@ public static class TypeMapper
             return $"{mappedElement}[]";
         }
 
-        // Handle array types T[] -> T_mapped[], T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
-        {
-            var bracketStart = calorType.IndexOf('[');
-            if (bracketStart > 0 && calorType.EndsWith("]"))
-            {
-                var suffix = calorType[bracketStart..];
-                if (suffix.All(c => c == '[' || c == ']' || c == ','))
-                {
-                    var elementType = calorType[..bracketStart];
-                    var mappedElement = CalorToCSharp(elementType);
-                    return $"{mappedElement}{suffix}";
-                }
-            }
-        }
-
         // Handle tuple types (i32, str) -> (int, string)
         if (calorType.StartsWith("(") && calorType.EndsWith(")"))
         {
@@ -522,8 +505,34 @@ public static class TypeMapper
             return $"{mappedBase}<{mappedArgs}>{mappedSuffix}";
         }
 
-        // Direct mapping
-        return CalorToCSharpMap.TryGetValue(calorType, out var result) ? result : calorType;
+        if (CalorToCSharpMap.TryGetValue(calorType, out var result))
+            return result;
+
+        return CSharpToCalorMap.TryGetValue(calorType, out var alias)
+            && CalorToCSharpMap.TryGetValue(alias, out var csharpAlias)
+                ? csharpAlias : calorType;
+    }
+
+    internal static string CalorToCSharpQualifiedName(string name)
+    {
+        var genericIndex = name.IndexOf('<');
+        if (genericIndex <= 0)
+            return name;
+
+        var closingIndex = FindMatchingCloseBracket(name, genericIndex);
+        if (closingIndex <= genericIndex || name[closingIndex] != '>')
+            return name;
+
+        var baseName = name[..genericIndex];
+        var suffix = name[(closingIndex + 1)..];
+        var mappedBase = suffix.StartsWith('.')
+            && CalorToCSharpMap.TryGetValue(baseName, out var csharpBase)
+                ? csharpBase : baseName;
+        var mappedArgs = MapGenericArguments(
+            name[(genericIndex + 1)..closingIndex], CalorToCSharp);
+        var mappedSuffix = suffix.StartsWith('.')
+            ? CalorToCSharpQualifiedName(suffix) : suffix;
+        return $"{mappedBase}<{mappedArgs}>{mappedSuffix}";
     }
 
     /// <summary>
@@ -593,10 +602,8 @@ public static class TypeMapper
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(current))
-        {
-            result.Add(mapper(current.Trim()));
-        }
+        // An omitted final argument is a slot: G<,,> has arity three, not two.
+        result.Add(mapper(current.Trim()));
 
         return string.Join(", ", result);
     }
@@ -606,8 +613,7 @@ public static class TypeMapper
     /// </summary>
     public static bool IsPrimitiveType(string typeName)
     {
-        var normalizedLower = typeName.ToLowerInvariant();
-        return normalizedLower switch
+        return Parsing.AttributeHelper.ToSurfaceSpelling(typeName) switch
         {
             "int" or "i32" or "long" or "i64" or "short" or "i16" or "byte" or "u8" or
             "sbyte" or "i8" or "uint" or "u32" or "ulong" or "u64" or "ushort" or "u16" or
@@ -622,8 +628,7 @@ public static class TypeMapper
     /// </summary>
     public static bool IsNumericType(string typeName)
     {
-        var normalizedLower = typeName.ToLowerInvariant();
-        return normalizedLower switch
+        return Parsing.AttributeHelper.ToSurfaceSpelling(typeName) switch
         {
             "int" or "i32" or "long" or "i64" or "short" or "i16" or "byte" or "u8" or
             "sbyte" or "i8" or "uint" or "u32" or "ulong" or "u64" or "ushort" or "u16" or
@@ -637,15 +642,19 @@ public static class TypeMapper
     /// </summary>
     public static string GetDefaultValueLiteral(string calorType)
     {
-        return calorType.ToLowerInvariant() switch
+        return Parsing.AttributeHelper.ToSurfaceSpelling(calorType) switch
         {
-            "i32" or "i64" or "i16" or "i8" or "u32" or "u64" or "u16" or "u8" => "0",
-            "f32" or "f64" => "0.0",
+            "int" or "short" or "sbyte" or "ushort" or "byte" => "0",
+            "long" => "0L",
+            "uint" => "0U",
+            "ulong" => "0UL",
+            "float" => "0f",
+            "double" => "0.0",
             "decimal" => "0m",
             "bool" => "false",
-            "str" => "\"\"",
+            "string" => "\"\"",
             "char" => "'\\0'",
-            _ when calorType.StartsWith("?") => "none",
+            _ when calorType.StartsWith("?") => "null",
             _ => "default"
         };
     }
@@ -675,21 +684,6 @@ public static class TypeMapper
 
         // Value is between prefix end and closing bracket (exclusive)
         return type[valueStart..(i - 1)];
-    }
-
-    /// <summary>
-    /// Extracts ok and err types from expanded RESULT format: RESULT[ok=T][err=E]
-    /// </summary>
-    internal static (string? OkType, string? ErrType) ExtractResultTypes(string type)
-    {
-        var okType = ExtractBracketValue(type, "RESULT[ok=");
-        if (okType == null)
-            return (null, null);
-
-        // Find the [err=...] portion after the [ok=...] bracket
-        var errPrefix = $"RESULT[ok={okType}][err=";
-        var errType = ExtractBracketValue(type, errPrefix);
-        return (okType, errType);
     }
 
     /// <summary>

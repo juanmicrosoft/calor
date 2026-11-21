@@ -5,6 +5,7 @@ using Microsoft.Build.Utilities;
 
 namespace Calor.Tasks.Tests;
 
+[Xunit.Collection(ProcessStateCollection.Name)]
 public class BuildStateCacheTests : IDisposable
 {
     private readonly string _tempDir;
@@ -601,7 +602,7 @@ public class BuildStateCacheTests : IDisposable
         var resolved = Calor.Tasks.CompileCalor.ResolveCompilerClosurePaths(
             typeof(Calor.Tasks.CompileCalor).Assembly.Location);
         Assert.Contains(typeof(Calor.Compiler.Program).Assembly.Location, resolved);
-        Assert.Contains(typeof(Calor.Runtime.Option<int>).Assembly.Location, resolved);
+        Assert.Contains(typeof(Calor.Runtime.ContractViolationException).Assembly.Location, resolved);
 
         Assert.Contains(resolved, path =>
             path.Contains(
@@ -868,6 +869,27 @@ public class BuildStateCacheTests : IDisposable
 
         File.WriteAllText(referenceA, "a-v2");
         Assert.NotEqual(baseline, first.ComputeCacheInputs().Serialize());
+    }
+
+    [Fact]
+    public void CanonicalInputs_ReferencedAssemblies_FingerprintWithoutILAnalysis()
+    {
+        // 0.30: the binder loads explicit references into its metadata set, so the
+        // reference set changes compiler output even when IL analysis is off. Adding
+        // a reference, or changing its content at the same path, must move the key.
+        var reference = CreateTempFile("refs/Framework.dll", "framework-v1");
+        var none = new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir };
+        var referenced = new Calor.Tasks.CompileCalor
+        {
+            ProjectDirectory = _tempDir,
+            ReferencedAssemblies = [new TaskItem(reference)]
+        };
+
+        var baseline = referenced.ComputeCacheInputs().Serialize();
+        Assert.NotEqual(none.ComputeCacheInputs().Serialize(), baseline);
+
+        File.WriteAllText(reference, "framework-v2");
+        Assert.NotEqual(baseline, referenced.ComputeCacheInputs().Serialize());
     }
 
     [Fact]

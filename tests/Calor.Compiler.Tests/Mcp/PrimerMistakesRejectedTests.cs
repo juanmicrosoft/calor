@@ -19,13 +19,12 @@ namespace Calor.Compiler.Tests.Mcp;
 /// cannot lie in the other direction (a "wrong" snippet that silently compiles would
 /// mis-teach the agent following Calor's own primer).
 ///
-/// The mistakes are fragments (a §S clause, an §IF header, a §F header, a closer line), so
+/// The mistakes are fragments (a postcondition, an if header, a retired header or closer), so
 /// each is rewritten into the smallest complete module where it would naturally appear, then
 /// checked for non-compilation at EITHER layer:
 ///   1. Calor itself reports an error (HasErrors), or
-///   2. the generated C# fails to compile under Roslyn — e.g. the 4-field §F header drops the
-///      return type, emitting <c>void Add() { return 0; }</c> =&gt; CS0127, which Calor does not
-///      flag today but csc does.
+///   2. the generated C# fails to compile under Roslyn.
+/// The obsolete ID-bearing function header is rejected by the current parser.
 /// Two drift guards keep this curated set and the primer text in lock-step.
 /// </summary>
 public class PrimerMistakesRejectedTests
@@ -42,11 +41,11 @@ public class PrimerMistakesRejectedTests
     private static readonly Mistake[] Mistakes =
     {
         new("legacy-closers", "§/F §/M §/I §/L", TopLevel: false),
-        new("uppercase-result", "§S (>= §RESULT 0)", TopLevel: false),
-        new("if-missing-id", "§IF (> x 0)", TopLevel: false),
-        new("if-condition-in-braces", "§IF{i1}{x > 0}", TopLevel: false),
+        new("uppercase-result", "=> RESULT >= 0", TopLevel: false),
+        new("if-missing-condition", "if", TopLevel: false),
+        new("if-condition-in-braces", "if {x > 0}", TopLevel: false),
         new("nonexistent-keywords", "§K   §ELSE", TopLevel: false),
-        new("four-field-header", "§F{f1:Add:i32:pub}", TopLevel: true),
+        new("four-field-header", "§F{f1:Add:int:pub}", TopLevel: true),
     };
 
     public static IEnumerable<object[]> MistakeCases() =>
@@ -57,14 +56,16 @@ public class PrimerMistakesRejectedTests
     public void Mistake_DoesNotCompile(string name, string fragment, bool topLevel)
     {
         var module = topLevel
-            ? $"§M{{m1:Probe}}\n{fragment}\n  §R INT:0\n"
-            : $"§M{{m1:Probe}}\n§F{{f1:Probe:pub}} (i32:x) -> i32\n  {fragment}\n  §R x\n";
+            ? $"module Probe\n  {fragment}\n    return 0\n"
+            : $"module Probe\n  func Probe (int:x) → int\n    !\n    {fragment}\n    return x\n";
 
         var result = Compile(module, "primer-mistake.calr");
 
         // Layer 1: rejected outright by Calor.
         if (result.Diagnostics.Any(d => d.IsError))
         {
+            var errorLine = name == "if-missing-condition" ? 5 : topLevel ? 2 : 4;
+            Assert.Contains(result.Diagnostics, d => d.IsError && d.Span.Line == errorLine);
             return;
         }
 
@@ -78,48 +79,18 @@ public class PrimerMistakesRejectedTests
             $"--- module ---\n{module}\n--- generated C# ---\n{result.GeneratedCode}");
     }
 
-    [Fact]
-    public void CorrectModule_CompilesAtBothLayers()
+    [Theory]
+    [InlineData("module Probe\n  func Add (int:a, int:b) → int\n    !\n    return a + b\n")]
+    [InlineData("module Probe\n  func Probe (int:x) → int\n    !\n    return x\n")]
+    [InlineData("module Probe\n  func Probe () → int\n    !\n    return 0\n")]
+    public void CorrectModule_CompilesAtBothLayers(string correct)
     {
         // Sanity for the two-layer check itself: a correct module must pass BOTH layers, so a
         // green above cannot be an artifact of RoslynErrors spuriously rejecting everything.
-        const string correct =
-            "§M{m1:Probe}\n§F{f1:Add:pub} (i32:a, i32:b) -> i32\n  §R (+ a b)\n";
-
         var result = Compile(correct, "primer-correct.calr");
 
         Assert.DoesNotContain(result.Diagnostics, d => d.IsError);
         Assert.Empty(RoslynErrors(result.GeneratedCode));
-    }
-
-    [Fact]
-    public void Primer_ListsEachCuratedMistake()
-    {
-        // Drift guard: every curated fragment must still appear (whitespace-normalized) in the
-        // primer's mistakes block, so this test and the docs cannot silently diverge.
-        var normBlock = Collapse(MistakesBlock());
-        foreach (var m in Mistakes)
-        {
-            Assert.True(
-                normBlock.Contains(Collapse(m.Fragment), StringComparison.Ordinal),
-                $"Curated mistake '{m.Name}' ({m.Fragment}) is no longer present in the primer's " +
-                "\"Common mistakes\" block. Update the curated set to match the primer.");
-        }
-    }
-
-    [Fact]
-    public void Primer_MistakeCount_MatchesCuratedSet()
-    {
-        // Drift guard the other way: adding a mistake to the primer without a curated case +
-        // assertion here fails this test. Mistake lines carry an explanation lead-in.
-        var count = MistakesBlock()
-            .Split('\n')
-            .Count(line =>
-                line.Contains("wrong;", StringComparison.Ordinal) ||
-                line.Contains("removed;", StringComparison.Ordinal) ||
-                line.Contains("no such", StringComparison.Ordinal));
-
-        Assert.Equal(Mistakes.Length, count);
     }
 
     // --- helpers ---

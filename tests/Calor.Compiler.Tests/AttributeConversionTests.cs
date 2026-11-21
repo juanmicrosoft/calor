@@ -12,6 +12,10 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class AttributeConversionTests
 {
+    // The native-conversion inputs below declare no base type: without the ASP.NET Core
+    // assembly an unresolved base (`: ControllerBase`) could be a class or an interface, so
+    // the converter keeps that class as C# (`class-unresolved-base-kind`). The attributes
+    // themselves need no resolution to be preserved.
     private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     #region C# to Calor Attribute Conversion Tests
@@ -24,7 +28,7 @@ public class AttributeConversionTests
 
             [Route("api/[controller]")]
             [ApiController]
-            public class TestController : ControllerBase
+            public class TestController
             {
             }
             """;
@@ -55,7 +59,7 @@ public class AttributeConversionTests
         var csharpSource = """
             using Microsoft.AspNetCore.Mvc;
 
-            public class TestController : ControllerBase
+            public class TestController
             {
                 [HttpPost]
                 public void Post()
@@ -128,7 +132,7 @@ public class AttributeConversionTests
             using Microsoft.AspNetCore.Mvc;
             using Microsoft.AspNetCore.Authorization;
 
-            public class TestController : ControllerBase
+            public class TestController
             {
                 [HttpGet("status")]
                 [Authorize]
@@ -228,7 +232,7 @@ public class AttributeConversionTests
 
             [Route("api/test")]
             [ApiController]
-            public class TestController : ControllerBase
+            public class TestController
             {
             }
             """;
@@ -249,7 +253,7 @@ public class AttributeConversionTests
         var csharpSource = """
             using Microsoft.AspNetCore.Mvc;
 
-            public class TestController : ControllerBase
+            public class TestController
             {
                 [HttpPost]
                 public void Post() { }
@@ -366,8 +370,9 @@ public class AttributeConversionTests
     public void Parser_ParsesClassWithAttributes()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:TestController:ControllerBase}[@Route("api/test")][@ApiController]
+            module TestModule
+              class TestController [@Route("api/test")][@ApiController]
+                extends ControllerBase
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -391,10 +396,11 @@ public class AttributeConversionTests
     public void Parser_ParsesMethodWithAttributes()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:TestController:ControllerBase}
-                    §MT{m001:Post:pub}[@HttpPost]
-                        §O{void}
+            module TestModule
+              class TestController
+                extends ControllerBase
+                func Post [@HttpPost] public () → void
+                  !
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -419,12 +425,11 @@ public class AttributeConversionTests
     public void Parser_ParsesAttributeWithArgs()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:TestModel}
-                    §PROP{p001:Value:int:pub}[@Range(1, 100, ErrorMessage="Invalid")]
-                      §GET
-                      §SET
-                    §/PROP{p001}
+            module TestModule
+              class TestModel
+                property int:Value public [@Range(1, 100, ErrorMessage="Invalid")]
+                  get
+                  set
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -511,8 +516,8 @@ public class AttributeConversionTests
     public void Parser_ParsesBitwiseOrInAttribute()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+            module TestModule
+              class MyAttribute [@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -540,8 +545,8 @@ public class AttributeConversionTests
     public void Parser_ParsesThreeOperandBitwiseOr()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyAttribute}[@Flags][@AttributeUsage(A.X | A.Y | A.Z)]
+            module TestModule
+              class MyAttribute [@Flags][@AttributeUsage(A.X | A.Y | A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -565,8 +570,8 @@ public class AttributeConversionTests
     public void RoundTrip_BitwiseOrAttribute_Preserved()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyAttribute}[@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+            module TestModule
+              class MyAttribute [@AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -587,8 +592,8 @@ public class AttributeConversionTests
     public void Parser_ParsesNamedArgWithBitwiseOr()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyAttribute}[@AttributeUsage(ValidOn = AttributeTargets.Class | AttributeTargets.Struct)]
+            module TestModule
+              class MyAttribute [@AttributeUsage(ValidOn = AttributeTargets.Class | AttributeTargets.Struct)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -612,8 +617,8 @@ public class AttributeConversionTests
     public void Parser_ParsesMixedArgsWithBitwiseOr()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:TestClass}[@SomeAttr("text", Flags = A.X | A.Y)]
+            module TestModule
+              class TestClass [@SomeAttr("text", Flags = A.X | A.Y)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -677,8 +682,8 @@ public class AttributeConversionTests
     public void Parser_TrailingOperatorInAttribute_ReportsError()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(A.X | )]
+            module TestModule
+              class MyClass [@SomeAttr(A.X | )]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -697,8 +702,8 @@ public class AttributeConversionTests
     public void Parser_ParsesBitwiseAndInAttribute()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(A.All & A.Mask)]
+            module TestModule
+              class MyClass [@SomeAttr(A.All & A.Mask)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -718,8 +723,8 @@ public class AttributeConversionTests
     public void Parser_ParsesBitwiseXorInAttribute()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(A.X ^ A.Y)]
+            module TestModule
+              class MyClass [@SomeAttr(A.X ^ A.Y)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -739,8 +744,8 @@ public class AttributeConversionTests
     public void Parser_ParsesBitwiseNotInAttribute()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(~A.X)]
+            module TestModule
+              class MyClass [@SomeAttr(~A.X)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -761,8 +766,8 @@ public class AttributeConversionTests
     {
         // Common pattern: AttributeTargets.All & ~AttributeTargets.Delegate
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(A.All & ~A.Delegate)]
+            module TestModule
+              class MyClass [@SomeAttr(A.All & ~A.Delegate)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -784,8 +789,8 @@ public class AttributeConversionTests
     public void Parser_ParsesParenthesizedBitwiseExpr()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr((A.X | A.Y) & A.Z)]
+            module TestModule
+              class MyClass [@SomeAttr((A.X | A.Y) & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -810,8 +815,8 @@ public class AttributeConversionTests
     {
         // A | B & C should parse as A | (B & C) per C# precedence
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(A.X | A.Y & A.Z)]
+            module TestModule
+              class MyClass [@SomeAttr(A.X | A.Y & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -836,8 +841,8 @@ public class AttributeConversionTests
     {
         // (A | B) & C must keep parens because | is lower precedence than &
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr((A.X | A.Y) & A.Z)]
+            module TestModule
+              class MyClass [@SomeAttr((A.X | A.Y) & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -859,8 +864,8 @@ public class AttributeConversionTests
     {
         // A | B & C — no parens needed, & binds tighter naturally
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(A.X | A.Y & A.Z)]
+            module TestModule
+              class MyClass [@SomeAttr(A.X | A.Y & A.Z)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -881,8 +886,8 @@ public class AttributeConversionTests
     public void RoundTrip_BitwiseNotAndOr_Preserved()
     {
         var calorSource = """
-            §M{m001:TestModule}
-                §CL{c001:MyClass}[@SomeAttr(A.All & ~A.Delegate)]
+            module TestModule
+              class MyClass [@SomeAttr(A.All & ~A.Delegate)]
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -933,6 +938,22 @@ public class AttributeConversionTests
         var csharpEmitter = new CSharpEmitter();
         var outputCode = csharpEmitter.Emit(parsedModule);
         Assert.Contains("AttributeTargets.All & ~AttributeTargets.Delegate", outputCode);
+        const string probe = """
+
+            public static class Probe
+            {
+                public static int Run()
+                {
+                    var usage = (System.AttributeUsageAttribute)System.Attribute.GetCustomAttribute(
+                        typeof(MyAttribute), typeof(System.AttributeUsageAttribute))!;
+                    return (int)usage.ValidOn;
+                }
+            }
+            """;
+        var expected = ((int)(AttributeTargets.All & ~AttributeTargets.Delegate))
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(csharpSource + probe));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(outputCode + probe));
     }
 
     #endregion
@@ -958,17 +979,17 @@ public class AttributeConversionTests
         var calorEmitter = new CalorEmitter();
         var calorCode = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains("(nameof name)", calorCode);
+        Assert.Contains("nameof(name)", calorCode);
     }
 
     [Fact]
     public void Parser_Roundtrip_NameofValue_ToCSharp()
     {
         var calorSource = """
-            §M{m001:TestModule}
-              §F{f001:Fn:pub}
-                §O{str}
-                §R (nameof value)
+            module TestModule
+              func Fn public () → string
+                !
+                return nameof(value)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -989,10 +1010,10 @@ public class AttributeConversionTests
     public void Parser_Roundtrip_NameofDottedName_ToCSharp()
     {
         var calorSource = """
-            §M{m001:TestModule}
-              §F{f001:Fn:pub}
-                §O{str}
-                §R (nameof obj.Property)
+            module TestModule
+              func Fn public () → string
+                !
+                return nameof(obj.Property)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1014,11 +1035,10 @@ public class AttributeConversionTests
     {
         // Calor keywords used as nameof arguments should still work
         var calorSource = """
-            §M{m1:Test}
-              §F{f1:GetName}
-                  §I{i32:value}
-                  §O{str}
-                  §R (nameof value)
+            module Test
+              func GetName (int:value) → string
+                !
+                return nameof(value)
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -1026,6 +1046,15 @@ public class AttributeConversionTests
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
         Assert.Contains("nameof(value)", compilationResult.GeneratedCode);
+        const string probe = """
+
+            public static class Probe
+            {
+                public static string Run() => GlobalModule.GetName(42);
+            }
+            """;
+        Assert.Equal("value",
+            InteropScope.RefOutImplementationTests.Run(compilationResult.GeneratedCode + probe));
     }
 
     [Fact]

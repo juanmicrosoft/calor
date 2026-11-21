@@ -17,6 +17,18 @@
 # and no single host accumulates the whole suite. This CAPS THE SYMPTOM; it does not fix the leak
 # (see docs/plans/2026-09-03-issue-1150-kill-rate-measurement.md). The parts come from
 # scripts/compiler-shard-filter.sh, whose final part complements the other three.
+#
+# 0.30 (#1730): the historical replays (Category=HistoricalReplay) are a fifth part. Each
+# rebuilds an archived compiler and reruns one test with it, about 2-4 minutes, and they cost
+# the serial parts about half an hour. Their host starts in the background after the build and
+# runs beside the parts on cores the serial suite leaves idle; the step waits for it and fails
+# when it fails. Its TRX is checked like every other part.
+#
+# 0.30 (#1730): the four parts run at the same time, each in its own fresh host with its own log
+# and TRX (each host runs its tests serially, so the 4-vCPU runner has a core per part). The step
+# waits for every part, prints each log, then fails if any part failed. Two pairs run back to back
+# used 40.3 min on a slow runner (run 44793777859), past the job limit; four at once bound the
+# step by the slowest part instead of two parts in sequence.
 set -euo pipefail
 # usage: bash scripts/run-shard-tests.sh <matrix name> <test project>
 test "$#" -eq 2
@@ -32,17 +44,62 @@ bash scripts/runner-resource-sampler.sh 10 &
 sampler_pid=$!
 trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
 if [ "$name" = "compiler" ]; then
+  # 0.30 (#1730): five hosts (four parts and the replay host, which rebuilds archived
+  # compilers) peak above the runner's 16 GB of RAM plus its 3 GB of swap: two runs on
+  # 2026-11-20 filled the swap, and the second was killed (exit 143, memAvail 47M). On a
+  # Linux runner with passwordless sudo, add an 8 GB swap file before the hosts start.
+  # Elsewhere (no sudo, not Linux) this is skipped and the step runs as before.
+  if [ "$(uname -s)" = "Linux" ] && sudo -n true 2>/dev/null && [ ! -e /calor-extra.swap ]; then
+    if sudo fallocate -l 8G /calor-extra.swap && sudo chmod 600 /calor-extra.swap \
+        && sudo mkswap /calor-extra.swap > /dev/null && sudo swapon /calor-extra.swap; then
+      echo "Added 8 GB swap: $(swapon --show=NAME,SIZE --noheadings | tr '\n' ' ')"
+    else
+      echo "Could not add swap; continuing with the runner's own." >&2
+    fi
+  fi
   bash scripts/compiler-shard-filter.sh --self-test
   # The invocations pass --no-build, so build once up front.
   dotnet build "$project" -c Release
-  for part in $(bash scripts/compiler-shard-filter.sh --parts); do
+  replay_filter="$(bash scripts/compiler-shard-filter.sh --replay)"
+  dotnet test "$project" -c Release --no-build --no-restore \
+    --filter "$replay_filter" \
+    --logger "trx;LogFileName=$name-replay.trx" \
+    --results-directory artifacts/test \
+    --verbosity normal > replay-output.log 2>&1 &
+  replay_pid=$!
+  # Parts 1-3 in the background; the last (largest) part in the foreground, then wait for the rest.
+  part_pids=()
+  for part in $(bash scripts/compiler-shard-filter.sh --parts | head -n 3); do
     filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
     dotnet test "$project" -c Release --no-build --no-restore \
       --filter "$filter" \
       --logger "trx;LogFileName=$name-$part.trx" \
       --results-directory artifacts/test \
-      --verbosity normal 2>&1 | tee -a test-output.log
+      --verbosity normal > "part-$part.log" 2>&1 &
+    part_pids+=("$part:$!")
   done
+  part="$(bash scripts/compiler-shard-filter.sh --parts | tail -n 1)"
+  filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
+  dotnet test "$project" -c Release --no-build --no-restore \
+    --filter "$filter" \
+    --logger "trx;LogFileName=$name-$part.trx" \
+    --results-directory artifacts/test \
+    --verbosity normal 2>&1 | tee -a test-output.log
+  parts_failed=0
+  for entry in "${part_pids[@]}"; do
+    part="${entry%%:*}"
+    part_status=0
+    wait "${entry#*:}" || part_status=$?
+    echo "--- compiler part $part (exit $part_status) ---"
+    tee -a test-output.log < "part-$part.log"
+    [ "$part_status" = 0 ] || parts_failed=1
+  done
+  replay_status=0
+  wait "$replay_pid" || replay_status=$?
+  echo "--- historical replay host (exit $replay_status) ---"
+  tee -a test-output.log < replay-output.log
+  test "$replay_status" = 0
+  test "$parts_failed" = 0
 else
   dotnet test "$project" -c Release \
     --logger "trx;LogFileName=$name.trx" \

@@ -1,0 +1,14 @@
+module InterpolationSearch InterpolationSearch
+  module InterpolationSearchModule
+    func EstimatePosition public (int:low, int:high, int:target, int:lowVal, int:highVal) → int
+      !
+      requires low <= high
+      requires lowVal < highVal
+      let range = high - low
+      let valRange = highVal - lowVal
+      let offset = target - lowVal
+      return low + ((offset * range) / valRange)
+
+    func InRange public (int:target, int:lowVal, int:highVal) → bool
+      !
+      return target >= lowVal && target <= highVal

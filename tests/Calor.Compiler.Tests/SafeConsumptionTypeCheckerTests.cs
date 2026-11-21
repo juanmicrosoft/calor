@@ -6,14 +6,21 @@ namespace Calor.Compiler.Tests;
 
 public sealed class SafeConsumptionTypeCheckerTests
 {
+    // Isolate opt-in typing; tests that need default-pipeline acceptance compile separately.
     private static CompilationResult Check(string source)
-        => Program.Compile(source, "safe-consumption.calr", new CompilationOptions
+    {
+        var result = Program.Compile(source, "safe-consumption.calr", new CompilationOptions
         {
             EnableTypeChecking = true,
             EnforceEffects = false,
             DeferGeneratedOutputValidation = true,
             StatusWriter = TextWriter.Null
         });
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code.StartsWith("Calor00", StringComparison.Ordinal)
+            || diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal));
+        return result;
+    }
 
     private static void AssertNoErrors(CompilationResult result)
         => Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
@@ -30,20 +37,20 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithNonNullFallback_HasTheReferentType()
     {
         var accepted = Program.Compile("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> str
-                §E{}
-                §B{value:str} (?? input "fallback")
-                §R value
+            module SafeConsumption
+              func Probe public (string?:input) → string
+                !
+                let string:value = input ?? "fallback"
+                return value
             """, "safe-consumption.calr");
         AssertNoErrors(accepted);
         Assert.Contains("input ?? \"fallback\"", accepted.GeneratedCode);
 
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §B{value:i32} (?? input "fallback")
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                let int:value = input ?? "fallback"
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -55,10 +62,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithThrow_HasTheReferentType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{alloc,throw}
-                §B{value:i32} (?? input §TH §NEW{ArgumentNullException})
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                ! alloc, throw
+                let int:value = input ?? throw new ArgumentNullException()
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -70,15 +77,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithNullableFallback_StaysNullable()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §B{fallback:?str} null
-                §B{value:Option<str>} (?? input fallback)
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                let string?:fallback = null
+                let Option<string>:value = input ?? fallback
             """);
 
         var diagnostic = SingleErrorAt(rejected, 5);
-        Assert.Contains("?str", diagnostic.Message);
+        Assert.Contains("string?", diagnostic.Message);
         Assert.DoesNotContain("<error>", diagnostic.Message);
     }
 
@@ -86,41 +93,42 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CoalesceWithNullFallback_StaysNullable()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §B{value:Option<str>} (?? input null)
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                let Option<string>:value = input ?? null
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
-        Assert.Contains("?str", diagnostic.Message);
+        Assert.Contains("string?", diagnostic.Message);
         Assert.DoesNotContain("<error>", diagnostic.Message);
     }
 
     [Fact]
-    public void CoalesceDoesNotUnwrapRuntimeOption()
+    public void UnknownGenericCoalesce_DoesNotIntroduceOptionSemantics()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{alloc}
-                §B{opt:Option<str>} §SM "value"
-                §B{value:str} (?? opt "fallback")
+            module SafeConsumption
+              func Probe public (Option<string>:opt) → void
+                ! alloc
+                let string:value = opt ?? "fallback"
             """);
 
-        var diagnostic = SingleErrorAt(rejected, 5);
-        Assert.Contains("Option<str>", diagnostic.Message);
-        Assert.Contains("does not unwrap", diagnostic.Message);
+        Assert.DoesNotContain(rejected.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ReferenceOptionMismatch);
+        Assert.DoesNotContain("Unwrap", rejected.GeneratedCode);
+        Assert.DoesNotContain("Calor.Runtime.Option", rejected.GeneratedCode);
+        Assert.Contains("Option<string>", rejected.GeneratedCode);
     }
 
     [Fact]
     public void ConditionalWithOneThrowingArm_HasTheOtherArmType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
-                §E{throw}
-                §B{value:i32} (? flag §TH "missing" "fallback")
+            module SafeConsumption
+              func Probe public (bool:flag) → void
+                ! throw
+                let int:value = flag ? throw "missing" : "fallback"
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -132,10 +140,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ConditionalWithBothThrowingArms_HasNeverType()
     {
         var accepted = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
-                §E{throw}
-                §B{value:i32} (?? (? flag §TH "left" §TH "right") "fallback")
+            module SafeConsumption
+              func Probe public (bool:flag) → void
+                ! throw
+                let int:value = (flag ? throw "left" : throw "right") ?? "fallback"
             """);
 
         AssertNoErrors(accepted);
@@ -145,10 +153,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ConditionalValidatesItsCondition()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{value:str} (? INT:1 "yes" "no")
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let string:value = 1 ? "yes" : "no"
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -159,10 +167,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ConditionalReportsUnrelatedArmMismatch()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
-                §E{}
-                §B{value:str} (? flag INT:1 "fallback")
+            module SafeConsumption
+              func Probe public (bool:flag) → void
+                !
+                let string:value = flag ? 1 : "fallback"
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -174,10 +182,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ThrowExpressionRejectsKnownNonExceptionReference()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag, str:message) -> void
-                §E{throw}
-                §B{value:i32} (? flag §TH message INT:1)
+            module SafeConsumption
+              func Probe public (bool:flag, string:message) → void
+                ! throw
+                let int:value = flag ? throw message : 1
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -189,12 +197,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void IsPatternConditionBindsNonNullVariableOnlyInTrueBranch()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §IF{if1} (is input str text)
-                  §B{ok:str} text
-                §B{leak:str} text
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                if input is string text
+                  let string:ok = text
+                let string:leak = text
             """);
 
         var diagnostic = Assert.Single(rejected.Diagnostics.Errors);
@@ -207,10 +215,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void IsPatternConditionalArmBindsNonNullVariableOnlyInTrueArm()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §B{value:i32} (? (is input str text) text "fallback")
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                let int:value = input is string text ? text : "fallback"
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -222,11 +230,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NegatedIsPatternDoesNotBindInTrueBranch()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §IF{if1} (! (is input str text))
-                  §B{value:str} text
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                if !(input is string text)
+                  let string:value = text
             """);
 
         var diagnostic = Assert.Single(rejected.Diagnostics.Errors);
@@ -239,12 +247,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpressionTypePatternBindingHasTheTestedNonNullType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §B{value:i32} §W{sw1:expr} input
-                  §K §PTYPE{str:text} → text
-                  §K _ → "fallback"
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                let int:value = match input
+                  case string text → text
+                  case _ → "fallback"
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
@@ -256,12 +264,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NegatedMatchTypePatternDoesNotBind()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §B{value:str} §W{sw1:expr} input
-                  §K (not §PTYPE{str:text}) → text
-                  §K _ → "fallback"
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                let string:value = match input
+                  case (not string text) → text
+                  case _ → "fallback"
             """);
 
         var diagnostic = Assert.Single(rejected.Diagnostics.Errors);
@@ -274,33 +282,51 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void IsPatternRejectsKnownImpossibleInputType()
     {
         var rejected = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{value:bool} (is INT:1 str text)
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let bool:value = 1 is string text
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
         Assert.Contains("not compatible", diagnostic.Message);
-        Assert.Contains("str", diagnostic.Message);
-        Assert.Contains("i32", diagnostic.Message);
+        Assert.Contains("string", diagnostic.Message);
+        Assert.Contains("int", diagnostic.Message);
     }
 
     [Theory]
-    [InlineData("§IF{if1} (is input Widget text)\n      §R true")]
-    [InlineData("§IF{if1} false\n      §R true\n    §EI (is input Widget text)\n      §R true")]
+    [InlineData("§IF (is input Widget text)\n      §R true")]
+    [InlineData("§IF false\n      §R true\n    §EI (is input Widget text)\n      §R true")]
     [InlineData("§R (? (is input Widget text) true false)")]
-    [InlineData("§IF{if1} (&& (is input Widget text) true)\n      §R true")]
-    [InlineData("§WH{wh1} (is input Widget text)\n      §R true")]
-    [InlineData("§W{w1} input\n      §K _ §WHEN (is input Widget text)\n        §R true")]
-    [InlineData("§R §W{w1:expr} input\n      §K _ §WHEN (is input Widget text) → true\n      §K _ → false")]
+    [InlineData("§IF (&& (is input Widget text) true)\n      §R true")]
+    [InlineData("§WH (is input Widget text)\n      §R true")]
+    [InlineData("§W input\n      §K _ §WHEN (is input Widget text)\n        §R true")]
+    [InlineData("§R §W input\n      §K _ §WHEN (is input Widget text) → true\n      §K _ → false")]
     public void UnknownPatternType_IsDiagnosedOnceWhenItsBindingIsTransferred(string body)
     {
+        var nativeBody = body switch
+        {
+            "§IF (is input Widget text)\n      §R true" =>
+                "if input is Widget text\n      return true",
+            "§IF false\n      §R true\n    §EI (is input Widget text)\n      §R true" =>
+                "if false\n      return true\n    else if input is Widget text\n      return true",
+            "§R (? (is input Widget text) true false)" =>
+                "return input is Widget text ? true : false",
+            "§IF (&& (is input Widget text) true)\n      §R true" =>
+                "if input is Widget text && true\n      return true",
+            "§WH (is input Widget text)\n      §R true" =>
+                "while input is Widget text\n      return true",
+            "§W input\n      §K _ §WHEN (is input Widget text)\n        §R true" =>
+                "match input\n      case _ when input is Widget text\n        return true",
+            "§R §W input\n      §K _ §WHEN (is input Widget text) → true\n      §K _ → false" =>
+                "return match input\n      case _ when input is Widget text → true\n      case _ → false",
+            _ => throw new ArgumentOutOfRangeException(nameof(body), body, "Unmapped original subject")
+        };
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?object:input) -> bool
-                §E{}
-            """ + "\n    " + body + "\n    §R false");
+            module SafeConsumption
+              func Probe public (object?:input) → bool
+                !
+            """ + "\n    " + nativeBody + "\n    return false");
 
         AssertNoErrors(result);
         var warning = Assert.Single(result.Diagnostics.Where(diagnostic =>
@@ -313,14 +339,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UnknownPatternType_DiagnosesEachDistinctSourceOccurrence()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?object:input) -> bool
-                §E{}
-                §IF{if1} (is input Widget first)
-                  §R true
-                §EI (is input Widget second)
-                  §R true
-                §R false
+            module SafeConsumption
+              func Probe public (object?:input) → bool
+                !
+                if input is Widget first
+                  return true
+                else if input is Widget second
+                  return true
+                return false
             """);
 
         AssertNoErrors(result);
@@ -339,14 +365,23 @@ public sealed class SafeConsumptionTypeCheckerTests
     [InlineData("(? true §TH §NEW{i32} \"fallback\")")]
     public void KnownInvalidOperands_AreRejectedBeforeGeneratedValidation(string expression)
     {
+        var nativeExpression = expression switch
+        {
+            "(?? INT:1 §TH \"missing\")" => "1 ?? throw \"missing\"",
+            "(?? BOOL:true false)" => "true ?? false",
+            "(?? INT:1 §C{System.Guid.NewGuid} §/C)" => "1 ?? System.Guid.NewGuid()",
+            "(? true §TH §C{MakeString} §/C \"fallback\")" => "true ? throw MakeString() : \"fallback\"",
+            "(? true §TH §NEW{i32} \"fallback\")" => "true ? throw new int() : \"fallback\"",
+            _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unmapped original subject")
+        };
         var source = $$"""
-            §M{m1:SafeConsumption}
-              §F{f1:MakeString:pub} () -> str
-                §E{}
-                §R "not an exception"
-              §F{f2:Probe:pub} () -> object
-                §E{alloc,throw}
-                §R {{expression}}
+            module SafeConsumption
+              func MakeString public () → string
+                !
+                return "not an exception"
+              func Probe public () → object
+                ! alloc, throw
+                return {{nativeExpression}}
             """;
         foreach (var result in new[] { Check(source), Program.Compile(source, "invalid-consumption.calr") })
         {
@@ -367,26 +402,34 @@ public sealed class SafeConsumptionTypeCheckerTests
     [InlineData("Take", "§C{Missing} §A (?? 1 2) §/C")]
     public void CallExpressions_ValidateChildrenWithoutAssumingASelectedReturnType(string target, string argument)
     {
+        var nativeArgument = argument switch
+        {
+            "(?? 1 2)" => "1 ?? 2",
+            "(? 1 2 3)" => "1 ? 2 : 3",
+            "(? true §TH §C{MakeString} §/C 1)" => "true ? throw MakeString() : 1",
+            "§C{Missing} §A (?? 1 2) §/C" => "Missing(1 ?? 2)",
+            _ => throw new ArgumentOutOfRangeException(nameof(argument), argument, "Unmapped original subject")
+        };
         var source = $$"""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:MakeString:pub} () -> str
-                §E{}
-                §R "not an exception"
-              §F{f3:Overloaded:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f4:Overloaded:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{f5:Generic:pub}<T> (T:value) -> T
-                §E{}
-                §R value
-              §F{f6:Probe:pub} {{(target == "Shadowed" ? "(i32:Shadowed)" : "()")}} -> i32
-                §E{throw}
-                §R §C{{{target}}} §A {{argument}} §/C
+            module SafeConsumption
+              func Take public (int:value) → int
+                !
+                return value
+              func MakeString public () → string
+                !
+                return "not an exception"
+              func Overloaded public (int:value) → int
+                !
+                return value
+              func Overloaded public (string:value) → string
+                !
+                return value
+              func Generic<T> public (T:value) → T
+                !
+                return value
+              func Probe public {{(target == "Shadowed" ? "(int:Shadowed)" : "()")}} → int
+                ! throw
+                return {{target}}({{nativeArgument}})
             """;
         var result = Check(source);
         Assert.True(result.HasErrors);
@@ -399,16 +442,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CallExpressions_RecognizeFunctionArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Double:pub} (i32:value) -> i32
-                §E{}
-                §R (* value 2)
-              §F{f2:Map:pub} (Func<i32,i32>:transform §E{}) -> i32
-                §E{}
-                §R §C{transform} §A 1 §/C
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R §C{Map} §A Double §/C
+            module SafeConsumption
+              func Double public (int:value) → int
+                !
+                return value * 2
+              func Map public (Func<int,int>:transform !) → int
+                !
+                return transform(1)
+              func Probe public () → int
+                !
+                return Map(Double)
             """);
 
         AssertNoErrors(result);
@@ -418,16 +461,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ExpressionCalls_ValidateNestedArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Double:pub} (i32:value) -> i32
-                §E{}
-                §R (* value 2)
-              §F{f2:GetTransform:pub} () -> Func<i32,i32>
-                §E{}
-                §R Double
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R §C §C{GetTransform} §/C §A (?? INT:1 INT:2) §/C
+            module SafeConsumption
+              func Double public (int:value) → int
+                !
+                return value * 2
+              func GetTransform public () → Func<int,int> ! unknown
+                !
+                return Double
+              func Probe public () → int
+                !
+                return GetTransform()(1 ?? 2)
             """);
 
         var diagnostic = SingleErrorAt(result, 10);
@@ -438,16 +481,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ResolvedOverloadReturnType_IsCheckedByOuterConsumer()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Pick} §A 1 §/C 2)
+            module SafeConsumption
+              func Pick public (int:value) → int
+                !
+                return value
+              func Pick public (string:value) → string
+                !
+                return value
+              func Probe public () → int
+                !
+                return Pick(1) ?? 2
             """);
 
         var diagnostic = SingleErrorAt(result, 10);
@@ -458,11 +501,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NullableValueBindings_AcceptValuesAndConditionalNull()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag) -> void
-                §E{}
-                §B{direct:?i32} INT:1
-                §B{conditional:?i32} (? flag null INT:1)
+            module SafeConsumption
+              func Probe public (bool:flag) → void
+                !
+                let int?:direct = 1
+                let int?:conditional = flag ? null : 1
             """);
 
         AssertNoErrors(result);
@@ -472,15 +515,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpressions_UnifyThrowingAndNullArms()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> void
-                §E{throw}
-                §B{text:str} §W{m1:expr} value
-                  §K 0 → "ok"
-                  §K _ → §TH "bad"
-                §B{nullable:?str} §W{m2:expr} value
-                  §K 0 → "ok"
-                  §K _ → null
+            module SafeConsumption
+              func Probe public (int:value) → void
+                ! throw
+                let string:text = match value
+                  case 0 → "ok"
+                  case _ → throw "bad"
+                let string?:nullable = match value
+                  case 0 → "ok"
+                  case _ → null
             """);
 
         AssertNoErrors(result);
@@ -490,16 +533,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void FunctionReferences_AreMatchedAgainstDelegateTargetsAndOverloads()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f3:Probe:pub} () -> void
-                §E{}
-                §B{picker:Func<i32,i32>} Pick
+            module SafeConsumption
+              func Pick public (string:value) → string
+                !
+                return value
+              func Pick public (int:value) → int
+                !
+                return value
+              func Probe public () → void
+                !
+                let Func<int,int>:picker = Pick
             """);
 
         AssertNoErrors(result);
@@ -509,16 +552,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NamedArguments_SelectTheMappedOverloadReturnType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:value, i32:number) -> str
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (i32:value, str:number) -> i32
-                §E{}
-                §R value
-              §F{f3:Probe:pub} () -> str
-                §E{}
-                §R (?? §C{Pick} §A[number] 7 §A[value] "ok" §/C "fallback")
+            module SafeConsumption
+              func Pick public (string:value, int:number) → string
+                !
+                return value
+              func Pick public (int:value, string:number) → int
+                !
+                return value
+              func Probe public () → string
+                !
+                return Pick(number: 7, value: "ok") ?? "fallback"
             """);
 
         AssertNoErrors(result);
@@ -528,13 +571,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCallReturnType_IsCheckedByOuterConsumer()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub}<T> (T:value) -> T
-                §E{}
-                §R value
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Identity<i32>} §A 1 §/C 2)
+            module SafeConsumption
+              func Identity<T> public (T:value) → T
+                !
+                return value
+              func Probe public () → int
+                !
+                return Identity<int>(1) ?? 2
             """);
 
         var diagnostic = SingleErrorAt(result, 7);
@@ -545,18 +588,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_ValidateArgumentsAndExposeReturnType()
     {
         var wrongArgument = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
-                §E{}
-                §R §C{transform} §A "wrong" §/C
+            module SafeConsumption
+              func Probe public (Func<int,int>:transform ! unknown) → int
+                !
+                return transform("wrong")
             """);
         Assert.True(wrongArgument.HasErrors);
 
         var invalidConsumer = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
-                §E{}
-                §R (?? §C{transform} §A 1 §/C 2)
+            module SafeConsumption
+              func Probe public (Func<int,int>:transform ! unknown) → int
+                !
+                return transform(1) ?? 2
             """);
         var diagnostic = SingleErrorAt(invalidConsumer, 4);
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
@@ -566,17 +609,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericAndVariantMethodGroups_ConvertToDelegateTargets()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub}<T> (T:value) -> T
-                §E{}
-                §R value
-              §F{f2:GetText:pub} () -> str
-                §E{}
-                §R "text"
-              §F{f3:Probe:pub} () -> void
-                §E{}
-                §B{identity:Func<i32,i32>} Identity
-                §B{textFactory:Func<object>} GetText
+            module SafeConsumption
+              func Identity<T> public (T:value) → T
+                !
+                return value
+              func GetText public () → string
+                !
+                return "text"
+              func Probe public () → void
+                !
+                let Func<int,int>:identity = Identity
+                let Func<object>:textFactory = GetText
             """);
 
         AssertNoErrors(result);
@@ -586,19 +629,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void OverloadedMethodGroups_UseCallArgumentDelegateContext()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f3:Map:pub} (Func<i32,i32>:transform) -> i32
-                §E{}
-                §R §C{transform} §A 1 §/C
-              §F{f4:Probe:pub} () -> i32
-                §E{}
-                §R §C{Map} §A Pick §/C
+            module SafeConsumption
+              func Pick public (string:value) → string
+                !
+                return value
+              func Pick public (int:value) → int
+                !
+                return value
+              func Map public (Func<int,int>:transform ! unknown) → int
+                !
+                return transform(1)
+              func Probe public () → int
+                !
+                return Map(Pick)
             """);
 
         AssertNoErrors(result);
@@ -608,19 +651,20 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UserDeclaredDelegate_ProvidesMethodGroupContext()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Picker:pub}
-                §I{i32:value}
-                §O{i32}
-              §F{f1:Pick:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f3:Probe:pub} () -> void
-                §E{}
-                §B{picker:Picker} Pick
+            module SafeConsumption
+              delegate Picker (int:value) → int
+                ! unknown
+
+
+              func Pick public (string:value) → string
+                !
+                return value
+              func Pick public (int:value) → int
+                !
+                return value
+              func Probe public () → void
+                !
+                let Picker:picker = Pick
             """);
 
         AssertNoErrors(result);
@@ -630,11 +674,11 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NullableValueCommonType_IsIndependentOfArmOrder()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:flag, ?i32:maybe) -> void
-                §E{}
-                §B{value:?f64} (? flag maybe FLOAT:1.5)
-                §B{reverse:?f64} (? flag FLOAT:1.5 maybe)
+            module SafeConsumption
+              func Probe public (bool:flag, int?:maybe) → void
+                !
+                let double?:value = flag ? maybe : 1.5
+                let double?:reverse = flag ? 1.5 : maybe
             """);
 
         AssertNoErrors(result);
@@ -644,12 +688,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpression_RejectsUnrelatedInferredArmTypes()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> void
-                §E{}
-                §B{mixed} §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
+            module SafeConsumption
+              func Probe public (int:value) → void
+                !
+                let mixed = match value
+                  case 0 → 1
+                  case _ → "text"
             """);
 
         var diagnostic = SingleErrorAt(result, 4);
@@ -660,10 +704,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UnmodeledStructuralWrappers_StillValidateNestedExpressions()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> str
-                §E{}
-                §R §INTERP "value=" §EXP (?? 1 2) §/INTERP
+            module SafeConsumption
+              func Probe public () → string
+                !
+                return "value=${1 ?? 2}"
             """);
 
         var diagnostic = SingleErrorAt(result, 4);
@@ -674,13 +718,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void InlineGenericFunctionNames_AreCallableMethodGroups()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity<T>:pub} (T:value) -> T
-                §E{}
-                §R value
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{identity:Func<i32,i32>} Identity
+            module SafeConsumption
+              func Identity<T> public (T:value) → T
+                !
+                return value
+              func Probe public () → void
+                !
+                let Func<int,int>:identity = Identity
             """);
 
         AssertNoErrors(result);
@@ -690,13 +734,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericInference_MergesAllArgumentBounds()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Choose:pub}<T> (T:first, T:second) -> T
-                §E{}
-                §R second
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Choose} §A (cast char INT:65) §A 1 §/C 2)
+            module SafeConsumption
+              func Choose<T> public (T:first, T:second) → T
+                !
+                return second
+              func Probe public () → int
+                !
+                return Choose((char)65, 1) ?? 2
             """);
 
         var diagnostic = SingleErrorAt(result, 7);
@@ -707,14 +751,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NamedUserDelegateCalls_MapArgumentsByName()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Picker:pub}
-                §I{i32:number}
-                §I{str:text}
-                §O{str}
-              §F{f1:Probe:pub} (Picker:pick) -> str
-                §E{}
-                §R §C{pick} §A[text] "x" §A[number] 1 §/C
+            module SafeConsumption
+              delegate Picker (int:number, string:text) → string
+                ! unknown
+
+
+
+              func Probe public (Picker:pick ! unknown) → string
+                !
+                return pick(text: "x", number: 1)
             """);
 
         AssertNoErrors(result);
@@ -724,13 +769,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ExpandedParamsCalls_ExposeTheirReturnType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:First:pub} (i32[]:values:params) -> i32
-                §E{}
-                §R §IDX values 0
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{First} §A 1 §A 2 §/C 3)
+            module SafeConsumption
+              func First public (params int[]:values) → int
+                !
+                return values[0]
+              func Probe public () → int
+                !
+                return First(1, 2) ?? 3
             """);
 
         var diagnostic = SingleErrorAt(result, 7);
@@ -741,13 +786,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DuplicateNamedParameters_DoNotCrashTypeChecking()
     {
         var exception = Record.Exception(() => Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (i32:value, i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R §C{Take} §A[value] 1 §/C
+            module SafeConsumption
+              func Take public (int:value, int:value) → int
+                !
+                return value
+              func Probe public () → int
+                !
+                return Take(value: 1)
             """));
 
         Assert.Null(exception);
@@ -757,10 +802,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NullableCoalesce_UsesTheWiderUnderlyingType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?i32:left, ?f64:right) -> ?f64
-                §E{}
-                §R (?? left right)
+            module SafeConsumption
+              func Probe public (int?:left, double?:right) → double?
+                !
+                return left ?? right
             """);
 
         AssertNoErrors(result);
@@ -770,13 +815,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericExpandedParams_InferFromEveryElement()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:First:pub}<T> (T[]:values:params) -> T
-                §E{}
-                §R §IDX values 0
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{First} §A 1 §A 2 §/C 3)
+            module SafeConsumption
+              func First<T> public (params T[]:values) → T
+                !
+                return values[0]
+              func Probe public () → int
+                !
+                return First(1, 2) ?? 3
             """);
 
         var diagnostic = SingleErrorAt(result, 7);
@@ -787,16 +832,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferFromMethodGroupArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:GetInt:pub} () -> i32
-                §E{}
-                §R 1
-              §F{f2:Make:pub}<T> (Func<T>:factory) -> T
-                §E{}
-                §R §C{factory} §/C
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Make} §A GetInt §/C 2)
+            module SafeConsumption
+              func GetInt public () → int
+                !
+                return 1
+              func Make<T> public (Func<T>:factory ! unknown) → T
+                !
+                return factory()
+              func Probe public () → int
+                !
+                return Make(GetInt) ?? 2
             """);
 
         var diagnostic = SingleErrorAt(result, 10);
@@ -807,10 +852,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void AnonymousObjectHolders_ExposeNestedExpressions()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> object
-                §E{}
-                §R §ANON Age = (?? 1 2) §/ANON
+            module SafeConsumption
+              func Probe public () → object
+                !
+                return new { Age = 1 ?? 2 }
             """);
 
         var diagnostic = SingleErrorAt(result, 4);
@@ -821,12 +866,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpression_UsesExplicitObjectTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> void
-                §E{}
-                §B{mixed:object} §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
+            module SafeConsumption
+              func Probe public (int:value) → void
+                !
+                let object:mixed = match value
+                  case 0 → 1
+                  case _ → "text"
             """);
 
         AssertNoErrors(result);
@@ -846,26 +891,26 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MatchExpression_UsesReturnAndCallParameterTargets()
     {
         var returnResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> object
-                §E{}
-                §R §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
+            module SafeConsumption
+              func Probe public (int:value) → object
+                !
+                return match value
+                  case 0 → 1
+                  case _ → "text"
             """);
         AssertNoErrors(returnResult);
 
         var argumentResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value) -> object
-                §E{}
-                §R value
-              §F{f2:Probe:pub} (i32:value) -> object
-                §E{}
-                §R §C{Take} §A §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
-                §/C
+            module SafeConsumption
+              func Take public (object:value) → object
+                !
+                return value
+              func Probe public (int:value) → object
+                !
+                return Take(match value
+                  case 0 → 1
+                  case _ → "text"
+                )
             """);
         AssertNoErrors(argumentResult);
     }
@@ -874,92 +919,92 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void OverloadInference_PrefersIdentityConversion()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (f64:value) -> str
-                §E{}
-                §R "wide"
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Pick} §A 1 §/C 2)
+            module SafeConsumption
+              func Pick public (int:value) → int
+                !
+                return value
+              func Pick public (double:value) → string
+                !
+                return "wide"
+              func Probe public () → int
+                !
+                return Pick(1) ?? 2
             """);
 
         var diagnostic = SingleErrorAt(result, 10);
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
 
         var categoryResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (object:value) -> str
-                §E{}
-                §R "boxed"
-              §F{f2:Pick:pub} (f64:value) -> i32
-                §E{}
-                §R 1
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Pick} §A 1 §/C 2)
+            module SafeConsumption
+              func Pick public (object:value) → string
+                !
+                return "boxed"
+              func Pick public (double:value) → int
+                !
+                return 1
+              func Probe public () → int
+                !
+                return Pick(1) ?? 2
             """);
         var categoryDiagnostic = SingleErrorAt(categoryResult, 10);
         Assert.Contains("Null-coalescing requires", categoryDiagnostic.Message);
 
         var namedResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:x, object:y) -> i32
-                §E{}
-                §R x
-              §F{f2:Pick:pub} (object:y, f64:x) -> str
-                §E{}
-                §R "wide"
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Pick} §A[x] 1 §A[y] "s" §/C 2)
+            module SafeConsumption
+              func Pick public (int:x, object:y) → int
+                !
+                return x
+              func Pick public (object:y, double:x) → string
+                !
+                return "wide"
+              func Probe public () → int
+                !
+                return Pick(x: 1, y: "s") ?? 2
             """);
         var namedDiagnostic = SingleErrorAt(namedResult, 10);
         Assert.Contains("Null-coalescing requires", namedDiagnostic.Message);
 
         var paramsResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (i32[]:values:params) -> str
-                §E{}
-                §R "expanded"
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Pick} §A 1 §/C 2)
+            module SafeConsumption
+              func Pick public (int:value) → int
+                !
+                return value
+              func Pick public (params int[]:values) → string
+                !
+                return "expanded"
+              func Probe public () → int
+                !
+                return Pick(1) ?? 2
             """);
         var paramsDiagnostic = SingleErrorAt(paramsResult, 10);
         Assert.Contains("Null-coalescing requires", paramsDiagnostic.Message);
 
         var charResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (f64:value) -> str
-                §E{}
-                §R "wide"
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Pick} §A (cast char INT:65) §/C 2)
+            module SafeConsumption
+              func Pick public (int:value) → int
+                !
+                return value
+              func Pick public (double:value) → string
+                !
+                return "wide"
+              func Probe public () → int
+                !
+                return Pick((char)65) ?? 2
             """);
         var charDiagnostic = SingleErrorAt(charResult, 10);
         Assert.Contains("Null-coalescing requires", charDiagnostic.Message);
 
         var optionalResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Pick:pub} (i32:value, i32:other = 0) -> str
-                §E{}
-                §R "optional"
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Pick} §A 1 §/C 2)
+            module SafeConsumption
+              func Pick public (int:value) → int
+                !
+                return value
+              func Pick public (int:value, int:other = 0) → string
+                !
+                return "optional"
+              func Probe public () → int
+                !
+                return Pick(1) ?? 2
             """);
         var optionalDiagnostic = SingleErrorAt(optionalResult, 10);
         Assert.Contains("Null-coalescing requires", optionalDiagnostic.Message);
@@ -969,25 +1014,25 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupConversion_RejectsBoxingReturnsAndModifierMismatches()
     {
         var boxingResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:GetInt:pub} () -> i32
-                §E{}
-                §R 1
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<object>} GetInt
+            module SafeConsumption
+              func GetInt public () → int
+                !
+                return 1
+              func Probe public () → void
+                !
+                let Func<object>:factory = GetInt
             """);
         Assert.Contains(boxingResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var modifierResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Bump:pub} (i32:value:ref) -> i32
-                §E{}
-                §R value
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{f:Func<i32,i32>} Bump
+            module SafeConsumption
+              func Bump public (ref int:value) → int
+                !
+                return value
+              func Probe public () → void
+                !
+                let Func<int,int>:f = Bump
             """);
         Assert.Contains(modifierResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -997,19 +1042,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_ReportShapeErrorsAndPreserveNamedResults()
     {
         var arityResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
-                §E{}
-                §R §C{transform} §A 1 §A 2 §/C
+            module SafeConsumption
+              func Probe public (Func<int,int>:transform ! unknown) → int
+                !
+                return transform(1, 2)
             """);
         Assert.Contains(arityResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
 
         var namedResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
-                §E{}
-                §R (?? §C{transform} §A[arg] 1 §/C 2)
+            module SafeConsumption
+              func Probe public (Func<int,int>:transform ! unknown) → int
+                !
+                return transform(arg: 1) ?? 2
             """);
         var diagnostic = SingleErrorAt(namedResult, 4);
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
@@ -1019,19 +1064,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericMethodGroupInference_IsIndependentOfDeclarationOrder()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Get:pub} (object:value) -> str
-                §E{}
-                §R "wide"
-              §F{f2:Get:pub} (str:value) -> i32
-                §E{}
-                §R 1
-              §F{f3:Choose:pub}<T> (Func<str,T>:factory, T:fallback) -> T
-                §E{}
-                §R fallback
-              §F{f4:Probe:pub} () -> i32
-                §E{}
-                §R (?? §C{Choose} §A Get §A 1 §/C 2)
+            module SafeConsumption
+              func Get public (object:value) → string
+                !
+                return "wide"
+              func Get public (string:value) → int
+                !
+                return 1
+              func Choose<T> public (Func<string,T>:factory ! unknown, T:fallback) → T
+                !
+                return fallback
+              func Probe public () → int
+                !
+                return Choose(Get, 1) ?? 2
             """);
 
         var diagnostic = SingleErrorAt(result, 13);
@@ -1042,15 +1087,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UsesItsDelegateReturnTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> i32
-                §E{}
-                §B{factory:Func<object>} §LAM{l1}
-                  §R §W{m:expr} value
-                    §K 0 → 1
-                    §K _ → "text"
-                §/LAM{l1}
-                §R 0
+            module SafeConsumption
+              func Probe public (int:value) → int
+                !
+                let Func<object>:factory = () =>
+                  return match value
+                    case 0 → 1
+                    case _ → "text"
+
+                return 0
             """);
 
         AssertNoErrors(result);
@@ -1060,13 +1105,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_ContextuallyTypeMatchArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<object,object>:transform, i32:value) -> object
-                §E{}
-                §R §C{transform} §A §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
-                §/C
+            module SafeConsumption
+              func Probe public (Func<object,object>:transform ! unknown, int:value) → object
+                !
+                return transform(match value
+                  case 0 → 1
+                  case _ → "text"
+                )
             """);
 
         AssertNoErrors(result);
@@ -1076,17 +1121,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericLambdaContext_UsesOrdinaryArgumentInferenceFirst()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Choose:pub}<T> (Func<T>:factory, T:fallback) -> T
-                §E{}
-                §R fallback
-              §F{f2:Probe:pub} (i32:value, object:fallback) -> object
-                §E{}
-                §R §C{Choose} §A §LAM{l1}
-                  §R §W{m:expr} value
-                    §K 0 → 1
-                    §K _ → "text"
-                §/LAM{l1} §A fallback §/C
+            module SafeConsumption
+              func Choose<T> public (Func<T>:factory ! unknown, T:fallback) → T
+                !
+                return fallback
+              func Probe public (int:value, object:fallback) → object
+                !
+                return Choose(() =>
+                  return match value
+                    case 0 → 1
+                    case _ → "text"
+                , fallback)
             """);
 
         AssertNoErrors(result);
@@ -1096,19 +1141,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void InapplicableOverload_DoesNotEraseCallArgumentTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value) -> object
-                §E{}
-                §R value
-              §F{f2:Take:pub} (i32:value, i32:other) -> object
-                §E{}
-                §R value
-              §F{f3:Probe:pub} (i32:value) -> object
-                §E{}
-                §R §C{Take} §A §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
-                §/C
+            module SafeConsumption
+              func Take public (object:value) → object
+                !
+                return value
+              func Take public (int:value, int:other) → object
+                !
+                return value
+              func Probe public (int:value) → object
+                !
+                return Take(match value
+                  case 0 → 1
+                  case _ → "text"
+                )
             """);
 
         AssertNoErrors(result);
@@ -1118,19 +1163,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NonContextualArguments_NarrowTheContextualCandidateSet()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value, i32:tag) -> object
-                §E{}
-                §R value
-              §F{f2:Take:pub} (str:value, str:tag) -> object
-                §E{}
-                §R value
-              §F{f3:Probe:pub} (i32:value) -> object
-                §E{}
-                §R §C{Take} §A §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
-                §A 1 §/C
+            module SafeConsumption
+              func Take public (object:value, int:tag) → object
+                !
+                return value
+              func Take public (string:value, string:tag) → object
+                !
+                return value
+              func Probe public (int:value) → object
+                !
+                return Take(match value
+                  case 0 → 1
+                  case _ → "text"
+                , 1)
             """);
 
         AssertNoErrors(result);
@@ -1140,19 +1185,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualLambda_ValidatesItsDeclaredSignatureAndReturnType()
     {
         var returnResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1} "wrong" §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () => "wrong"
             """);
         Assert.Contains(returnResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var parameterResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{map:Func<i32,i32>} §LAM{l1:value:str} 1 §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int,int>:map = (string:value) => 1
             """);
         Assert.Contains(parameterResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -1162,10 +1207,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CallStatements_UseSignatureAwareDelegateValidation()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Action<i32>:consume) -> void
-                §E{}
-                §C{consume} §/C
+            module SafeConsumption
+              func Probe public (Action<int>:consume ! unknown) → void
+                !
+                consume()
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1176,40 +1221,42 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateInvocationAndMethodGroups_RespectByRefAndEnumValueSemantics()
     {
         var modifierResult = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Mutator:pub}
-                §I{i32:value:ref}
-                §O{i32}
-              §F{f1:Probe:pub} (Mutator:mutate, i32:value) -> i32
-                §E{}
-                §R §C{mutate} §A value §/C
+            module SafeConsumption
+              delegate Mutator (ref int:value) → int
+                ! unknown
+
+
+              func Probe public (Mutator:mutate ! unknown, int:value) → int
+                !
+                return mutate(value)
             """);
         Assert.Contains(modifierResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
 
         var enumResult = Check("""
-            §M{m1:SafeConsumption}
-              §EN{e1:Color}
-              Red
-              §/EN{e1}
-              §F{f1:GetColor:pub} () -> Color
-                §E{}
-                §R Color.Red
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<object>} GetColor
+            module SafeConsumption
+              enum Color
+                Red
+
+              func GetColor public () → Color
+                !
+                return Color.Red
+              func Probe public () → void
+                !
+                let Func<object>:factory = GetColor
             """);
         Assert.Contains(enumResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var identityResult = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:Mutator:pub}
-                §I{f64:value:ref}
-                §O{void}
-              §F{f1:Probe:pub} (Mutator:mutate, i32:value:ref) -> void
-                §E{}
-                §C{mutate} §A{ref} value §/C
+            module SafeConsumption
+              delegate Mutator (ref double:value) → void
+                ! unknown
+
+
+              func Probe public (Mutator:mutate ! unknown, ref int:value) → void
+                !
+                mutate(ref value)
             """);
         Assert.Contains(identityResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -1219,10 +1266,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedLambda_StillTraversesNestedConsumers()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1} (?? 1 2) §/LAM{l1} §/C
+            module SafeConsumption
+              func Probe public () → void
+                !
+                System.Threading.Tasks.Task.Run(() => 1 ?? 2)
             """);
 
         var diagnostic = SingleErrorAt(result, 4);
@@ -1233,30 +1280,30 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualInference_HandlesParamsAndVariableGenericBounds()
     {
         var paramsResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object[]:values:params) -> object
-                §E{}
-                §R values
-              §F{f2:Probe:pub} (i32:value) -> object
-                §E{}
-                §R §C{Take} §A §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
-                §/C
+            module SafeConsumption
+              func Take public (params object[]:values) → object
+                !
+                return values
+              func Probe public (int:value) → object
+                !
+                return Take(match value
+                  case 0 → 1
+                  case _ → "text"
+                )
             """);
         AssertNoErrors(paramsResult);
 
         var variableResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Choose:pub}<T> (T:first, T:second) -> T
-                §E{}
-                §R first
-              §F{f2:Probe:pub} (i32:value, object:fallback) -> object
-                §E{}
-                §R §C{Choose} §A fallback §A §W{m:expr} value
-                  §K 0 → 1
-                  §K _ → "text"
-                §/C
+            module SafeConsumption
+              func Choose<T> public (T:first, T:second) → T
+                !
+                return first
+              func Probe public (int:value, object:fallback) → object
+                !
+                return Choose(fallback, match value
+                  case 0 → 1
+                  case _ → "text"
+                )
             """);
         AssertNoErrors(variableResult);
     }
@@ -1265,19 +1312,19 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void OverloadedMethodGroupInference_UsesTheBestMember()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Value:pub} (object:value) -> i32
-                §E{}
-                §R 1
-              §F{f2:Value:pub} (str:value) -> str
-                §E{}
-                §R value
-              §F{f3:Use:pub}<T> (Func<str,T>:factory) -> T
-                §E{}
-                §R §C{factory} §A "x" §/C
-              §F{f4:Probe:pub} () -> i32
-                §E{}
-                §R §C{Use} §A Value §/C
+            module SafeConsumption
+              func Value public (object:value) → int
+                !
+                return 1
+              func Value public (string:value) → string
+                !
+                return value
+              func Use<T> public (Func<string,T>:factory ! unknown) → T
+                !
+                return factory("x")
+              func Probe public () → int
+                !
+                return Use(Value)
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1288,29 +1335,29 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void LosingLambdaOverloads_DoNotLeakDiagnostics()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
-                §E{}
-                §R §C{map} §A 1 §/C
-              §F{f2:Pick:pub} (Func<str,str>:map) -> str
-                §E{}
-                §R §C{map} §A "x" §/C
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R §C{Pick} §A §LAM{l1:x:i32} x §/LAM{l1} §/C
+            module SafeConsumption
+              func Pick public (Func<int,int>:map ! unknown) → int
+                !
+                return map(1)
+              func Pick public (Func<string,string>:map ! unknown) → string
+                !
+                return map("x")
+              func Probe public () → int
+                !
+                return Pick((int:x) => x)
             """);
         AssertNoErrors(result);
 
         var actionResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §C{Identity} §A x §/C
-                §/LAM{l1}
+            module SafeConsumption
+              func Identity public (int:value) → int
+                !
+                return value
+              func Probe public () → void
+                !
+                let Action<int>:action = (int:x) =>
+                  Identity(x)
+
             """);
         AssertNoErrors(actionResult);
     }
@@ -1319,14 +1366,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NestedMatchExpressions_InheritTheOuterTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:value) -> object
-                §E{}
-                §R §W{outer:expr} value
-                  §K 0 → §W{inner:expr} value
-                    §K 0 → 1
-                    §K _ → "text"
-                  §K _ → "fallback"
+            module SafeConsumption
+              func Probe public (int:value) → object
+                !
+                return match value
+                  case 0 → match value
+                    case 0 → 1
+                    case _ → "text"
+                  case _ → "fallback"
             """);
 
         AssertNoErrors(result);
@@ -1336,13 +1383,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedMatch_StillTraversesNestedConsumers()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:key) -> void
-                §E{}
-                §C{System.Console.WriteLine} §A §W{m:expr} key
-                  §K 0 → (?? 1 2)
-                  §K _ → "text"
-                §/C
+            module SafeConsumption
+              func Probe public (int:key) → void
+                !
+                System.Console.WriteLine(match key
+                  case 0 → 1 ?? 2
+                  case _ → "text"
+                )
             """);
 
         var diagnostic = SingleErrorAt(result, 5);
@@ -1353,32 +1400,32 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualCandidateProbes_DiscardNestedDiagnostics()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (object:value) -> object
-                §E{}
-                §R value
-              §F{f2:Probe:pub} (i32:key) -> object
-                §E{}
-                §R §C{Take} §A §W{m:expr} key
-                  §K 0 → (?? 1 2)
-                  §K _ → "text"
-                §/C
+            module SafeConsumption
+              func Take public (object:value) → object
+                !
+                return value
+              func Probe public (int:key) → object
+                !
+                return Take(match key
+                  case 0 → 1 ?? 2
+                  case _ → "text"
+                )
             """);
 
         var diagnostic = SingleErrorAt(result, 8);
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
 
         var divergentResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
-                §E{}
-                §R §C{map} §A 1 §/C
-              §F{f2:Pick:pub} (Func<str,str>:map) -> str
-                §E{}
-                §R §C{map} §A "x" §/C
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R §C{Pick} §A §LAM{l1:x:i32} (?? x 2) §/LAM{l1} §/C
+            module SafeConsumption
+              func Pick public (Func<int,int>:map ! unknown) → int
+                !
+                return map(1)
+              func Pick public (Func<string,string>:map ! unknown) → string
+                !
+                return map("x")
+              func Probe public () → int
+                !
+                return Pick((int:x) => x ?? 2)
             """);
         Assert.Single(divergentResult.Diagnostics.Errors.Where(
             error => error.Message.Contains("Null-coalescing requires", StringComparison.Ordinal)));
@@ -1388,22 +1435,22 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericMethodGroupCosts_UseSubstitutedSignatures()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Map:pub}<T> (T:value) -> T
-                §E{}
-                §R value
-              §F{f2:Map:pub} (object:value) -> object
-                §E{}
-                §R value
-              §F{f3:Use:pub} (Func<str,str>:map) -> i32
-                §E{}
-                §R 1
-              §F{f4:Use:pub} (Func<object,object>:map) -> str
-                §E{}
-                §R "wide"
-              §F{f5:Probe:pub} () -> str
-                §E{}
-                §R (?? §C{Use} §A Map §/C "fallback")
+            module SafeConsumption
+              func Map<T> public (T:value) → T
+                !
+                return value
+              func Map public (object:value) → object
+                !
+                return value
+              func Use public (Func<string,string>:map ! unknown) → int
+                !
+                return 1
+              func Use public (Func<object,object>:map ! unknown) → string
+                !
+                return "wide"
+              func Probe public () → string
+                !
+                return Use(Map) ?? "fallback"
             """);
 
         var diagnostic = SingleErrorAt(result, 16);
@@ -1414,24 +1461,24 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DirectCalls_RejectByRefWideningAndInvalidNamedOrdering()
     {
         var refResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Mutate:pub} (f64:value:ref) -> void
-                §E{}
-              §F{f2:Probe:pub} (i32:value:ref) -> void
-                §E{}
-                §C{Mutate} §A{ref} value §/C
+            module SafeConsumption
+              func Mutate public (ref double:value) → void
+                !
+              func Probe public (ref int:value) → void
+                !
+                Mutate(ref value)
             """);
         Assert.Contains(refResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
 
         var namedResult = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Take:pub} (i32:left, i32:right) -> i32
-                §E{}
-                §R left
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R §C{Take} §A[right] 2 §A 1 §/C
+            module SafeConsumption
+              func Take public (int:left, int:right) → int
+                !
+                return left
+              func Probe public () → int
+                !
+                return Take(right: 2, 1)
             """);
         Assert.Contains(namedResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
@@ -1441,16 +1488,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void FailedContextualOverloads_ReportNoMatchingOverload()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
-                §E{}
-                §R §C{map} §A 1 §/C
-              §F{f2:Pick:pub} (Func<str,i32>:map) -> i32
-                §E{}
-                §R 1
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R §C{Pick} §A §LAM{l1:x:i32} "wrong" §/LAM{l1} §/C
+            module SafeConsumption
+              func Pick public (Func<int,int>:map ! unknown) → int
+                !
+                return map(1)
+              func Pick public (Func<string,int>:map ! unknown) → int
+                !
+                return 1
+              func Probe public () → int
+                !
+                return Pick((int:x) => "wrong")
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1461,13 +1508,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferTypeArgumentsFromLambdaResults()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
-                §E{}
-                §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> str
-                §E{}
-                §R §C{Make} §A §LAM{l1} 1 §/LAM{l1} §/C
+            module SafeConsumption
+              func Make<T> public (Func<T>:factory ! unknown) → T
+                !
+                return factory()
+              func Probe public () → string
+                !
+                return Make(() => 1)
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1478,15 +1525,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForFuncRequiresAReturnValue()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Identity:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §C{Identity} §A 1 §/C
-                §/LAM{l1}
+            module SafeConsumption
+              func Identity public (int:value) → int
+                !
+                return value
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  Identity(1)
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1497,13 +1544,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForFuncRequiresAllPathsToReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
-                  §IF{if1} flag
-                    §R 1
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<bool,int>:factory = (bool:flag) =>
+                  if flag
+                    return 1
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1514,13 +1561,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferLambdaResultsInsideParameterScope()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Apply:pub}<T,U> (T:value, Func<T,U>:map) -> U
-                §E{}
-                §R §C{map} §A value §/C
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R §C{Apply} §A 1 §A §LAM{l1:x} x §/LAM{l1} §/C
+            module SafeConsumption
+              func Apply<T,U> public (T:value, Func<T,U>:map ! unknown) → U
+                !
+                return map(value)
+              func Probe public () → int
+                !
+                return Apply(1, (x) => x)
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1530,16 +1577,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_InferLambdaResultsFromLocalBindings()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
-                §E{}
-                §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R §C{Make} §A §LAM{l1}
-                  §B{x:i32} 1
-                  §R x
-                §/LAM{l1} §/C
+            module SafeConsumption
+              func Make<T> public (Func<T>:factory ! unknown) → T
+                !
+                return factory()
+              func Probe public () → int
+                !
+                return Make(() =>
+                  let int:x = 1
+                  return x
+                )
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1549,18 +1596,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void GenericCalls_ExcludeNestedLambdaReturnsFromOuterInference()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
-                §E{}
-                §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> i32
-                §E{}
-                §R §C{Make} §A §LAM{l1}
-                  §B{nested:Func<str>} §LAM{l2}
-                    §R "nested"
-                  §/LAM{l2}
-                  §R 1
-                §/LAM{l1} §/C
+            module SafeConsumption
+              func Make<T> public (Func<T>:factory ! unknown) → T
+                !
+                return factory()
+              func Probe public () → int
+                !
+                return Make(() =>
+                  let Func<string>:nested = () =>
+                    return "nested"
+
+                  return 1
+                )
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1570,16 +1617,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ExhaustiveMatchCanDefinitelyReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32,i32>} §LAM{l1:value:i32}
-                  §W{m1} value
-                    §K 0
-                      §R 1
-                    §K _
-                      §R 2
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int,int>:factory = (int:value) =>
+                  match value
+                    case 0
+                      return 1
+                    case _
+                      return 2
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1589,15 +1636,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturningTryWithFinallyCanDefinitelyReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
-                    §R 1
-                  §FI
-                    §P "cleanup"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  try
+                    return 1
+                  finally
+                    System.Console.WriteLine("cleanup")
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1607,13 +1654,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopCanDefinitelyNotReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §P "loop"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  while true
+                    System.Console.WriteLine("loop")
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1623,14 +1670,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalDoWhileCanDefinitelyNotReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §DO{d1}
-                    §P "loop"
-                  §/DO{d1} true
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  do
+                    System.Console.WriteLine("loop")
+                  while true
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1640,14 +1687,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_DoWhileWithReturningBodyDefinitelyReturns()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §DO{d1}
-                    §R 1
-                  §/DO{d1} false
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  do
+                    return 1
+                  while false
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1657,14 +1704,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopWithNestedBreakMustReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §UNSAFE{u1}
-                      §BK
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  while true
+                    unsafe
+                      break
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1675,14 +1722,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnreachableLoopExitAfterReturnDoesNotFallThrough()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §R 1
-                    §BK
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  while true
+                    return 1
+                    break
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1692,14 +1739,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturnAfterReachableLoopExitIsUnreachable()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §BK
-                    §R 1
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  while true
+                    break
+                    return 1
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1710,15 +1757,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopWithGotoMustReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §GOTO{done}
-                  §LABEL{done}
-                  §P "done"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  while true
+                    goto done
+                  done:
+                  System.Console.WriteLine("done")
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1729,21 +1776,21 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoAcrossDeeplyNestedLoopsMustReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §WH{w2} true
-                      §WH{w3} true
-                        §WH{w4} true
-                          §WH{w5} true
-                            §WH{w6} true
-                              §WH{w7} true
-                                §GOTO{done}
-                  §LABEL{done}
-                  §P "done"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  while true
+                    while true
+                      while true
+                        while true
+                          while true
+                            while true
+                              while true
+                                goto done
+                  done:
+                  System.Console.WriteLine("done")
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1754,14 +1801,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_UnconditionalLoopWithInternalGotoDoesNotReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §LABEL{again}
-                    §GOTO{again}
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  while true
+                    again:
+                    goto again
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1771,15 +1818,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForwardGotoWithinLoopRemainsInsideLoop()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §GOTO{again}
-                    §LABEL{again}
-                    §P "loop"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  while true
+                    goto again
+                    again:
+                    System.Console.WriteLine("loop")
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1789,14 +1836,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForwardGotoFollowsLocalReturnTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §GOTO{done}
-                  §LABEL{done}
-                  §R 1
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  goto done
+                  done:
+                  return 1
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1806,15 +1853,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ForwardGotoDoesNotResumeAtSkippedReturn()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §GOTO{done}
-                  §R 1
-                  §LABEL{done}
-                  §P "done"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  goto done
+                  return 1
+                  done:
+                  System.Console.WriteLine("done")
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -1825,16 +1872,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_NestedGotoFollowsEnclosingReturnTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
-                  §IF{if1} flag
-                    §GOTO{done}
-                  §R 1
-                  §LABEL{done}
-                  §R 2
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<bool,int>:factory = (bool:flag) =>
+                  if flag
+                    goto done
+                  return 1
+                  done:
+                  return 2
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1844,17 +1891,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseInsideLoopMatchDoesNotExitLoop()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §W{m1} 1
-                      §K 1
-                        §GOTO{CASE:2}
-                      §K 2
-                        §P "loop"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  while true
+                    match 1
+                      case 1
+                        goto case 2
+                      case 2
+                        System.Console.WriteLine("loop")
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1864,18 +1911,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 1
-                    §K 1
-                      §GOTO{CASE:2}
-                    §K 2
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  match 1
+                    case 1
+                      goto case 2
+                    case 2
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1885,18 +1932,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCharacterCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 'a'
-                    §K 'a'
-                      §GOTO{CASE:'b'}
-                    §K 'b'
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  match 'a'
+                    case 'a'
+                      goto case 'b'
+                    case 'b'
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1906,18 +1953,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoNullCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?str:input) -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
-                    §K "x"
-                      §GOTO{CASE:null}
-                    §K null
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public (string?:input) → void
+                !
+                let Func<int>:factory = () =>
+                  match input
+                    case "x"
+                      goto case null
+                    case null
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1927,18 +1974,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoBooleanCaseFollowsReturningTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (bool:input) -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
-                    §K false
-                      §GOTO{CASE:true}
-                    §K true
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public (bool:input) → void
+                !
+                let Func<int>:factory = () =>
+                  match input
+                    case false
+                      goto case true
+                    case true
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1948,18 +1995,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseUsesConvertedIntegralValue()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (u32:input) -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
-                    §K UINT:1
-                      §GOTO{CASE:2}
-                    §K UINT:2
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public (uint:input) → void
+                !
+                let Func<int>:factory = () =>
+                  match input
+                    case 1u
+                      goto case 2
+                    case 2u
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1969,18 +2016,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseConvertsIntegralValueToCharacter()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 'a'
-                    §K 'a'
-                      §GOTO{CASE:98}
-                    §K 'b'
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  match 'a'
+                    case 'a'
+                      goto case 98
+                    case 'b'
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -1990,18 +2037,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseConvertsIntegralValueToNullableCharacter()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (?char:input) -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
-                    §K 'a'
-                      §GOTO{CASE:98}
-                    §K 'b'
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public (char?:input) → void
+                !
+                let Func<int>:factory = () =>
+                  match input
+                    case 'a'
+                      goto case 98
+                    case 'b'
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2011,18 +2058,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseConvertsCharacterLabelToIntegralValue()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (i32:input) -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} input
-                    §K 1
-                      §GOTO{CASE:98}
-                    §K 'b'
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public (int:input) → void
+                !
+                let Func<int>:factory = () =>
+                  match input
+                    case 1
+                      goto case 98
+                    case 'b'
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2032,22 +2079,22 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_NestedMatchUsesCachedLocalTargetType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
-                  §IF{i1} flag
-                    §B{c:char} 'a'
-                    §W{m1} c
-                      §K 'a'
-                        §GOTO{CASE:98}
-                      §K 'b'
-                        §R 1
-                      §K _
-                        §R 0
-                  §EL
-                    §R 2
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<bool,int>:factory = (bool:flag) =>
+                  if flag
+                    let char:c = 'a'
+                    match c
+                      case 'a'
+                        goto case 98
+                      case 'b'
+                        return 1
+                      case _
+                        return 0
+                  else
+                    return 2
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2057,21 +2104,21 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_TryMatchUsesCachedTargetType()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
-                    §W{m1} 'a'
-                      §K 'a'
-                        §GOTO{CASE:98}
-                      §K 'b'
-                        §R 2
-                      §K _
-                        §R 0
-                  §FI
-                    §P "finally"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  try
+                    match 'a'
+                      case 'a'
+                        goto case 98
+                      case 'b'
+                        return 2
+                      case _
+                        return 0
+                  finally
+                    System.Console.WriteLine("finally")
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2081,18 +2128,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCaseCannotTargetGuardedArm()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 1
-                    §K 1
-                      §GOTO{CASE:2}
-                    §K 2 §WHEN false
-                      §R 2
-                    §K _
-                      §R 0
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  match 1
+                    case 1
+                      goto case 2
+                    case 2 when false
+                      return 2
+                    case _
+                      return 0
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2103,18 +2150,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_ReportsGuardedGotoCaseTarget()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §W{m1} x
-                    §K 1
-                      §GOTO{CASE:2}
-                    §K 2 §WHEN false
-                      §P "two"
-                    §K _
-                      §P "other"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Action<int>:action = (int:x) =>
+                  match x
+                    case 1
+                      goto case 2
+                    case 2 when false
+                      System.Console.WriteLine("two")
+                    case _
+                      System.Console.WriteLine("other")
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2125,15 +2172,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_BreakInsideLoopMatchDoesNotExitLoop()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §W{m1} 1
-                      §K 1
-                        §BK
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  while true
+                    match 1
+                      case 1
+                        break
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2143,15 +2190,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturnAfterMatchBreakIsUnreachable()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §W{m1} 1
-                    §K _
-                      §BK
-                      §R 1
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  match 1
+                    case _
+                      break
+                      return 1
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2162,12 +2209,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ContinueOutsideLoopDoesNotCompleteLambda()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §CN
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  continue
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2178,12 +2225,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_ContinueOutsideLoopIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §CN
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Action<int>:action = (int:x) =>
+                  continue
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2194,12 +2241,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_BreakOutsideLoopIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §BK
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Action<int>:action = (int:x) =>
+                  break
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2210,12 +2257,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_RethrowOutsideCatchIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §RT
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  throw
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2226,13 +2273,13 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_RethrowInsideForIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §L{loop:i:0:1:1}
-                    §RT
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Action<int>:action = (int:x) =>
+                  for i from 0 to 1 step 1
+                    throw
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2243,12 +2290,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedLambda_RethrowOutsideCatchIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1}
-                  §RT
-                §/LAM{l1} §/C
+            module SafeConsumption
+              func Probe public () → void
+                !
+                System.Threading.Tasks.Task.Run(() =>
+                  throw
+                )
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2259,12 +2306,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void UncontextualizedLambda_ContinueOutsideLoopIsInvalid()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1}
-                  §CN
-                §/LAM{l1} §/C
+            module SafeConsumption
+              func Probe public () → void
+                !
+                System.Threading.Tasks.Task.Run(() =>
+                  continue
+                )
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2275,17 +2322,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void NestedLambdaInsideTry_PreservesControlFlowDiagnostic()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{outer:Action<i32>} §LAM{l1:x:i32}
-                  §TR{t1}
-                    §B{inner:Action<i32>} §LAM{l2:y:i32}
-                      §RT
-                    §/LAM{l2}
-                  §FI
-                    §P "finally"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Action<int>:outer = (int:x) =>
+                  try
+                    let Action<int>:inner = (int:y) =>
+                      throw
+
+                  finally
+                    System.Console.WriteLine("finally")
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2299,18 +2346,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ContextualLambdaReturnInsideTry_IsValidated()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
-                §E{}
-                §R §C{factory} §/C
-              §F{f2:Probe:pub} () -> i32
-                §E{cw}
-                §R §C{Make} §A §LAM{l1}
-                  §TR{t1}
-                    §R "bad"
-                  §FI
-                    §P "done"
-                §/LAM{l1} §/C
+            module SafeConsumption
+              func Make<T> public (Func<T>:factory ! unknown) → T
+                !
+                return factory()
+              func Probe public () → int
+                ! cw
+                return Make(() =>
+                  try
+                    return "bad"
+                  finally
+                    System.Console.WriteLine("done")
+                )
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2321,15 +2368,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void VoidStatementLambda_CatchFilterMustBeBoolean()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{action:Action<i32>} §LAM{l1:x:i32}
-                  §TR{t1}
-                    §P "try"
-                  §CA{Exception:ex} §WHEN 1
-                    §P "catch"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Action<int>:action = (int:x) =>
+                  try
+                    System.Console.WriteLine("try")
+                  catch Exception ex when 1
+                    System.Console.WriteLine("catch")
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2340,17 +2387,17 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_GotoCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
-                    §P "try"
-                  §FI
-                    §GOTO{done}
-                  §LABEL{done}
-                  §R 1
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  try
+                    System.Console.WriteLine("try")
+                  finally
+                    goto done
+                  done:
+                  return 1
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2361,15 +2408,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ReturnCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
-                    §P "try"
-                  §FI
-                    §R 1
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  try
+                    System.Console.WriteLine("try")
+                  finally
+                    return 1
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2380,15 +2427,15 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ThrowCanTerminateFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §TR{t1}
-                    §P "try"
-                  §FI
-                    §TH STR:"boom"
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                !
+                let Func<int>:factory = () =>
+                  try
+                    System.Console.WriteLine("try")
+                  finally
+                    throw "boom"
+
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2398,16 +2445,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_ContinueCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §TR{t1}
-                      §P "try"
-                    §FI
-                      §CN
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  while true
+                    try
+                      System.Console.WriteLine("try")
+                    finally
+                      continue
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2418,16 +2465,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void StatementLambda_BreakCannotLeaveFinally()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} () -> void
-                §E{cw}
-                §B{factory:Func<i32>} §LAM{l1}
-                  §WH{w1} true
-                    §TR{t1}
-                      §P "try"
-                    §FI
-                      §BK
-                §/LAM{l1}
+            module SafeConsumption
+              func Probe public () → void
+                ! cw
+                let Func<int>:factory = () =>
+                  while true
+                    try
+                      System.Console.WriteLine("try")
+                    finally
+                      break
+
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2438,12 +2485,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_SupportReferenceDelegateVariance()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Use:pub} (Func<object>:factory) -> void
-                §E{}
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<Func<str>>} Use
+            module SafeConsumption
+              func Use public (Func<object>:factory ! unknown) → void
+                !
+              func Probe public () → void
+                !
+                let Action<Func<string>>:action = Use
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2453,12 +2500,12 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_SupportNestedDelegateReturnVariance()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Use:pub} (Func<Func<object>>:factory) -> void
-                §E{}
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<Func<Func<str>>>} Use
+            module SafeConsumption
+              func Use public (Func<Func<object>>:factory ! unknown) → void
+                !
+              func Probe public () → void
+                !
+                let Action<Func<Func<string>>>:action = Use
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
@@ -2468,18 +2515,20 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_RejectDistinctNamedDelegates()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §DEL{d1:First:pub}
-                §I{str:value}
-                §O{void}
-              §DEL{d2:Second:pub}
-                §I{str:value}
-                §O{void}
-              §F{f1:Use:pub} (First:callback) -> void
-                §E{}
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<Second>} Use
+            module SafeConsumption
+              delegate First (string:value) → void
+                ! unknown
+
+
+              delegate Second (string:value) → void
+                ! unknown
+
+
+              func Use public (First:callback ! unknown) → void
+                !
+              func Probe public () → void
+                !
+                let Action<Second>:action = Use
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2490,23 +2539,23 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupParameters_RejectWideningAndBoxing()
     {
         var widening = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Widen:pub} (f64:value) -> void
-                §E{}
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<i32>} Widen
+            module SafeConsumption
+              func Widen public (double:value) → void
+                !
+              func Probe public () → void
+                !
+                let Action<int>:action = Widen
             """);
         Assert.Contains(widening.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
 
         var boxing = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Box:pub} (object:value) -> void
-                §E{}
-              §F{f2:Probe:pub} () -> void
-                §E{}
-                §B{action:Action<i32>} Box
+            module SafeConsumption
+              func Box public (object:value) → void
+                !
+              func Probe public () → void
+                !
+                let Action<int>:action = Box
             """);
         Assert.Contains(boxing.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
@@ -2516,18 +2565,18 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupRanking_RejectsParetoIncomparableCandidates()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (str:left, object:right) -> i32
-                §E{}
-                §R left.Length
-              §F{f2:Pick:pub} (object:left, str:right) -> i32
-                §E{}
-                §R right.Length
-              §F{f3:Take:pub} (Func<str,str,i32>:picker) -> void
-                §E{}
-              §F{f4:Probe:pub} () -> void
-                §E{}
-                §C{Take} §A Pick §/C
+            module SafeConsumption
+              func Pick public (string:left, object:right) → int
+                !
+                return left.Length
+              func Pick public (object:left, string:right) → int
+                !
+                return right.Length
+              func Take public (Func<string,string,int>:picker ! unknown) → void
+                !
+              func Probe public () → void
+                !
+                Take(Pick)
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2538,10 +2587,10 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void DelegateCalls_RejectPositionalArgumentsAfterOutOfPositionNamedArguments()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Probe:pub} (Func<i32,i32,i32>:combine) -> i32
-                §E{}
-                §R §C{combine} §A[arg2] 2 §A 1 §/C
+            module SafeConsumption
+              func Probe public (Func<int,int,int>:combine ! unknown) → int
+                !
+                return combine(arg2: 2, 1)
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2552,16 +2601,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void MethodGroupRanking_DoesNotUseReturnTypeIdentity()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Value:pub} (f64:value) -> object
-                §E{}
-                §R value
-              §F{f2:Value:pub} (decimal:value) -> str
-                §E{}
-                §R "value"
-              §F{f3:Probe:pub} () -> void
-                §E{}
-                §B{factory:Func<char,object>} Value
+            module SafeConsumption
+              func Value public (double:value) → object
+                !
+                return value
+              func Value public (decimal:value) → string
+                !
+                return "value"
+              func Probe public () → void
+                !
+                let Func<char,object>:factory = Value
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2572,16 +2621,16 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void ImplicitLambda_UsesAnonymousFunctionBetterConversion()
     {
         var result = Check("""
-            §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (Func<object,i32>:map) -> str
-                §E{}
-                §R "object"
-              §F{f2:Pick:pub} (Func<str,i32>:map) -> i32
-                §E{}
-                §R 1
-              §F{f3:Probe:pub} () -> i32
-                §E{}
-                §R §C{Pick} §A §LAM{l1:x} 1 §/LAM{l1} §/C
+            module SafeConsumption
+              func Pick public (Func<object,int>:map ! unknown) → string
+                !
+                return "object"
+              func Pick public (Func<string,int>:map ! unknown) → int
+                !
+                return 1
+              func Probe public () → int
+                !
+                return Pick((x) => 1)
             """);
 
         Assert.Contains(result.Diagnostics.Errors,
@@ -2594,14 +2643,21 @@ public sealed class SafeConsumptionTypeCheckerTests
     [InlineData("§B{result:i32} (?? 1 2)\n    §R result")]
     public void InvalidCoalesce_HasTheSameOwnedDiagnosticAcrossConsumers(string body)
     {
+        var nativeBody = body switch
+        {
+            "§R §C{Take} §A (?? 1 2) §/C" => "return Take(1 ?? 2)",
+            "§C{Take} §A (?? 1 2) §/C\n    §R 0" => "Take(1 ?? 2)\n    return 0",
+            "§B{result:i32} (?? 1 2)\n    §R result" => "let int:result = 1 ?? 2\n    return result",
+            _ => throw new ArgumentOutOfRangeException(nameof(body), body, "Unmapped original subject")
+        };
         var source = $$"""
-            §M{m:M}
-              §F{take:Take:pub} (i32:value) -> i32
-                §E{}
-                §R value
-              §F{probe:Probe:pub} () -> i32
-                §E{}
-                {{body}}
+            module M
+              func Take public (int:value) → int
+                !
+                return value
+              func Probe public () → int
+                !
+                {{nativeBody}}
             """;
         foreach (var result in new[] { Check(source), Program.Compile(source, "invalid-consumer.calr") })
         {
@@ -2614,18 +2670,135 @@ public sealed class SafeConsumptionTypeCheckerTests
     public void CallArgumentPattern_DoesNotLeakIntoTheEnclosingScope()
     {
         var result = Check("""
-            §M{m:M}
-              §F{take:Take:pub} (bool:value) -> bool
-                §E{}
-                §R value
-              §F{probe:Probe:pub} (?str:input) -> str
-                §E{}
-                §B{result} §C{Take} §A (is input str text) §/C
-                §R text
+            module M
+              func Take public (bool:value) → bool
+                !
+                return value
+              func Probe public (string?:input) → string
+                !
+                let result = Take(input is string text)
+                return text
             """);
         var error = Assert.Single(result.Diagnostics.Errors);
         Assert.Equal(DiagnosticCode.UndefinedReference, error.Code);
         Assert.Equal(8, error.Span.Line);
         Assert.Contains("text", error.Message);
+    }
+
+    [Fact]
+    public void NativeInvocationStatements_AcceptValidDelegateAndFunctionArguments()
+    {
+        var result = Check("""
+            module SafeConsumption
+              func Take public (int:value) → void
+                !
+              func Probe public (Action<int>:consume ! unknown) → void
+                !
+                consume(1)
+                Take(1)
+                System.Console.WriteLine(1)
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Theory]
+    [InlineData("catch", false)]
+    [InlineData("outside", true)]
+    [InlineData("nested", true)]
+    public void NativeBareThrow_UsesOnlyTheCurrentLambdaCatchScope(string scope, bool invalid)
+    {
+        var body = scope switch
+        {
+            "catch" => """
+                try
+                  throw new Exception()
+                catch Exception ex
+                  throw
+                """,
+            "outside" => "throw",
+            "nested" => """
+                try
+                  throw new Exception()
+                catch Exception ex
+                  let Action:inner = () =>
+                    throw
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown catch scope")
+        };
+        var source = """
+            module SafeConsumption
+              func Probe public () → void
+                ! alloc, throw
+                let Action:action = () =>
+            """ + "\n" + string.Join("\n", body.Split('\n').Select(line => "      " + line));
+        var result = Check(source);
+
+        if (invalid)
+        {
+            var error = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.TypeMismatch, error.Code);
+            Assert.Equal("rethrow must be used within a catch block", error.Message);
+        }
+        else
+        {
+            AssertNoErrors(result);
+        }
+    }
+
+    [Theory]
+    [InlineData("string", "object", false)]
+    [InlineData("object", "string", true)]
+    [InlineData("int", "object", true)]
+    public void NestedStandardDelegateVariance_PermitsOnlyReferenceConversions(
+        string sourceType, string targetType, bool invalid)
+    {
+        var result = Check($$"""
+            module SafeConsumption
+              func Use public (Func<Func<{{targetType}}>>:factory ! unknown) → void
+                !
+              func Probe public () → void
+                !
+                let Action<Func<Func<{{sourceType}}>>>:action = Use
+            """);
+
+        if (invalid)
+        {
+            var error = SingleErrorAt(result, 6);
+            Assert.Contains("Method group 'Use' is not compatible", error.Message);
+        }
+        else
+        {
+            AssertNoErrors(result);
+        }
+    }
+
+    [Theory]
+    [InlineData("First", false)]
+    [InlineData("Second", true)]
+    public void NestedNamedDelegates_RetainNominalIdentity(string delegateName, bool invalid)
+    {
+        var result = Check($$"""
+            module SafeConsumption
+              delegate First (string:value) → void
+                ! unknown
+              delegate Second (string:value) → void
+                ! unknown
+              func Use public (Func<First>:factory ! unknown) → void
+                !
+              func Probe public () → void
+                !
+                let Action<Func<{{delegateName}}>>:action = Use
+            """);
+
+        if (invalid)
+        {
+            var error = SingleErrorAt(result, 10);
+            Assert.Contains("Method group 'Use' is not compatible", error.Message);
+        }
+        else
+        {
+            AssertNoErrors(result);
+        }
     }
 }

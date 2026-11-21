@@ -11,12 +11,108 @@ namespace Calor.Compiler.Tests;
 /// binding surface, and it must cover the concrete ExpressionNode subclass set EXACTLY —
 /// in both directions. A new node class with no dispatch entry, or a stale entry for a
 /// removed class, fails here by construction (the code-side half of F-1's bidirectional
-/// completeness rule). The parser-totality work leaves 60 accepted expression classes;
+/// completeness rule). The current language has 57 accepted expression classes;
 /// KeywordArgNode is a parser helper rather than a value expression.
-/// than the number so an F-1 amendment and a code change must move together.
 /// </summary>
 public class BinderDispatchCompletenessTests
 {
+    [Theory]
+    [InlineData("let Func<Task<int>>:factory = async () => 42", 2)]
+    [InlineData("let Func<ValueTask<int>>:factory = async () => 42", 2)]
+    [InlineData("let factory = async () => 42", 2)]
+    [InlineData("let Func<int>:factory = () => 42", 2)]
+    [InlineData("let Func<Task<int>>:factory = async () => 40 + 2", 4)]
+    public void ContextualLambdaBinding_CountsEachNativeExpressionOnce(string statement, int expectedCount)
+    {
+        AssertExpressionCount($$"""
+            module LambdaAccounting
+              func Probe () → void
+                !
+                {{statement}}
+            """, expectedCount);
+    }
+
+    [Theory]
+    [InlineData("Task", 2)]
+    [InlineData("ValueTask", 2)]
+    public void ContextualLambdaReturn_CountsEachNativeExpressionOnce(string carrier, int expectedCount)
+    {
+        AssertExpressionCount($$"""
+            module LambdaReturnAccounting
+              func Probe () → Func<{{carrier}}<int>> ! unknown
+                !
+                return async () => 42
+            """, expectedCount);
+    }
+
+    [Theory]
+    [InlineData("checked")]
+    [InlineData("unchecked")]
+    public void OverflowScope_CountsItsWrapperAndEveryOperandOnce(string keyword)
+    {
+        AssertExpressionCount($$"""
+            module OverflowAccounting
+              func Probe () → void
+                !
+                let int:value = {{keyword}}(1 + 2)
+            """, 4);
+    }
+
+    [Fact]
+    public void AsyncOverloadCandidates_DoNotDuplicateLambdaAccounting()
+    {
+        AssertExpressionCount("""
+            module CandidateAccounting
+              func Choose async (int:value) → Task<int>
+                !
+                return value
+              func Choose async (string:value) → Task<int>
+                !
+                return 0
+              func Consume async () → Task<int>
+                !
+                let Func<Task<int>>:factory = async () => 42
+                return await Choose(42)
+            """, 7);
+    }
+
+    [Fact]
+    public void GenericAsyncMethodGroup_CountsDispatchWithoutRebindingLambda()
+    {
+        AssertExpressionCount("""
+            module MethodGroupAccounting
+              func Identity<T> async (T:value) → Task<T>
+                !
+                return value
+              func Consume async () → Task<int>
+                !
+                let Func<ValueTask<int>>:local = async () => 42
+                let Func<int, Task<int>>:factory = Identity
+                let Task<int>:pending = factory(42)
+                return await pending
+            """, 8, "'Identity' is a function, not a variable. Did you mean to call it?");
+    }
+
+    private static void AssertExpressionCount(string source, int expectedCount, string? expectedBinderError = null)
+    {
+        var compilation = Program.Compile(source, "lambda-accounting.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        Assert.NotNull(compilation.Ast);
+        var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var binder = new Binder(diagnostics);
+        binder.Bind(compilation.Ast);
+        if (expectedBinderError == null)
+            Assert.Empty(diagnostics.Errors);
+        else
+        {
+            var diagnostic = Assert.Single(diagnostics.Errors);
+            Assert.Equal(Compiler.Diagnostics.DiagnosticCode.TypeMismatch, diagnostic.Code);
+            Assert.Equal(expectedBinderError, diagnostic.Message);
+        }
+        Assert.Equal(expectedCount, binder.ExpressionsBound);
+    }
+
     private static IReadOnlyList<Type> ConcreteExpressionTypes() =>
         typeof(ExpressionNode).Assembly.GetTypes()
             .Where(t => !t.IsAbstract && typeof(ExpressionNode).IsAssignableFrom(t))
@@ -48,6 +144,9 @@ public class BinderDispatchCompletenessTests
         // KeywordArgNode reclassified out of the AST entirely — it is a parser-internal
         // value object that can no longer TYPE as an expression, so it leaves the
         // denominator by becoming unrepresentable, not by being silently skipped.
-        Assert.Equal(60, ConcreteExpressionTypes().Count);
+        // #1617 removes Some/None/Ok/Err expression classes from the current language.
+        // Native checked/unchecked expressions add one explicit lexical-scope class in 0.30.
+        // The historical registration stays unchanged; exact surviving dispatch is checked above.
+        Assert.Equal(57, ConcreteExpressionTypes().Count);
     }
 }

@@ -88,10 +88,9 @@ public sealed class AgentGuidanceTests
     public void GuardDiscovery_FailedRefinementEntry_SuggestsPreconditionAndGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main private (int:x | (# >= 0)) → void
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -118,11 +117,10 @@ public sealed class AgentGuidanceTests
     public void GuardDiscovery_FailedProofObligation_SuggestsGuards()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -139,7 +137,8 @@ public sealed class AgentGuidanceTests
         var guards = discovery.DiscoverGuards(tracker);
 
         Assert.NotEmpty(guards);
-        Assert.Contains(guards, g => g.CalorExpression.Contains("§Q"));
+        Assert.Contains(guards, g => g.CalorExpression.StartsWith("requires ", StringComparison.Ordinal));
+        Assert.DoesNotContain(guards, g => g.CalorExpression.Contains('§'));
     }
 
     [Fact]
@@ -162,12 +161,10 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_ParameterUsedAsDivisor_SuggestsNonZero()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
-                  §I{i32:x}
-                  §I{i32:y}
-                  §O{i32}
-                  §R (/ x y)
+            module Test Test block
+              func Divide (int:x, int:y) → int
+                !
+                return (x / y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -186,12 +183,10 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_ParameterAlreadyRefined_NoSuggestion()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
-                  §I{i32:x}
-                  §I{i32:y} | (!= # INT:0)
-                  §O{i32}
-                  §R (/ x y)
+            module Test Test block
+              func Divide (int:x, int:y | (# != 0)) → int
+                !
+                return (x / y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -208,13 +203,11 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_ParameterWithPrecondition_NoSuggestion()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
-                  §I{i32:x}
-                  §I{i32:y}
-                  §O{i32}
-                  §Q (!= y INT:0)
-                  §R (/ x y)
+            module Test Test block
+              func Divide (int:x, int:y) → int
+                !
+                requires (y != 0)
+                return (x / y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -231,11 +224,10 @@ public sealed class AgentGuidanceTests
     public void TypeSuggester_NoPatterns_NoSuggestions()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §R (+ x INT:1)
+            module Test Test block
+              func Main (int:x) → int
+                !
+                return (x + 1)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -275,10 +267,10 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:x | (# >= 0)) → void
+                !
+                return
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -297,12 +289,10 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Divide:pub}
-                  §I{i32:x}
-                  §I{i32:y}
-                  §O{i32}
-                  §R (/ x y)
+            module Test Test block
+              func Divide (int:x, int:y) → int
+                !
+                return (x / y)
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -323,13 +313,11 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §I{i32:y}
-                  §O{i32}
-                  §PROOF{p1:positive} (> x INT:0)
-                  §R (/ x y)
+            module Test Test block
+              func Main (int:x | (# >= 0), int:y) → int
+                !
+                proof{"positive"} (x > 0)
+                return (x / y)
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -351,10 +339,10 @@ public sealed class AgentGuidanceTests
     {
         var tool = new RefineTool();
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -398,12 +386,11 @@ public sealed class AgentGuidanceTests
     [Fact]
     public void GuardDiscovery_NestedAndPredicate_FormatsCorrectly()
     {
-        // Test that a compound predicate like (&& (>= # INT:0) (<= # INT:100)) formats correctly
+        // A compound predicate formats as native infix with the parameter in place of #
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
-                  §I{i32:x} | (&& (>= # INT:0) (<= # INT:100))
-                  §O{void}
+            module Test Test block
+              func Main private (int:x | ((# >= 0) && (# <= 100))) → void
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -423,19 +410,18 @@ public sealed class AgentGuidanceTests
         Assert.NotEmpty(guards);
         // The precondition guard should contain the formatted condition with >= and <=
         var precondGuard = guards.First(g => g.InsertionKind == "precondition");
-        Assert.Contains(">=", precondGuard.CalorExpression);
-        Assert.Contains("<=", precondGuard.CalorExpression);
-        Assert.Contains("§Q", precondGuard.CalorExpression);
+        Assert.Equal("requires (x >= 0) && (x <= 100)", precondGuard.CalorExpression);
+        var ifGuard = guards.First(g => g.InsertionKind == "if_guard");
+        Assert.StartsWith("if !((x >= 0) && (x <= 100))\n  throw new InvalidOperationException(", ifGuard.CalorExpression);
     }
 
     [Fact]
     public void GuardDiscovery_SelfRefInPredicate_ReplacedWithParamName()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main private (int:age | (# >= 0)) → void
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -465,10 +451,9 @@ public sealed class AgentGuidanceTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:priv}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main private (int:x | (# >= 0)) → void
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -505,11 +490,9 @@ public sealed class AgentGuidanceTests
     public void Pipeline_PermissivePolicy_FailedIsWarningNotError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:always-positive} (> x INT:0)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"always-positive"} (x > 0)
             """;
 
         var options = new CompilationOptions
@@ -537,11 +520,9 @@ public sealed class AgentGuidanceTests
     public void Pipeline_DefaultPolicy_FailedIsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:always-positive} (> x INT:0)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"always-positive"} (x > 0)
             """;
 
         var options = new CompilationOptions

@@ -1,0 +1,40 @@
+module SkillSyntax SkillSyntax block
+  module SkillSyntaxModule
+    func Main () → void
+      ! cw
+      Console.WriteLine("=== Calor Skill Syntax Validation ===")
+      Console.WriteLine("")
+      TestArithmetic()
+      TestComparison()
+      TestControlFlow()
+
+    func TestArithmetic private () → void
+      Console.WriteLine("Testing arithmetic operators...")
+
+    func Add (int:a, int:b) → int
+      !
+      return a + b
+
+    func Subtract (int:a, int:b) → int
+      !
+      return a - b
+
+    func Multiply (int:a, int:b) → int
+      !
+      return a * b
+
+    func TestComparison private () → void
+      Console.WriteLine("Testing comparison operators...")
+
+    func IsPositive (int:x) → bool
+      !
+      return x > 0
+
+    func IsZero (int:x) → bool
+      !
+      return x == 0
+
+    func TestControlFlow private () → void
+      Console.WriteLine("Testing control flow...")
+      for i from 1 to 5 step 1
+        Console.WriteLine(i)

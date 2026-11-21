@@ -1,0 +1,55 @@
+module CsvRow CsvRow block
+  module CsvRowModule partial
+    func NeedsQuoting (string:@field) → bool
+      !
+      return ((@field).Contains(",") || ((@field).Contains("\"") || ((@field).Contains("\r") || (@field).Contains("\n"))))
+
+    func EscapeField (string:@field) → string
+      !
+      let bool:needs = NeedsQuoting(@field)
+      if (!needs)
+        return @field
+      return ("\"" + ((@field).Replace("\"", "\"\"") + "\""))
+
+    func JoinRow (List<string>:fields) → string
+      !
+      var string:outp = ""
+      var int:i = 0
+      while (i < fields . Count)
+        if (i > 0)
+          set outp (outp + ",")
+        let string:f = fields[i]
+        let string:esc = EscapeField(f)
+        set outp (outp + esc)
+        set i (i + 1)
+      return outp
+
+    func SplitRow (string:line) → List<string>
+      ! mut, alloc
+      let List<string>:fields = new System.Collections.Generic.List<string>()
+      var string:cur = ""
+      var bool:inQuotes = false
+      var int:i = 0
+      while (i < line.Length)
+        let string:c = (line).Substring(i, 1)
+        if inQuotes
+          if (c == "\"")
+            if (((i + 1) < line.Length) && ((line).Substring((i + 1), 1) == "\""))
+              set cur (cur + "\"")
+              set i (i + 1)
+            else
+              set inQuotes false
+          else
+            set cur (cur + c)
+        else if (c == ",")
+          fields.Add(cur)
+          set cur ""
+        else if ((c == "\"") && (cur.Length == 0))
+          set inQuotes true
+        else
+          set cur (cur + c)
+        set i (i + 1)
+      fields.Add(cur)
+      return fields
+
+

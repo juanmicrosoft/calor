@@ -1,0 +1,13 @@
+module Test_13_11 Test_13_11 overflow unchecked
+  class ArrayDemo public
+    func CreateSized public (int:n) → int[]
+      ! alloc
+      return new int[n]
+
+    func CreateEmpty public () → string[]
+      ! alloc
+      return new string[0]
+
+    func Wrap public (string:value) → object[]
+      ! alloc
+      return new object[] {value, new int[] {1, 2}}

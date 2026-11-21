@@ -1,9 +1,16 @@
 using System.Reflection;
 using System.Text.Json;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -148,7 +155,7 @@ public class BoundTypeArchitectureTests
             (new BoundStringLiteral(span, "hello", isMultiline: false, isUtf8: true),
                 "ReadOnlySpan<BYTE>"),
             (new BoundDecimalLiteral(span, 1.5m), "DECIMAL"),
-            (new BoundNoneLiteral(span), "NONE"),
+            (new BoundNullLiteral(span), "NULL"),
         };
 
         foreach (var (expression, expected) in sampler)
@@ -175,12 +182,12 @@ public class BoundTypeArchitectureTests
     /// existing expression's <c>DisplayString</c> moves) rests on this pin, so
     /// the pin had to become real before the limitation could be claimed.</para>
     ///
-    /// <para>Regenerate: <c>CALOR_REGENERATE_DISPLAYSTRING_GOLDEN=1 dotnet test
-    /// --filter AcrossCalorSourceCorpus</c>. A moved row is a decision — record
-    /// what moved and why in the PR that regenerates it.</para>
+    /// <para>The frozen golden replays with its original compiler and inputs.
+    /// Current native representations have separate, exact per-subject expectations;
+    /// neither parse failures nor exceptions can remove a subject.</para>
     /// </summary>
     [Fact]
-    public void BoundExpressionType_DisplayString_ByteIdenticalToTypeName_AcrossCalorSourceCorpus()
+    public async Task BoundExpressionType_DisplayString_ByteIdenticalToTypeName_AcrossCalorSourceCorpus()
     {
         var repoRoot = CliTestHarness.FindRepoRoot();
         var corpusRoots = new[]
@@ -194,122 +201,168 @@ public class BoundTypeArchitectureTests
             .SelectMany(root => Directory.EnumerateFiles(root, "*.calr", SearchOption.AllDirectories))
             .ToArray();
 
-        Assert.NotEmpty(files);
-
-        var histogram = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        var modulesBound = 0;
+        var fixturePath = Path.Combine(repoRoot, "tests", "TestData", "BoundTypes",
+            "displaystring-current-expectations.json");
+        var expected = JsonSerializer.Deserialize<SortedDictionary<string, CorpusExpectation>>(
+            File.ReadAllText(fixturePath))!;
+        Assert.Equal(18, files.Length);
+        Assert.Equal(expected.Keys, files.Select(file =>
+            Path.GetRelativePath(repoRoot, file).Replace('\\', '/')).Order(StringComparer.Ordinal));
         var expressionsChecked = 0;
 
-        foreach (var file in files)
+        foreach (var file in files.Order(StringComparer.Ordinal))
         {
-            try
+            var relative = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
+            Assert.Contains(relative, ActiveSyntaxInputs.OriginalPaths);
+            var source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(repoRoot, file));
+            var module = Parse(source);
+            var generated = CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(module)).GetRoot();
+            Assert.Equal(module.Name,
+                Assert.Single(generated.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>()).Name.ToString());
+            Assert.Contains(generated.DescendantNodes().OfType<ClassDeclarationSyntax>(),
+                declaration => declaration.Identifier.ValueText == module.Name + "Module");
+            var boundModule = Bind(module);
+            var histogram = Histogram(boundModule);
+            expressionsChecked += histogram.Values.Sum();
+            Assert.Equal(expected[relative].Functions,
+                boundModule.Functions.Select(function => function.Symbol.Name));
+            Assert.True(expected[relative].Histogram.OrderBy(pair => pair.Key, StringComparer.Ordinal).SequenceEqual(histogram),
+                $"{relative}: bound-expression distribution changed.\n"
+                + JsonSerializer.Serialize(histogram, new JsonSerializerOptions { WriteIndented = true }));
+            var emitted = new CalorEmitter().Emit(module);
+            Assert.DoesNotContain('§', emitted);
+            var reparsed = Parse(emitted);
+            Assert.Equal(histogram, Histogram(Bind(reparsed)));
+            if (relative.StartsWith("samples/", StringComparison.Ordinal))
             {
-                var source = File.ReadAllText(file);
-                var lexDiagnostics = new DiagnosticBag();
-                var lexer = new Lexer(source, lexDiagnostics);
-                var tokens = lexer.TokenizeAllForParser();
-                var parseDiagnostics = new DiagnosticBag();
-                var parser = new Parser(tokens, parseDiagnostics);
-                var module = parser.Parse();
-
-                var bindDiagnostics = new DiagnosticBag();
-                var binder = new Calor.Compiler.Binding.Binder(bindDiagnostics);
-                var boundModule = binder.Bind(module);
-                modulesBound++;
-
-                foreach (var boundExpr in EnumerateBoundExpressions(boundModule))
+                foreach (var candidate in new[] { source, emitted })
                 {
-                    expressionsChecked++;
-                    var key = $"{boundExpr.GetType().Name}|{boundExpr.Type.DisplayString}";
-                    histogram[key] = histogram.GetValueOrDefault(key) + 1;
+                    var compiled = Program.Compile(candidate, relative);
+                    Assert.False(compiled.HasErrors, $"{relative}:\n{string.Join("\n", compiled.Diagnostics)}");
+                    LoadAssembly(compiled.GeneratedCode);
                 }
             }
-            catch (Exception)
-            {
-                // Some samples may fail to bind cleanly — skip them. The point
-                // is to catch TypeName-vs-DisplayString drift on modules that
-                // DO bind; a corpus-file bind failure is not what this pin is
-                // about.
-            }
+            if (relative == "samples/Contracts/contracts.calr")
+                AssertContractMessageTransition(module);
+            if (relative == "benchmarks/arithmetic/overflow.calr")
+                AssertCheckedBoundary(source, module);
         }
 
-        // Anti-vacuity: without a real denominator every comparison below passes.
-        Assert.True(modulesBound > 0,
-            $"No .calr modules bound cleanly. Corpus roots: {string.Join(", ", corpusRoots)}");
         Assert.True(expressionsChecked > 400,
             $"Only {expressionsChecked} bound expressions checked; the corpus denominator "
             + "collapsed, so the golden comparison would be vacuous.");
 
-        var goldenPath = Path.Combine(
-            repoRoot, "tests", "TestData", "BoundTypes", "displaystring-corpus-golden.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(goldenPath)!);
+        var historical = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(repoRoot, "scripts", "registered_ledger_historical_replay.py"), "bound-types"],
+            repoRoot, TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(historical.ExitCode == 0 && !historical.TimedOut,
+            $"Historical DisplayString golden replay failed (exit {historical.ExitCode}).\n{historical.Output}");
+    }
 
-        if (string.Equals(
-                Environment.GetEnvironmentVariable("CALOR_REGENERATE_DISPLAYSTRING_GOLDEN"),
-                "1", StringComparison.Ordinal))
+    private sealed record CorpusExpectation(
+        [property: System.Text.Json.Serialization.JsonPropertyName("histogram")] SortedDictionary<string, int> Histogram,
+        [property: System.Text.Json.Serialization.JsonPropertyName("functions")] string[] Functions);
+
+    private static SortedDictionary<string, int> Histogram(BoundModule module)
+        => new(EnumerateBoundExpressions(module)
+            .GroupBy(expression => $"{expression.GetType().Name}|{expression.Type.DisplayString}",
+                StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
+            StringComparer.Ordinal);
+
+    [Fact]
+    public void CorpusPatternBindings_PreserveTheIntegerScrutineeType()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root,
+            Path.Combine(root, "samples", "PatternMatching", "matching.calr")));
+        var references = BindAndCollect<BoundVariableExpression>(source)
+            .Where(reference => reference.Variable.Name == "n").ToArray();
+
+        Assert.Equal(3, references.Length);
+        Assert.Equal(3, references.Select(reference => reference.SymbolId).Distinct().Count());
+        Assert.All(references, reference =>
         {
-            File.WriteAllText(goldenPath, System.Text.Json.JsonSerializer.Serialize(
-                histogram, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }) + "\n");
-            Console.WriteLine($"DisplayString corpus golden regenerated: {goldenPath}");
-            return;
-        }
+            Assert.Equal("INT", reference.Type.DisplayString);
+            Assert.False(reference.HasUnknownInferredType);
+        });
+    }
 
-        // A missing golden is a failure, never a silent regeneration (R2-A: the
-        // BinderIncompleteRatchetTests pattern). Regenerate only via the env var.
-        Assert.True(File.Exists(goldenPath),
-            $"DisplayString corpus golden missing at {goldenPath} — run once with CALOR_REGENERATE_DISPLAYSTRING_GOLDEN=1");
-        var golden = System.Text.Json.JsonSerializer
-            .Deserialize<SortedDictionary<string, int>>(File.ReadAllText(goldenPath))!;
+    [Theory]
+    [InlineData("benchmarks/security/command-injection.calr", "Replace", 9, "string")]
+    [InlineData("benchmarks/security/sql-injection.calr", "Replace", 1, "string")]
+    public void CorpusScalarInstanceCalls_UseSelectedStringMetadata(
+        string relativePath, string methodName, int expectedCount, string expectedDisplay)
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var source = File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(root,
+            Path.Combine(root, relativePath)));
+        var calls = BindAndCollect<BoundCallExpression>(source)
+            .Where(call => call.ResolvedMetadataMethod?.Name == methodName).ToArray();
 
-        var drifted = new List<string>();
-        foreach (var key in golden.Keys.Union(histogram.Keys).OrderBy(k => k, StringComparer.Ordinal))
+        Assert.Equal(expectedCount, calls.Length);
+        var oracleTree = CSharpSyntaxTree.ParseText(methodName == "Replace"
+            ? "class Oracle { string Run(string receiver) => receiver.Replace(\"a\", \"b\"); }"
+            : "class Oracle { int Run(string receiver) => receiver.GetHashCode(); }");
+        var oracle = CSharpCompilation.Create("ScalarOracle", [oracleTree],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Empty(oracle.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+        var oracleMethod = Assert.IsAssignableFrom<IMethodSymbol>(oracle.GetSemanticModel(oracleTree)
+            .GetSymbolInfo(Assert.Single(oracleTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())).Symbol);
+        Assert.All(calls, call =>
         {
-            var expected = golden.GetValueOrDefault(key);
-            var actual = histogram.GetValueOrDefault(key);
-            if (expected != actual)
-                drifted.Add($"{key}: golden {expected}, measured {actual}");
-        }
-
-        Assert.True(drifted.Count == 0,
-            "Bound-expression DisplayString distribution drifted over the committed corpus — "
-            + "the verifier cache and the effect resolver key on these exact strings. "
-            + "Regenerate with CALOR_REGENERATE_DISPLAYSTRING_GOLDEN=1 in the PR that moves them, "
-            + "naming what moved:\n  " + string.Join("\n  ", drifted.Take(25)));
+            Assert.Equal("<expression-call>", call.Target);
+            var receiver = Assert.IsType<BoundVariableExpression>(call.EvaluatedReceiver);
+            Assert.Same(receiver, call.Receiver);
+            Assert.Same(receiver.Variable, call.ReceiverSymbol);
+            Assert.False(receiver.SymbolId.IsNone);
+            Assert.Equal(receiver.Variable.Name, source.Substring(receiver.Span.Start, receiver.Span.Length));
+            Assert.False(receiver.HasUnknownInferredType);
+            var selected = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.Equal(SpecialType.System_String, selected.ContainingType.SpecialType);
+            Assert.Equal(oracleMethod.ToDisplayString(), selected.ToDisplayString());
+            Assert.Equal(methodName, selected.Name);
+            Assert.False(selected.IsStatic);
+            Assert.Empty(selected.DeclaringSyntaxReferences);
+            Assert.Equal(expectedDisplay, call.Type.DisplayString);
+            Assert.False(call.HasUnresolvedArguments);
+        });
     }
 
     /// <summary>
     /// v0.15 E1 slice 2b — a lambda's bound type is a
     /// <see cref="FunctionBoundType"/> (kind 5), not a
     /// <see cref="NominalBoundType"/> whose name happens to spell a signature,
-    /// AND its <c>DisplayString</c> is byte-identical to the pre-slice
-    /// <c>LAMBDA(...)-&gt;...</c> string.
+    /// AND its <c>DisplayString</c> retains the explicit
+    /// <c>LAMBDA(...)-&gt;...</c> shape with current native type spellings.
     ///
     /// <para>Both halves matter. The kind is what lets the effect pass and
     /// <c>ExternalCallCollector</c> answer "is this a function type?"
-    /// structurally. The string has to stay because <c>Binder.cs:1320</c>
-    /// infers an untyped <c>§B</c>'s <c>TypeName</c> from the initializer's
-    /// <c>DisplayString</c>, so a change here would move OTHER expressions'
-    /// display strings — the thing the corpus golden above pins.</para>
+    /// structurally. Inferred bindings also consume the initializer's display
+    /// string; the current corpus fixture pins those downstream strings
+    /// separately from the unchanged historical golden.</para>
     ///
     /// <para>Discriminates: drop <c>displayOverride</c> and the string becomes
-    /// <c>(i32) -&gt; INT</c>; revert to <c>NominalBoundType</c> and the kind
+    /// <c>(int) -&gt; INT</c>; revert to <c>NominalBoundType</c> and the kind
     /// assertion fails.</para>
     /// </summary>
     [Theory]
     [InlineData(
-        "§B{f} §LAM{l1:x:i32} (+ x INT:1)",
-        "LAMBDA(i32)->INT")]
+        "let f = (int:x) => x + 1",
+        "LAMBDA(int)->INT")]
     [InlineData(
-        "§B{g} §LAM{l2}",
+        "let g = () =>\n      return",
         "LAMBDA()->VOID")]
     public void LambdaExpression_BindsToFunctionBoundType_WithUnchangedDisplayString(
         string bindingLine,
         string expectedDisplay)
     {
         var source = string.Join("\n", [
-            "§M{m1:LambdaTypeProbe}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §E{}",
+            "module LambdaTypeProbe",
+            "  func Main public () → void",
+            "    !",
             $"    {bindingLine}",
             "",
         ]);
@@ -319,6 +372,11 @@ public class BoundTypeArchitectureTests
 
         var functionType = Assert.IsType<FunctionBoundType>(lambda.Type);
         Assert.Equal(expectedDisplay, functionType.DisplayString);
+        Assert.Equal(expectedDisplay == "LAMBDA()->VOID" ? Array.Empty<string>() : new[] { "int" },
+            functionType.ParameterTypes.Select(type => type.DisplayString));
+        Assert.Equal(expectedDisplay == "LAMBDA()->VOID" ? "VOID" : "INT",
+            functionType.ReturnType.DisplayString);
+        AssertNativeLambdaRoundTrip(source, expectedDisplay);
     }
 
     /// <summary>
@@ -332,10 +390,10 @@ public class BoundTypeArchitectureTests
     public void LambdaFunctionBoundType_CarriesParameterAndReturnTypes()
     {
         var source = string.Join("\n", [
-            "§M{m1:LambdaShapeProbe}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §E{}",
-            "    §B{f} §LAM{l1:x:i32:y:str} (+ x INT:1)",
+            "module LambdaShapeProbe",
+            "  func Main public () → void",
+            "    !",
+            "    let f = (int:x, string:y) => x + 1",
             "",
         ]);
 
@@ -343,21 +401,21 @@ public class BoundTypeArchitectureTests
         var functionType = Assert.IsType<FunctionBoundType>(lambda.Type);
 
         Assert.Equal(
-            "i32, str",
+            "int, string",
             string.Join(", ", functionType.ParameterTypes.Select(t => t.DisplayString)));
         // The expression body's OWN bound type, handed over by the binder — not
         // a string re-parsed into a type.
         Assert.Equal("INT", functionType.ReturnType.DisplayString);
+        AssertNativeLambdaRoundTrip(source, "LAMBDA(int,string)->INT");
     }
 
     /// <summary>
     /// v0.15 E1 slice 2b — the side channel the effect pass reads receivers
     /// through. <c>CallGraphAnalysis.BoundValueTypes(callerId)</c> hands over
     /// the bound <see cref="BoundType"/> of each call site's receiver, keyed by
-    /// the receiver path as the target spells it.
+    /// the structural receiver path, not the native call's placeholder target.
     ///
-    /// <para>This is the structural pin for the slice: the API does not exist
-    /// on <c>main</c>, and the effect pass's resolvers now consult it before any
+    /// <para>This is the structural pin for the slice: effect resolvers consult it before any
     /// AST type string. Delete the <c>RecordReceiver</c> call in
     /// <c>ResolveBoundCallSites</c> and the assertions below go empty.</para>
     ///
@@ -371,25 +429,33 @@ public class BoundTypeArchitectureTests
     public void CallGraphSideChannel_CarriesBoundReceiverTypesPerCallSite()
     {
         var source = string.Join("\n", [
-            "§M{m001:ReceiverChannelProbe}",
-            "  §F{f001:Go:pub}",
-            "      §I{i32:n}",
-            "      §O{void}",
-            "      §E{}",
-            "      §B{sb} §NEW{StringBuilder}",
-            "      §C{sb.AppendLine} §A STR:\"x\" §/C",
-            "      §B{u} §C{Whatever.Make} §/C",
-            "      §C{u.Run} §/C",
+            "module ReceiverChannelProbe",
+            "  using System.Text",
+            "  func Go public (int:n) → void",
+            "    !",
+            "    let sb = new StringBuilder()",
+            "    sb.AppendLine(\"x\")",
+            "    let u = Whatever.Make()",
+            "    u.Run()",
             "",
         ]);
 
-        var lexDiagnostics = new DiagnosticBag();
-        var tokens = new Lexer(source, lexDiagnostics).TokenizeAllForParser();
-        var module = new Parser(tokens, new DiagnosticBag()).Parse();
+        var module = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+        var receiverCalls = Descendants(bound).OfType<BoundCallExpression>()
+            .Where(call => call.Receiver is BoundVariableExpression).ToArray();
+        var known = Assert.Single(receiverCalls, call => call.ResolvedMetadataMethod?.Name == "AppendLine");
+        Assert.Equal("System.Text.StringBuilder", known.ResolvedMetadataMethod!.ContainingType.ToDisplayString());
+        var unknown = Assert.Single(receiverCalls, call =>
+            call.Receiver is BoundVariableExpression { Variable.Name: "u" });
+        Assert.Null(unknown.ResolvedMetadataMethod);
+        Assert.IsType<UnresolvedBoundType>(unknown.Receiver!.Type);
         var analysis = Calor.Compiler.Analysis.CallGraphAnalysis.Build(module);
 
         Assert.True(analysis.IsBoundResolutionComplete);
-        var receivers = analysis.BoundValueTypes("f001");
+        var receivers = analysis.BoundValueTypes(Assert.Single(module.Functions).Id);
 
         // Anti-vacuity: the probe has two dotted call sites.
         Assert.True(
@@ -399,22 +465,162 @@ public class BoundTypeArchitectureTests
         // A receiver the binder typed: nominal, keyable as a manifest type.
         var stringBuilder = Assert.IsType<NominalBoundType>(receivers["sb"]);
         Assert.Equal("StringBuilder", stringBuilder.QualifiedName);
+        Assert.Equal(known.Receiver!.Type, stringBuilder);
 
         // A receiver the binder could not type — an inferred §B whose
         // initializer it cannot resolve. This is the §D6 exit ramp, and it is
         // why ResolveLocalValueType returns null here instead of guessing.
-        Assert.IsType<UnresolvedBoundType>(receivers["u"]);
+        Assert.Equal(Assert.IsType<UnresolvedBoundType>(unknown.Receiver.Type),
+            Assert.IsType<UnresolvedBoundType>(receivers["u"]));
+
+        const string allowed = """
+            module ReceiverEffects
+              using System.Text
+              func Go () → void
+                ! alloc,mut
+                let sb = new StringBuilder()
+                sb.AppendLine("x")
+            """;
+        var permitted = Program.Compile(allowed);
+        Assert.False(permitted.HasErrors, string.Join("\n", permitted.Diagnostics));
+        var denied = Program.Compile(allowed.Replace("! alloc,mut", "!", StringComparison.Ordinal));
+        Assert.True(denied.HasErrors);
+        Assert.Contains(denied.Diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    private static void AssertContractMessageTransition(ModuleNode module)
+    {
+        var divide = Assert.Single(module.Functions, function => function.Name == "Divide");
+        var precondition = Assert.Single(divide.Preconditions);
+        Assert.Null(precondition.Message);
+        var condition = Assert.IsType<BinaryOperationNode>(precondition.Condition);
+        Assert.Equal(BinaryOperator.NotEqual, condition.Operator);
+        Assert.Equal("b", Assert.IsType<ReferenceNode>(condition.Left).Name);
+        Assert.Equal(0, Assert.IsType<IntLiteralNode>(condition.Right).Value);
+
+        const string original = """
+            public static class OriginalContract
+            {
+                public static int Divide(int a, int b)
+                {
+                    if (!(b != 0)) throw new Calor.Runtime.ContractViolationException(
+                        "message= divisor must not be zero \"\"", "f_auto4",
+                        Calor.Runtime.ContractKind.Requires, startOffset: 663, length: 50,
+                        sourceFile: null, line: 21, column: 5, condition: "b != 0");
+                    return a / b;
+                }
+            }
+            """;
+        var historical = LoadMethod(original, "Divide");
+        var current = LoadMethod(new CSharpEmitter().Emit(module), "Divide");
+        Assert.Equal(5, historical.Invoke(null, [10, 2]));
+        Assert.Equal(5, current.Invoke(null, [10, 2]));
+        var oldFailure = Assert.IsType<Calor.Runtime.ContractViolationException>(
+            Assert.Throws<TargetInvocationException>(() => historical.Invoke(null, [10, 0])).InnerException);
+        var newFailure = Assert.IsType<Calor.Runtime.ContractViolationException>(
+            Assert.Throws<TargetInvocationException>(() => current.Invoke(null, [10, 0])).InnerException);
+        Assert.Equal("message= divisor must not be zero \"\"", oldFailure.Message);
+        Assert.Equal("Precondition failed: b != 0", newFailure.Message);
+        Assert.Equal(Calor.Runtime.ContractKind.Requires, oldFailure.Kind);
+        Assert.Equal(oldFailure.Kind, newFailure.Kind);
+        Assert.Equal("b != 0", oldFailure.Condition);
+        Assert.Equal(oldFailure.Condition, newFailure.Condition);
+    }
+
+    private static void AssertCheckedBoundary(string source, ModuleNode module)
+    {
+        const string originalExpression = """
+            public static class OriginalChecked
+            {
+                public static int SafeCheckedAddition(int a, int b)
+                {
+                    int result = checked(a + b);
+                    return result;
+                }
+            }
+            """;
+        const string assignment = """
+            public static class CheckedAssignment
+            {
+                public static int SafeCheckedAddition(int a, int b)
+                {
+                    int result = 0;
+                    checked { result = a + b; }
+                    return result;
+                }
+            }
+            """;
+        var converted = new CSharpToCalorConverter().Convert(assignment);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var expectedFrame = Assert.IsType<RawCSharpFrame>(
+            Assert.Single(RawCSharpFrame.ReadTokens(converted.CalorSource!),
+                token => token.Value is RawCSharpFrame).Value);
+        var actualFrame = Assert.IsType<RawCSharpFrame>(
+            Assert.Single(RawCSharpFrame.ReadTokens(source),
+                token => token.Value is RawCSharpFrame).Value);
+        Assert.Equal(expectedFrame, actualFrame);
+        Assert.Equal("checked-block", actualFrame.FeatureName);
+        Assert.Equal("checked overflow block preserved verbatim", actualFrame.Reason);
+        Assert.Equal("        checked { result = a + b; }\n", actualFrame.Code);
+        foreach (var code in new[] { originalExpression, assignment, new CSharpEmitter().Emit(module) })
+        {
+            var method = LoadMethod(code, "SafeCheckedAddition");
+            Assert.Equal(5, method.Invoke(null, [2, 3]));
+            Assert.Equal(int.MaxValue, method.Invoke(null, [int.MaxValue, 0]));
+            Assert.IsType<OverflowException>(
+                Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [int.MaxValue, 1])).InnerException);
+            Assert.IsType<OverflowException>(
+                Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [int.MinValue, -1])).InnerException);
+        }
+    }
+
+    private static MethodInfo LoadMethod(string source, string name)
+        => Assert.Single(LoadAssembly(source).GetTypes().SelectMany(type =>
+            type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)),
+            method => method.Name == name);
+
+    private static Assembly LoadAssembly(string source)
+    {
+        var compilation = CSharpCompilation.Create("BoundTypeOracle_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+        return Assembly.Load(stream.ToArray());
     }
 
     private static IReadOnlyList<T> BindAndCollect<T>(string source)
         where T : BoundNode
+        => Descendants(Bind(Parse(source))).OfType<T>().ToArray();
+
+    private static ModuleNode Parse(string source)
     {
-        var lexDiagnostics = new DiagnosticBag();
-        var tokens = new Lexer(source, lexDiagnostics).TokenizeAllForParser();
-        var parseDiagnostics = new DiagnosticBag();
-        var module = new Parser(tokens, parseDiagnostics).Parse();
-        var bound = new Calor.Compiler.Binding.Binder(new DiagnosticBag()).Bind(module);
-        return Descendants(bound).OfType<T>().ToArray();
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return module;
+    }
+
+    private static BoundModule Bind(ModuleNode module)
+    {
+        var diagnostics = new DiagnosticBag();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(module);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        return bound;
+    }
+
+    private static void AssertNativeLambdaRoundTrip(string source, string display)
+    {
+        var emitted = new CalorEmitter().Emit(Parse(source));
+        Assert.DoesNotContain('§', emitted);
+        var lambda = Assert.Single(BindAndCollect<BoundLambdaExpression>(emitted));
+        Assert.Equal(display, Assert.IsType<FunctionBoundType>(lambda.Type).DisplayString);
+        foreach (var candidate in new[] { source, emitted })
+        {
+            var compiled = Program.Compile(candidate);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        }
     }
 
     private static IEnumerable<BoundNode> Descendants(BoundNode node)

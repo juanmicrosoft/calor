@@ -12,6 +12,9 @@ public static class TestHelpers
 {
     private static readonly CSharpToCalorConverter Converter = new();
 
+    public static void AssertRawFraming(string? source, TokenKind kind = TokenKind.CSharpInterop, bool present = true)
+        => Calor.Compiler.Tests.RawFrameAssertions.AssertFramed(source, kind, present);
+
     /// <summary>
     /// Converts C# source to Calor source. Returns the ConversionResult.
     /// </summary>
@@ -140,6 +143,10 @@ public static class TestHelpers
     /// </summary>
     public static string? ReadSnapshot(string snapshotName)
     {
+        var root = Calor.Compiler.Tests.ActiveSyntaxInputs.RepositoryRoot;
+        var original = $"tests/Calor.Conversion.Tests/Snapshots/{snapshotName}";
+        if (Calor.Compiler.Tests.ActiveSyntaxInputs.OriginalPaths.Contains(original))
+            return File.ReadAllText(Calor.Compiler.Tests.ActiveSyntaxInputs.ForCurrentCompiler(root, original));
         var path = Path.Combine(AppContext.BaseDirectory, "Snapshots", snapshotName);
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }

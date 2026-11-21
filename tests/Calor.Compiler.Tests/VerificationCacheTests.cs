@@ -681,13 +681,12 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §S (>= result INT:0)
-      §R (* x x)
+module Test
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x
 ";
 
         var cacheOptions = new VerificationCacheOptions
@@ -719,13 +718,12 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §S (>= result INT:0)
-      §R (* x x)
+module Test
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x
 ";
 
         var cacheOptions = new VerificationCacheOptions
@@ -773,12 +771,11 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §R (* x x)
+module Test
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    return x * x
 ";
 
         var cacheOptions = new VerificationCacheOptions
@@ -810,12 +807,11 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §R (* x x)
+module Test
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    return x * x
 ";
 
         // First, populate cache
@@ -866,18 +862,16 @@ public class VerificationCacheTests : IDisposable
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x INT:0)
-      §S (>= result INT:0)
-      §R (* x x)
-  §F{f002:BadDecrement:pub}
-      §I{i32:x}
-      §O{i32}
-      §S (>= result INT:0)
-      §R (- x INT:1)
+module Test
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x
+  func BadDecrement (int:x) → int
+    !
+    => result >= 0
+    return x - 1
 ";
 
         // Run with cache disabled to get fresh results
@@ -1050,6 +1044,39 @@ public class VerificationCacheTests : IDisposable
 
         // Should be invalid due to format version mismatch
         Assert.False(entry.IsValidFor("4.12.0"));
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void Cache_PreEscapeIdentityFormatCannotServeMatchingReferenceKeys(string name)
+    {
+        var options = new VerificationCacheOptions { Enabled = true, CacheDirectory = _testCacheDir };
+        var parameters = new[] { (name, "int") };
+        var condition = new RequiresNode(EmptySpan,
+            new BinaryOperationNode(EmptySpan, BinaryOperator.Equal,
+                new ReferenceNode(EmptySpan, name, isVerbatim: true), new IntLiteralNode(EmptySpan, 0)),
+            null, new AttributeCollection());
+        var proven = new ContractVerificationResult(ContractVerificationStatus.Proven);
+        using (var writer = new VerificationCache(options))
+            writer.CachePreconditionResult(parameters, condition, proven);
+
+        var path = Assert.Single(Directory.GetFiles(_testCacheDir, "*.json", SearchOption.AllDirectories));
+        var persisted = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        Assert.Equal(VerificationCacheEntry.CurrentFormatVersion, persisted["version"]!.GetValue<string>());
+        persisted["version"] = "1.22";
+        File.WriteAllText(path, persisted.ToJsonString());
+
+        using (var reader = new VerificationCache(options))
+        {
+            Assert.False(reader.TryGetPreconditionResult(parameters, condition, out var stale));
+            Assert.Null(stale);
+            reader.CachePreconditionResult(parameters, condition, proven);
+        }
+        using var currentReader = new VerificationCache(options);
+        Assert.True(currentReader.TryGetPreconditionResult(parameters, condition, out var current));
+        Assert.Equal(ContractVerificationStatus.Proven, current!.Status);
     }
 
     [Fact]

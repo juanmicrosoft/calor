@@ -1,0 +1,23 @@
+module AbsoluteContracts AbsoluteContracts
+  module AbsoluteContractsModule
+    func AbsNonNeg public (int:x) → int
+      !
+      requires x > 0 - 2147483647
+      => result >= 0
+      if x >= 0
+        return x
+      else
+        return 0 - x
+
+    func AbsIdempotent public (int:x) → int
+      !
+      requires x >= 0
+      => result == x
+      return x
+
+    func TriangleInequality public (int:absA, int:absB, int:absSum) → bool
+      !
+      requires absA >= 0
+      requires absB >= 0
+      requires absSum >= 0
+      return absSum <= (absA + absB)

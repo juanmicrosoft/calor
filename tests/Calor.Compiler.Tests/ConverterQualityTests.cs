@@ -1,3 +1,5 @@
+using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
@@ -6,7 +8,7 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Tests for converter quality improvements: §ERR parseable emission,
+/// Tests for converter quality improvements: raw C# fallback emission,
 /// Unicode escape sequences, and named argument round-trip.
 /// </summary>
 public class ConverterQualityTests
@@ -23,8 +25,7 @@ public class ConverterQualityTests
         if (result.Success) return string.Empty;
         return string.Join("\n", result.Issues.Select(i => $"{i.Severity}: {i.Message}"));
     }
-
-    #region §ERR Fallback Emission Tests
+    #region Raw C# Fallback Emission Tests
 
     [Fact]
     public void MakeRefExpression_ConvertsAsRawCSharp()
@@ -54,18 +55,15 @@ public class ConverterQualityTests
     [Fact]
     public void FallbackExpression_ParsesWithoutCascadingErrors()
     {
-        // A .calr file containing §ERR should parse with only warnings, not cascading errors
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
-                  §B{x:i32} §ERR "TODO: unknown-expression -- C#: checked(1 + 2)"
+                  §B{x:i32} §CS{checked(1 + 2)}
             """;
 
         var compileResult = Program.Compile(calorSource);
 
-        // The §ERR should parse as an ErrExpressionNode wrapping a string literal
-        // It may produce a semantic error but should NOT produce cascading parse errors
         var parseErrors = compileResult.Diagnostics
             .Where(d => d.Code == DiagnosticCode.UnexpectedToken)
             .ToList();
@@ -76,10 +74,10 @@ public class ConverterQualityTests
     public void FallbackExpression_InReturn_ParsesCleanly()
     {
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{str}
-                  §R §ERR "TODO: throw-expression -- C#: throw new Exception()"
+                  §R §CS{throw new Exception()}
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -93,14 +91,13 @@ public class ConverterQualityTests
     [Fact]
     public void FallbackExpression_MultipleInFile_NoParserCascade()
     {
-        // Multiple §ERR tokens in one file should each produce one error, not cascade
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                   §O{void}
-                  §B{x:i32} §ERR "TODO: feature-a -- C#: something"
-                  §B{y:str} §ERR "TODO: feature-b -- C#: something else"
-                  §B{z:bool} §ERR "TODO: feature-c -- C#: yet another"
+                  §B{x:i32} §CS{checked(1 + 2)}
+                  §B{y:str} §CS{string.Empty}
+                  §B{z:bool} §CS{true}
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -114,8 +111,8 @@ public class ConverterQualityTests
     [Fact]
     public void FallbackExpression_ConvertThenCompile_NoCascade()
     {
-        // A class with multiple unsupported constructs should produce individual §ERR tokens
-        // that parse cleanly instead of cascading parse failures
+        // Unsupported constructs retain their original C# instead of introducing
+        // a second error representation.
         var csharp = """
             public class Test
             {
@@ -289,18 +286,18 @@ public class ConverterQualityTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Named args should appear as §A[name] syntax
-        Assert.Contains("§A[name]", result.CalorSource);
-        Assert.Contains("§A[flag]", result.CalorSource);
+        Assert.Contains("name: ", result.CalorSource);
+        Assert.Contains("flag: ", result.CalorSource);
     }
 
     [Fact]
     public void NamedArgs_CalorParsesCorrectly()
     {
         var calorSource = """
-            §M{m001:Test}
-              §F{f001:Configure:pub}
-                  §O{void}
-                  §C{Register} §A[name] "en-US" §A[flag] true §/C
+            module Test Test block
+              func Configure () → void
+                !
+                Register(name: "en-US", flag: true)
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -339,7 +336,7 @@ public class ConverterQualityTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Second arg should be named, first should not
-        Assert.Contains("§A[flag]", result.CalorSource);
+        Assert.Contains("flag: ", result.CalorSource);
     }
 
     [Fact]
@@ -463,7 +460,7 @@ public class ConverterQualityTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("(? flag 1 0)", result.CalorSource);
+        Assert.Contains("(flag ? 1 : 0)", result.CalorSource);
 
         // Should parse and compile
         var compileResult = Program.Compile(result.CalorSource);
@@ -474,8 +471,8 @@ public class ConverterQualityTests
     [Fact]
     public void Ternary_WithMethodCallBranches_Decomposes()
     {
-        // Ternary where branches are method calls (emitted as §C{...} §/C)
-        // should be decomposed into §IF/§EL/§/I
+        // Ternary where branches are method calls. 0.30: native calls are inline
+        // expressions, so the conditional stays one expression (no if/else decomposition).
         var csharp = """
             public class Test
             {
@@ -490,11 +487,7 @@ public class ConverterQualityTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should NOT contain (? ... §C ...) inline
-        Assert.DoesNotContain("(? flag §C", result.CalorSource);
-        // Should contain the decomposed form
-        Assert.Contains("§IF{", result.CalorSource);
-        Assert.Contains("§EL", result.CalorSource);
+        Assert.Contains("return (flag ? Helper() : Other())", result.CalorSource);
 
         // Should parse and compile
         var compileResult = Program.Compile(result.CalorSource);
@@ -523,7 +516,7 @@ public class ConverterQualityTests
         Assert.NotNull(result.CalorSource);
 
         // If §NEW is in the ternary branches, it should be decomposed
-        if (result.CalorSource.Contains("§NEW") && result.CalorSource.Contains("§IF{"))
+        if (result.CalorSource.Contains("§NEW") && result.CalorSource.Contains("§IF "))
         {
             Assert.DoesNotContain("(? flag §NEW", result.CalorSource);
         }
@@ -663,7 +656,8 @@ public class ConverterQualityTests
             var trimmed = line.Trim();
             if (string.IsNullOrWhiteSpace(trimmed)) continue;
             // Should NOT have bare text like "cs" without // prefix
-            if (!trimmed.StartsWith("§") && !trimmed.StartsWith("//")
+            if (!System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^(module|using|enum|class|interface|func|field|property) ")
+                && !trimmed.StartsWith("//")
                 && !trimmed.Contains("=") && !trimmed.StartsWith("["))
             {
                 Assert.Fail($"Orphaned text found: '{trimmed}' in line: '{line}'");
@@ -975,8 +969,8 @@ public class ConverterQualityTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.DoesNotContain("§NEW{object}", result.CalorSource);
-        Assert.Contains("§NEW{KeyValuePair<str, i32>}", result.CalorSource);
+        Assert.DoesNotContain("new object(", result.CalorSource);
+        Assert.Contains("new KeyValuePair<string, int>(", result.CalorSource);
     }
 
     [Fact]
@@ -1060,7 +1054,7 @@ public class Foo
     [Fact]
     public void ScientificNotation_ParsesCorrectly()
     {
-        var source = "§M{m1:Test}\n  §CL{c1:Foo:pub}\n    §MT{m1:Foo:pub} () -> f64\n      §B{f64:epsilon} 2.2204460492503131E-16\n      §R epsilon\n\n\n";
+        var source = "module Test Test block\n  class Foo\n    func Foo () → double\n      !\n      let double:epsilon = 2.220446049250313E-16\n      return epsilon\n";
         var diag = new DiagnosticBag();
         var tokens = new Lexer(source, diag).TokenizeAll();
         // Check lexer recognized the scientific notation as a float literal
@@ -1111,8 +1105,8 @@ public class Foo
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Should contain cast without ? annotation
-        Assert.Contains("cast u8[]", result.CalorSource);
-        Assert.DoesNotContain("cast u8[]?", result.CalorSource);
+        Assert.Contains("(byte[])value", result.CalorSource);
+        Assert.DoesNotContain("(byte[]?)value", result.CalorSource);
     }
 
     [Fact]
@@ -1131,8 +1125,8 @@ public class Foo
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("cast str[][]", result.CalorSource);
-        Assert.DoesNotContain("cast str[]?[]", result.CalorSource);
+        Assert.Contains("(string[][])value", result.CalorSource);
+        Assert.DoesNotContain("(string[]?[])value", result.CalorSource);
     }
 
     #endregion

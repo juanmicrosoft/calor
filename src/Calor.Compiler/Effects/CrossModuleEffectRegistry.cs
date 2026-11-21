@@ -85,12 +85,8 @@ public sealed class CrossModuleEffectRegistry
     public static CrossModuleEffectRegistry Build(
         IReadOnlyList<(ModuleNode Ast, string FilePath)> modules)
     {
-        var summaries = new List<(EffectSummary, string)>(modules.Count);
-        foreach (var (ast, path) in modules)
-        {
-            summaries.Add((EffectSummaryBuilder.Build(ast), path));
-        }
-        return Build(summaries);
+        // The driver's cross-module map, as `calor build` passes it.
+        return Build(EffectSummaryBuilder.BuildAll(modules));
     }
 
     private void RegisterFunction(string moduleName, string filePath, EffectFunctionSummary func)
@@ -100,7 +96,7 @@ public sealed class CrossModuleEffectRegistry
             BuildDiagnostics.Add(new Diagnostic(
                 DiagnosticCode.UndeclaredPublicFunction,
                 $"Public function '{func.Name}' in module '{moduleName}' has no effect declaration. " +
-                $"Cross-module callers cannot verify effect safety. Add §E{{...}} to declare effects.",
+                $"Cross-module callers cannot verify effect safety. Add an indented ! row to declare effects.",
                 new TextSpan(0, 0, func.DeclarationLine, func.DeclarationColumn),
                 DiagnosticSeverity.Warning,
                 filePath));
@@ -125,7 +121,7 @@ public sealed class CrossModuleEffectRegistry
             BuildDiagnostics.Add(new Diagnostic(
                 DiagnosticCode.UndeclaredPublicFunction,
                 $"Public method '{qualifiedName}' in module '{moduleName}' has no effect declaration. " +
-                $"Cross-module callers cannot verify effect safety. Add §E{{...}} to declare effects.",
+                $"Cross-module callers cannot verify effect safety. Add an indented ! row to declare effects.",
                 new TextSpan(0, 0, method.DeclarationLine, method.DeclarationColumn),
                 DiagnosticSeverity.Warning,
                 filePath));

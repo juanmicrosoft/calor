@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Files": [
+    "program.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_q8q2c911t863",
+      "File": "program.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "SdkSample",
+      "Signature": ""
+    },
+    {
+      "Id": "f_f9de0phr1hew",
+      "File": "program.calr",
+      "Container": "SdkSample",
+      "Kind": 1,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

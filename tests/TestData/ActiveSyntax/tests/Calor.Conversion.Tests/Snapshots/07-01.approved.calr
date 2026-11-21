@@ -1,0 +1,15 @@
+module Test_07_01 Test_07_01 overflow unchecked
+  using System
+  using System.Collections.Generic
+  using System.IO
+  using System.Linq
+  using System.Net.Http
+  using System.Threading
+  using System.Threading.Tasks
+
+  delegate MyHandler public (int:x)
+    ! unknown
+
+  raw member:delegate-semantics:Other:Unsupported%20Other%3A%20public%20delegate%20bool%20Predicate%3CT%3E%28T%20item%29%3B 42
+public delegate bool Predicate<T>(T item);
+

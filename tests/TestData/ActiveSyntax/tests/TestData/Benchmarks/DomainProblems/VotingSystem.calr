@@ -1,0 +1,19 @@
+module VotingSystem VotingSystem
+  module VotingSystemModule
+    func AddVote public (int:currentVotes) → int
+      !
+      return currentVotes + 1
+
+    func HasMajority public (int:votes, int:totalVotes) → bool
+      !
+      requires totalVotes > 0
+      return (votes * 2) > totalVotes
+
+    func Percentage public (int:votes, int:totalVotes) → float
+      !
+      requires totalVotes > 0
+      return ((double)votes / (double)totalVotes) * 100
+
+    func IsValid public (int:totalVotes, int:eligibleVoters) → bool
+      !
+      return totalVotes <= eligibleVoters

@@ -111,6 +111,8 @@ public sealed class KInductionProver : IDisposable
         string invariantExpression,
         BoundFunction function)
     {
+        if (loop.Condition != null)
+            return new KInductionResult(KInductionStatus.Unsupported, 0, invariantExpression);
         var sw = System.Diagnostics.Stopwatch.StartNew();
         if (HasUnrepresentableLiteral(loop.From) || HasUnrepresentableLiteral(loop.To)
             || loop.Step != null && HasUnrepresentableLiteral(loop.Step))
@@ -201,6 +203,8 @@ public sealed class KInductionProver : IDisposable
     /// </summary>
     public KInductionResult SynthesizeAndProve(BoundForStatement loop, BoundFunction function)
     {
+        if (loop.Condition != null)
+            return new KInductionResult(KInductionStatus.Unsupported, 0);
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         // Extract loop context for template instantiation

@@ -1,10 +1,10 @@
-§M{m001:Test_05_02:overflow=unchecked}
+§M{Test_05_02:overflow=unchecked}
   §U{System.Linq}
   §U{System.Collections.Generic}
 
-  §CL{c001:Filter:pub}
-    §MT{m002:GetPositive:pub} (List<i32>:items) -> List<i32>
-      §B{_lamWhere004} §LAM{lam003:x:i32} (> x 0) §/LAM{lam003}
+  §CL{Filter:pub}
+    §MT{GetPositive:pub} (List<i32>:items) -> List<i32>
+      §B{_lamWhere004} §LAM{x:i32} (> x 0) §/LAM
       §B{_chainWhere005} §C{items.Where} _lamWhere004
       §R §C{_chainWhere005.ToList}
 

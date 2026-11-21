@@ -13,40 +13,35 @@ namespace Calor.Compiler.Tests.Mcp;
 public class EditPrecisionMcpToolTests
 {
     private static readonly string SampleSource = @"
-§M{m001:MathModule}
-  §F{f001:add:pub}
-      §I{i32:x, i32:y}
-      §O{i32}
-      §Q (>= x INT:0)
-      §S (>= result INT:0)
-      §R (+ x y)
-  §F{f002:multiply:pub}
-      §I{i32:a, i32:b}
-      §O{i32}
-      §R (* a b)
-  §F{f003:computeTotal:pub}
-      §I{i32:x, i32:y, i32:z}
-      §O{i32}
-      §B{partial:i32} §C{add} §A x §A y §/C
-      §R (* partial z)
+module MathModule MathModule block
+  func add (int:x, int:y) → int
+    !
+    requires (x >= 0)
+    => (result >= 0)
+    return (x + y)
+  func multiply (int:a, int:b) → int
+    !
+    return (a * b)
+  func computeTotal (int:x, int:y, int:z) → int
+    !
+    let int:partial = add(x, y)
+    return (partial * z)
 ";
 
     private static readonly string SampleSourceWithEffects = @"
-§M{m002:IoModule}
-  §F{f010:readInput:pub}
-      §O{str}
-      §E{cr}
-      §R STR:""hello""
-  §F{f011:processAndPrint:pub}
-      §I{str:input}
-      §O{void}
-      §E{cw}
-      §P input
-  §F{f012:main:pub}
-      §O{void}
-      §E{cw, cr}
-      §B{data:str} §C{readInput} §/C
-      §C{processAndPrint} §A data §/C
+module IoModule IoModule block
+  func readInput () → string
+    ! cr
+    return ""hello""
+
+  func processAndPrint (string:input) → void
+    ! cw
+    Console.WriteLine(input)
+
+  func main () → void
+    ! cw, cr
+    let string:data = readInput()
+    processAndPrint(data)
 ";
 
     #region ImpactAnalysisTool Tests
@@ -55,28 +50,30 @@ public class EditPrecisionMcpToolTests
     public async Task ImpactAnalysis_FindsDirectCallers()
     {
         var tool = new StructureTool();
-        var args = CreateImpactArgs(SampleSource, "f001"); // add function
+        var target = FunctionId(SampleSource, "add");
+        var args = CreateImpactArgs(SampleSource, target);
 
         var result = await tool.ExecuteAsync(args);
 
         Assert.False(result.IsError, GetErrorText(result));
         var output = ParseOutput(result);
         Assert.True(output.GetProperty("success").GetBoolean());
-        Assert.Equal("f001", output.GetProperty("targetId").GetString());
+        Assert.Equal(target, output.GetProperty("targetId").GetString());
     }
 
     [Fact]
     public async Task ImpactAnalysis_WithPosition_ResolvesSymbol()
     {
         var tool = new StructureTool();
-        // Line 2 contains §F{f001:add:pub} — "add" starts at column 11
-        var args = CreateImpactArgsWithPosition(SampleSource, 2, 11);
+        // The source has a leading newline; "add" starts at line 3, column 8.
+        var args = CreateImpactArgsWithPosition(SampleSource, 3, 8);
 
         var result = await tool.ExecuteAsync(args);
 
         Assert.False(result.IsError, GetErrorText(result));
         var output = ParseOutput(result);
         Assert.True(output.GetProperty("success").GetBoolean());
+        Assert.Equal(FunctionId(SampleSource, "add"), output.GetProperty("targetId").GetString());
         // Verify the resolved symbol has an identity (targetId or targetSymbol)
         Assert.True(
             output.TryGetProperty("targetId", out var targetId) || output.TryGetProperty("targetSymbol", out _),
@@ -87,23 +84,23 @@ public class EditPrecisionMcpToolTests
     public async Task ImpactAnalysis_ContractImpacts_DetectsContracts()
     {
         var tool = new StructureTool();
-        var args = CreateImpactArgs(SampleSource, "f001");
+        var args = CreateImpactArgs(SampleSource, FunctionId(SampleSource, "add"));
 
         var result = await tool.ExecuteAsync(args);
 
         Assert.False(result.IsError, GetErrorText(result));
         var output = ParseOutput(result);
 
-        // f001 has preconditions and postconditions
+        // add has preconditions and postconditions.
         Assert.True(output.TryGetProperty("contractImpacts", out var contractImpacts));
-        Assert.True(contractImpacts.GetArrayLength() > 0, "Should detect contracts on function f001");
+        Assert.True(contractImpacts.GetArrayLength() > 0, "Should detect contracts on function add");
     }
 
     [Fact]
     public async Task ImpactAnalysis_DepthLimiting()
     {
         var tool = new StructureTool();
-        var args = CreateImpactArgsWithDepth(SampleSource, "f001", 1);
+        var args = CreateImpactArgsWithDepth(SampleSource, FunctionId(SampleSource, "add"), 1);
 
         var result = await tool.ExecuteAsync(args);
 
@@ -134,7 +131,7 @@ public class EditPrecisionMcpToolTests
     public async Task CallGraph_FindsCallees()
     {
         var tool = new StructureTool();
-        var args = CreateCallGraphArgs(SampleSource, "f003", "callees");
+        var args = CreateCallGraphArgs(SampleSource, FunctionId(SampleSource, "computeTotal"), "callees");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -145,7 +142,7 @@ public class EditPrecisionMcpToolTests
         var callees = output.GetProperty("callees");
         Assert.True(callees.GetArrayLength() > 0, "computeTotal calls add");
 
-        // Verify at least one callee references "add" (since f003/computeTotal calls add)
+        // Verify at least one callee references "add" (computeTotal calls add).
         var calleesJson = callees.EnumerateArray().Select(c => c.ToString()).ToList();
         Assert.True(calleesJson.Any(c => c.Contains("add")), $"Expected callee 'add' but got: {string.Join(", ", calleesJson)}");
     }
@@ -154,7 +151,7 @@ public class EditPrecisionMcpToolTests
     public async Task CallGraph_FindsCallers()
     {
         var tool = new StructureTool();
-        var args = CreateCallGraphArgs(SampleSource, "f001", "callers");
+        var args = CreateCallGraphArgs(SampleSource, FunctionId(SampleSource, "add"), "callers");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -167,7 +164,7 @@ public class EditPrecisionMcpToolTests
     public async Task CallGraph_BothDirections()
     {
         var tool = new StructureTool();
-        var args = CreateCallGraphArgs(SampleSource, "f003", "both");
+        var args = CreateCallGraphArgs(SampleSource, FunctionId(SampleSource, "computeTotal"), "both");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -180,7 +177,7 @@ public class EditPrecisionMcpToolTests
     public async Task CallGraph_IncludesEffectAnnotations()
     {
         var tool = new StructureTool();
-        var args = CreateCallGraphArgs(SampleSourceWithEffects, "f012", "both", includeEffects: true);
+        var args = CreateCallGraphArgs(SampleSourceWithEffects, FunctionId(SampleSourceWithEffects, "main"), "both", includeEffects: true);
 
         var result = await tool.ExecuteAsync(args);
 
@@ -197,7 +194,7 @@ public class EditPrecisionMcpToolTests
     public async Task CallGraph_NoCyclesInSample()
     {
         var tool = new StructureTool();
-        var args = CreateCallGraphArgs(SampleSource, "f001", "both");
+        var args = CreateCallGraphArgs(SampleSource, FunctionId(SampleSource, "add"), "both");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -238,7 +235,7 @@ public class EditPrecisionMcpToolTests
     {
         var tool = new EditPreviewTool();
         // Introduce a syntax error
-        var modified = "§M{m001:MathModule}\n  §F{f001:add:pub\n  invalid syntax here";
+        var modified = "module MathModule MathModule block\n  func add (int:x\n  invalid syntax here";
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);
@@ -252,7 +249,7 @@ public class EditPrecisionMcpToolTests
     public async Task EditPreview_EditSummary_ShowsChanges()
     {
         var tool = new EditPreviewTool();
-        var modified = SampleSource.Replace("§R (+ x y)", "§R (+ x (+ y INT:1))");
+        var modified = SampleSource.Replace("return (x + y)", "return (x + (y + 1))");
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);
@@ -268,7 +265,7 @@ public class EditPrecisionMcpToolTests
     {
         var tool = new EditPreviewTool();
         // Remove a contract line
-        var modified = SampleSource.Replace("  §Q (>= x INT:0)\n", "");
+        var modified = SampleSource.Replace("    requires (x >= 0)\n", "");
 
         var args = CreateEditPreviewArgs(SampleSource, modified);
         var result = await tool.ExecuteAsync(args);
@@ -312,7 +309,7 @@ public class EditPrecisionMcpToolTests
     public async Task ScopeInfo_FindsEnclosingFunction()
     {
         var tool = new NavigateTool();
-        // Line 7 is §R (+ x y) — inside the "add" function body
+        // Line 7 is return (x + y) — inside the "add" function body
         var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
@@ -390,7 +387,7 @@ public class EditPrecisionMcpToolTests
     public async Task ScopeInfo_IncludesActiveContracts()
     {
         var tool = new NavigateTool();
-        // Inside add function which has §Q and §S
+        // Inside add function which has requires and =>
         var args = CreateArgs(SampleSource, 7, 5, "scope");
 
         var result = await tool.ExecuteAsync(args);
@@ -424,7 +421,7 @@ public class EditPrecisionMcpToolTests
     public async Task FindReferences_BySymbolId_Works()
     {
         var tool = new NavigateTool();
-        var args = CreateFindRefsArgsWithId(SampleSource, "f001");
+        var args = CreateFindRefsArgsWithId(SampleSource, FunctionId(SampleSource, "add"));
 
         var result = await tool.ExecuteAsync(args);
 
@@ -452,8 +449,8 @@ public class EditPrecisionMcpToolTests
     public async Task FindReferences_ByPosition_StillWorks()
     {
         var tool = new NavigateTool();
-        // "add" on function definition line 2: §F{f001:add:pub}
-        var args = CreateArgs(SampleSource, 2, 11, "references");
+        // "add" on function definition line 3: func add
+        var args = CreateArgs(SampleSource, 3, 8, "references");
 
         var result = await tool.ExecuteAsync(args);
 
@@ -570,6 +567,13 @@ public class EditPrecisionMcpToolTests
     #endregion
 
     #region Helper Methods
+
+    private static string FunctionId(string source, string name)
+    {
+        var parsed = CalorSourceHelper.Parse(source);
+        Assert.True(parsed.IsSuccess);
+        return Assert.Single(parsed.Ast!.Functions, function => function.Name == name).Id;
+    }
 
     private static JsonElement CreateArgs(string source, int line, int column, string? action = null)
     {

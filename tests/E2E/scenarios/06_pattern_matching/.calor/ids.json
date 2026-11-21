@@ -1,0 +1,48 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_ahemxw2egr5w",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "PatternDemo",
+      "Signature": ""
+    },
+    {
+      "Id": "m_tnjm71w6xmdm",
+      "File": "input.calr",
+      "Container": "PatternDemo",
+      "Kind": 0,
+      "Name": "PatternDemoModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_5913rmj30dhr",
+      "File": "input.calr",
+      "Container": "PatternDemo.PatternDemoModule\u00600",
+      "Kind": 5,
+      "Name": "Describe",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022str\u0022}"
+    },
+    {
+      "Id": "mt_09wzmwpkt90n",
+      "File": "input.calr",
+      "Container": "PatternDemo.PatternDemoModule\u00600",
+      "Kind": 5,
+      "Name": "GetGrade",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022str\u0022}"
+    },
+    {
+      "Id": "mt_gspbcfetfarx",
+      "File": "input.calr",
+      "Container": "PatternDemo.PatternDemoModule\u00600",
+      "Kind": 5,
+      "Name": "GetHttpStatus",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022str\u0022}"
+    }
+  ]
+}

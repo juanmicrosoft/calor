@@ -1,0 +1,114 @@
+module L3M15 L3M15 block
+  module L3M15Module public
+
+    func l3m15_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 7)
+      requires (y >= 0)
+      => (result >= 24382)
+      let int:total = ((x * 5) + y)
+      if (total < 24382)
+        return 24382
+      else
+        return total
+
+    func l3m15_fn02 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24389)
+      if (x >= 24389)
+        return x
+      else
+        return 24389
+
+    func l3m15_fn03 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24396)
+        return (acc + 24396)
+      else
+        return ((acc * 2) + 24396)
+
+    func l3m15_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 43)
+
+    func l3m15_fn05 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24403)
+      if (x >= 24403)
+        return x
+      else
+        return 24403
+
+    func l3m15_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 24410)
+      let int:total = ((x * 2) + y)
+      if (total < 24410)
+        return 24410
+      else
+        return total
+
+    func l3m15_fn07 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24417)
+      if (x >= 24417)
+        return x
+      else
+        return 24417
+
+    func l3m15_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24424)
+        return (acc + 24424)
+      else
+        return ((acc * 2) + 24424)
+
+    func l3m15_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24431)
+      if (x >= 24431)
+        return x
+      else
+        return 24431
+
+    func l3m15_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 33)
+
+    func l3m15_fn11 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24438)
+      if (x >= 24438)
+        return x
+      else
+        return 24438
+
+    func l3m15_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 12)
+
+    func l3m15_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 30)

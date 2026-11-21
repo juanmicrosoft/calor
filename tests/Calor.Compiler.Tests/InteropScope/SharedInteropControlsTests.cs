@@ -22,7 +22,10 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// compile that changes behavior fails. A cell's outcome must be one the control allows and must
 /// equal the committed observation in <c>controls-results.json</c>: a reclassified cell fails until
 /// the results are regenerated (<c>CALOR_REGENERATE_T1_CONTROLS=1</c>) and the new observations are
-/// reviewed in the pull request that changes them.
+/// reviewed in the pull request that changes them. Current initializer frame counts and strict
+/// compilation are pinned separately in <c>initializer-current-expectations.json</c>; original
+/// sources, traces, outcomes and all other observation fields remain the original controls.
+/// Explicit X-INT-02 surface observations use <c>R0/array-current-results.json</c>.
 /// </summary>
 public sealed class SharedInteropControlsTests : IDisposable
 {
@@ -83,8 +86,51 @@ public sealed class SharedInteropControlsTests : IDisposable
         var committed = Results()[id];
         Assert.True(committed is not null, $"{id} has no committed observation; regenerate with CALOR_REGENERATE_T1_CONTROLS=1");
         Assert.Equal(committed["originalTrace"]!.GetValue<string>(), original);
-        Assert.True(JsonNode.DeepEquals(committed["surfaces"]?[surface], cell),
-            $"{id} on {surface} reclassified: committed {committed["surfaces"]?[surface]?.ToJsonString()}, observed {cell.ToJsonString()}");
+        var expected = committed["surfaces"]?[surface]?.DeepClone();
+        if (id is "T1-INIT-NESTED" or "T1-INIT-ORDER")
+        {
+            // Current raw frames preserve whole members, not the former expression fragments.
+            // Keep the original trace, outcome, options and every other path counter unchanged.
+            var current = JsonNode.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+                Dir, "initializer-current-expectations.json")))![id]!;
+            expected!["compile"] = current["compile"]!.DeepClone();
+            expected["paths"]!["interop"] = current["interop"]!.DeepClone();
+        }
+        if (id == "X-INT-02")
+        {
+            using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(CliTestHarness.FindRepoRoot(),
+                "tests/TestData/InteropScope/R0/array-current-results.json")));
+            var migration = surface is "cli-migrate" or "mcp-migrate" or "mcp-batch";
+            var registered = current.RootElement.GetProperty(migration ? "controls" : "additionalControls").GetProperty(id);
+            Assert.Equal(migration ? new[] { "cli-migrate", "mcp-migrate", "mcp-batch" }
+                    : ["library", "cli-convert", "mcp-convert", "mcp-convert-passthroughOnError"],
+                registered.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
+            Assert.Contains(surface, registered.GetProperty("surfaces").EnumerateArray().Select(value => value.GetString()));
+            Assert.Equal(registered.GetProperty("recordedCompile").GetString(), expected!["compile"]!.GetValue<string>());
+            Assert.Equal("default", registered.GetProperty("compile").GetString());
+            Assert.Equal("native", outcome);
+            Assert.False(surfaceError);
+            RawFrameAssertions.AssertFramed(calor!, present: false);
+            Assert.DoesNotContain("§CS{", calor!);
+            foreach (var path in new[] { "interop", "rescue", "passthrough", "lossy", "dropped" })
+                Assert.Equal(0, cell["paths"]![path]!.GetValue<int>());
+            var observation = current.RootElement.GetProperty("rows").GetProperty(registered.GetProperty("row").GetString()!);
+            Assert.True(observation.GetProperty("recordedUnknownEffects").GetBoolean());
+            Assert.True(observation.GetProperty("strictCompileSuccess").GetBoolean());
+            Assert.Equal(observation.GetProperty("trace").GetString(), original);
+            var strict = Compile(id, calor!, enforceEffects: true);
+            ArrayExpressionConversionTests.AssertCurrentArraySelections(strict, observation);
+            if (!migration)
+                ArrayExpressionConversionTests.AssertCurrentArrayDeclarations(source, strict, registered);
+            var permissive = Compile(id, calor!, enforceEffects: false);
+            Assert.False(permissive.HasErrors, string.Join(Environment.NewLine, permissive.Diagnostics.Errors));
+            Assert.Equal(permissive.GeneratedCode, strict.GeneratedCode);
+            Assert.Equal(original, Run(strict.GeneratedCode));
+            Assert.Equal(original, Run(permissive.GeneratedCode));
+            expected["compile"] = JsonValue.Create(registered.GetProperty("compile").GetString());
+        }
+        Assert.True(JsonNode.DeepEquals(expected, cell),
+            $"{id} on {surface} reclassified: expected {expected?.ToJsonString()}, observed {cell.ToJsonString()}");
     }
 
     /// <summary>The surface defaults the controls file records are what each entry point actually builds.</summary>
@@ -99,7 +145,7 @@ public sealed class SharedInteropControlsTests : IDisposable
         }
         Check("library", new ConversionOptions());
         Check("cli-convert", Commands.ConvertCommand.BuildCSharpToCalorOptions(benchmark: false, verbose: false, explain: false,
-            noFallback: false, passthrough: false, explicitCallClosers: false));
+            noFallback: false, passthrough: false));
         // Every committed cell reports the options that applied; they must agree with the recorded defaults.
         foreach (var (control, node) in Results())
             foreach (var (surface, cell) in node!["surfaces"]!.AsObject())

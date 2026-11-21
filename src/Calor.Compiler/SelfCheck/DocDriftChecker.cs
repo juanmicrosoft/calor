@@ -100,6 +100,10 @@ public sealed class DocDriftInputs
     /// <see cref="WebsiteExampleChecker"/> (#1143).
     /// </summary>
     public IReadOnlyList<DocFile> WebsiteDocs { get; init; } = [];
+
+    /// <summary>Shared displayed landing snippets and their registered TSX consumers.</summary>
+    public DocFile? LandingSnippets { get; init; }
+    public IReadOnlyList<DocFile> LandingComponents { get; init; } = [];
 }
 
 /// <summary>
@@ -208,6 +212,8 @@ public static class DocDriftChecker
         }
 
         diagnostics.AddRange(WebsiteExampleChecker.Check(inputs.WebsiteDocs));
+        if (inputs.LandingSnippets != null || inputs.LandingComponents.Count > 0)
+            diagnostics.AddRange(WebsiteExampleChecker.CheckLanding(inputs.LandingSnippets, inputs.LandingComponents));
 
         return diagnostics;
     }
@@ -276,6 +282,8 @@ public static class DocDriftChecker
             .ToList();
 
         var mirrorDocs = new List<MirrorDoc>();
+        mirrorDocs.AddRange(LoadTeachingMirrors(root, loadErrors));
+        mirrorDocs.AddRange(LoadSyntaxReferenceMirrors(root, loadErrors));
         var inventory = LoadAstInventoryMirror(root, loadErrors);
         if (inventory != null)
             mirrorDocs.Add(inventory);
@@ -324,6 +332,10 @@ public static class DocDriftChecker
             VersionScanDocs = NonNull(claudeMd).Concat(NonNull(copilotInstructions)).Concat(versionDocs)
                 .Concat(websiteDocs).ToList(),
             WebsiteDocs = websiteDocs,
+            LandingSnippets = LoadDoc(root, WebsiteExampleChecker.LandingSnippetsPath, loadErrors),
+            LandingComponents = WebsiteExampleChecker.LandingComponentNames
+                .Select(name => LoadDoc(root, WebsiteExampleChecker.LandingComponentPath(name), loadErrors))
+                .OfType<DocFile>().ToList(),
             SemanticsVersionDocs = semanticsDocs,
             MirrorDocs = mirrorDocs,
             ExemplarDoc = exemplarDoc,
@@ -393,6 +405,166 @@ public static class DocDriftChecker
         return true;
     }
 
+    public static DocDriftInputs LoadTeachingFromRepository(string root, List<Diagnostic> diagnostics)
+    {
+        var mirrors = LoadTeachingMirrors(root, diagnostics);
+        var reference = LoadDoc(root, ExemplarCompileChecker.TeachingReferencePath, diagnostics);
+        var primer = LoadDoc(root, ExemplarCompileChecker.RelativePath, diagnostics);
+        return new DocDriftInputs
+        {
+            Version = "", LexerKeywords = Parsing.Lexer.KeywordNames, DiagnosticCodes = [],
+            KnownEffectCodes = [], DocumentedEffectCodes = [],
+            MirrorDocs = mirrors,
+            KeywordDocs = reference == null ? [] : [reference],
+            AgentTaskReferenceDoc = reference,
+            ExemplarDoc = primer
+        };
+    }
+
+    private static IReadOnlyList<MirrorDoc> LoadTeachingMirrors(string root, List<Diagnostic> diagnostics)
+    {
+        var source = LoadDoc(root, ExemplarCompileChecker.TeachingSourcePath, diagnostics);
+        if (source == null)
+            return [];
+        try
+        {
+            return ExemplarCompileChecker.GenerateTeachingResources(source.Content).Select(pair =>
+            {
+                var path = Path.Combine(root, pair.Key);
+                return new MirrorDoc(pair.Key, source.Path,
+                    File.Exists(path) ? File.ReadAllText(path) : null, pair.Value);
+            }).ToList();
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException
+            or InvalidOperationException or KeyNotFoundException or ArgumentException)
+        {
+            diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                $"Cannot generate teaching reference: {exception.Message}", source.Path, 1, 1));
+            return [];
+        }
+    }
+
+    public static bool RegenerateTeachingResources(string root, List<Diagnostic> diagnostics)
+    {
+        var mirrors = LoadTeachingMirrors(root, diagnostics);
+        if (mirrors.Count == 0)
+            return false;
+        var reference = mirrors.Single(mirror =>
+            mirror.MirrorPath == ExemplarCompileChecker.TeachingReferencePath);
+        var findings = ExemplarCompileChecker.CheckAgentTaskReference(
+            new DocFile(reference.MirrorPath, reference.Expected));
+        diagnostics.AddRange(findings);
+        if (findings.Count > 0)
+            return false;
+        foreach (var mirror in mirrors)
+        {
+            var path = Path.Combine(root, mirror.MirrorPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (mirror.Actual != mirror.Expected)
+                File.WriteAllText(path, mirror.Expected, new UTF8Encoding(false));
+        }
+        return true;
+    }
+
+    public static string GenerateSyntaxReferenceMarkdown(DocFile source)
+    {
+        var lines = source.Content.Split('\n');
+        var end = Array.FindIndex(lines, 1, line => line.TrimEnd('\r') == "---");
+        if (lines[0].TrimEnd('\r') != "---" || end < 0)
+            throw new InvalidDataException($"Missing syntax-reference front matter in {source.Path}");
+        var header = string.Join("\n", lines.Take(end + 1));
+        var title = Regex.Match(header, "^title: \"(?<value>[^\"\\r\\n]+)\"\\r?$", RegexOptions.Multiline);
+        var order = Regex.Match(header, "^order: (?<value>[0-9]+)\\r?$", RegexOptions.Multiline);
+        if (!title.Success || !order.Success
+            || !Regex.IsMatch(header, "^section: \"syntax-reference\"\\r?$", RegexOptions.Multiline))
+            throw new InvalidDataException($"Invalid syntax-reference metadata in {source.Path}");
+        var fencedLines = WebsiteExampleChecker.ParseFences(source.Content)
+            .SelectMany(fence => Enumerable.Range(fence.OpenLine - 1, fence.CloseLine - fence.OpenLine + 1))
+            .ToHashSet();
+        for (var index = end + 1; index < lines.Length; index++)
+        {
+            if (fencedLines.Contains(index))
+                continue;
+            lines[index] = Regex.Replace(lines[index], @"\]\(/docs/(?<path>[^)\s]+)\)",
+                match => $"](https://calor.dev/docs/{match.Groups["path"].Value})");
+            lines[index] = Regex.Replace(lines[index], "<SupportLevel feature=\"(?<feature>[a-z0-9-]+)\" />", match =>
+            {
+                var feature = Migration.FeatureSupport.GetFeatureInfo(match.Groups["feature"].Value)
+                    ?? throw new InvalidDataException($"Unknown support feature in {source.Path}: {match.Groups["feature"].Value}");
+                return feature.Support.ToString();
+            });
+            if (lines[index].Contains("<SupportLevel", StringComparison.Ordinal))
+                throw new InvalidDataException($"Unsupported support component in {source.Path}");
+        }
+        var isIndex = Path.GetFileName(source.Path) == "index.mdx";
+        var navigation = isIndex
+            ? "nav_order: 4\nhas_children: true\npermalink: /syntax-reference/\n"
+            : $"parent: Syntax Reference\nnav_order: {order.Groups["value"].Value}\n";
+        return "---\nlayout: default\n"
+            + $"title: \"{title.Groups["value"].Value}\"\n{navigation}---\n\n"
+            + $"# {title.Groups["value"].Value}\n\n"
+            + $"<!-- Generated from {source.Path.Replace('\\', '/')} by calor self-check docs --fix. Edit the source, not this file. -->\n"
+            + string.Join("\n", lines.Skip(end + 1));
+    }
+
+    private static IReadOnlyList<MirrorDoc> LoadSyntaxReferenceMirrors(string root, List<Diagnostic> diagnostics)
+    {
+        var sources = LoadDocsInDirectory(root, Path.Combine("website", "content", "syntax-reference"),
+            diagnostics, pattern: "*.mdx").Where(source => Path.GetFileName(source.Path) != "current-language.mdx").ToList();
+        if (sources.Count == 0)
+        {
+            diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                "No canonical syntax-reference pages found", Path.Combine("website", "content", "syntax-reference"), 1, 1));
+            return [];
+        }
+        var mirrors = new List<MirrorDoc>();
+        foreach (var source in sources.OrderBy(source => source.Path, StringComparer.Ordinal))
+        {
+            try
+            {
+                var relative = Path.Combine("docs", "syntax-reference", Path.GetFileNameWithoutExtension(source.Path) + ".md");
+                var path = Path.Combine(root, relative);
+                mirrors.Add(new MirrorDoc(relative, source.Path,
+                    File.Exists(path) ? File.ReadAllText(path) : null, GenerateSyntaxReferenceMarkdown(source)));
+            }
+            catch (InvalidDataException exception)
+            {
+                diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                    $"Cannot generate syntax reference: {exception.Message}", source.Path, 1, 1));
+            }
+        }
+        var directory = Path.Combine(root, "docs", "syntax-reference");
+        if (Directory.Exists(directory))
+        {
+            var names = sources.Select(source => Path.GetFileNameWithoutExtension(source.Path))
+                .Append("current-language").ToHashSet(StringComparer.Ordinal);
+            foreach (var path in Directory.EnumerateFiles(directory, "*.md").Order(StringComparer.Ordinal))
+                if (!names.Contains(Path.GetFileNameWithoutExtension(path)))
+                    diagnostics.Add(Drift(DiagnosticCode.DocDriftMissingInput,
+                        "Syntax-reference mirror has no canonical MDX source", Path.GetRelativePath(root, path), 1, 1));
+        }
+        return mirrors;
+    }
+
+    public static bool RegenerateSyntaxReference(string root, List<Diagnostic> diagnostics)
+    {
+        var mirrors = LoadSyntaxReferenceMirrors(root, diagnostics);
+        if (mirrors.Count == 0 || diagnostics.Count != 0)
+            return false;
+        diagnostics.AddRange(WebsiteExampleChecker.Check(mirrors.Select(mirror =>
+            new DocFile(mirror.SourcePath, mirror.Expected)).ToList()));
+        if (diagnostics.Count != 0)
+            return false;
+        foreach (var mirror in mirrors)
+        {
+            var path = Path.Combine(root, mirror.MirrorPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (mirror.Actual != mirror.Expected)
+                File.WriteAllText(path, mirror.Expected, new UTF8Encoding(false));
+        }
+        return true;
+    }
+
     /// <summary>The CLAUDE.md H1 the AGENTS.md transform anchors on.</summary>
     public const string ClaudeTitleAnchor = "# CLAUDE.md — Calor Compiler";
 
@@ -459,7 +631,9 @@ public static class DocDriftChecker
 
     private static void CheckMirror(MirrorDoc mirror, List<Diagnostic> diagnostics)
     {
-        var normalizedActual = mirror.Actual?.Replace("\r\n", "\n");
+        var normalizedActual = mirror.SourcePath.EndsWith(".mdx", StringComparison.Ordinal)
+            ? mirror.Actual
+            : mirror.Actual?.Replace("\r\n", "\n");
         if (normalizedActual == mirror.Expected)
         {
             return;
@@ -575,10 +749,7 @@ public static class DocDriftChecker
     {
         foreach (var block in FindCalorFences(doc))
         {
-            var firstContent = block.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
-            if (block.Suppressed ||
-                firstContent == null ||
-                !Regex.IsMatch(firstContent.TrimStart(), @"^§M(?:\s|\{|$)"))
+            if (block.Suppressed || !ExemplarCompileChecker.StartsWithModule(block.Lines))
             {
                 continue;
             }
@@ -988,6 +1159,206 @@ public static class DocDriftChecker
 /// </summary>
 public static class WebsiteExampleChecker
 {
+    public static readonly string LandingRelativePath = Path.Combine("website", "src", "components", "landing");
+    public static string LandingSnippetsPath => Path.Combine(LandingRelativePath, "snippets.json");
+    public static IReadOnlyList<string> LandingComponentNames { get; } =
+        ["CodeComparison", "FirstProgram", "CatchBugs", "FeatureGrid", "CompetitivePositioning"];
+    public static string LandingComponentPath(string name) => Path.Combine(LandingRelativePath, name + ".tsx");
+
+    // These are prose, not executable fragments. Inline source must move to the
+    // shared source, including fragments without a module opener.
+    private static readonly IReadOnlyDictionary<string, string[]> LandingProse =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["CompetitivePositioning"] =
+            [
+                "'First-class requires and => contracts'",
+                "'Declared explicitly in ! rows'",
+                "'Expressed with requires; checked or verified'",
+            ],
+        };
+
+    // Keep code displays simple and fail closed when a component adds a new display
+    // shape. This also catches expression-only fragments with no section-sign tag.
+    private static readonly IReadOnlyDictionary<string, string[]> LandingCodeDisplays =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            // #1722 removed the code samples from these three; the inline-Calor guard still applies.
+            ["CodeComparison"] = [],
+            ["FirstProgram"] = [],
+            ["CatchBugs"] = [],
+            ["FeatureGrid"] = ["{feature.code}"],
+            ["CompetitivePositioning"] = [],
+        };
+
+    public sealed record LandingDiagnostic(string Code, string Severity, string Message);
+    public sealed record LandingSnippet(string Component, string Code, string Before, string After, int Indent,
+        IReadOnlyList<string> Inputs, IReadOnlyList<LandingDiagnostic> ExpectedDiagnostics);
+
+    /// <summary>
+    /// Landing code is rendered directly from JSON, never extracted from TypeScript. The
+    /// source guard enforces that convention while allowing prose mentions of bare tags.
+    /// Context supplies omitted declarations, not an alternative copy of the shown code.
+    /// </summary>
+    public static List<Diagnostic> CheckLanding(DocFile? source, IReadOnlyList<DocFile> components, Coverage? coverage = null)
+    {
+        var findings = new List<Diagnostic>();
+        coverage ??= new Coverage();
+        void Invalid(string message, string path) =>
+            findings.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation, message, path, 1));
+        foreach (var name in LandingComponentNames)
+        {
+            if (!components.Any(c => c.Path == LandingComponentPath(name)))
+                findings.Add(Finding(DiagnosticCode.DocDriftMissingInput,
+                    $"Missing registered landing component {name}", LandingComponentPath(name), 1));
+        }
+        if (source == null)
+        {
+            findings.Add(Finding(DiagnosticCode.DocDriftMissingInput,
+                "Missing shared landing snippet source", LandingSnippetsPath, 1));
+            return findings;
+        }
+
+        Dictionary<string, LandingSnippet>? snippets;
+        try
+        {
+            snippets = JsonSerializer.Deserialize<Dictionary<string, LandingSnippet>>(source.Content,
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    RespectRequiredConstructorParameters = true,
+                    UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow,
+                });
+        }
+        catch (JsonException exception)
+        {
+            Invalid($"Invalid landing snippet source: {exception.Message}", source.Path);
+            return findings;
+        }
+        if (snippets == null || snippets.Count == 0)
+        {
+            Invalid("Landing snippet source must contain registered examples", source.Path);
+            return findings;
+        }
+
+        var references = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var component in components)
+        {
+            coverage.LandingComponents++;
+            var proseOnly = component.Content;
+            var name = Path.GetFileNameWithoutExtension(component.Path);
+            foreach (var prose in LandingProse.GetValueOrDefault(name) ?? [])
+                proseOnly = proseOnly.Replace(prose, "", StringComparison.Ordinal);
+            if (proseOnly.Contains('§') || Regex.IsMatch(proseOnly, @"\\(?:u00[aA]7|u\{0*[aA]7\}|x[aA]7)")
+                || Regex.IsMatch(proseOnly,
+                    """['"`](?:\s|\\[nr])*(?:(?:module|func|class|let|var|requires|return|set)\s|=>|!\s)"""))
+                Invalid("Inline Calor source bypasses landing snippet validation; render landingSnippets.<id>.code instead",
+                    component.Path);
+
+            var displays = Regex.Matches(component.Content, @"<code\b[^>]*>(?<body>[\s\S]*?)</code>")
+                .Select(match => match.Groups["body"].Value.Trim()).Order(StringComparer.Ordinal);
+            if (!displays.SequenceEqual((LandingCodeDisplays.GetValueOrDefault(name) ?? []).Order(StringComparer.Ordinal),
+                StringComparer.Ordinal))
+                Invalid("Unregistered landing code display: register its shared source and display shape", component.Path);
+            foreach (Match pre in Regex.Matches(component.Content, @"<pre\b[^>]*>(?<body>[\s\S]*?)</pre>"))
+            {
+                if (!Regex.IsMatch(pre.Groups["body"].Value.Trim(), @"^<code\b[^>]*>[\s\S]*</code>$"))
+                    Invalid("Landing preformatted examples must use a registered code display", component.Path);
+            }
+            foreach (Match property in Regex.Matches(component.Content, @"\bcode:\s*(?<value>[^\r\n]+)"))
+            {
+                var value = property.Groups["value"].Value.Trim();
+                if (!Regex.IsMatch(value, @"^landingSnippets\.[A-Za-z0-9_]+\.code,$")
+                    && !(name == "FeatureGrid" && value == "'calor query impact Save\\n  --effects --row fs:w',"))
+                    Invalid("Unregistered landing code property: Calor fragments must use shared snippet source", component.Path);
+            }
+
+            var uses = Regex.Matches(component.Content, @"\blandingSnippets\.(?<id>[A-Za-z0-9_]+)\.code\b");
+            if (uses.Count > 0 && !component.Content.Contains("import landingSnippets from './snippets.json';", StringComparison.Ordinal))
+                Invalid("Landing snippet consumers must import the shared snippets.json source", component.Path);
+            foreach (Match use in uses)
+            {
+                var id = use.Groups["id"].Value;
+                references[id] = references.GetValueOrDefault(id) + 1;
+                if (!snippets.TryGetValue(id, out var snippet) || snippet == null
+                    || component.Path != LandingComponentPath(snippet.Component))
+                    Invalid($"Unknown or misplaced landing snippet reference '{id}'", component.Path);
+            }
+        }
+
+        foreach (var (id, snippet) in snippets)
+        {
+            if (snippet == null || !Regex.IsMatch(id, @"^[A-Za-z_][A-Za-z0-9_]*$")
+                || !LandingComponentNames.Contains(snippet.Component, StringComparer.Ordinal)
+                || string.IsNullOrWhiteSpace(snippet.Code) || snippet.Before == null || snippet.After == null
+                || (snippet.Before.Length > 0 && !snippet.Before.EndsWith('\n'))
+                || snippet.Indent is < 0 or > 4 || snippet.Indent % 2 != 0
+                || snippet.Inputs == null || snippet.Inputs.Any(string.IsNullOrWhiteSpace)
+                || snippet.ExpectedDiagnostics == null
+                || snippet.ExpectedDiagnostics.Any(d => d == null || d.Code == null || !CodePattern.IsMatch(d.Code)
+                    || d.Severity is not ("Error" or "Warning") || string.IsNullOrWhiteSpace(d.Message)))
+            {
+                Invalid($"Malformed landing snippet '{id}': code, context and exact diagnostic expectations are required", source.Path);
+                continue;
+            }
+            if (references.GetValueOrDefault(id) != 1)
+                Invalid($"Landing snippet '{id}' must have exactly one registered consumer", source.Path);
+            var fragment = !ExemplarCompileChecker.StartsWithModule(snippet.Code.Split('\n'));
+            if (fragment && string.IsNullOrWhiteSpace(snippet.Before))
+            {
+                Invalid($"Landing fragment '{id}' requires explicit compilation context", source.Path);
+                continue;
+            }
+            var text = snippet.Before + string.Join("\n", snippet.Code.Replace("\r\n", "\n").Split('\n')
+                .Select(line => new string(' ', snippet.Indent) + line)) + "\n" + snippet.After;
+            var program = new Fence("calor", [], text.Split('\n'), 1, text.Split('\n').Length + 1);
+            if (!program.IsCompleteProgram)
+            {
+                Invalid($"Landing snippet '{id}' context must form a complete module", source.Path);
+                continue;
+            }
+            coverage.LandingPrograms++;
+            if (fragment) coverage.LandingFragments++;
+            if (snippet.ExpectedDiagnostics.Count > 0) coverage.LandingNegativePrograms++;
+            var members = new List<Fence> { program };
+            foreach (var input in snippet.Inputs)
+                members.Add(new Fence("calor", [], input.Split('\n'), 1, input.Split('\n').Length + 1));
+            if (members.Any(member => !member.IsCompleteProgram))
+            {
+                Invalid($"Landing snippet '{id}' additional inputs must be complete modules", source.Path);
+                continue;
+            }
+            var compiled = Compile(source, members, findings);
+            if (!compiled.Actual.TryGetValue(program, out var actual))
+                continue;
+            var rest = members.Where(member => !compiled.FailedFiles.Contains(member)).ToList();
+            if (rest.Count > 0 && rest.Count < members.Count)
+            {
+                foreach (var (member, retry) in Compile(source, rest, findings).Actual)
+                {
+                    var known = compiled.Actual[member].Select(d => (d.Code, d.Message)).ToHashSet();
+                    foreach (var error in retry.Where(d => d.IsError && !known.Contains((d.Code, d.Message))))
+                        findings.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                            $"Landing snippet '{id}' context fails after removing failing inputs: {error.Code}: {error.Message}",
+                            source.Path, 1));
+                }
+            }
+            foreach (var member in members.Skip(1))
+            {
+                if (compiled.Actual.TryGetValue(member, out var inputDiagnostics))
+                    actual.AddRange(inputDiagnostics);
+            }
+            static string Key(LandingDiagnostic d) => $"{d.Severity} {d.Code}: {d.Message}";
+            var expected = snippet.ExpectedDiagnostics.Select(Key).Order(StringComparer.Ordinal);
+            var reported = actual.Select(d => $"{d.Severity} {d.Code}: {d.Message}").Order(StringComparer.Ordinal);
+            if (!reported.SequenceEqual(expected, StringComparer.Ordinal))
+                findings.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                    $"Landing snippet '{id}' diagnostics differ: expected [{string.Join("; ", expected)}], " +
+                    $"actual [{string.Join("; ", reported)}]", source.Path, 1));
+        }
+        return findings;
+    }
+
     /// <summary>Repository-relative root of the website's MDX content.</summary>
     public static readonly string ContentRelativePath = Path.Combine("website", "content");
 
@@ -1004,21 +1375,20 @@ public static class WebsiteExampleChecker
     /// <summary>MDX cannot hold HTML comments, so the drift suppression marker takes JSX-comment form.</summary>
     public const string MdxSuppressionMarker = "{/* drift:ignore */}";
 
-    private static readonly Regex CompleteProgramStart = new(@"^§M(?:\s|\{|$)", RegexOptions.Compiled);
     private static readonly Regex CodePattern = new(@"^Calor\d{4}$", RegexOptions.Compiled);
     private static readonly Regex GroupPattern = new(@"^[A-Za-z0-9_-]+$", RegexOptions.Compiled);
     private static readonly Regex Heading = new(@"^#{1,6}\s", RegexOptions.Compiled);
     private static readonly Regex LocationClaim = new(@"\bline (?<line>\d+), column (?<column>\d+)\b", RegexOptions.Compiled);
 
-    // One quoted diagnostic in an output fence: an optional "path(l,c): " prefix, an optional
-    // severity word, the code, and the message (continuation lines are appended).
+    // Accept current one-line text and older quoted output without rewriting historical pages.
     private static readonly Regex QuotedDiagnostic = new(
-        @"^(?:\S+\((?<line>\d+),(?<column>\d+)\):\s*)?(?:(?<severity>error|warning)\s+)?(?<code>Calor\d{4}):\s*(?<message>.*)$",
+        @"^(?:(?<agent>.+:(?<line>\d+):(?<column>\d+))\s+(?<code>Calor\d{4})\s+(?:(?<severity>warning|info):\s*)?(?<message>.*)"
+            + @"|(?:\S+\((?<line>\d+),(?<column>\d+)\):\s*)?(?:(?<severity>error|warning)\s+)?(?<code>Calor\d{4}):\s*(?<message>.*))$",
         RegexOptions.Compiled);
 
     // Lines that make a fence read as real tool output.
     private static readonly Regex OutputShaped = new(
-        @"Calor\d{4}:|^\s*(?:error|warning)\b|\.calr[:(]\d+[:,]\d+|^\s*===.*===\s*$|^\s*BLOCKED:",
+        @"Calor\d{4}:|^.+:\d+:\d+\s+Calor\d{4}\s|^\s*(?:error|warning)\b|\.calr[:(]\d+[:,]\d+|^\s*===.*===\s*$|^\s*BLOCKED:",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     private static readonly HashSet<string> OutputLanguages = new(StringComparer.Ordinal) { "", "text", "console", "plaintext" };
@@ -1050,8 +1420,7 @@ public static class WebsiteExampleChecker
         public string Source => string.Join("\n", Lines) + "\n";
 
         public bool IsCompleteProgram => Language == "calor"
-            && Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) is { } first
-            && CompleteProgramStart.IsMatch(first.TrimStart());
+            && ExemplarCompileChecker.StartsWithModule(Lines);
 
         public string? Value(string key) => Tokens
             .Where(t => t.StartsWith(key + "=", StringComparison.Ordinal))
@@ -1070,6 +1439,10 @@ public static class WebsiteExampleChecker
         public int GroupedPrograms { get; set; }
         public int CheckedOutputs { get; set; }
         public int IllustrativeOutputs { get; set; }
+        public int LandingComponents { get; set; }
+        public int LandingPrograms { get; set; }
+        public int LandingFragments { get; set; }
+        public int LandingNegativePrograms { get; set; }
     }
 
     /// <summary>True when the page is a historical record excluded from website checks.</summary>
@@ -1321,7 +1694,7 @@ public static class WebsiteExampleChecker
         if (fence.Language == "calor" && fence.Tokens.Count > 0 && !fence.IsCompleteProgram)
         {
             diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
-                "`expect=`/`group=` apply only to complete programs (first line starts with §M); " +
+                "`expect=`/`group=` apply only to complete programs (first non-comment content line starts with module); " +
                 "on a fragment they would be silently ignored", page.Path, fence.OpenLine));
             ok = false;
         }
@@ -1342,12 +1715,10 @@ public static class WebsiteExampleChecker
         }
 
         // A non-calor fence holding a complete program would bypass every check above.
-        if (fence.Language != "calor"
-            && fence.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) is { } first
-            && CompleteProgramStart.IsMatch(first.TrimStart()))
+        if (fence.Language != "calor" && ExemplarCompileChecker.StartsWithModule(fence.Lines))
         {
             diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
-                $"A complete Calor program (starts with §M) is fenced as ```{fence.Language}; label it ```calor so it is checked",
+                $"A complete Calor program (starts with module) is fenced as ```{fence.Language}; label it ```calor so it is checked",
                 page.Path, fence.OpenLine));
             ok = false;
         }
@@ -1499,14 +1870,16 @@ public static class WebsiteExampleChecker
             return;
         }
 
-        var quoted = new List<(string? Severity, string Code, string Message, string? Location)>();
+        var quoted = new List<(string? Severity, string Code, string Message, string? Location, bool Agent)>();
         foreach (var line in output.Lines)
         {
             var match = QuotedDiagnostic.Match(line.Trim());
             if (match.Success)
-                quoted.Add((match.Groups["severity"].Success ? match.Groups["severity"].Value : null,
+                quoted.Add((match.Groups["severity"].Success ? match.Groups["severity"].Value
+                        : match.Groups["agent"].Success ? "error" : null,
                     match.Groups["code"].Value, match.Groups["message"].Value,
-                    match.Groups["line"].Success ? $"{match.Groups["line"].Value},{match.Groups["column"].Value}" : null));
+                    match.Groups["line"].Success ? $"{match.Groups["line"].Value},{match.Groups["column"].Value}" : null,
+                    match.Groups["agent"].Success));
             else if (quoted.Count > 0 && line.Trim().Length > 0)
                 quoted[^1] = quoted[^1] with { Message = quoted[^1].Message + " " + line.Trim() };
             else if (line.Trim().Length > 0)
@@ -1516,10 +1889,10 @@ public static class WebsiteExampleChecker
         }
 
         var remaining = unit.Members.SelectMany(m => unit.Actual.GetValueOrDefault(m) ?? []).ToList();
-        foreach (var (severity, code, message, location) in quoted)
+        foreach (var (severity, code, message, location, agent) in quoted)
         {
             var match = remaining.FirstOrDefault(d => d.Code == code
-                && Normalize(d.Message) == Normalize(message)
+                && Normalize(agent ? DiagnosticText.ShortMessage(d) : d.Message) == Normalize(message)
                 && (severity == null || string.Equals(severity, d.Severity.ToString(), StringComparison.OrdinalIgnoreCase))
                 && (location == null || location == $"{d.Span.Line},{d.Span.Column}"));
             if (match == null)

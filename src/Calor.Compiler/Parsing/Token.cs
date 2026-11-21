@@ -1,3 +1,7 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace Calor.Compiler.Parsing;
 
 /// <summary>
@@ -21,7 +25,9 @@ public enum TokenKind
     Question,           // ?
     OpenParen,          // (
     CloseParen,         // )
-    Arrow,              // → or ->
+    Arrow,              // →
+    FatArrow,           // => (postcondition header or lambda)
+    Semicolon,          // ; (re-evaluated for clauses)
     At,                 // @ (for C#-style attributes)
     Comma,              // , (for attribute arguments)
 
@@ -54,7 +60,7 @@ public enum TokenKind
     ReadLine,           // §G = Console.ReadLine (renamed from Get to avoid conflict)
     DebugPrint,         // §D = Debug.WriteLine (renamed from Debug to avoid potential conflicts)
 
-    // Keywords (recognized after §)
+    // Canonical keywords and retained internal legacy kinds
     Module,
     EndModule,
     Func,
@@ -62,8 +68,6 @@ public enum TokenKind
     In,
     Out,
     Effects,
-    Body,
-    EndBody,
     Call,
     EndCall,
     Arg,
@@ -84,24 +88,18 @@ public enum TokenKind
     Continue,
     Goto,
     Label,
-    SemVer,             // §SEMVER{MAJOR.MINOR.PATCH} - module semantics-version declaration
+    SemVer,             // semver "MAJOR.MINOR.PATCH" - module semantics-version declaration
     Bind,
+    Let,
+    From,
+    To,
+    Step,
 
     // Phase 3: Type System
-    Type,
-    EndType,
-    Record,
-    EndRecord,
-    Field,
     Match,
     EndMatch,
     Case,
     EndCase,    // §/K - closing case tag for block syntax
-    Some,
-    None,
-    Ok,
-    Err,
-    Variant,
 
     // Phase 4: Contracts and Effects
     Requires,
@@ -130,7 +128,6 @@ public enum TokenKind
     EndHashSet,     // §/HSET
     KeyValue,       // §KV - Dictionary key-value pair
     Push,           // §PUSH - Add to list/set
-    Add,            // §ADD - Add to set (alias for PUSH, idiomatic for HashSet)
     Put,            // §PUT - Add/update dictionary entry
     Remove,         // §REM - Remove from collection
     SetIndex,       // §SETIDX - Set list element by index
@@ -144,9 +141,8 @@ public enum TokenKind
     Count,          // §CNT - Collection .Count property
 
     // Phase 7: Generics
-    TypeParam,
+    Record,
     Where,
-    Generic,
 
     // Phase 8: Classes, Interfaces, Inheritance
     Class,
@@ -157,10 +153,6 @@ public enum TokenKind
     Extends,
     Method,
     EndMethod,
-    Virtual,
-    Override,
-    Abstract,
-    Sealed,
     This,
     EndThis,
     Base,
@@ -182,12 +174,11 @@ public enum TokenKind
     EndInit,
     Constructor,
     EndConstructor,
-    OperatorOverload,       // §OP
+    OperatorOverload,       // op
     EndOperatorOverload,    // §/OP
     BaseCall,
     EndBaseCall,
     Assign,
-    Default,
 
     // Phase 10: Try/Catch/Finally
     Try,
@@ -213,7 +204,6 @@ public enum TokenKind
     Unsubscribe,
 
     // Phase 12: Async/Await
-    Async,
     Await,
     AsyncFunc,          // §AF - Async function
     EndAsyncFunc,       // §/AF - End async function
@@ -225,7 +215,7 @@ public enum TokenKind
     EndInterpolate,
     NullCoalesce,
     NullConditional,
-    RangeOp,
+    RangeOp,            // ..
     IndexEnd,
     Expression,
 
@@ -243,53 +233,26 @@ public enum TokenKind
 
     // Extended Features Phase 1: Quick Wins
     Example,            // §EX - Inline examples/tests
-    Todo,               // §TODO - Structured todo items
-    Fixme,              // §FIXME - Bug markers
-    Hack,               // §HACK - Workaround markers
 
     // Extended Features Phase 2: Core Features
-    Uses,               // §USES - Dependency declarations
-    EndUses,            // §/USES
-    UsedBy,             // §USEDBY - Reverse dependency tracking
-    EndUsedBy,          // §/USEDBY
     Assume,             // §ASSUME - Assumptions
 
     // Extended Features Phase 3: Enhanced Contracts
-    Complexity,         // §COMPLEXITY - Performance contracts
     Since,              // §SINCE - API versioning
     Deprecated,         // §DEPRECATED - Deprecation markers
     Breaking,           // §BREAKING - Breaking change markers
-    Experimental,       // §EXPERIMENTAL - Experimental feature markers
-    Stable,             // §STABLE - Stability markers
 
     // Enums and Extensions
-    Enum,               // §EN or §ENUM - Enum definition
-    EndEnum,            // §/EN or §/ENUM
+    Enum,               // §EN - Enum definition
+    EndEnum,            // §/EN
     EnumExtension,      // §EEXT - Enum extension methods (note: §EXT is for class inheritance)
     EndEnumExtension,   // §/EEXT
 
     // Extended Features Phase 4: Future Extensions
-    Decision,           // §DECISION - Decision records
-    EndDecision,        // §/DECISION
-    Chosen,             // §CHOSEN - Chosen option in decision
-    Rejected,           // §REJECTED - Rejected option in decision
-    Reason,             // §REASON - Reason for decision
-    Context,            // §CONTEXT - Context markers (also used in decisions)
-    EndContext,         // §/CONTEXT
-    Visible,            // §VISIBLE - Visible files in context
-    EndVisible,         // §/VISIBLE
-    HiddenSection,      // §HIDDEN - Hidden files in context (renamed to avoid C# keyword)
-    EndHidden,          // §/HIDDEN
-    Focus,              // §FOCUS - Focus target
-    FileRef,            // §FILE - File reference (renamed to avoid conflict)
     PropertyTest,       // §PROPERTY - Property-based testing (renamed to avoid conflict with Property)
-    Lock,               // §LOCK - Multi-agent locking
-    AgentAuthor,        // §AUTHOR - Agent authorship tracking
-    TaskRef,            // §TASK - Task reference
-    DateMarker,         // §DATE - Date marker
 
     // Yield support
-    Yield,              // §YIELD - yield return
+    Yield,              // yield value / yield break
     YieldBreak,         // §YBRK - yield break
 
     // LINQ Support
@@ -300,10 +263,10 @@ public enum TokenKind
     RawCSharp,          // §RAW ... §/RAW - Raw C# content emitted verbatim
     RawCSharpExpression,  // §CS{...} - Inline C# expression
     CSharpInterop,      // §CSHARP{...}§/CSHARP - C# interop block (member-level)
-    CompilerDirective,  // §CDIR{base64} - exact nonconditional C# directive
+    CompilerDirective,  // raw directive:<feature> N - validated nonconditional C# directive
 
     // Preprocessor Directives
-    Preprocessor,       // §PP{CONDITION} - preprocessor conditional start
+    Preprocessor,       // pp; Value is exact physical-line remainder, excluding CR/LF
     EndPreprocessor,    // §/PP{CONDITION} - preprocessor conditional end
     PreprocessorElse,   // §PPE - preprocessor else
 
@@ -373,6 +336,7 @@ public readonly struct Token : IEquatable<Token>
     public string Text { get; }
     public TextSpan Span { get; }
     public object? Value { get; }
+    public string? DocComment { get; init; }
     internal int IndentationDepth { get; init; }
 
     public Token(TokenKind kind, string text, TextSpan span, object? value = null)
@@ -383,7 +347,8 @@ public readonly struct Token : IEquatable<Token>
         Value = value;
     }
 
-    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndNamespace;
+    public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndNamespace
+        && Kind != TokenKind.RangeOp;
 
     public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral or TokenKind.CharLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;
@@ -463,6 +428,295 @@ internal readonly record struct IntLiteralInfo(
 /// (#774 faithful preservation). Stored in <see cref="Token.Value"/> for SINGLE: literals.
 /// </summary>
 internal readonly record struct FloatLiteralInfo(double Value, bool IsSingle);
+
+internal sealed record RawCSharpFrame(
+    string Code,
+    string? FeatureName = null,
+    string? Reason = null,
+    Ast.InteropMemberKind MemberKind = Ast.InteropMemberKind.Other,
+    bool IsCompilationUnitPassthrough = false,
+    bool IsCompilerDirective = false)
+{
+    private static readonly System.Text.UTF8Encoding StrictMetadataUtf8 = new(false, true);
+
+    internal static string NormalizeLineEndings(string source)
+    {
+        if (!source.Contains("\r\n", StringComparison.Ordinal))
+            return source;
+        var result = new System.Text.StringBuilder(source.Length);
+        var cursor = 0;
+        foreach (var token in ReadTokens(source))
+        {
+            if (token.Value is not RawCSharpFrame frame)
+                continue;
+            var payloadStart = token.Span.End - frame.Code.Length;
+            result.Append(source[cursor..payloadStart].Replace("\r\n", "\n", StringComparison.Ordinal));
+            result.Append(frame.Code);
+            cursor = token.Span.End;
+        }
+        result.Append(source[cursor..].Replace("\r\n", "\n", StringComparison.Ordinal));
+        return result.ToString();
+    }
+
+    internal static string MaskForAnalysis(string source)
+    {
+        var characters = source.ToCharArray();
+        var tokens = new Lexer(source, new Diagnostics.DiagnosticBag()).TokenizeAll();
+        foreach (var token in tokens)
+            if (token.Value is RawCSharpFrame)
+                for (var i = token.Span.Start; i < token.Span.End; i++)
+                    if (characters[i] is not '\r' and not '\n')
+                        characters[i] = ' ';
+        return new string(characters);
+    }
+
+    internal static Token? FindAtOffset(string source, int offset)
+    {
+        var tokens = new Lexer(source, new Diagnostics.DiagnosticBag()).TokenizeAll();
+        foreach (var token in tokens)
+            if ((token.Value is RawCSharpFrame
+                    || token.Kind == TokenKind.Error
+                        && (token.Text == "raw"
+                            || token.Text.StartsWith("raw ", StringComparison.Ordinal)
+                            || token.Text.StartsWith("raw\t", StringComparison.Ordinal)))
+                && offset >= token.Span.Start
+                && (token.Kind == TokenKind.Error || offset < token.Span.End
+                    || offset == token.Span.End && token.Text[^1] is not '\r' and not '\n'))
+                return token;
+        return null;
+    }
+
+    internal static List<Token> ReadTokens(string source)
+    {
+        var diagnostics = new Diagnostics.DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAll();
+        var frameErrors = diagnostics.Errors
+            .Where(d => d.Code == Diagnostics.DiagnosticCode.InvalidRawFrame).ToList();
+        if (frameErrors.Count > 0)
+            throw new FormatException(string.Join("\n", frameErrors.Select(d => d.Message)));
+        return tokens;
+    }
+
+    internal static string RewriteOutsideFrames(string source, Func<string, string> rewrite)
+    {
+        return RewriteOutsideTokens(source,
+            ReadTokens(source).Where(t => t.Value is RawCSharpFrame).ToList(), rewrite);
+    }
+
+    internal static string RewriteOutsideTokens(string source, IReadOnlyList<Token> tokens, Func<string, string> rewrite)
+    {
+        if (tokens.Count == 0)
+            return rewrite(source);
+        var prefix = "__CALOR_OPAQUE_FRAME_";
+        while (source.Contains(prefix, StringComparison.Ordinal))
+            prefix += "_";
+        var masked = new System.Text.StringBuilder();
+        var replacements = new List<(string Marker, string Text, bool EndsLine)>();
+        var cursor = 0;
+        foreach (var token in tokens)
+        {
+            var marker = prefix + replacements.Count + "__";
+            var endsLine = token.Text[^1] is '\r' or '\n';
+            masked.Append(source, cursor, token.Span.Start - cursor);
+            masked.Append(marker);
+            if (endsLine)
+                masked.Append('\n');
+            replacements.Add((marker, token.Text, endsLine));
+            cursor = token.Span.End;
+        }
+        masked.Append(source, cursor, source.Length - cursor);
+        var result = rewrite(masked.ToString());
+        foreach (var (marker, text, endsLine) in replacements)
+        {
+            if (!result.Contains(marker, StringComparison.Ordinal))
+                throw new InvalidOperationException("Source rewrite removed an opaque raw frame boundary.");
+            result = result.Replace(
+                endsLine && result.Contains(marker + "\n", StringComparison.Ordinal)
+                    ? marker + "\n" : marker, text, StringComparison.Ordinal);
+        }
+        return result;
+    }
+
+    internal string ReasonMarker
+    {
+        get
+        {
+            if (IsCompilerDirective)
+                return "directive:" + Uri.EscapeDataString(FeatureName!);
+            if (!IsCompilationUnitPassthrough
+                && Reason == null && MemberKind == Ast.InteropMemberKind.Other)
+            {
+                if (FeatureName == null)
+                    return "member";
+                var compact = Uri.EscapeDataString(FeatureName);
+                if (compact.Length > 0 && compact is not ("statement" or "member" or "unit"))
+                    return compact;
+            }
+            return $"{(IsCompilationUnitPassthrough ? "unit" : "member")}:" +
+                $"{Encode(FeatureName)}:{MemberKind}:{Encode(Reason)}";
+        }
+    }
+
+    private static string Encode(string? value) =>
+        value == null ? "~" : Uri.EscapeDataString(value).Replace("~", "%7E", StringComparison.Ordinal);
+
+    internal static void ValidateInteropReasons(
+        IReadOnlyList<Token> tokens, Diagnostics.DiagnosticBag diagnostics)
+    {
+        foreach (var token in tokens)
+        {
+            if (token.Value is RawCSharpFrame { IsCompilerDirective: true }
+                || token.Kind is not (TokenKind.RawCSharp or TokenKind.CSharpInterop))
+                continue;
+            if (token.Value is not RawCSharpFrame frame
+                || string.IsNullOrWhiteSpace(frame.FeatureName) || string.IsNullOrWhiteSpace(frame.Reason))
+            {
+                diagnostics.ReportError(token.Span, Diagnostics.DiagnosticCode.InvalidCSharpInteropReason,
+                    "Raw C# passthrough requires nonempty feature and reason metadata. "
+                    + "Write native Calor instead, or run calor convert on the original C# and retain its marked fallback. "
+                    + "A marker alone does not establish converter origin or reason applicability.");
+                continue;
+            }
+            if (!Migration.FeatureSupport.IsKnownPreservationReason(frame.FeatureName))
+                diagnostics.ReportError(token.Span, Diagnostics.DiagnosticCode.InvalidCSharpInteropReason,
+                    $"Unknown C# preservation feature '{frame.FeatureName}'. "
+                    + "Write native Calor instead, or run calor convert on the original C# to obtain a current reason. "
+                    + "A recognized feature alone does not establish converter origin or reason applicability.");
+        }
+    }
+
+    private static bool TryDecodeMetadata(string encoded, out string? decoded)
+    {
+        decoded = null;
+        if (encoded == "~")
+            return true;
+        for (var index = 0; index < encoded.Length; index++)
+        {
+            if (encoded[index] != '%')
+                continue;
+            var bytes = new List<byte>();
+            while (index < encoded.Length && encoded[index] == '%')
+            {
+                if (index + 2 >= encoded.Length
+                    || !byte.TryParse(encoded.AsSpan(index + 1, 2),
+                        System.Globalization.NumberStyles.AllowHexSpecifier,
+                        System.Globalization.CultureInfo.InvariantCulture, out var value))
+                    return false;
+                bytes.Add(value);
+                index += 3;
+            }
+            try
+            {
+                _ = StrictMetadataUtf8.GetCharCount(bytes.ToArray());
+            }
+            catch (System.Text.DecoderFallbackException)
+            {
+                return false;
+            }
+            index--;
+        }
+        decoded = Uri.UnescapeDataString(encoded);
+        try
+        {
+            _ = StrictMetadataUtf8.GetByteCount(decoded);
+        }
+        catch (System.Text.EncoderFallbackException)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    internal static bool TryParseReason(string marker, out RawCSharpFrame frame)
+    {
+        frame = new RawCSharpFrame("");
+        var parts = marker.Split(':');
+        if (parts[0] == "directive" && parts.Length > 1)
+        {
+            if (parts.Length != 2)
+                return false;
+            var feature = Uri.UnescapeDataString(parts[1]);
+            if (!IsCompilerDirectiveFeature(feature)
+                || Uri.EscapeDataString(feature) != parts[1])
+                return false;
+            frame = frame with { FeatureName = feature, IsCompilerDirective = true };
+            return true;
+        }
+        if (parts.Length == 1)
+        {
+            if (marker is "statement" or "member")
+                return true;
+            if (marker == "unit")
+            {
+                frame = frame with { IsCompilationUnitPassthrough = true };
+                return true;
+            }
+            if (!TryDecodeMetadata(marker, out var compactFeature))
+                return false;
+            frame = frame with { FeatureName = compactFeature };
+            return true;
+        }
+        if (parts.Length != 4 || parts[0] is not ("member" or "unit")
+            || !Enum.TryParse<Ast.InteropMemberKind>(parts[2], out var kind)
+            || !Enum.IsDefined(kind)
+            || !TryDecodeMetadata(parts[1], out var interopFeature)
+            || !TryDecodeMetadata(parts[3], out var reason))
+            return false;
+        frame = frame with
+        {
+            FeatureName = interopFeature,
+            MemberKind = kind,
+            Reason = reason,
+            IsCompilationUnitPassthrough = parts[0] == "unit"
+        };
+        return true;
+    }
+
+    internal static string? GetCompilerDirectiveFeature(DirectiveTriviaSyntax directive) => directive switch
+    {
+        NullableDirectiveTriviaSyntax => "nullable-directive",
+        PragmaWarningDirectiveTriviaSyntax or PragmaChecksumDirectiveTriviaSyntax => "pragma",
+        WarningDirectiveTriviaSyntax => "warning-directive",
+        ErrorDirectiveTriviaSyntax => "error-directive",
+        LineDirectiveTriviaSyntax or LineSpanDirectiveTriviaSyntax => "line-directive",
+        DefineDirectiveTriviaSyntax or UndefDirectiveTriviaSyntax => "symbol-directive",
+        _ => null
+    };
+
+    private static bool IsCompilerDirectiveFeature(string feature) =>
+        feature is "nullable-directive" or "pragma" or "warning-directive"
+            or "error-directive" or "line-directive" or "symbol-directive";
+
+    internal bool TryValidateCompilerDirective(out string error)
+    {
+        error = "A directive frame must contain only complete nonconditional C# directives matching its declared feature and comments or whitespace.";
+        if (!IsCompilerDirective || FeatureName == null || !IsCompilerDirectiveFeature(FeatureName))
+            return false;
+        var root = SyntaxFactory.ParseCompilationUnit(Code);
+        if (root.Members.Count != 0 || root.Usings.Count != 0
+            || root.Externs.Count != 0 || root.AttributeLists.Count != 0
+            || root.GetDiagnostics().Any(diagnostic => diagnostic.Id is not ("CS1029" or "CS1030")))
+            return false;
+        var directives = 0;
+        foreach (var trivia in root.DescendantTrivia())
+        {
+            if (trivia.GetStructure() is DirectiveTriviaSyntax directive)
+            {
+                if (GetCompilerDirectiveFeature(directive) != FeatureName)
+                    return false;
+                directives++;
+            }
+            else if (!trivia.IsKind(SyntaxKind.WhitespaceTrivia)
+                && !trivia.IsKind(SyntaxKind.EndOfLineTrivia)
+                && !trivia.IsKind(SyntaxKind.SingleLineCommentTrivia)
+                && !trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)
+                && !trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                && !trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                return false;
+        }
+        return directives > 0;
+    }
+}
 
 internal abstract record InterpolatedStringTokenPart;
 

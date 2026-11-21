@@ -346,7 +346,7 @@ public class LlmEvaluationCalculatorTests
         // Source with contracts
         var context = new EvaluationContext
         {
-            CalorSource = "§M{m001:T} §F{f001:F:pub} §I{i32:x} §O{i32} §Q (> x 0) §S (>= result 0) §R x",
+            CalorSource = "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    => (result >= 0)\n    return x",
             CSharpSource = "class T { int F(int x) { return x; } }",
             FileName = "unmatched_name", // Won't find in question bank
             Level = 1,
@@ -382,7 +382,7 @@ public class LlmEvaluationCalculatorTests
 
         var context = new EvaluationContext
         {
-            CalorSource = "§M{m001:T} §F{f001:Log:pub} §I{str:msg} §O{void} §E{cw} §P msg",
+            CalorSource = "module T T block\n  func Log (string:msg) → void ! cw\n    !\n    Console.WriteLine(msg)",
             CSharpSource = "class T { void Log(string msg) { Console.WriteLine(msg); } }",
             FileName = "unmatched_name",
             Level = 1,
@@ -405,7 +405,7 @@ public class LlmEvaluationCalculatorTests
     {
         return new EvaluationContext
         {
-            CalorSource = "§M{m001:T} §F{f001:F:pub} §O{i32} §R 42",
+            CalorSource = "module T T block\n  func F () → int\n    !\n    return 42",
             CSharpSource = "class T { int F() { return 42; } }",
             FileName = "test",
             Level = 1,

@@ -1,0 +1,165 @@
+module Ledger Ledger block
+  module LedgerModule partial
+    func EntryFee (int:amount) → int
+      !
+      requires (amount > 0)
+      requires (amount < 1000000)
+      => (result >= 0)
+      return (amount / 100)
+
+    func IsValidAccount (int:account, int:accountCount) → bool
+      !
+      return ((account >= 0) && (account < accountCount))
+
+    func IsValidAmount (int:amount) → bool
+      !
+      return ((amount > 0) && (amount < 1000000))
+
+    func PostEntry (int[]:debits, int[]:credits, int[]:amounts, int:count, int:debitAcct, int:creditAcct, int:amount) → int
+      ! mut
+      requires (count >= 0)
+      requires (count < debits.Length)
+      requires (count < credits.Length)
+      requires (count < amounts.Length)
+      => (result == (count + 1))
+      set debits[count] debitAcct
+      set credits[count] creditAcct
+      set amounts[count] amount
+      return (count + 1)
+
+    func AccountBalance (int[]:debits, int[]:credits, int[]:amounts, int:count, int:account) → int
+      !
+      requires (count >= 0)
+      requires (count <= debits.Length)
+      requires (count <= credits.Length)
+      requires (count <= amounts.Length)
+      var int:total = 0
+      var int:i = 0
+      while (i < count)
+        let int:amt = amounts[i]
+        if (credits[i] == account)
+          set total (total + amt)
+        if (debits[i] == account)
+          set total (total - amt)
+        set i (i + 1)
+      return total
+
+    func TotalDebited (int[]:debits, int[]:amounts, int:count, int:account) → int
+      !
+      requires (count >= 0)
+      requires (count <= debits.Length)
+      requires (count <= amounts.Length)
+      var int:total = 0
+      var int:i = 0
+      while (i < count)
+        if (debits[i] == account)
+          let int:amt = amounts[i]
+          set total (total + amt)
+        set i (i + 1)
+      return total
+
+    func TotalCredited (int[]:credits, int[]:amounts, int:count, int:account) → int
+      !
+      requires (count >= 0)
+      requires (count <= credits.Length)
+      requires (count <= amounts.Length)
+      var int:total = 0
+      var int:i = 0
+      while (i < count)
+        if (credits[i] == account)
+          let int:amt = amounts[i]
+          set total (total + amt)
+        set i (i + 1)
+      return total
+
+    func TotalVolume (int[]:amounts, int:count) → int
+      !
+      requires (count >= 0)
+      requires (count <= amounts.Length)
+      var int:total = 0
+      var int:i = 0
+      while (i < count)
+        set total (total + amounts[i])
+        set i (i + 1)
+      return total
+
+    func FeesCollected (int[]:credits, int[]:amounts, int:count) → int
+      !
+      requires (count >= 0)
+      requires (count <= credits.Length)
+      requires (count <= amounts.Length)
+      let int:fees = TotalCredited(credits, amounts, count, 0)
+      return fees
+
+    func TransferCost (int:amount) → int
+      !
+      requires (amount > 0)
+      requires (amount < 1000000)
+      => (result >= amount)
+      return (amount + (amount / 100))
+
+    func CanAfford (int:balance, int:amount) → bool
+      !
+      requires (amount > 0)
+      requires (amount < 1000000)
+      let int:cost = TransferCost(amount)
+      return (balance >= cost)
+
+    func Transfer (int[]:debits, int[]:credits, int[]:amounts, int:count, int:fromAcct, int:toAcct, int:amount) → int
+      ! mut
+      requires (count >= 0)
+      requires ((count + 2) <= debits.Length)
+      requires ((count + 2) <= credits.Length)
+      requires ((count + 2) <= amounts.Length)
+      => (result >= (count + 1))
+      let int:next = PostEntry(debits, credits, amounts, count, fromAcct, toAcct, amount)
+      let int:fee = EntryFee(amount)
+      if (fee > 0)
+        let int:next2 = PostEntry(debits, credits, amounts, next, fromAcct, 0, fee)
+        return next2
+      return next
+
+    func BatchPost (int[]:debits, int[]:credits, int[]:amounts, int:count, int[]:fromAccts, int[]:toAccts, int[]:batchAmounts, int:n) → int
+      ! mut
+      requires (count >= 0)
+      requires (n >= 0)
+      requires (n <= fromAccts.Length)
+      requires (n <= toAccts.Length)
+      requires (n <= batchAmounts.Length)
+      requires ((count + n) <= debits.Length)
+      requires ((count + n) <= credits.Length)
+      requires ((count + n) <= amounts.Length)
+      var int:cur = count
+      var int:i = 0
+      while (i < n)
+        let int:fromAcct = fromAccts[i]
+        let int:toAcct = toAccts[i]
+        let int:amt = batchAmounts[i]
+        set cur PostEntry(debits, credits, amounts, cur, fromAcct, toAcct, amt)
+        set i (i + 1)
+      return cur
+
+    func BatchTransfer (int[]:debits, int[]:credits, int[]:amounts, int:count, int[]:fromAccts, int[]:toAccts, int[]:batchAmounts, int:n) → int
+      ! mut
+      requires (count >= 0)
+      requires (n >= 0)
+      requires (n <= fromAccts.Length)
+      requires (n <= toAccts.Length)
+      requires (n <= batchAmounts.Length)
+      requires ((count + (2 * n)) <= debits.Length)
+      requires ((count + (2 * n)) <= credits.Length)
+      requires ((count + (2 * n)) <= amounts.Length)
+      var int:cur = count
+      var int:i = 0
+      while (i < n)
+        let int:fromAcct = fromAccts[i]
+        let int:toAcct = toAccts[i]
+        let int:amt = batchAmounts[i]
+        set cur PostEntry(debits, credits, amounts, cur, fromAcct, toAcct, amt)
+        let int:fee = (amt / 100)
+        if (fee > 0)
+          set cur PostEntry(debits, credits, amounts, cur, fromAcct, 0, fee)
+        set i (i + 1)
+      return cur
+
+

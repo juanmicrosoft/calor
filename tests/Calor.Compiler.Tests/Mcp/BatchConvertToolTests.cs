@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Mcp.Tools;
 using Xunit;
 
@@ -105,7 +106,7 @@ public class BatchConvertToolTests
         {
             // Structural closer tags are a hard parser error (Calor0830)
             File.WriteAllText(Path.Combine(tempDir, "Bad.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n  §/F{f001}\n");
+                "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"hi\"\n  §/F\n");
 
             var args = JsonDocument.Parse($$"""
                 {
@@ -140,39 +141,57 @@ public class BatchConvertToolTests
         }
     }
 
-    [Fact]
-    public async Task ExecuteAsync_CompileMode_BindError_CarriesDeclarationId()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Compile_MetadataCorruptionOrAmbiguousRename_FailsClosedWithoutWrites(bool ambiguous, bool summary)
     {
-        // review of #757 item 2: pin the declarationId capability — a bind
-        // error (Calor0250) parses to a full AST, so the entry must resolve
-        // to its enclosing function ID.
-        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-batch-declid-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempDir);
-
+        var root = Path.Combine(Path.GetTempPath(), $"calor-batch-fail-closed-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
         try
         {
-            File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §B{x}\n");
-
-            var args = JsonDocument.Parse($$"""
-                {
-                    "action": "compile",
-                    "projectPath": {{JsonSerializer.Serialize(tempDir)}}
-                }
-                """).RootElement;
-
+            var path = Path.Combine(root, "Input.calr");
+            File.WriteAllText(path, "module Test Test block\n  func Original () → int\n    !\n    return 1\n");
+            var args = JsonSerializer.SerializeToElement(new { action = "compile", projectPath = root, summary });
+            Assert.False((await _tool.ExecuteAsync(args)).IsError);
+            var sidecar = new DeclarationIdentityStore(root).SidecarPath;
+            if (ambiguous)
+                File.WriteAllText(path, "module Test Test block\n  func First () → int\n    !\n    return 1\n\n  func Second () → int\n    !\n    return 1\n");
+            else
+                File.WriteAllText(sidecar, "{broken");
+            var added = Path.Combine(root, "Added.calr");
+            File.WriteAllText(added, "module Added Added block\n  func Other () → int\n    !\n    return 2\n");
+            var before = File.ReadAllBytes(sidecar);
+            var source = File.ReadAllBytes(path);
+            var addedSource = File.ReadAllBytes(added);
             var result = await _tool.ExecuteAsync(args);
-            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
-            var file = Assert.Single(root.GetProperty("files").EnumerateArray());
-            var entry = file.GetProperty("errors").EnumerateArray()
-                .Single(e => e.GetProperty("code").GetString() == "Calor0250");
-
-            Assert.Equal("f001", entry.GetProperty("declarationId").GetString());
+            Assert.True(result.IsError);
+            var response = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.False(response.GetProperty("success").GetBoolean());
+            var files = response.GetProperty(summary ? "failedDetails" : "files").EnumerateArray().ToArray();
+            Assert.Equal(2, files.Length);
+            Assert.All(files, file =>
+            {
+                if (!summary)
+                    Assert.False(file.GetProperty("success").GetBoolean());
+                var error = Assert.Single(file.GetProperty("errors").EnumerateArray());
+                Assert.Equal("Calor0806", error.GetProperty("code").GetString());
+                Assert.False(error.TryGetProperty("declarationId", out _));
+            });
+            Assert.Equal(before, File.ReadAllBytes(sidecar));
+            Assert.Equal(source, File.ReadAllBytes(path));
+            Assert.Equal(addedSource, File.ReadAllBytes(added));
         }
         finally
         {
-            Directory.Delete(tempDir, true);
+            Directory.Delete(root, true);
         }
     }
-}
 
+    private static DeclarationIdentityStore.State ReadIdentityState(string root) =>
+        Assert.IsType<DeclarationIdentityStore.State>(JsonSerializer.Deserialize<DeclarationIdentityStore.State>(
+            File.ReadAllText(new DeclarationIdentityStore(root).SidecarPath),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+}

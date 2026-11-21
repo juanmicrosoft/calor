@@ -1,5 +1,5 @@
-§M{m1:Test}
-  §F{f002:RequirePositive:pub} (i32:n) -> i32
-    §Q (> n 0)
-    §R n
-
+module Test Test block
+  func RequirePositive (int:n) → int
+    !
+    requires (n > 0)
+    return n

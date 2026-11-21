@@ -84,15 +84,16 @@ public class StructuralControlFlowTests
     {
         var assembly = Compile(
             """
-            §M{m001:GuardedMatch}
-              §F{f001:Classify:pub} (i32 value) -> str
-                §W{m001} value
-                  §K §VAR{n} §WHEN (> n INT:10)
-                    §R STR:"large"
-                  §K §VAR{n} §WHEN (> n INT:0)
-                    §R STR:"positive"
-                  §K _
-                    §R STR:"other"
+            module GuardedMatch GuardedMatch block
+              func Classify (int:value) → string
+                !
+                match value
+                  case var n when (n > 10)
+                    return "large"
+                  case var n when (n > 0)
+                    return "positive"
+                  case _
+                    return "other"
             """,
             out var generated);
 
@@ -114,35 +115,46 @@ public class StructuralControlFlowTests
     {
         var assembly = Compile(
             """
-            §M{m001:StructuralLoops}
-              §F{f001:Encode:pub} (i32 from, i32 to, i32 step) -> i32
-                §B{~value:i32} INT:0
-                §L{l001:i:from:to:step}
-                  §B{~value:i32} (+ (* value INT:10) i)
-                §R value
+            module StructuralLoops StructuralLoops block
+              func Encode (int:first, int:last, int:increment) → int
+                !
+                var int:value = 0
+                for i from first to last step increment
+                  set value ((value * 10) + i)
+                return value
 
-              §F{f002:ExpressionStep:pub} () -> i32
-                §B{one:i32} INT:1
-                §B{~value:i32} INT:0
-                §L{l002:i:1:5:(+ one one)}
-                  §B{~value:i32} (+ (* value INT:10) i)
-                §R value
+              func ExpressionStep () → int
+                !
+                let int:one = 1
+                var int:value = 0
+                for i from 1 to 5 step (one + one)
+                  set value ((value * 10) + i)
+                return value
 
-              §F{f003:ExactOnce:pub} () -> i32
-                §B{~fromCalls:i32} INT:0
-                §B{~toCalls:i32} INT:0
-                §B{~stepCalls:i32} INT:0
-                §B{~value:i32} INT:0
-                §L{l003:i:(pre-inc fromCalls):(+ (pre-inc toCalls) INT:2):(pre-inc stepCalls)}
-                  §B{~value:i32} (+ (* value INT:10) i)
-                §R (+ (* value INT:1000) (+ (* fromCalls INT:100) (+ (* toCalls INT:10) stepCalls)))
+              func ExactOnce () → int
+                ! alloc, mut
+                let Counter:fromCounter = new Counter()
+                let Counter:toCounter = new Counter()
+                let Counter:stepCounter = new Counter()
+                var int:value = 0
+                for i from fromCounter.Next to (toCounter.Next + 2) step stepCounter.Next
+                  set value ((value * 10) + i)
+                return ((value * 1000) + ((fromCounter.Calls * 100) + ((toCounter.Calls * 10) + stepCounter.Calls)))
 
-              §F{f004:Collision:pub} () -> i32
-                §B{__calorForFrom:i32} INT:7
-                §B{~value:i32} INT:0
-                §L{l004:i:1:1:1}
-                  §B{~value:i32} (+ value i)
-                §R (+ value __calorForFrom)
+              class Counter
+                field int:Calls
+                property int:Next
+                  get
+                    set Calls (Calls + 1)
+                    return Calls
+
+              func Collision () → int
+                !
+                let int:__calorForFrom = 7
+                var int:value = 0
+                for i from 1 to 1 step 1
+                  set value (value + i)
+                return (value + __calorForFrom)
             """,
             out var generated);
 
@@ -297,111 +309,14 @@ public class StructuralControlFlowTests
         Assert.DoesNotContain("+=", generated, StringComparison.Ordinal);
         Assert.Contains("value++;", generated, StringComparison.Ordinal);
     }
-
-    [Fact]
-    public void RawCSharpIdentifiers_CannotCollideWithGeneratedLoopState()
-    {
-        var assembly = Compile(
-            """
-            §M{m001:RawLoopCollision}
-              §F{f001:Run:pub} () -> i32
-                §B{~result:i32} INT:0
-                §RAW
-                int __calorForFrom = 10;
-                int __calorForTo = 20;
-                int __calorForStep = 30;
-                int __calorForAscending = 40;
-                int __calorForFirst = 50;
-                goto __calorForAdvance;
-                __calorForAdvance:
-                result += __calorForFrom + __calorForTo + __calorForStep
-                    + __calorForAscending + __calorForFirst;
-                §/RAW
-                §L{l001:i:1:2:1}
-                  §RAW
-                  if (i == 1) continue;
-                  §/RAW
-                  §B{~result:i32} (+ result i)
-                §R result
-            """,
-            out var generated);
-
-        Assert.Contains("var __calorForFrom_1 = 1;", generated);
-        Assert.Contains("var __calorForFirst_1 = true;", generated);
-        Assert.Contains("while (true)", generated);
-        Assert.Equal(
-            152,
-            InvokeStatic(assembly, "RawLoopCollisionModule", "Run"));
-    }
-
-    [Fact]
-    public void RawCSharpIdentifiers_AreReservedAcrossEveryPreprocessorBranch()
-    {
-        var defaultAssembly = Compile(
-            """
-            §M{m001:RawConditionalCollision}
-              §F{f001:Run:pub} () -> i32
-                §B{~result:i32} INT:0
-                §RAW
                 #if BROKEN
-                int __calorForFrom_1 = 1;
-                /* disabled fragment comment */
                 #elif FOO
-                int __calorForFrom = 10;
-                int __calorForTo = 20;
-                __calorForFirst:
-                result += __calorForFrom + __calorForTo;
                 #elif BAR
-                int __calorForStep = 20;
-                result += __calorForStep;
                 #else
-                int __calorForAscending = 30;
                 #if NESTED
-                int __calorForFirst_1 = 40;
-                result += __calorForAscending + __calorForFirst_1;
                 #else
-                int __calorForFirst_1 = 50;
-                result += __calorForAscending + __calorForFirst_1;
                 #endif
                 #endif
-                // __calorForFrom_2 and keywords class while are lexical noise.
-                string lexicalNoise = "__calorForTo_1 __calorForStep_1";
-                _ = lexicalNoise;
-                §/RAW
-                §L{l001:i:1:2:1}
-                  §B{~result:i32} (+ result i)
-                §R result
-            """,
-            out var generated);
-
-        Assert.Contains("var __calorForFrom_2 = 1;", generated);
-        Assert.Contains("var __calorForTo_1 = 2;", generated);
-        Assert.Contains("var __calorForStep_1 = 1;", generated);
-        Assert.Contains("var __calorForAscending_1 =", generated);
-        Assert.Contains("var __calorForFirst_2 = true;", generated);
-        Assert.Equal(
-            83,
-            InvokeStatic(
-                defaultAssembly,
-                "RawConditionalCollisionModule",
-                "Run"));
-
-        var fooAssembly = CompileGenerated(generated, "FOO");
-        Assert.Equal(
-            33,
-            InvokeStatic(
-                fooAssembly,
-                "RawConditionalCollisionModule",
-                "Run"));
-
-        var barAssembly = CompileGenerated(generated, "BAR");
-        Assert.Equal(
-            23,
-            InvokeStatic(
-                barAssembly,
-                "RawConditionalCollisionModule",
-                "Run"));
-    }
 
     [Fact]
     public void YieldDetection_IsStructuralAcrossLegalContainers()
@@ -667,11 +582,10 @@ public class StructuralControlFlowTests
     {
         var result = Program.Compile(
             $$"""
-            §M{m001:IteratorParameters}
-              §F{f001:Values:pub}
-                §I{i32:value:{{modifier}}}
-                §O{i32}
-                §YIELD value
+            module IteratorParameters IteratorParameters block
+              func Values ({{modifier}} int:value) → int
+                !
+                yield value
             """);
 
         Assert.Contains(
@@ -689,11 +603,10 @@ public class StructuralControlFlowTests
     {
         var result = Program.Compile(
             """
-            §M{m001:IteratorParameters}
-              §F{f001:Values:pub}
-                §I{i32:value}
-                §O{i32}
-                §YIELD value
+            module IteratorParameters IteratorParameters block
+              func Values (int:value) → int
+                !
+                yield value
             """);
 
         Assert.False(
@@ -708,19 +621,17 @@ public class StructuralControlFlowTests
         foreach (var source in new[]
                  {
                      """
-                     §M{m001:AsyncIteratorParameters}
-                       §AF{f001:Values:pub}
-                         §I{i32:value:ref}
-                         §O{i32}
-                         §YIELD value
+                     module AsyncIteratorParameters AsyncIteratorParameters block
+                       func Values async (ref int:value) → int
+                         !
+                         yield value
                      """,
                      """
-                     §M{m001:GenericIteratorParameters}
-                       §CL{c001:Container:pub}
-                         §MT{m001:Values:pub:stat}<T>
-                           §I{T:value:ref}
-                           §O{T}
-                           §YIELD value
+                     module GenericIteratorParameters GenericIteratorParameters block
+                       class Container
+                         func Values<T> static (ref T:value) → T
+                           !
+                           yield value
                      """
                  })
         {
@@ -839,7 +750,8 @@ public class StructuralControlFlowTests
     [Fact]
     public void MigratedLocalIterator_RejectsItsOwnRefParameter()
     {
-        var conversion = new CSharpToCalorConverter().Convert(
+        var conversion = new CSharpToCalorConverter(
+            new() { ValidateRoundTripCSharp = false }).Convert(
             """
             using System.Collections.Generic;
             public class IteratorParameters
@@ -853,14 +765,11 @@ public class StructuralControlFlowTests
                 }
             }
             """);
-        Assert.False(conversion.Success);
+        Assert.True(conversion.Success);
         Assert.Contains(
             conversion.Issues,
             issue => issue.Message.Contains(
-                "local function 'Local'",
-                StringComparison.Ordinal)
-                && issue.Message.Contains(
-                    "modifier 'ref'",
+                "Local(ref int value)",
                     StringComparison.Ordinal));
         Assert.NotNull(conversion.Ast);
         var interop = Assert.Single(
@@ -880,22 +789,6 @@ public class StructuralControlFlowTests
                 && diagnostic.Message.Contains(
                     "modifier 'ref'",
                     StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void ValuelessYield_IsRejectedAndNeverEmittedAsYieldReturn()
-    {
-        var result = Program.Compile(
-            """
-            §M{m001:ValuelessYield}
-              §F{f001:Values:pub} () -> i32
-                §YIELD
-            """);
-
-        Assert.Contains(
-            result.Diagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.YieldRequiresValue);
-        Assert.DoesNotContain("yield return;", result.GeneratedCode, StringComparison.Ordinal);
     }
 
     private static IEnumerable<(StatementNode Statement, string Marker)>

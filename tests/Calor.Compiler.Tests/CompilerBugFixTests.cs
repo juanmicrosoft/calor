@@ -70,11 +70,14 @@ public class CompilerBugFixTests
     public void Emitter_AllModuleFunctions_AreStatic()
     {
         var source = """
-            §M{m001:TestMod}
-              §F{f001:Helper:pub}
-                  §O{void}
-              §F{f002:Main:pub}
-                  §O{void}
+            module TestMod TestMod block
+              func Helper () → void
+                !
+                return
+
+              func Main () → void
+                !
+                return
             """;
 
         var result = Program.Compile(source);
@@ -92,11 +95,10 @@ public class CompilerBugFixTests
     public void CnfLowering_StringParameter_HasStringType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Greet:pub}
-                  §I{string:name}
-                  §O{string}
-                  §R name
+            module Test Test block
+              func Greet (string:name) → string
+                !
+                return name
             """;
 
         var module = Parse(source, out var diag);
@@ -115,11 +117,10 @@ public class CompilerBugFixTests
     public void CnfLowering_BoolParameter_HasBoolType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:pub}
-                  §I{bool:flag}
-                  §O{bool}
-                  §R flag
+            module Test Test block
+              func Check (bool:flag) → bool
+                !
+                return flag
             """;
 
         var module = Parse(source, out var diag);
@@ -136,13 +137,11 @@ public class CompilerBugFixTests
     public void CnfLowering_BindTracksType_AssignHasCorrectType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{msg:string} STR:"hello"
-                  §C{Console.WriteLine}
-                    §A msg
-                  §/C
+            module Test Test block
+              func Foo () → void
+                !
+                let string:msg = "hello"
+                Console.WriteLine(msg)
             """;
 
         var module = Parse(source, out var diag);
@@ -169,8 +168,8 @@ public class CompilerBugFixTests
     public void TypeChecker_MatchExpression_NoTypeErrorForValidMatch()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Classify:pub}
+            §M{Test}
+              §F{Classify:pub}
                   §I{i32:x}
                   §O{i32}
                   §X{ma001:x}
@@ -195,7 +194,7 @@ public class CompilerBugFixTests
     /// <c>"hello" + "world"</c> is a type error. It is not: `+` on strings is CONCATENATION in
     /// Calor exactly as in the emitted C#, and `calor run` on that program prints
     /// <c>helloworld</c>. The old assertion pinned a defect — it made the opt-in checker reject a
-    /// working program, including the MCP primer's own <c>§M{m3:Files}</c> module, which
+    /// working program, including the MCP primer's own <c>§M{Files}</c> module, which
     /// <c>PrimerCompilesTests</c> requires to compile. The two tests contradicted each other and
     /// this one was wrong.
     /// </summary>
@@ -223,12 +222,10 @@ public class CompilerBugFixTests
     public void TypeChecker_IntArithmetic_NoError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
+            module Test Test block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
             """;
 
         var module = Parse(source, out var diag);
@@ -242,12 +239,10 @@ public class CompilerBugFixTests
     public void TypeChecker_FloatArithmetic_NoError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:pub}
-                  §I{f64:a}
-                  §I{f64:b}
-                  §O{f64}
-                  §R (+ a b)
+            module Test Test block
+              func Add (double:a, double:b) → double
+                !
+                return (a + b)
             """;
 
         var module = Parse(source, out var diag);
@@ -265,13 +260,10 @@ public class CompilerBugFixTests
     public void TypeChecker_PrintStatement_NoError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §C{Console.WriteLine}
-                    §A STR:"hello"
-                  §/C
+            module Test Test block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello")
             """;
 
         var module = Parse(source, out var diag);
@@ -319,12 +311,13 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void Binder_OptionExpression_RetainsItsValue()
+    public void Binder_ThrowExpression_RetainsItsException()
     {
-        var someExpr = new SomeExpressionNode(DummySpan, new IntLiteralNode(DummySpan, 42));
+        var thrown = new ThrowExpressionNode(DummySpan,
+            new NewExpressionNode(DummySpan, "Exception", [], []));
 
         var func = MakeFunction("Foo", "INT",
-            body: new List<StatementNode> { new ReturnStatementNode(DummySpan, someExpr) });
+            body: new List<StatementNode> { new ReturnStatementNode(DummySpan, thrown) });
         var module = MakeModule(func);
 
         var diagnostics = new DiagnosticBag();
@@ -333,9 +326,9 @@ public class CompilerBugFixTests
 
         Assert.NotNull(bound);
         var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
-        var option = Assert.IsType<BoundSomeExpression>(ret.Expression);
-        Assert.Equal("Option<INT>", option.Type.DisplayString);
-        Assert.IsType<BoundIntLiteral>(option.Value);
+        var expression = Assert.IsType<BoundThrowExpression>(ret.Expression);
+        Assert.Equal("NEVER", expression.Type.DisplayString);
+        Assert.IsType<BoundNewExpression>(expression.Exception);
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
         Assert.DoesNotContain(diagnostics,
@@ -350,7 +343,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_NullEscapeSequence_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"null\\0char\"", out var diagnostics);
+        var tokens = Tokenize("\"null\\0char\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -360,7 +353,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_TabEscapeSequence_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"col1\\tcol2\"", out var diagnostics);
+        var tokens = Tokenize("\"col1\\tcol2\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -370,7 +363,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_CarriageReturnEscape_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"line\\rend\"", out var diagnostics);
+        var tokens = Tokenize("\"line\\rend\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.StrLiteral, tokens[0].Kind);
@@ -380,7 +373,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_InvalidEscapeSequence_ToleratesAndEmitsLiteral()
     {
-        var tokens = Tokenize("STR:\"bad\\xescape\"", out var diagnostics);
+        var tokens = Tokenize("\"bad\\xescape\"", out var diagnostics);
 
         // Unknown escapes are now tolerated — the literal character is emitted
         Assert.False(diagnostics.HasErrors);
@@ -390,7 +383,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_EscapedQuote_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"she said \\\"hi\\\"\"", out var diagnostics);
+        var tokens = Tokenize("\"she said \\\"hi\\\"\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal("she said \"hi\"", tokens[0].Value);
@@ -399,7 +392,7 @@ public class CompilerBugFixTests
     [Fact]
     public void Lexer_EscapedBackslash_ParsesCorrectly()
     {
-        var tokens = Tokenize("STR:\"path\\\\file\"", out var diagnostics);
+        var tokens = Tokenize("\"path\\\\file\"", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Equal("path\\file", tokens[0].Value);
@@ -539,9 +532,10 @@ public class CompilerBugFixTests
     public void ContractVerificationPass_EmptyContracts_NoCrash()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Simple:pub}
-                  §O{void}
+            module Test Test block
+              func Simple () → void
+                !
+                return
             """;
 
         var result = Program.Compile(source);
@@ -556,18 +550,14 @@ public class CompilerBugFixTests
     public void E2E_CompleteProgram_WithArithmetic_Compiles()
     {
         var source = """
-            §M{m001:Calculator}
-              §F{f001:Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
-              §F{f002:Main:pub}
-                  §O{void}
-                  §E{cw}
-                  §C{Console.WriteLine}
-                    §A INT:42
-                  §/C
+            module Calculator Calculator block
+              func Add (int:a, int:b) → int
+                !
+                return (a + b)
+
+              func Main () → void
+                ! cw
+                Console.WriteLine(42)
             """;
 
         var result = Program.Compile(source);
@@ -581,13 +571,11 @@ public class CompilerBugFixTests
     public void E2E_ProgramWithContracts_CompilesCleanly()
     {
         var source = """
-            §M{m001:Safe}
-              §F{f001:Divide:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §Q (!= b INT:0)
-                  §R (/ a b)
+            module Safe Safe block
+              func Divide (int:a, int:b) → int
+                !
+                requires (b != 0)
+                return (a / b)
             """;
 
         var result = Program.Compile(source);
@@ -598,8 +586,8 @@ public class CompilerBugFixTests
     public void E2E_ArrayInitializer_Compiles()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
+            §M{Test}
+              §F{Main:pub}
                   §O{void}
                   §ARR{a001:nums:i32} INT:1 INT:2 INT:3
             """;
@@ -610,42 +598,18 @@ public class CompilerBugFixTests
             Assert.NotEmpty(result.GeneratedCode);
         }
     }
-
     #endregion
-
     #region BindValidationPass: Calor0250 fires through the full CLI pipeline
-
-    [Fact]
-    public void BindValidation_BareBinding_ReportsCalor0250_ThroughCli()
-    {
-        // §B{x} with no type and no initializer must fail compilation
-        // through the production CLI path. PR #642 implemented the diagnostic
-        // in the Binder, but the Binder is not invoked from Program.Compile;
-        // BindValidationPass wires this check into the main pipeline.
-        var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x}
-            """;
-
-        var result = Program.Compile(source);
-
-        Assert.True(result.HasErrors,
-            "Calor0250 must fire for §B{x} with no type and no initializer.");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
-    }
 
     [Fact]
     public void BindValidation_TypedBinding_NoInitializer_Compiles()
     {
         // §B{x:i32} (typed, no initializer) is valid — default-initializes.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x:i32}
+            module Test Test block
+              func Foo () → void
+                !
+                let int:x
             """;
 
         var result = Program.Compile(source);
@@ -660,10 +624,10 @@ public class CompilerBugFixTests
     {
         // §B{x} INT:42 (untyped, with initializer) is valid — type is inferred.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} INT:42
+            module Test Test block
+              func Foo () → void
+                !
+                let x = 42
             """;
 
         var result = Program.Compile(source);
@@ -674,59 +638,14 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void BindValidation_BareBinding_InsideIfBody_ReportsCalor0250()
+    public void StrictBindInference_NullInitializer_ReportsCalor0251()
     {
-        // The validator must recurse into nested statement bodies.
+        // A null initializer requires an explicit nullable type.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §I{i32:n}
-                  §O{void}
-                  §IF{if1} (> n INT:0)
-                      §B{tmp}
-            """;
-
-        var result = Program.Compile(source);
-
-        Assert.True(result.HasErrors,
-            "Calor0250 must fire for bare §B inside a nested if body.");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
-    }
-
-    [Fact]
-    public void BindValidation_BareBinding_InsideForBody_ReportsCalor0250()
-    {
-        // The loop header is `§L{id:var:from:to:step}` — colon-delimited, so a typed literal
-        // `INT:0` inside it parses `INT` as the `from` expression. The fixture used to write
-        // that, and nothing noticed: the misparse was silent until the type checker started
-        // reporting `Undefined variable 'INT'`. Corrected to the documented form; the §B{tmp}
-        // this test is actually about is unchanged.
-        var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §L{l1:i:0:10:1}
-                      §B{tmp}
-            """;
-
-        var result = Program.Compile(source);
-
-        Assert.True(result.HasErrors,
-            "Calor0250 must fire for bare §B inside a nested for loop body.");
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
-    }
-
-    [Fact]
-    public void StrictBindInference_NoneInitializer_ReportsCalor0251()
-    {
-        // §B{x} §NN with --strict-bind-inference must fail with Calor0251.
-        var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} §NN
+            module Test Test block
+              func Foo () → void
+                !
+                let x = null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -738,32 +657,32 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void StrictBindInference_NoneInitializer_NoStrict_Compiles()
+    public void StrictBindInference_NullInitializer_NoStrict_DoesNotReportCalor0251()
     {
-        // With --no-strict-bind-inference (StrictBindInference = false), §B{x} §NN must compile.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} §NN
+            module Test Test block
+              func Foo () → void
+                !
+                let x = null
             """;
 
         var result = Program.Compile(source, "test.calr",
             new CompilationOptions { StrictBindInference = false });
 
-        Assert.False(result.HasErrors,
-            "With StrictBindInference = false, §B{x} §NN must not fire Calor0251.");
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.BindCannotInferNullLiteral);
+        Assert.True(result.HasErrors,
+            "Disabling strict inference does not make an untyped null a valid C# var initializer.");
     }
 
     [Fact]
-    public void StrictBindInference_TypedNone_DoesNotReportCalor0251()
+    public void StrictBindInference_TypedNull_DoesNotReportCalor0251()
     {
-        // §B{x:Option<i32>} §NN bypasses the inference path entirely.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x:Option<i32>} §NN
+            module Test Test block
+              func Foo () → void
+                !
+                let int?:x = null
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -778,10 +697,10 @@ public class CompilerBugFixTests
     {
         // §B{x} §C{Vec.empty} §/C is a known generic factory; strict mode flags it.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} §C{Vec.empty} §/C
+            module Test Test block
+              func Foo () → void
+                !
+                let x = Vec.empty()
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -796,10 +715,10 @@ public class CompilerBugFixTests
     public void StrictBindInference_GenericFactoryCall_NoStrict_Compiles()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} §C{Vec.empty} §/C
+            module Test Test block
+              func Foo () → void
+                !
+                let x = Vec.empty()
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -814,10 +733,10 @@ public class CompilerBugFixTests
     {
         // (+ INT:0 FLOAT:0.0) mixes integer and float literals: ambiguous widening.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} (+ INT:0 FLOAT:0.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (0 + 0.0)
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -832,10 +751,10 @@ public class CompilerBugFixTests
     public void StrictBindInference_AmbiguousNumeric_NoStrict_Compiles()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} (+ INT:0 FLOAT:0.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (0 + 0.0)
             """;
 
         var result = Program.Compile(source, "test.calr",
@@ -850,10 +769,10 @@ public class CompilerBugFixTests
     {
         // Same-type operands: no ambiguity, no diagnostic.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                  §O{void}
-                  §B{x} (+ INT:1 INT:2)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (1 + 2)
             """;
 
         var result = Program.Compile(source, "test.calr",

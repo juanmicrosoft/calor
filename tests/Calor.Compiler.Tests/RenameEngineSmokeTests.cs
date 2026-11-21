@@ -26,13 +26,13 @@ public sealed class RenameEngineSmokeTests : IDisposable
     public void RenamesFunctionAcrossFiles()
     {
         var a = Write("a.calr", """
-            §M{m001:Alpha}
-              §F{f001:Compute:pub} () -> i32
-                §E{}
-                §R INT:42
-              §F{f002:Use:pub} () -> i32
-                §E{}
-                §R §C{Compute} §/C
+            module Alpha
+              func Compute () → int
+                !
+                return 42
+              func Use () → int
+                !
+                return Compute()
             """);
 
         var index = ProjectSymbolIndex.Build([a], out var skipped);
@@ -58,15 +58,15 @@ public sealed class RenameEngineSmokeTests : IDisposable
     public void RenamesLocalWithoutTouchingSameNamedLocalInAnotherFunction()
     {
         var a = Write("shadow.calr", """
-            §M{m001:Shadow}
-              §F{f001:First:pub} () -> i32
-                §E{}
-                §B{value:i32} INT:1
-                §R value
-              §F{f002:Second:pub} () -> i32
-                §E{}
-                §B{value:i32} INT:2
-                §R value
+            module Shadow
+              func First () → int
+                !
+                let int:value = 1
+                return value
+              func Second () → int
+                !
+                let int:value = 2
+                return value
             """);
 
         var index = ProjectSymbolIndex.Build([a], out _);
@@ -92,13 +92,13 @@ public sealed class RenameEngineSmokeTests : IDisposable
     public void RefusesRenameThatWouldCollideWithAnExistingName()
     {
         var a = Write("collide.calr", """
-            §M{m001:Collide}
-              §F{f001:First:pub} () -> i32
-                §E{}
-                §R INT:1
-              §F{f002:Second:pub} () -> i32
-                §E{}
-                §R INT:2
+            module Collide
+              func First () → int
+                !
+                return 1
+              func Second () → int
+                !
+                return 2
             """);
 
         var index = ProjectSymbolIndex.Build([a], out _);
@@ -112,19 +112,19 @@ public sealed class RenameEngineSmokeTests : IDisposable
     }
 
     [Fact]
-    public void RefusesModuleDeclaredInSeveralFiles()
+    public void RenamesFileLabelIndependentlyOfAnotherFilesIdenticalLabel()
     {
         var a = Write("part-a.calr", """
-            §M{m001:Split}
-              §F{f001:One:pub} () -> i32
-                §E{}
-                §R INT:1
+            module Split
+              func One () → int
+                !
+                return 1
             """);
         var b = Write("part-b.calr", """
-            §M{m002:Split}
-              §F{f001:Two:pub} () -> i32
-                §E{}
-                §R INT:2
+            module Split
+              func Two () → int
+                !
+                return 2
             """);
 
         var index = ProjectSymbolIndex.Build([a, b], out _);
@@ -133,8 +133,49 @@ public sealed class RenameEngineSmokeTests : IDisposable
         Assert.NotNull(occurrence);
 
         var result = RenameEngine.Rename(index, occurrence.SymbolId, "Renamed");
-        Assert.Equal(RenameRefusal.SplitDeclaration, result.Refusal);
+        Assert.Equal(RenameRefusal.None, result.Refusal);
+        var edit = Assert.Single(result.Edits);
+        Assert.Equal(a, edit.FilePath);
+        Assert.Equal("Split", source.Substring(edit.Span.Start, edit.Span.Length));
+        Assert.Equal("Renamed", edit.NewText);
+        Assert.Equal(source, File.ReadAllText(a));
+        Assert.StartsWith("module Split", File.ReadAllText(b));
+    }
+
+    [Theory]
+    [InlineData(
+        "module First\n  class Worker partial\n    field int:Left",
+        "module Second\n  class Worker partial\n    field int:Right", true)]
+    [InlineData(
+        "module First Shared\n  class Worker partial\n    field int:Left",
+        "module Second Shared\n  class Worker partial\n    field int:Right", true)]
+    [InlineData(
+        "module Same Left\n  class Worker partial\n    field int:Left",
+        "module Same Right\n  class Worker partial\n    field int:Right", false)]
+    [InlineData(
+        "module Same\n  class Worker<T> partial\n    field int:Left",
+        "module Same\n  class Worker<T,U> partial\n    field int:Right", false)]
+    [InlineData(
+        "module Same\n  class OwnerA\n    class Worker partial\n      field int:Left",
+        "module Same\n  class OwnerB\n    class Worker partial\n      field int:Right", false)]
+    [InlineData(
+        "module Same\n  class Owner<T>\n    class Worker partial\n      field int:Left",
+        "module Same\n  class Owner<T,U>\n    class Worker partial\n      field int:Right", false)]
+    public void TypeSplitGuardUsesActualQualifiedIdentity(string first, string second, bool splitType)
+    {
+        var a = Write("first.calr", first);
+        var b = Write("second.calr", second);
+        var index = ProjectSymbolIndex.Build([a, b], out var skipped);
+        Assert.Empty(skipped);
+        var occurrence = index.Resolve(a, first.IndexOf("Worker", StringComparison.Ordinal));
+        Assert.NotNull(occurrence);
+        Assert.True(occurrence.IsTypeDeclaration);
+        Assert.Equal(splitType, occurrence.IsSplitDeclaration);
+        var result = RenameEngine.Rename(index, occurrence.SymbolId, "Renamed");
+        Assert.Equal(splitType ? RenameRefusal.SplitDeclaration : RenameRefusal.TypeReferencesNotIndexed, result.Refusal);
         Assert.Empty(result.Edits);
+        Assert.Equal(first, File.ReadAllText(a));
+        Assert.Equal(second, File.ReadAllText(b));
     }
 
     private static int CountOccurrences(string source, string value)

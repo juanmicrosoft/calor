@@ -151,6 +151,10 @@ public sealed class Z3ImplicationProver : IDisposable
             translator.DeclareVariable("result", "i32");
         }
 
+        // Keep the typed BCL model for both translation and exception-path definedness.
+        antecedent = translator.NormalizeBclExpression(antecedent);
+        consequent = translator.NormalizeBclExpression(consequent);
+
         // Translate antecedent → Z3 BoolExpr A
         var antecedentExpr = translator.TranslateBoolExpr(antecedent);
         if (antecedentExpr == null)
@@ -222,6 +226,13 @@ public sealed class Z3ImplicationProver : IDisposable
             solver.Assert(_ctx.MkNot(consequentDefined != null
                 ? _ctx.MkAnd(consequentDefined, consequentExpr)
                 : consequentExpr));
+            // The translator's binding facts hold for every value the contracts can read, as in
+            // Z3Verifier: fresh constants equal their literals, and a native BCL Length/Count
+            // (`s.Length`) is at most int.MaxValue. Without them a native string length is an
+            // unbounded str.len wrapped to 32 bits, which the solver answers with `unknown`
+            // instead of the string-model Assumed verdict the legacy length operation got.
+            foreach (var binding in translator.BindingConstraints)
+                solver.Assert(binding);
 
             var status = solver.Check();
             // #1413 review round 3: string ranges, array bounds, and null receivers are total in the
@@ -433,6 +444,9 @@ public sealed class Z3ImplicationProver : IDisposable
             // Default to i32 if no output type specified
             translator.DeclareVariable("result", "i32");
         }
+
+        implementerPostcondition = translator.NormalizeBclExpression(implementerPostcondition);
+        interfacePostcondition = translator.NormalizeBclExpression(interfacePostcondition);
 
         // Translate implementer postcondition → Z3 BoolExpr (the antecedent)
         var implementerExpr = translator.TranslateBoolExpr(implementerPostcondition);

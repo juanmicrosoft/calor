@@ -1,7 +1,8 @@
-§M{m1:Test}
-  §F{f001:Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 
-  §F{f002:Multiply:pub} (i32:x, i32:y) -> i32
-    §R (* x y)
-
+  func Multiply (int:x, int:y) → int
+    !
+    return (x * y)

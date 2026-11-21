@@ -1,0 +1,56 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_q9eqa7fc7djp",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "QuantifierDemo",
+      "Signature": ""
+    },
+    {
+      "Id": "m_4vahwaxjqhgq",
+      "File": "input.calr",
+      "Container": "QuantifierDemo",
+      "Kind": 0,
+      "Name": "QuantifierDemoModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_ajbensjdk3yq",
+      "File": "input.calr",
+      "Container": "QuantifierDemo.QuantifierDemoModule\u00600",
+      "Kind": 5,
+      "Name": "AllNonNegative",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022bool\u0022}"
+    },
+    {
+      "Id": "mt_y5x47m98e1a2",
+      "File": "input.calr",
+      "Container": "QuantifierDemo.QuantifierDemoModule\u00600",
+      "Kind": 5,
+      "Name": "ExistsTarget",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022bool\u0022}"
+    },
+    {
+      "Id": "mt_fj49epnd3ejy",
+      "File": "input.calr",
+      "Container": "QuantifierDemo.QuantifierDemoModule\u00600",
+      "Kind": 5,
+      "Name": "ImplicationTest",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022bool\u0022}"
+    },
+    {
+      "Id": "mt_res3gdej296w",
+      "File": "input.calr",
+      "Container": "QuantifierDemo.QuantifierDemoModule\u00600",
+      "Kind": 5,
+      "Name": "MatrixSymmetry",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022bool\u0022}"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+module CompactClass CompactClass
+  module CompactClassModule
+    func Greet public (string:name) → string
+      ! cw
+      System.Console.WriteLine(name)
+      return name
+
+    func Square public (int:x) → int
+      !
+      => result >= 0
+      return x * x
+
+    func Max public (int:a, int:b) → int
+      !
+      => result >= a
+      => result >= b
+      if a > b
+        return a
+      else
+        return b

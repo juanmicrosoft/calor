@@ -1,8 +1,13 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using Binder = Calor.Compiler.Binding.Binder;
+using NullableAnnotation = Calor.Compiler.Binding.BoundTypes.NullableAnnotation;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
 namespace Calor.Compiler.Tests;
@@ -37,31 +42,10 @@ public class BinderCoreFamilyTests
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.AnalysisIncomplete);
 
     [Fact]
-    public void Some_BindsWithComposedOptionType()
+    public void Null_BindsWithNullType()
     {
-        var (expr, diags) = BindReturn(new SomeExpressionNode(S, new IntLiteralNode(S, 42)));
-        var some = Assert.IsType<BoundSomeExpression>(expr);
-        Assert.Equal("Option<INT>", some.Type.DisplayString);
-        Assert.IsType<BoundIntLiteral>(some.Value);
-        AssertComplete(diags);
-    }
-
-    [Fact]
-    public void Ok_BindsWithComposedResultType()
-    {
-        var (expr, diags) = BindReturn(new OkExpressionNode(S, new IntLiteralNode(S, 1)));
-        var ok = Assert.IsType<BoundOkExpression>(expr);
-        Assert.Equal("Result<INT, OBJECT>", ok.Type.DisplayString);
-        AssertComplete(diags);
-    }
-
-    [Fact]
-    public void Err_BindsWithComposedResultType()
-    {
-        var (expr, diags) = BindReturn(new ErrExpressionNode(S, new StringLiteralNode(S, "boom")));
-        var err = Assert.IsType<BoundErrExpression>(expr);
-        Assert.Equal("Result<OBJECT, STRING>", err.Type.DisplayString);
-        Assert.IsType<BoundStringLiteral>(err.Error);
+        var (expr, diags) = BindReturn(new ReferenceNode(S, "null"));
+        Assert.IsType<BoundNullLiteral>(expr);
         AssertComplete(diags);
     }
 
@@ -121,11 +105,12 @@ public class BinderCoreFamilyTests
     public void With_BindsTargetAndAssignments_KeepsTargetType()
     {
         var node = new WithExpressionNode(S,
-            new SomeExpressionNode(S, new IntLiteralNode(S, 5)),
+            new RecordCreationNode(S, "Counter", [
+                new FieldAssignmentNode(S, "Value", new IntLiteralNode(S, 5))]),
             new[] { new WithPropertyAssignmentNode(S, "Value", new IntLiteralNode(S, 9)) });
         var (expr, diags) = BindReturn(node);
         var with = Assert.IsType<BoundWithExpression>(expr);
-        Assert.Equal("Option<INT>", with.Type.DisplayString);
+        Assert.Equal("Counter", with.Type.DisplayString);
         Assert.Single(with.Assignments);
         AssertComplete(diags);
     }
@@ -146,14 +131,14 @@ public class BinderCoreFamilyTests
         // The review-of-B2 CRITICAL: "analyzable again" was false — checkers' closed
         // traversal switches skipped the new node types' children (a nested /0 produced
         // NO finding through the full pipeline). The BoundChildren default arms fix it;
-        // this pins the claim END TO END: a division by literal zero inside a Some
-        // payload must produce the actual Calor0920, not merely a bound subtree.
+        // this pins the claim END TO END: a division nested inside a call argument
+        // must produce the actual Calor0920, not merely a bound subtree.
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} () -> void
-    §E{cw}
-    §B{b} §SM (/ 10 0)
-    §P b";
+module Test Test block
+  func Trap () → void
+    ! cw
+    let b = Math.Abs((10 / 0))
+    Console.WriteLine(b)";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -180,9 +165,6 @@ public class BinderCoreFamilyTests
         // B2 node yields exactly its expression children.
         var i = new BoundIntLiteral(S, 1);
         var j = new BoundIntLiteral(S, 2);
-        Assert.Equal([i], BoundChildren.Of(new BoundSomeExpression(S, i)));
-        Assert.Equal([i], BoundChildren.Of(new BoundOkExpression(S, i)));
-        Assert.Equal([i], BoundChildren.Of(new BoundErrExpression(S, i)));
         Assert.Equal([i, j], BoundChildren.Of(new BoundExpressionCall(S, i, [j])));
         Assert.Equal([i], BoundChildren.Of(
             new BoundAnonymousObjectCreation(S, [new BoundNamedValue("a", i, S)])));
@@ -192,6 +174,69 @@ public class BinderCoreFamilyTests
             new BoundWithExpression(S, i, [new BoundNamedValue("x", j, S)])));
         Assert.Equal([i], BoundChildren.Of(new BoundThrowExpression(S, i)));
         Assert.Empty(BoundChildren.Of(i));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StorageFlowRetyping_PreservesSelectedMetadataWithoutMutatingOriginal(bool memberAccess)
+    {
+        var compilation = CSharpCompilation.Create("StorageMetadata", references:
+            [MetadataReference.CreateFromFile(typeof(string).Assembly.Location)]);
+        var stringType = compilation.GetSpecialType(SpecialType.System_String);
+        var metadataMember = Assert.Single(stringType.GetMembers("Length"));
+        var arrayType = compilation.CreateArrayTypeSymbol(stringType);
+        var selected = new VariableSymbol(SymbolId.Create("test", "Value"), "Value", "STRING",
+            isMutable: false, isProperty: true, nullableAnnotation: NullableAnnotation.Annotated);
+        var originalType = new NominalBoundType(
+            "STRING", NullableAnnotation.Annotated, roslynSymbol: stringType);
+        var receiver = new BoundThisExpression(S, "Owner");
+        BoundExpression original = memberAccess
+            ? new BoundFieldAccessExpression(S, receiver, "Value", null, selected,
+                resolvedType: originalType)
+            {
+                ResolvedMetadataMember = metadataMember,
+                UnsupportedMetadataMember = metadataMember,
+                IsTupleElementRead = true,
+                IsAnonymousPropertyRead = true,
+                HasUnknownInferredType = true,
+                MetadataArrayResultType = arrayType
+            }
+            : new BoundVariableExpression(S, selected, typeOverride: originalType)
+            {
+                HasUnknownInferredType = true,
+                MetadataArrayResultType = arrayType
+            };
+        var reference = Assert.IsAssignableFrom<IBoundStorageExpression>(original);
+        var narrowedType = new NominalBoundType(
+            "STRING", NullableAnnotation.NotAnnotated, roslynSymbol: stringType);
+
+        var copy = reference.WithFlowType(narrowedType);
+
+        Assert.NotSame(original, copy);
+        Assert.Same(originalType, original.Type);
+        Assert.Same(narrowedType, copy.Type);
+        Assert.Equal(original.Span, copy.Span);
+        Assert.Same(original.Children, copy.Children);
+        Assert.True(copy.HasUnknownInferredType);
+        Assert.Same(arrayType, copy.MetadataArrayResultType);
+        var copiedReference = Assert.IsAssignableFrom<IBoundStorageExpression>(copy);
+        Assert.Same(reference.ReferencedStorage, copiedReference.ReferencedStorage);
+        Assert.Same(reference.ResolvedStorageCandidates, copiedReference.ResolvedStorageCandidates);
+        if (memberAccess)
+        {
+            var member = Assert.IsType<BoundFieldAccessExpression>(copy);
+            Assert.Same(receiver, member.Target);
+            Assert.Same(selected, member.ResolvedField);
+            Assert.Same(metadataMember, member.ResolvedMetadataMember);
+            Assert.Same(metadataMember, member.UnsupportedMetadataMember);
+            Assert.True(member.IsTupleElementRead);
+            Assert.True(member.IsAnonymousPropertyRead);
+        }
+        else
+        {
+            Assert.Same(selected, Assert.IsType<BoundVariableExpression>(copy).Variable);
+        }
     }
 
     [Fact]

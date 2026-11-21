@@ -1,0 +1,11 @@
+module MathPower MathPower
+  module MathPowerModule
+    func Power public (int:@base, int:exp) → int
+      !
+      requires exp >= 0
+      var result = 1
+      var i = 0
+      while i < exp
+        var result = result * @base
+        var i = i + 1
+      return result

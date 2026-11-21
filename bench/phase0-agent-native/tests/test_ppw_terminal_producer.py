@@ -42,6 +42,7 @@ class TerminalProducerTests(Fixture):
             "EDIT_MECHANISM": "raw", "ARM_REPO_ROOT": "/SYNTHETIC/frozen-product",
             "FIXTURE_DIR": "starter-a", "TEMPLATE_SOURCE": "SYNTHETIC",
             "ARM_CANARY_STATUS": "SYNTHETIC", "ARM_CANARY_COMPILER_HASH": "1" * 64,
+            "ARM_CANARY_FILE": "", "ARM_CANARY_INPUT_JSON": "", "INITIALIZED_WORKSPACE": "0",
             "REFERENCE_DIR": "", "REFERENCE_SOURCE": "SYNTHETIC",
             "AGENT_RC": str(exit_code), "PYTHONDONTWRITEBYTECODE": "1",
         })

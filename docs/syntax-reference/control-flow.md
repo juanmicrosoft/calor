@@ -1,533 +1,379 @@
 ---
 layout: default
-title: Control Flow
+title: "Control Flow"
 parent: Syntax Reference
 nav_order: 4
 ---
 
 # Control Flow
 
-Calor provides loops and conditionals with explicit structure.
+<!-- Generated from website/content/syntax-reference/control-flow.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
----
+Control-flow headers use lowercase words. Indent each body two spaces below its
+header. A dedent ends the body; do not write closing tags or source IDs.
 
-## Loops
+<a id="loops"></a>
 
-### For Loop Syntax
+## Counted loops
 
-```
-§L{id:var:from:to:step}
-  // body
-```
+Calor has two `for` forms with different evaluation rules.
 
-| Part | Description |
-|:-----|:------------|
-| `id` | Unique loop identifier |
-| `var` | Loop variable name |
-| `from` | Starting value (inclusive) |
-| `to` | Ending value (inclusive) |
-| `step` | Increment per iteration |
+| Form | Bounds and condition | Endpoint |
+|:-----|:---------------------|:---------|
+| `for i from start to end step amount` | Evaluates start, end and step once, in that order | Inclusive |
+| `for i = start; condition; i = next` | Evaluates the condition before every iteration | Determined by the condition |
 
-The `from`, `to`, and `step` expressions are each evaluated exactly once, before
-the loop starts. The evaluated sign of `step` selects ascending (`<=`) or
-descending (`>=`) comparison. A zero step throws
-`ArgumentOutOfRangeException` before the first iteration. Integral advancement
-is checked: reaching a numeric minimum or maximum endpoint terminates normally
-instead of wrapping around into an unbounded loop.
+### Snapshot range
 
-When `step` is omitted, Calor advances with a checked increment of the evaluated
-induction value itself. This keeps the implicit `+1` in the loop variable's
-integral type (`i8` through `u64`) and avoids mixed-type `+=` or narrowing.
+```calor
+for i from 1 to 10 step 1
+  Console.WriteLine(i)
 
-### Examples
+for i from 10 to 1 step -1
+  Console.WriteLine(i)
 
-**Count 1 to 10:**
-```
-§L{for1:i:1:10:1}
-  §P i
+for i from 0 to n - 1 step 2
+  Console.WriteLine(i)
 ```
 
-**Count down:**
-```
-§L{for1:i:10:1:-1}
-  §P i
-```
+The omitted step is `1`. A zero step throws. A step that would overflow the
+loop variable ends the range rather than wrapping around.
 
-**Count by 2s:**
-```
-§L{for1:i:0:100:2}
-  §P i
-```
+Changing the original bound does not change an already-started snapshot range.
+This complete example visits `1`, `2` and `3`, then returns `33`: three visits
+and a final loop value of three.
 
-**Using variable bounds:**
-```
-§L{for1:i:1:n:1}
-  §P i
-```
-
-**Using expressions:**
-```
-§L{for1:i:0:(- n 1):1}
-  §P i
+```calor
+module RangeSnapshots
+  func Main () → int
+    !
+    var int:limit = 3
+    var int:count = 0
+    var int:last = 0
+    for i from 1 to limit step 1
+      set count count + 1
+      set last i
+      set limit 4
+    return count * 10 + last
 ```
 
-### While Loop Syntax
+### Reevaluated condition
 
-```
-§WH{id} condition
-  // body
-```
+Use the semicolon form when changes in the body must affect the next condition.
+This program visits `0`, `1`, `2` and `3`, then returns `4`.
 
-| Part | Description |
-|:-----|:------------|
-| `id` | Unique loop identifier |
-| `condition` | Boolean expression evaluated before each iteration |
-
-### While Loop Examples
-
-**Simple countdown:**
-```
-§B{~i} 10
-§WH{while1} (> i 0)
-  §P i
-  §ASSIGN i (- i 1)
+```calor
+module ReevaluatedLoops
+  func Main () → int
+    !
+    var int:limit = 3
+    var int:count = 0
+    for i = 0; i < limit; i = i + 1
+      set count count + 1
+      if i == 0
+        set limit 4
+    return count
 ```
 
-**Read until done:**
-```
-§B{~running} true
-§WH{while1} running
-  §B{input} §C{Console.ReadLine} §/C
-  §IF{if1} (== input "quit")
-    §ASSIGN running false
-```
+The update runs after the body or a `continue`, but not after a `break`.
+These two `for` forms are not interchangeable.
 
-### Do-While Loop Syntax
+## While and do-while
 
-```
-§DO{id}
-  // body (executes at least once)
-§/DO{id} (condition)
-```
+`while condition` tests before the body. `do` tests after the body, so its body
+runs at least once. Put the final `while` at the same indentation as `do`.
 
-| Part | Description |
-|:-----|:------------|
-| `id` | Unique loop identifier |
-| `condition` | Boolean expression evaluated after each iteration |
+```calor
+module WhileAndDo
+  func Main () → int
+    !
+    var int:before = 0
+    while before < 3
+      set before before + 1
 
-The condition is placed at the end to match the semantics: the body always executes at least once, then the condition is checked.
-
-The loop variable must be declared MUTABLE (`§B{~name:type}`) and updated with `§ASSIGN` inside the body. Re-binding it with a second `§B` inside the loop shadows the outer one, which is `Calor0255` (C# forbids it, CS0136), and the condition on the closer would then reference a variable the generated code cannot see.
-
-`§/DO{id} (condition)` is **required**. It is retained — unlike the structural closers removed in Phase 4d — precisely because it carries the condition, and there is nowhere else to put it. The id must match the opening `§DO{id}`; a mismatch is reported as a mismatched-id error.
-
-### Do-While Loop Examples
-
-**Execute at least once:**
-```
-§B{~i} 0
-§DO{do1}
-  §P i
-  §ASSIGN i (+ i 1)
-§/DO{do1} (< i INT:10)
+    var int:after = 0
+    do
+      set after after + 1
+    while false
+    return before * 10 + after
 ```
 
-**Menu loop (always show menu first):**
-```
-§B{~choice:i32} 0
-§DO{do1}
-  §P "1. Option A"
-  §P "2. Option B"
-  §P "3. Exit"
-  §ASSIGN choice §C{ReadChoice} §/C
-§/DO{do1} (!= choice INT:3)
-```
+The result is `31`: the first loop runs three times, and the second runs once.
+Use `var` and `set` for state that changes across iterations.
 
-**Retry until success:**
-```
-§B{~success:bool} false
-§DO{do1}
-  §ASSIGN success §C{TryOperation} §/C
-§/DO{do1} (not success)
-```
+<a id="dictionary-iteration"></a>
 
----
+## Collection iteration
 
-## Dictionary Iteration
+`each item in collection` visits collection elements. An explicit element type
+uses `each Type:item in collection`. For dictionaries, the two-name form
+deconstructs each entry into its key and value.
 
-Use `§EACHKV` to iterate over key-value pairs in a dictionary.
+```calor
+each item in items
+  Console.WriteLine(item)
 
-### Syntax
+each string:name in names
+  Console.WriteLine(name)
 
-```
-§EACHKV{id:keyVar:valueVar} dictName
-  // body uses keyVar and valueVar
+each key, value in dictionary
+  Console.WriteLine(key)
+  Console.WriteLine(value)
 ```
 
-| Part | Description |
-|:-----|:------------|
-| `id` | Unique loop identifier |
-| `keyVar` | Variable name for the current key |
-| `valueVar` | Variable name for the current value |
-| `dictName` | Name of the dictionary to iterate |
+This complete program constructs a dictionary and sums its values. Its result
+is `55`. Allocation and collection mutation require `alloc` and `mut`; updating
+the local accumulator does not require a heap-mutation effect.
 
-### Examples
-
-**Print all entries:**
-```
-§DICT{ages:str:i32}
-  §KV "alice" 30
-  §KV "bob" 25
-
-§EACHKV{e1:name:age} ages
-  §P name
-  §P age
+```calor
+module DictionaryIteration
+  func Main () → int
+    ! alloc, mut
+    let Dictionary<string,int>:scores = new Dictionary<string,int>()
+    scores.Add("alice", 30)
+    scores.Add("bob", 25)
+    var int:total = 0
+    each name, score in scores
+      if name.Length > 0
+        set total total + score
+    return total
 ```
 
-**Sum all values:**
-```
-§B{~total} 0
-§EACHKV{e1:k:v} scores
-  §ASSIGN total (+ total v)
+`break` exits the nearest loop. `continue` advances to its next iteration.
+Neither keyword takes a source ID.
+
+```calor
+module LoopExits
+  func Main () → int
+    !
+    var int:sum = 0
+    for i from 0 to 5 step 1
+      if i == 1
+        continue
+      if i == 4
+        break
+      set sum sum + i
+    return sum
 ```
 
-**Conditional processing:**
-```
-§EACHKV{e1:key:val} data
-  §IF{if1} (> val 100)
-    §P key
-```
-
-### Comparison with §EACH
-
-| Loop Type | Use Case |
-|:----------|:---------|
-| `§L{id:var:from:to:step}` | Numeric ranges |
-| `§EACH{id:var} collection` | Lists, arrays, sets |
-| `§EACHKV{id:k:v} dict` | Dictionaries (key-value pairs) |
-
----
+The result is `5`: the loop adds zero, two and three, skips one, and stops at
+four before adding it.
 
 ## Conditionals
 
-### Single Line (Arrow Syntax)
+`if`, `else if` and `else` belong at the same indentation. Each selected branch
+has an indented body. Conditions use ordinary expression precedence.
 
-For simple single-action branches:
+Use `condition ? first : second` when a condition chooses a value, for example
+`return count > 0 ? "items" : "none"`. Use `if` for statement bodies and side effects.
+`calor lint` reports `Calor1305` for two branches returning matching primitive
+literals. Its safe patch retains comments by leaving commented branches alone,
+keeps later source-line mappings, and does not introduce a wider conditional
+type into a narrow return. The converter emits the same bounded canonical form.
+This rule does not rewrite calls, assignments, lambdas, or mixed-type branches.
 
-```
-§IF{id} condition → action
-§EI condition → action
-§EL → action
-```
+```calor
+if x > 0
+  Console.WriteLine("positive")
+else if x < 0
+  Console.WriteLine("negative")
+else
+  Console.WriteLine("zero")
 
-### Multi-Line (Block Syntax)
-
-For complex branches:
-
-```
-§IF{id} condition
-  // multiple statements
-§EI condition
-  // multiple statements
-§EL
-  // multiple statements
-```
-
-### Parts
-
-| Part | Description |
-|:-----|:------------|
-| `§IF cond` | If statement (block body indents below) |
-| `condition` | Boolean expression |
-| `→` | Arrow separator (single-line inline form) |
-| `§EI` | Else-if (optional, can repeat) at same column as `§IF` |
-| `§EL` | Else (optional, at most one) at same column as `§IF` |
-| `§IF{id} cond` | Explicit ID form (optional, for tooling references) |
-
----
-
-## Conditional Examples
-
-### Simple If
-
-```
-§IF{if1} (> x 0) → §P "positive"
+if x > 0
+  if x < 100
+    Console.WriteLine("between 0 and 100")
+  else
+    Console.WriteLine("100 or greater")
 ```
 
-### If-Else
+<a id="fizzbuzz-complete-example"></a>
 
-```
-§IF{if1} (> x 0)
-  §P "positive"
-§EL
-  §P "not positive"
-```
+### FizzBuzz
 
-### If-ElseIf-Else
+`PrintOne` writes one value. `Main` prints values one through 100. Both declare
+`cw`, the console-write effect.
 
-```
-§IF{if1} (> x 0)
-  §P "positive"
-§EI (< x 0)
-  §P "negative"
-§EL
-  §P "zero"
-```
+```calor
+module FizzBuzz
+  func PrintOne (int:i) → void
+    ! cw
+    if i % 15 == 0
+      Console.WriteLine("FizzBuzz")
+    else if i % 3 == 0
+      Console.WriteLine("Fizz")
+    else if i % 5 == 0
+      Console.WriteLine("Buzz")
+    else
+      Console.WriteLine(i)
 
-### Single Line with Multiple Branches
-
-```
-§IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-§EI (== (% i 3) 0) → §P "Fizz"
-§EI (== (% i 5) 0) → §P "Buzz"
-§EL → §P i
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      PrintOne(i)
 ```
 
-### Nested Conditionals
+<a id="loop-with-conditional"></a>
 
-```
-§IF{if1} (> x 0)
-  §IF{if2} (< x 100)
-    §P "between 0 and 100"
-  §EL
-    §P "100 or greater"
-```
+### Combining a loop and a condition
 
----
+`PrintEvens` prints each even value in the inclusive range. `CountEvens`
+counts the same values; `CountEvens(6)` returns `3`.
 
-## FizzBuzz Complete Example
+```calor
+module Example
+  func PrintEvens (int:n) → void
+    ! cw
+    requires n > 0
+    for i from 1 to n step 1
+      if i % 2 == 0
+        Console.WriteLine(i)
 
-```
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
-    §O{void}
-    §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
-```
-
----
-
-## Loop with Conditional
-
-```
-§M{m001:Example}
-  §F{f001:PrintEvens:pub}
-    §I{i32:n}
-    §O{void}
-    §E{cw}
-    §Q (> n 0)
-    §L{for1:i:1:n:1}
-      §IF{if1} (== (% i 2) 0)
-        §P i
+  func CountEvens (int:n) → int
+    !
+    requires n > 0
+    var int:count = 0
+    for i from 1 to n step 1
+      if i % 2 == 0
+        set count count + 1
+    return count
 ```
 
----
+## Early return
 
-## Early Return
+A `return` exits its function, including from inside a branch or loop. This
+factorial example returns immediately for zero or one; `Main` returns `120`.
 
-Use conditionals with return for early exit:
+```calor
+module EarlyReturn
+  func Factorial (int:n) → int
+    !
+    requires n >= 0
+    if n <= 1
+      return 1
+    return n * Factorial(n - 1)
 
-```
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n 0)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
-```
-
----
-
-## Iterators and Yield
-
-Use `§YIELD expression` to produce the next iterator value and `§YBRK` to stop
-iteration:
-
-```
-§F{f001:Count:pub}
-  §O{i32}
-  §YIELD 1
-  §YIELD 2
-  §YBRK
+  func Main () → int
+    !
+    return Factorial(5)
 ```
 
-`§YIELD` always requires an expression. A valueless `§YIELD` is rejected; it
-does not mean `yield break`. Use `§YBRK` explicitly.
+## Pattern matching
 
-Yield detection is structural across nested statement containers such as
-matches, loops, `using`, and synchronization blocks. A yield inside a nested
-lambda belongs to the lambda and is rejected rather than turning the enclosing
-function into an iterator. Calor also rejects C#-illegal suspension points:
-value-yields in catch, unsafe, fixed, or try-with-catch regions; every yield in
-finally; and all yields in constructors, property/indexer accessors, event
-accessors, operators, and async callables. Property and indexer iterators are
-fail-closed until Calor defines their return-type and deferred-execution
-semantics.
+`match value` selects a case. In an expression match, each `case pattern → value`
+produces the result. `_` is the fallback pattern. Relational patterns use
+ordinary comparison operators. `case var name when condition` captures a value
+and applies a guard.
 
-Iterator functions and methods may only use value parameters. Parameters marked
-`ref`, `in`, or `out` are rejected before C# emission. This applies equally to
-generic, static, and async callable shapes; yields inside nested lambdas or local
-functions do not turn the enclosing callable into an iterator.
+```calor
+module HttpStatus
+  func GetStatusMessage (int:code) → string
+    !
+    return match code
+      case 200 → "OK"
+      case 201 → "Created"
+      case 400 → "Bad Request"
+      case 404 → "Not Found"
+      case 500 → "Server Error"
+      case _ → "Unknown Status"
 
----
+  func Grade (int:score) → string
+    !
+    return match score
+      case >= 90 → "A"
+      case >= 80 → "B"
+      case >= 70 → "C"
+      case >= 60 → "D"
+      case _ → "F"
 
-## Pattern Matching
+  func Describe (int:value) → string
+    !
+    return match value
+      case var n when n > 100 → "large positive"
+      case var n when n > 0 → "small positive"
+      case 0 → "zero"
+      case var n when n > -100 → "small negative"
+      case _ → "large negative"
 
-Pattern matching provides concise multi-way branching with C# switch expression semantics.
-
-### Switch Expression Syntax
-
-```
-§W{id} expression
-  §K pattern1 → result1
-  §K pattern2 → result2
-  §K _ → default
-```
-
-| Part | Description |
-|:-----|:------------|
-| `§W expr` | Switch expression (cases indent below) |
-| `expression` | Value to match against |
-| `§K` | Case keyword (indented under `§W`) |
-| `pattern` | Pattern to match |
-| `→` | Arrow to result (single expression) |
-| `_` | Wildcard (matches anything) |
-| `§W{id} expr` | Explicit ID form (optional) |
-
-### Literal Patterns
-
-Match exact values:
-
-```
-§B{day} §W{sw1} dayNum
-  §K 0 → "Sunday"
-  §K 1 → "Monday"
-  §K 2 → "Tuesday"
-  §K _ → "Other"
+  func Main () → string
+    !
+    return GetStatusMessage(404) + ":" + Grade(95) + ":" + Describe(101)
 ```
 
-### Relational Patterns (`§PREL`)
+`Main` returns `"Not Found:A:large positive"`. For nullable values, use `??`
+when a missing value needs a fallback. For failures, use exceptions and
+`try`/`catch`; see [Types](https://calor.dev/docs/syntax-reference/types/#failure-uses-exceptions).
 
-Match value ranges using relational operators:
+### List patterns
 
-| Syntax | Meaning | C# Equivalent |
-|:-------|:--------|:--------------|
-| `§PREL{gte} value` | Greater than or equal | `>= value` |
-| `§PREL{gt} value` | Greater than | `> value` |
-| `§PREL{lte} value` | Less than or equal | `<= value` |
-| `§PREL{lt} value` | Less than | `< value` |
+List patterns use brackets: `[]` matches an empty list and `[var first]`
+matches one element. A single `..` can skip elements at the start, middle or
+end. Use `.. var rest` to bind that slice, as in
+`[var first, .. var rest, var last]`.
 
-**Example - Grade calculation:**
-```
-§B{grade} §W{sw1} score
-  §K §PREL{gte} 90 → "A"
-  §K §PREL{gte} 80 → "B"
-  §K §PREL{gte} 70 → "C"
-  §K §PREL{gte} 60 → "D"
-  §K _ → "F"
-```
+Binding an array slice requires the `alloc` effect; bare `..` does not allocate.
+Other list-like receiver types currently retain unresolved effects rather than
+acquiring an array's purity contract.
 
-### Variable Patterns with Guards (`§VAR`, `§WHEN`)
+### Statement match
 
-Capture the matched value and add conditions:
+A statement match uses indented case bodies, not expression arrows. A body can
+contain several statements, including an explicit return.
 
-```
-§B{desc} §W{sw1} value
-  §K §VAR{n} §WHEN (> n 100) → "large positive"
-  §K §VAR{n} §WHEN (> n 0) → "small positive"
-  §K 0 → "zero"
-  §K §VAR{n} §WHEN (> n -100) → "small negative"
-  §K _ → "large negative"
-```
-
-| Part | Description |
-|:-----|:------------|
-| `§VAR{name}` | Captures value into variable `name` |
-| `§WHEN condition` | Guard condition (pattern matches only if true) |
-
-### Option Patterns (`§SM`, `§NN`)
-
-Match Option types:
-
-```
-§R §W{sw1} maybeValue
-  §K §SM §VAR{v} → v        // Some(v) - extract value
-  §K §NN → 0                 // None - default
+```calor
+module MatchBlocks
+  func Word (int:value) → string
+    ! cw
+    match value
+      case 1
+        return "one"
+      case 2
+        Console.WriteLine("matched two")
+        return "two"
+      case _
+        return "other"
 ```
 
-### Result Patterns (`§OK`, `§ERR`)
+`Word(2)` prints `"matched two"` and returns `"two"`. The console-write effect
+is explicit even though the other branches do not print.
 
-Match Result types:
+## Iterators and yield
 
-```
-§R §W{sw1} result
-  §K §OK §VAR{v} → (+ "Success: " v)
-  §K §ERR §VAR{e} → (+ "Error: " e)
-```
+Use `yield expression` to produce the next value and `yield break` to stop.
+Both forms stay on one physical line. A bare `yield` is not termination.
+The function's declared return type is the actual iterator carrier.
 
-### Statement Match Blocks
+```calor
+module IteratorValues
+  using System.Collections.Generic
+  func Count () → IEnumerable<int>
+    !
+    yield 1
+    yield 2
+    yield break
 
-Use a statement-position match for cases with multiple statements. Indentation
-delimits each block:
-
-```
-§W{sw1} x
-  §K 1
-    §R "one"
-  §K 2
-    §P "matched two"         // Block syntax (multiple statements)
-    §R "two"
-  §K _
-    §R "other"
-```
-
-An expression-position match, such as `§R §W{sw1} x` or a binding initializer,
-supports arrow arms and blocks containing exactly one `§R value`. Other block
-shapes produce the fatal diagnostic `Calor1006`: the compiler does not discard
-statements or substitute `default`. This restriction also applies inside lambdas
-and when optional type checking is disabled.
-
-### Complete Example
-
-```
-§M{m001:HttpStatus}
-  §F{f001:GetStatusMessage:pub}
-    §I{i32:code}
-    §O{str}
-    §R §W{sw1} code
-      §K 200 → "OK"
-      §K 201 → "Created"
-      §K 400 → "Bad Request"
-      §K 404 → "Not Found"
-      §K 500 → "Server Error"
-      §K _ → "Unknown Status"
+  func Main () → int
+    !
+    var int:sum = 0
+    each int:item in Count()
+      set sum sum + item
+    return sum
 ```
 
----
+`Main()` returns `3`. Calling `Count()` produces an enumerable; enumeration
+runs its body. Yields are detected structurally inside loops, matches and
+other statement containers, but a nested lambda's yield does not turn its
+enclosing function into an iterator.
 
-## Why Explicit Loop IDs?
+Iterator parameters must be by value, not `ref`, `in` or `out`. C#-illegal
+suspension points are rejected before emission: value-yields in a catch,
+unsafe, fixed or try-with-catch region; every yield in a finally; and yields
+in constructors, property/indexer/event accessors, operators, async callables
+and lambdas. Property and indexer iterators remain fail-closed rather than
+receiving guessed deferred-execution semantics.
 
-1. **Precise targeting** - "Modify loop for1" is unambiguous
-2. **Verification** - Compiler uses indentation to determine loop boundaries
-3. **Agent-friendly** - Easy to identify loop boundaries
-4. **Refactoring safe** - IDs survive code movement
+## Identity and refactoring
 
----
-
-## Why Arrow Syntax?
-
-The arrow `→` provides:
-
-1. **Single-line clarity** - `§IF cond → action` is compact
-2. **Readable flow** - Condition "leads to" action
-3. **Consistent pattern** - Same syntax for if, elseif, else
-
----
-
-## Next
-
-- [Contracts](/calor/syntax-reference/contracts/) - Preconditions and postconditions
+Source headers contain names, not IDs. Tools maintain declaration identity in
+the project's `.calor/ids.json` sidecar. Use identity-aware rename and move
+operations rather than inserting IDs into loops or functions.

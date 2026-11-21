@@ -1,0 +1,16 @@
+module RecordType RecordType
+  module RecordTypeModule
+    func CreatePoint public (float:x, float:y) → float
+      !
+      return x
+
+    func DistanceSquared public (float:x1, float:y1, float:x2, float:y2) → float
+      !
+      => result >= 0
+      let dx = x2 - x1
+      let dy = y2 - y1
+      return (dx * dx) + (dy * dy)
+
+    func AreEqual public (float:x1, float:y1, float:x2, float:y2) → bool
+      !
+      return x1 == x2 && y1 == y2

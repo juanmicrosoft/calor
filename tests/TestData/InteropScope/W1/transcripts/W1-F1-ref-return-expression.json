@@ -19,7 +19,7 @@
       "Output: <dir>/Cells.calr"
     ],
     "stderr": [],
-    "calor": "§M{m001:Cells:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n      }§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n      }§/CSHARP\n\n\n\n"
+    "calor": "§M{m001:Cells:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n}§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n}§/CSHARP\n\n\n\n"
   },
   "cli-convert-json": {
     "command": "calor convert Cells.cs -o Cells.calr --format json",
@@ -120,7 +120,7 @@
       "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:ref-parameter"
     ],
-    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n      }§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n      }§/CSHARP\n\n\n\n"
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n}§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n}§/CSHARP\n\n\n\n"
   },
   "mcp-convert-passthroughOnError": {
     "arguments": "{ source, passthroughOnError: true }",
@@ -160,6 +160,6 @@
       "warning:Calor1343:nullable-oblivious-nested-shape",
       "warning:Calor1343:ref-parameter"
     ],
-    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n      }§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n      }§/CSHARP\n\n\n\n"
+    "calorSource": "§M{m001:ConvertedModule:overflow=unchecked}\n  §NS{ns_global:_global:global}\n    §CL{c001:Cells:pub:stat}\n      §CSHARP{    public static ref int First(int[] a) => ref a[0];\n}§/CSHARP\n\n      §CSHARP{\n    public static ref int Last(int[] a)\n    {\n        return ref a[a.Length - 1];\n    }\n}§/CSHARP\n\n\n\n"
   }
 }

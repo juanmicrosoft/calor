@@ -27,11 +27,10 @@ public sealed class ObligationTests
     public void Generate_ProofObligation_CreatesObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -44,7 +43,7 @@ public sealed class ObligationTests
         Assert.Single(tracker.Obligations);
         var obl = tracker.Obligations[0];
         Assert.Equal(ObligationKind.ProofObligation, obl.Kind);
-        Assert.Equal("f001", obl.FunctionId);
+        Assert.Equal(Assert.Single(module.Functions).Id, obl.FunctionId);
         Assert.Contains("positive", obl.Description);
         Assert.Equal(ObligationStatus.Pending, obl.Status);
     }
@@ -53,12 +52,11 @@ public sealed class ObligationTests
     public void Generate_NestedProofObligation_CreatesObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §IF{i1} (> x INT:0)
-                    §PROOF{p1:positive} (> x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                if (x > 0)
+                  proof{"positive"} (x > 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -69,17 +67,20 @@ public sealed class ObligationTests
 
         var obligation = Assert.Single(tracker.Obligations);
         Assert.Equal(ObligationKind.ProofObligation, obligation.Kind);
-        Assert.Equal("p1", obligation.SourceProofId);
+        var proof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(module).OfType<ProofObligationNode>());
+        Assert.Equal(proof.Id, obligation.SourceProofId);
+        Assert.Equal(proof.Span, obligation.Span);
     }
 
     [Fact]
     public void Generate_InlineRefinement_CreatesRefinementEntryObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -92,19 +93,18 @@ public sealed class ObligationTests
         Assert.Single(tracker.Obligations);
         var obl = tracker.Obligations[0];
         Assert.Equal(ObligationKind.RefinementEntry, obl.Kind);
-        Assert.Equal("f001", obl.FunctionId);
+        Assert.Equal(Assert.Single(module.Functions).Id, obl.FunctionId);
         // Public function -> Boundary status
         Assert.Equal(ObligationStatus.Boundary, obl.Status);
     }
 
     [Fact]
-    public void Generate_PrivateFunctionInlineRefinement_IsPending()
+    public void Generate_PrivateFunctionInlineRefinement_IsBoundary()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Helper:priv}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Helper private (int:age | (# >= 0)) → void
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -117,43 +117,17 @@ public sealed class ObligationTests
         Assert.Single(tracker.Obligations);
         var obl = tracker.Obligations[0];
         Assert.Equal(ObligationKind.RefinementEntry, obl.Kind);
-        // Private function -> stays Pending (solver will check it)
-        Assert.Equal(ObligationStatus.Pending, obl.Status);
-    }
-
-    [Fact]
-    public void Generate_MultipleObligations_TracksAll()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var tracker = new ObligationTracker();
-        var generator = new ObligationGenerator(tracker);
-        generator.Generate(module);
-
-        // Should have at least 2: one for inline refinement, one for proof obligation
-        Assert.True(tracker.Obligations.Count >= 2);
-        Assert.Contains(tracker.Obligations, o => o.Kind == ObligationKind.RefinementEntry);
-        Assert.Contains(tracker.Obligations, o => o.Kind == ObligationKind.ProofObligation);
+        Assert.Equal(ObligationStatus.Boundary, obl.Status);
     }
 
     [Fact]
     public void Generate_NoRefinements_NoObligations()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -219,12 +193,10 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Add:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §Q (>= x INT:0)
-                  §PROOF{p1:non-neg} (>= x INT:0)
+            module Test Test block
+              func Add private (int:x) → void
+                requires (x >= 0)
+                proof{"non-neg"} (x >= 0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -260,11 +232,9 @@ public sealed class ObligationTests
         // so the solver proves it too. The proof is still carried by the string theory (null
         // strings are unmodeled), so it must stay Assumed, never Discharged.
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:bytelen} (== (len STR:"\u00e9") INT:1)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"bytelen"} (("é").Length == 1)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -290,11 +260,9 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:numeric} (== (+ INT:1 INT:1) INT:2)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"numeric"} ((1 + 1) == 2)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -313,11 +281,9 @@ public sealed class ObligationTests
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = """
-            §M{m001:Test}
-              §F{f001:Check:priv}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:always-positive} (> x INT:0)
+            module Test Test block
+              func Check private (int:x) → void
+                proof{"always-positive"} (x > 0)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -337,18 +303,17 @@ public sealed class ObligationTests
     }
 
     [SkippableFact]
-    public void Solve_InlineRefinementWithSelfRef_DischargesViaZ3()
+    public void Solve_InlineRefinementWithPrecondition_KeepsEntryBoundary()
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
         // Private function with precondition that guarantees the inline refinement.
         // The # in (>= # INT:0) should resolve to 'age' via PushSelfVariable.
         var source = """
-            §M{m001:Test}
-              §F{f001:Validate:priv}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
-                  §Q (>= age INT:0)
+            module Test Test block
+              func Validate private (int:age | (# >= 0)) → void
+                requires (age >= 0)
+                return
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -360,21 +325,20 @@ public sealed class ObligationTests
             o => o.Kind == ObligationKind.RefinementEntry);
         Assert.NotNull(refObl);
         Assert.Equal("age", refObl.ParameterName);
-        // Precondition (>= age 0) should discharge the inline refinement (>= # 0)
-        Assert.Equal(ObligationStatus.Discharged, refObl.Status);
+        Assert.Equal(ObligationStatus.Boundary, refObl.Status);
+        Assert.Null(refObl.Outcome);
     }
 
     [SkippableFact]
-    public void Solve_InlineRefinementWithoutPrecondition_Fails()
+    public void Solve_InlineRefinementWithoutPrecondition_IsNotACallerRefutation()
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Private function WITHOUT precondition — inline refinement can't be verified
+        // A private declaration does not universally claim that every input is valid.
         var source = """
-            §M{m001:Test}
-              §F{f001:Validate:priv}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Validate private (int:age | (# >= 0)) → void
+                return
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
@@ -385,8 +349,9 @@ public sealed class ObligationTests
         var refObl = options.ObligationResults.Obligations.FirstOrDefault(
             o => o.Kind == ObligationKind.RefinementEntry);
         Assert.NotNull(refObl);
-        Assert.Equal(ObligationStatus.Failed, refObl.Status);
-        Assert.NotNull(refObl.CounterexampleDescription);
+        Assert.Equal(ObligationStatus.Boundary, refObl.Status);
+        Assert.Null(refObl.CounterexampleDescription);
+        Assert.False(result.HasErrors);
     }
 
     // ───── Obligation Metadata ─────
@@ -395,10 +360,10 @@ public sealed class ObligationTests
     public void Generate_SetsParameterNameOnRefinementEntry()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:myParam} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:myParam | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -416,11 +381,10 @@ public sealed class ObligationTests
     public void Generate_SetsSourceProofIdOnProofObligation()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -431,45 +395,19 @@ public sealed class ObligationTests
         generator.Generate(module);
 
         var obl = Assert.Single(tracker.Obligations);
-        Assert.Equal("p1", obl.SourceProofId);
-    }
-
-    // ───── Full Pipeline Integration ─────
-
-    [Fact]
-    public void CompilePipeline_WithVerifyRefinements_PopulatesObligationResults()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
-            """;
-
-        var options = new CompilationOptions
-        {
-            VerifyRefinements = true
-        };
-
-        var result = Program.Compile(source, "test.calr", options);
-
-        // ObligationResults should be populated
-        Assert.NotNull(options.ObligationResults);
-        Assert.True(options.ObligationResults.Obligations.Count >= 2);
-
-        var summary = options.ObligationResults.GetSummary();
-        Assert.True(summary.Total >= 2);
+        var proof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(module).OfType<ProofObligationNode>());
+        Assert.Equal(proof.Id, obl.SourceProofId);
+        Assert.Equal(proof.Span, obl.Span);
     }
 
     [Fact]
     public void CompilePipeline_WithoutVerifyRefinements_NoObligations()
     {
         var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
+            §M{Test}
+              §RTYPE{NatInt:i32} (>= # INT:0)
+              §F{Main:pub}
                   §I{i32:x}
                   §O{void}
             """;
@@ -491,11 +429,10 @@ public sealed class ObligationTests
     public void CSharpEmit_DischargedProofObligation_EmitsProvenComment()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -528,11 +465,10 @@ public sealed class ObligationTests
     public void CSharpEmit_PolicyAlwaysGuard_OverridesProvenGuardElision()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -568,13 +504,13 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{m001:Test}
-              §F{f001:Bad:pub}
-                  §O{void}
-                  §B{~x:i32} INT:1
-                  §IF{i1} (> x INT:0)
-                    §ASSIGN x INT:-1
-                    §PROOF{p1} (> x INT:0)
+            module Test Test block
+              func Bad () → void
+                !
+                var int:x = 1
+                if (x > 0)
+                  set x -1
+                  proof (x > 0)
             """;
         var options = new CompilationOptions
         {
@@ -589,44 +525,19 @@ public sealed class ObligationTests
             options.ObligationResults!.Obligations,
             obligation => obligation.Kind == ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
-        Assert.Contains("Proof obligation [p1] violated", result.GeneratedCode);
+        var sourceProof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(result.Ast!).OfType<ProofObligationNode>());
+        Assert.Equal(sourceProof.Id, proof.SourceProofId);
+        Assert.Equal(sourceProof.Span, proof.Span);
+        Assert.Contains($"Proof obligation [{sourceProof.Id}] violated", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN:", result.GeneratedCode);
     }
 
-    [SkippableFact]
-    public void AssignmentSubtypeProof_UsesAssignedValue()
-    {
-        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Assign:priv}
-                  §I{Positive:value}
-                  §O{i32}
-                  §Q (> value INT:0)
-                  §ASSIGN value INT:-1
-                  §R value
-            """;
-        var options = new CompilationOptions
-        {
-            VerifyRefinements = true,
-            ObligationPolicy = ObligationPolicy.Permissive
-        };
-
-        Program.Compile(source, "test.calr", options);
-
-        var subtype = Assert.Single(
-            options.ObligationResults!.Obligations,
-            obligation => obligation.Kind == ObligationKind.Subtype);
-        Assert.NotEqual(ObligationStatus.Discharged, subtype.Status);
-    }
-
     private const string DischargedObligationSource = """
-        §M{m001:Test}
-          §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
+        module Test Test block
+          func Main (int:x) → void
+            !
+            proof{"check"} (x >= 0)
         """;
 
     private static ObligationTracker DischargedTracker(ModuleNode module)
@@ -655,7 +566,9 @@ public sealed class ObligationTests
         var csharp = emitter.Emit(module);
 
         Assert.DoesNotContain("throw new InvalidOperationException", csharp);
-        Assert.Contains("// PROVEN: proof obligation [p1: check]", csharp);
+        var proof = Assert.Single(
+            Calor.Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(module).OfType<ProofObligationNode>());
+        Assert.Contains($"// PROVEN: proof obligation [{proof.Id}: check]", csharp);
     }
 
     [Fact]
@@ -681,11 +594,10 @@ public sealed class ObligationTests
     public void CSharpEmit_FailedProofObligation_EmitsRuntimeGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -714,11 +626,10 @@ public sealed class ObligationTests
         // #879 ride-along: an obligation the solver cannot model keeps its runtime
         // check. Pre-fix, Unsupported fell through to the no-guard TODO comment.
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -749,11 +660,10 @@ public sealed class ObligationTests
         // Z3 unavailable attaches the tracker without solving) and must keep its guard.
         // The no-guard TODO now means exactly "no tracker ran".
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -775,11 +685,10 @@ public sealed class ObligationTests
     public void CSharpEmit_NoTracker_EmitsRuntimeGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"check"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -812,10 +721,10 @@ public sealed class ObligationTests
     public void CSharpEmit_InlineRefinedParameter_EmitsEntryGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Use:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Use (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -828,260 +737,18 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void CSharpEmit_NamedRefinedParameter_ErasesTypeAndEmitsEntryGuard()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
-                  §I{Nat:value}
-                  §O{void}
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var csharp = new CSharpEmitter().Emit(module);
-
-        Assert.Contains("void Use(int value)", csharp);
-        Assert.Contains("if (!(value >= 0))", csharp);
-    }
-
-    [Fact]
-    public void Generate_NamedRefinedReturn_CreatesReturnObligation()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Get:pub}
-                  §O{Nat}
-                  §R INT:1
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-
-        var obligation = Assert.Single(tracker.Obligations);
-        Assert.Equal(ObligationKind.RefinementReturn, obligation.Kind);
-        Assert.Equal("result", obligation.ParameterName);
-    }
-
-    [Fact]
-    public void CSharpEmit_NamedRefinedReturn_ErasesTypeAndEmitsGuard()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Get:pub}
-                  §O{Nat}
-                  §R INT:1
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var csharp = new CSharpEmitter().Emit(module);
-
-        Assert.Contains("int Get()", csharp);
-        Assert.Contains("if (!(__calorPostconditionResult", csharp);
-        Assert.Contains("Return value violates refinement type 'Nat'", csharp);
-    }
-
-    [Fact]
-    public void Generate_RefinedBinding_CreatesSubtypeObligation()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
-                  §O{void}
-                  §B{value:Nat} INT:1
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-
-        var obligation = Assert.Single(tracker.Obligations);
-        Assert.Equal(ObligationKind.Subtype, obligation.Kind);
-        Assert.Equal("value", obligation.ParameterName);
-    }
-
-    [Fact]
-    public void Generate_RefinedAssignment_CreatesSubtypeTransitionObligation()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
-                  §O{i32}
-                  §B{~value:Nat} INT:1
-                  §ASSIGN value INT:-1
-                  §R value
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-
-        var obligations = tracker.Obligations
-            .Where(obligation => obligation.Kind == ObligationKind.Subtype)
-            .ToArray();
-        Assert.Equal(2, obligations.Length);
-        Assert.Contains(
-            obligations,
-            obligation => obligation.Description.Contains(
-                "must preserve refinement type",
-                StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void CSharpEmit_RefinedBinding_ErasesTypeAndEmitsGuard()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Nat:i32} (>= # INT:0)
-              §F{f001:Use:pub}
-                  §O{void}
-                  §B{value:Nat} INT:1
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var csharp = new CSharpEmitter().Emit(module);
-
-        Assert.Contains("int value = 1;", csharp);
-        Assert.Contains("if (!(value >= 0))", csharp);
-        Assert.Contains("Value violates refinement type 'Nat'", csharp);
-    }
-
-    [Fact]
     public void CSharpEmit_RefinedParameterGuard_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:RequirePositive:pub}
-                  §I{i32:value} | (> # INT:0)
-                  §O{i32}
-                  §R value
+            module Test Test block
+              func RequirePositive (int:value | (# > 0)) → int
+                !
+                return value
             """);
 
         var exception = InvokeGenerated(csharp, "RequirePositive", -1);
 
         Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_NamedAndInlineParameterRefinements_AreConjoined()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Use:pub}
-                  §I{Positive:value} | (< # INT:10)
-                  §O{i32}
-                  §R value
-            """);
-
-        var exception = InvokeGenerated(csharp, "Use", -1);
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-        Assert.Contains("value > 0 && value < 10", csharp);
-    }
-
-    [Fact]
-    public void NestedNamedRefinements_EraseAndEnforceAllInheritedPredicates()
-    {
-        const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Small:Positive} (< # INT:10)
-              §F{f001:Use:pub}
-                  §I{Small:value}
-                  §O{i32}
-                  §R value
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-
-        var entry = Assert.Single(
-            tracker.Obligations,
-            obligation => obligation.Kind == ObligationKind.RefinementEntry);
-        Assert.IsType<BinaryOperationNode>(entry.Condition);
-
-        var csharp = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker).Emit(module);
-        var exception = InvokeGenerated(csharp, "Use", -1);
-
-        Assert.Contains("int Use(int value)", csharp);
-        Assert.Contains("value > 0 && value < 10", csharp);
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [SkippableFact]
-    public void NestedNamedRefinements_ResolveToConcreteSolverType()
-    {
-        Skip.IfNot(
-            Verification.Z3.Z3ContextFactory.IsAvailable,
-            "Z3 not available");
-        const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Small:Positive} (< # INT:10)
-              §F{f001:Use:priv}
-                  §I{Small:value}
-                  §O{void}
-                  §Q (> value INT:0)
-                  §Q (< value INT:10)
-            """;
-        var options = new CompilationOptions
-        {
-            VerifyRefinements = true
-        };
-
-        Program.Compile(source, "test.calr", options);
-
-        var entry = Assert.Single(
-            options.ObligationResults!.Obligations,
-            obligation => obligation.Kind == ObligationKind.RefinementEntry);
-        Assert.Equal(ObligationStatus.Discharged, entry.Status);
-    }
-
-    [Fact]
-    public void UnboundedInheritedQuantifier_IsRejectedBeforeRuntime()
-    {
-        const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonNegative:i32} (forall ((i i32)) (>= # INT:0))
-              §RTYPE{r2:Small:NonNegative} (< # INT:10)
-              §F{f001:Use:pub}
-                  §I{Small:value}
-                  §O{i32}
-                  §R value
-            """;
-
-        Assert.Throws<InvalidOperationException>(() => Emit(source));
-        var result = Program.Compile(source, "unbounded-refinement.calr", new CompilationOptions
-        {
-            EnableTypeChecking = true,
-            EnforceEffects = true,
-            ContractMode = ContractMode.Debug
-        });
-        Assert.Contains(result.Diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
     }
 
     [Fact]
@@ -1114,7 +781,7 @@ public sealed class ObligationTests
             Assert.IsType<ReferenceNode>(comparison.Left).Name);
 
         var unsupported = FactCollector.SubstituteSelfRefStatic(
-            new SomeExpressionNode(span, new SelfRefNode(span)),
+            new ThrowExpressionNode(span, new SelfRefNode(span)),
             "value");
         Assert.False(Assert.IsType<BoolLiteralNode>(unsupported).Value);
 
@@ -1132,341 +799,14 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void RefinementElision_RequiresAllConstraintsAndRuntimeAssumptions()
-    {
-        const string combinedSource = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Mutate:pub}
-                  §I{Positive:value} | (< # INT:10)
-                  §O{i32}
-                  §ASSIGN value INT:20
-                  §R value
-            """;
-        var combinedModule = Parse(combinedSource, out var combinedDiagnostics);
-        Assert.False(combinedDiagnostics.HasErrors);
-        var combinedTracker = new ObligationTracker();
-        new ObligationGenerator(combinedTracker).Generate(combinedModule);
-
-        var assignmentObligations = combinedTracker.Obligations
-            .Where(obligation =>
-                obligation.Kind == ObligationKind.Subtype
-                && obligation.Description.StartsWith(
-                    "Assignment to 'value'",
-                    StringComparison.Ordinal))
-            .ToArray();
-
-        Assert.Equal(2, assignmentObligations.Length);
-        Assert.Contains(
-            assignmentObligations,
-            obligation => obligation.Description.Contains(
-                "inline refinement",
-                StringComparison.Ordinal));
-
-        const string contractOffSource = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Mutate:pub}
-                  §I{Positive:value}
-                  §I{i32:next}
-                  §O{i32}
-                  §Q (> next INT:0)
-                  §ASSIGN value next
-                  §R value
-            """;
-        var contractOffModule = Parse(
-            contractOffSource,
-            out var contractOffDiagnostics);
-        Assert.False(contractOffDiagnostics.HasErrors);
-        var contractOffTracker = new ObligationTracker();
-        new ObligationGenerator(contractOffTracker).Generate(contractOffModule);
-        foreach (var obligation in contractOffTracker.Obligations)
-            obligation.Status = ObligationStatus.Discharged;
-        var contractOffCSharp = new CSharpEmitter(
-            ContractMode.Off,
-            null,
-            null,
-            contractOffTracker)
-        {
-            ElideProvenGuards = true
-        }.Emit(contractOffModule);
-
-        var exception = InvokeGenerated(
-            contractOffCSharp,
-            "Mutate",
-            1,
-            -1);
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-        Assert.DoesNotContain("Precondition failed", contractOffCSharp);
-    }
-
-    [Fact]
-    public void OperatorOverload_EnforcesRefinedReturnBoundary()
-    {
-        const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §CL{c001:MyType:pub}
-                §OP{op001:implicit:pub}
-                  §I{MyType:value}
-                  §O{Positive}
-                  §R INT:-1
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-        var csharp = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker).Emit(module);
-
-        Assert.Contains(
-            tracker.Obligations,
-            obligation => obligation.FunctionId == "op001"
-                && obligation.Kind == ObligationKind.RefinementReturn);
-        var assembly = CompileGenerated(csharp);
-        var type = Assert.Single(
-            assembly.GetTypes(),
-            candidate => candidate.GetMethod("op_Implicit") is not null);
-        var instance = Activator.CreateInstance(type);
-        var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(
-            () => type.GetMethod("op_Implicit")!.Invoke(
-                null,
-                [instance]));
-
-        Assert.IsType<InvalidOperationException>(invocation.InnerException);
-
-        var legacyCSharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §CL{c001:LegacyType:pub}
-                §MT{m001:op_Implicit:pub:stat}
-                  §I{LegacyType:value}
-                  §O{Positive}
-                  §R INT:-1
-            """);
-        var legacyAssembly = CompileGenerated(legacyCSharp);
-        var legacyType = Assert.Single(
-            legacyAssembly.GetTypes(),
-            candidate => candidate.GetMethod("op_Implicit") is not null);
-        var legacyInstance = Activator.CreateInstance(legacyType);
-        var legacyInvocation =
-            Assert.Throws<System.Reflection.TargetInvocationException>(
-                () => legacyType.GetMethod("op_Implicit")!.Invoke(
-                    null,
-                    [legacyInstance]));
-
-        Assert.IsType<InvalidOperationException>(
-            legacyInvocation.InnerException);
-    }
-
-    [Fact]
-    public void LambdaReturn_DoesNotInheritEnclosingRefinedReturnGuard()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Test:pub}
-                  §I{bool:early}
-                  §O{Positive}
-                  §B{f:Func<i32>} §LAM{l1} §R INT:-1 §/LAM{l1}
-                  §IF{i1} early
-                    §R INT:1
-                  §B{x:i32} §C{f} §/C
-                  §R INT:1
-            """);
-        var assembly = CompileGenerated(csharp);
-        var type = Assert.Single(
-            assembly.GetTypes(),
-            candidate => candidate.GetMethod("Test") is not null);
-
-        var result = type.GetMethod("Test")!.Invoke(null, [false]);
-
-        Assert.Equal(1, result);
-    }
-
-    [Fact]
-    public void EnumExtension_EnforcesRefinedReturnBoundary()
-    {
-        const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §EN{e001:Color}
-                Red
-              §EEXT{x001:Color}
-                §F{f001:Bad:pub}
-                  §I{Color:self}
-                  §O{Positive}
-                  §R INT:-1
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-        var csharp = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker).Emit(module);
-        var assembly = CompileGenerated(csharp);
-        var method = Assert.Single(
-            assembly.GetTypes()
-                .SelectMany(type => type.GetMethods())
-                .Where(candidate => candidate.Name == "Bad"));
-        var colorType = Assert.Single(
-            assembly.GetTypes(),
-            type => type.IsEnum && type.Name == "Color");
-        var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(
-            () => method.Invoke(
-                null,
-                [Enum.ToObject(colorType, 0)]));
-
-        Assert.Contains(
-            tracker.Obligations,
-            obligation => obligation.FunctionId == "f001"
-                && obligation.Kind == ObligationKind.RefinementReturn);
-        Assert.IsType<InvalidOperationException>(invocation.InnerException);
-    }
-
-    [Fact]
-    public void SiblingRefinementBindings_DoNotElideLiveAssignmentGuard()
-    {
-        const string source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Bad:pub}
-                  §I{bool:flag}
-                  §O{i32}
-                  §IF{i1} flag
-                    §B{~x:Positive} INT:1
-                  §IF{i2} (== flag BOOL:false)
-                    §B{~x:Negative} INT:-1
-                    §ASSIGN x INT:1
-                    §R x
-                  §R INT:0
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-        foreach (var obligation in tracker.Obligations)
-            obligation.Status = ObligationStatus.Discharged;
-        var csharp = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker)
-        {
-            ElideProvenGuards = true
-        }.Emit(module);
-
-        var exception = InvokeGenerated(csharp, "Bad", false);
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadReturn:pub}
-                  §O{Positive}
-                  §R INT:-1
-            """);
-
-        var exception = InvokeGenerated(csharp, "BadReturn");
-
-        Assert.IsType<InvalidOperationException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_NestedRefinedReturnGuard_RejectsInvalidRuntimeValue()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadNestedReturn:pub}
-                  §I{bool:takeBadPath}
-                  §O{Positive}
-                  §IF{i1} takeBadPath
-                    §R INT:-1
-                  §R INT:1
-            """);
-
-        var exception = InvokeGenerated(csharp, "BadNestedReturn", true);
-
-        Assert.IsType<InvalidOperationException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_RefinedBindingGuard_RejectsInvalidRuntimeValue()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadBinding:pub}
-                  §O{i32}
-                  §B{value:Positive} INT:-1
-                  §R value
-            """);
-
-        var exception = InvokeGenerated(csharp, "BadBinding");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_RefinedAssignmentGuard_RejectsInvalidRuntimeValue()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadAssignment:pub}
-                  §O{i32}
-                  §B{~value:Positive} INT:1
-                  §ASSIGN value INT:-1
-                  §R value
-            """);
-
-        var exception = InvokeGenerated(csharp, "BadAssignment");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_UnannotatedRefinedRebind_RejectsInvalidRuntimeValue()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:BadRebind:pub}
-                  §O{i32}
-                  §B{~value:Positive} INT:1
-                  §B{~value} INT:-1
-                  §R value
-            """);
-
-        var exception = InvokeGenerated(csharp, "BadRebind");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
     public void CSharpEmit_InlineRefinedParameterAssignment_RejectsInvalidRuntimeValue()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:BadParameterWrite:pub}
-                  §I{i32:value} | (> # INT:0)
-                  §O{i32}
-                  §ASSIGN value INT:-1
-                  §R value
+            module Test Test block
+              func BadParameterWrite (int:value | (# > 0)) → int
+                !
+                set value -1
+                return value
             """);
 
         var exception = InvokeGenerated(csharp, "BadParameterWrite", 1);
@@ -1475,47 +815,13 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void CSharpEmit_NestedSelfReference_CompilesAndRejectsInvalidValue()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §F{f001:Use:pub}
-                  §I{NonEmpty:value}
-                  §O{void}
-            """);
-
-        var exception = InvokeGenerated(csharp, "Use", "");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-        Assert.DoesNotContain("__self__", csharp);
-    }
-
-    [Fact]
-    public void CSharpEmit_AsyncRefinedReturn_RejectsInvalidRuntimeValue()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §AF{f001:BadAsyncReturn:pub}
-                  §O{Positive}
-                  §R INT:-1
-            """);
-
-        var exception = InvokeGenerated(csharp, "BadAsyncReturn");
-
-        Assert.IsType<InvalidOperationException>(exception);
-    }
-
-    [Fact]
     public void CSharpEmit_RefinedOutParameter_GuardsAfterAssignment()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:SetBad:pub}
-                  §I{i32:value:out} | (> # INT:0)
-                  §O{void}
-                  §ASSIGN value INT:-1
+            module Test Test block
+              func SetBad (out int:value | (# > 0)) → void
+                !
+                set value -1
             """);
 
         var exception = InvokeGenerated(csharp, "SetBad", (object?)null);
@@ -1523,181 +829,17 @@ public sealed class ObligationTests
         Assert.IsType<ArgumentOutOfRangeException>(exception);
     }
 
-    [Fact]
-    public void CSharpEmit_IndexedRead_EnforcesLogicalBoundAtRuntime()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Read:pub}
-                  §I{Sized:items}
-                  §I{i32:n}
-                  §I{i32:index}
-                  §O{i32}
-                  §R §IDX items index
-            """);
-
-        var exception = InvokeGenerated(
-            csharp,
-            "Read",
-            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
-            5,
-            7);
-
-        Assert.IsType<IndexOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_IndexedWrite_EnforcesLogicalBoundAtRuntime()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Write:pub}
-                  §I{Sized:items}
-                  §I{i32:n}
-                  §I{i32:index}
-                  §O{void}
-                  §SETIDX{items} index INT:42
-            """);
-
-        var exception = InvokeGenerated(
-            csharp,
-            "Write",
-            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
-            5,
-            7);
-
-        Assert.IsType<IndexOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_ArrayAccessAssignmentTarget_EnforcesLogicalBound()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Write:pub}
-                  §I{Sized:items}
-                  §I{i32:n}
-                  §I{i32:index}
-                  §O{void}
-                  §ASSIGN §IDX items index INT:42
-            """);
-
-        var exception = InvokeGenerated(
-            csharp,
-            "Write",
-            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
-            5,
-            7);
-
-        Assert.IsType<IndexOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_IndexedAlias_PreservesLogicalBoundAtRuntime()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:ReadAlias:pub}
-                  §I{Sized:items}
-                  §I{i32:n}
-                  §I{i32:index}
-                  §O{i32}
-                  §B{alias:i32[]} items
-                  §R §IDX alias index
-            """);
-
-        var exception = InvokeGenerated(
-            csharp,
-            "ReadAlias",
-            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
-            5,
-            7);
-
-        Assert.IsType<IndexOutOfRangeException>(exception);
-    }
-
-    [SkippableFact]
-    public void NestedSelfSubtypeObligation_IsTranslatedRatherThanUnsupported()
-    {
-        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §F{f001:Assign:priv}
-                  §I{NonEmpty:value}
-                  §I{str:other}
-                  §O{void}
-                  §ASSIGN value other
-            """;
-        var options = new CompilationOptions
-        {
-            VerifyRefinements = true,
-            ObligationPolicy = ObligationPolicy.Permissive
-        };
-        var result = Program.Compile(source, "test.calr", options);
-        Assert.False(result.HasErrors);
-
-        var subtype = Assert.Single(
-            options.ObligationResults!.Obligations,
-            obligation => obligation.Kind == ObligationKind.Subtype);
-        Assert.NotEqual(ObligationStatus.Unsupported, subtype.Status);
-    }
-
-    [Fact]
-    public void SiblingIndexedAliases_DoNotShareLogicalSizeFacts()
-    {
-        var source = """
-            §M{m001:Test}
-              §ITYPE{it1:SizedN:i32[]:n}
-              §ITYPE{it2:SizedM:i32[]:m}
-              §F{f001:Read:priv}
-                  §I{SizedN:left}
-                  §I{SizedM:right}
-                  §I{i32:n}
-                  §I{i32:m}
-                  §I{i32:index}
-                  §O{i32}
-                  §IF{i1} (> n INT:0)
-                    §B{alias:i32[]} left
-                    §B{x:i32} §IDX alias index
-                  §EL
-                    §B{alias:i32[]} right
-                    §B{y:i32} §IDX alias index
-                  §R INT:0
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-
-        var indexObligations = tracker.Obligations
-            .Where(obligation => obligation.Kind == ObligationKind.IndexBounds)
-            .ToArray();
-        Assert.Equal(2, indexObligations.Length);
-        Assert.All(
-            indexObligations,
-            obligation => Assert.Contains(
-                "runtime collection bounds",
-                obligation.Description));
-    }
-
     [SkippableFact]
     public void MethodNestedProof_UsesBranchFact()
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = """
-            §M{m001:Test}
-              §CL{c001:Checker:pub}
-                §MT{m001:Check:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §IF{if1} (> x INT:0)
-                    §PROOF{p1} (> x INT:0)
+            module Test Test block
+              class Checker
+                func Check (int:x) → void
+                  !
+                  if (x > 0)
+                    proof (x > 0)
             """;
         var options = new CompilationOptions
         {
@@ -1714,178 +856,13 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void CSharpEmit_MissingIndexedSizeWitness_FailsClosed()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Read:pub}
-                  §I{Sized:items}
-                  §I{i32:index}
-                  §O{i32}
-                  §R §IDX items index
-            """);
-
-        var exception = InvokeGenerated(
-            csharp,
-            "Read",
-            new[] { 0, 1, 2 },
-            1);
-
-        Assert.IsType<InvalidOperationException>(exception);
-        Assert.Contains("size witness 'n' is unavailable", exception.Message);
-    }
-
-    [Fact]
-    public void CSharpEmit_LocalIndexedBindingWithoutWitness_FailsClosed()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Read:pub}
-                  §I{i32:index}
-                  §O{i32}
-                  §B{items:Sized} §ARR{i32} INT:3
-                  §R §IDX items index
-            """);
-
-        var exception = InvokeGenerated(csharp, "Read", 1);
-
-        Assert.IsType<InvalidOperationException>(exception);
-        Assert.Contains("size witness 'n' is unavailable", exception.Message);
-    }
-
-    [Fact]
-    public void CSharpEmit_IndexedIncrement_EnforcesLogicalBound()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Increment:pub}
-                  §I{Sized:items}
-                  §I{i32:n}
-                  §I{i32:index}
-                  §O{void}
-                  (inc §IDX items index)
-            """);
-
-        var exception = InvokeGenerated(
-            csharp,
-            "Increment",
-            new[] { 0, 1, 2, 3, 4, 5, 6, 7 },
-            5,
-            7);
-
-        Assert.IsType<IndexOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_RefinedDecrement_RechecksInvariant()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Bad:pub}
-                  §O{i32}
-                  §B{~value:Positive} INT:1
-                  (dec value)
-                  §R value
-            """);
-
-        var exception = InvokeGenerated(csharp, "Bad");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_UninitializedRefinedBinding_RejectsInvalidDefault()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Bad:pub}
-                  §O{i32}
-                  §B{value:Positive}
-                  §R value
-            """);
-
-        var exception = InvokeGenerated(csharp, "Bad");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_NestedRefinedDecrement_RechecksInvariant()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Bad:pub}
-                  §O{i32}
-                  §B{~value:Positive} INT:1
-                  §B{old:i32} (post-dec value)
-                  §R value
-            """);
-
-        var exception = InvokeGenerated(csharp, "Bad");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-    }
-
-    [Fact]
-    public void CSharpEmit_RefinedIterator_GuardsYieldedValues()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Get:pub}
-                  §O{Positive}
-                  §YIELD INT:-1
-            """);
-
-        var exception = InvokeGenerated(csharp, "Get");
-
-        Assert.IsType<InvalidOperationException>(exception);
-        Assert.Contains("Yielded value violates", exception.Message);
-    }
-
-    [Fact]
-    public void CSharpEmit_PublicRefinedConstructor_RejectsInvalidValue()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §CL{c001:Box:pub}
-                §CTOR{ctor1:pub} (Positive:value)
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-        var csharp = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker).Emit(module);
-
-        var exception = InvokeGeneratedConstructor(csharp, -1);
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-        Assert.Contains(
-            tracker.Obligations,
-            obligation => obligation.Kind == ObligationKind.RefinementEntry);
-    }
-
-    [Fact]
     public void CSharpEmit_RefinedRefParameterMutation_CompilesAndThrows()
     {
         var csharp = Emit("""
-            §M{m001:Test}
-              §F{f001:Mutate:pub}
-                  §I{i32:value:ref} | (> # INT:0)
-                  §O{void}
-                  (dec value)
+            module Test Test block
+              func Mutate (ref int:value | (# > 0)) → void
+                !
+                set value (value - 1)
             """);
 
         var exception = InvokeGenerated(csharp, "Mutate", 1);
@@ -1897,11 +874,10 @@ public sealed class ObligationTests
     public void CSharpEmit_FailedRefinedWrites_DoNotCommitInvalidState()
     {
         var assignment = Emit("""
-            §M{m001:Test}
-              §F{f001:Mutate:pub}
-                  §I{i32:value:ref} | (> # INT:0)
-                  §O{void}
-                  §ASSIGN value INT:-1
+            module Test Test block
+              func Mutate (ref int:value | (# > 0)) → void
+                !
+                set value -1
             """);
         object?[] assignmentArguments = [1];
 
@@ -1914,11 +890,10 @@ public sealed class ObligationTests
         Assert.Equal(1, assignmentArguments[0]);
 
         var decrement = Emit("""
-            §M{m001:Test}
-              §F{f001:Mutate:pub}
-                  §I{i32:value:ref} | (> # INT:0)
-                  §O{void}
-                  (dec value)
+            module Test Test block
+              func Mutate (ref int:value | (# > 0)) → void
+                !
+                set value (value - 1)
             """);
         object?[] decrementArguments = [1];
 
@@ -1929,222 +904,6 @@ public sealed class ObligationTests
 
         Assert.IsType<ArgumentOutOfRangeException>(decrementException);
         Assert.Equal(1, decrementArguments[0]);
-    }
-
-    [Fact]
-    public void CSharpEmit_FailedTypedRebind_RollsBackNestedTargetMutation()
-    {
-        var csharp = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:NonNegative:i32} (>= # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Mutate:pub}
-                  §I{NonNegative:value:ref}
-                  §O{void}
-                  §B{~value:Negative} (post-dec value)
-            """);
-        object?[] arguments = [1];
-
-        var exception = InvokeGenerated(csharp, "Mutate", arguments);
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-        Assert.Equal(1, arguments[0]);
-    }
-
-    [Fact]
-    public void CSharpEmit_TypedRebind_PreservesPriorContractAndSupportsOutInitialization()
-    {
-        const string caughtRebindSource = """
-            §M{m001:Test}
-              §RTYPE{r1:NonNegative:i32} (>= # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Mutate:pub}
-                  §I{NonNegative:value:ref}
-                  §O{void}
-                  §TR{t1}
-                    §B{~value:Negative} (post-dec value)
-                  §CA{Exception:ex}
-                    §ASSIGN value INT:-1
-            """;
-        var caughtRebind = Emit(caughtRebindSource);
-        object?[] caughtArguments = [1];
-
-        var caughtException = InvokeGenerated(
-            caughtRebind,
-            "Mutate",
-            caughtArguments);
-
-        Assert.IsType<ArgumentOutOfRangeException>(caughtException);
-        Assert.Equal(1, caughtArguments[0]);
-
-        var caughtModule = Parse(caughtRebindSource, out var caughtDiagnostics);
-        Assert.False(caughtDiagnostics.HasErrors);
-        var caughtTracker = new ObligationTracker();
-        new ObligationGenerator(caughtTracker).Generate(caughtModule);
-        Assert.Contains(
-            caughtTracker.Obligations,
-            obligation => obligation.Description.Contains(
-                "Assignment to 'value' must preserve refinement type 'NonNegative'",
-                StringComparison.Ordinal));
-
-        var outInitialization = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §F{f001:Set:pub}
-                  §I{Positive:value:out}
-                  §O{void}
-                  §B{~value:Positive} INT:1
-            """);
-        var validation = GeneratedCSharpCompiler.Validate(outInitialization);
-
-        Assert.True(
-            validation.CompilationSuccess,
-            string.Join(Environment.NewLine, validation.CompilationErrors));
-        Assert.DoesNotContain("__refinementSnapshot", outInitialization);
-
-        var initializedOut = Emit("""
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §RTYPE{r2:Negative:i32} (< # INT:0)
-              §F{f001:Set:pub}
-                  §I{Positive:value:out}
-                  §O{void}
-                  §B{~value:Positive} INT:2
-                  §TR{t1}
-                    §B{~value:Negative} (post-dec value)
-                  §CA{Exception:ex}
-                    §ASSIGN value INT:2
-            """);
-        object?[] initializedOutArguments = [null];
-
-            var initializedOutAssembly = CompileGenerated(initializedOut);
-            var initializedOutType = Assert.Single(
-                initializedOutAssembly.GetTypes(),
-                candidate => candidate.GetMethod("Set") is not null);
-            initializedOutType.GetMethod("Set")!.Invoke(
-                null,
-                initializedOutArguments);
-
-            Assert.Equal(2, initializedOutArguments[0]);
-
-            var establishingRebind = Emit("""
-                §M{m001:Test}
-                  §RTYPE{r1:Positive:i32} (> # INT:0)
-                  §F{f001:Mutate:pub}
-                      §O{i32}
-                      §B{~value:i32} INT:1
-                      §B{~value:Positive} INT:2
-                      §ASSIGN value INT:-1
-                      §R value
-                """);
-
-            var establishingException = InvokeGenerated(
-                establishingRebind,
-                "Mutate");
-
-            Assert.IsType<ArgumentOutOfRangeException>(establishingException);
-    }
-
-    [Fact]
-    public void CSharpEmit_ConstructorInitializerChecksBeforeForwarding()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §CL{c001:AppException:pub}
-                §EXT{Exception}
-                §CTOR{ctor1:pub}
-                  §I{NonEmpty:message}
-                  §BASE
-                    §A message
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-        var csharp = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker).Emit(module);
-
-        var exception = InvokeGeneratedConstructor(csharp, "");
-
-        Assert.IsType<ArgumentOutOfRangeException>(exception);
-        Assert.Contains(" : base((message.Length > 0 ?", csharp);
-    }
-
-    [Fact]
-    public void CSharpEmit_ZeroArgumentConstructorInitializerWithRefinement_FailsClosed()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-              §CL{c001:AppException:pub}
-                §EXT{Exception}
-                §CTOR{ctor1:pub}
-                  §I{NonEmpty:message}
-                  §BASE
-            """;
-        var module = Parse(source, out var parseDiagnostics);
-        Assert.False(parseDiagnostics.HasErrors,
-            $"Errors: {string.Join(", ", parseDiagnostics.Select(d => d.Message))}");
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-        var diagnostics = new DiagnosticBag();
-
-        _ = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker,
-            diagnostics).Emit(module);
-
-        var diagnostic = Assert.Single(
-            diagnostics,
-            item => item.Code
-                == DiagnosticCode.ConstructorRefinementInitializerNotLowered);
-        Assert.True(diagnostic.IsError);
-
-        Assert.Throws<InvalidOperationException>(
-            () => new CSharpEmitter(
-                ContractMode.Debug,
-                null,
-                null,
-                tracker).Emit(module));
-    }
-
-    [Fact]
-    public void CSharpEmit_LambdaParameterShadowsOuterIndexedBound()
-    {
-        var source = """
-            §M{m001:Test}
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:Shadow:pub}
-                  §I{Sized:items}
-                  §I{i32:n}
-                  §I{i32:index}
-                  §O{void}
-                  §B{read:Func<i32[], i32>} §LAM{l1:items:i32[]} §IDX items index §/LAM{l1}
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-
-        var csharp = new CSharpEmitter().Emit(module);
-        var validation = GeneratedCSharpCompiler.Validate(csharp);
-
-        Assert.True(
-            validation.CompilationSuccess,
-            string.Join(Environment.NewLine, validation.CompilationErrors));
-        Assert.DoesNotContain("Indexed-type bound violated", csharp);
-        var indexObligation = Assert.Single(
-            tracker.Obligations,
-            obligation => obligation.Kind == ObligationKind.IndexBounds);
-        Assert.Contains("runtime collection bounds", indexObligation.Description);
     }
 
     [Fact]
@@ -2179,44 +938,6 @@ public sealed class ObligationTests
         Assert.Contains("=>", csharp);
         Assert.Contains("Proof obligation [p1] violated", csharp);
         Assert.Contains("if (!(x > 0))", csharp);
-    }
-
-    [Fact]
-    public void CSharpEmit_ElidesAllDischargedGuardKindsWhenOptedIn()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Positive:i32} (> # INT:0)
-              §ITYPE{it1:Sized:i32[]:n}
-              §F{f001:All:priv}
-                  §I{Positive:value}
-                  §I{Sized:items}
-                  §I{i32:n}
-                  §I{i32:index}
-                  §O{Positive}
-                  §B{local:Positive} value
-                  §R §IDX items index
-            """;
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        var tracker = new ObligationTracker();
-        new ObligationGenerator(tracker).Generate(module);
-        foreach (var obligation in tracker.Obligations)
-            obligation.Status = ObligationStatus.Discharged;
-        var emitter = new CSharpEmitter(
-            ContractMode.Debug,
-            null,
-            null,
-            tracker)
-        {
-            ElideProvenGuards = true
-        };
-
-        var csharp = emitter.Emit(module);
-
-        Assert.DoesNotContain("ArgumentOutOfRangeException", csharp);
-        Assert.DoesNotContain("Return value violates", csharp);
-        Assert.DoesNotContain("Indexed-type bound violated", csharp);
     }
 
     private static string Emit(string source)

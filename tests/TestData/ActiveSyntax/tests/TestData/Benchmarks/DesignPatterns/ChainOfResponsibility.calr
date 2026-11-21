@@ -1,0 +1,19 @@
+module ChainOfResponsibility ChainOfResponsibility
+  module ChainOfResponsibilityModule
+    func CanApprove public (float:amount, float:limit) → bool
+      !
+      requires amount > 0
+      requires limit > 0
+      return amount <= limit
+
+    func ManagerLimit public () → float
+      !
+      return 1000
+
+    func DirectorLimit public () → float
+      !
+      return 10000
+
+    func VPLimit public () → float
+      !
+      return 100000

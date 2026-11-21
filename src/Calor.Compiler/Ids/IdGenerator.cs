@@ -134,6 +134,12 @@ public static class IdGenerator
         IdKind.ProofObligation => ProofObligationPrefix,
         IdKind.IndexedType => IndexedTypePrefix,
         IdKind.Indexer => IndexerPrefix,
+        IdKind.Delegate => "d_",
+        IdKind.Event => "ev_",
+        IdKind.Record => "rec_",
+        IdKind.Union => "u_",
+        IdKind.Field => "fld_",
+        IdKind.Variant => "v_",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -146,6 +152,10 @@ public static class IdGenerator
     {
         if (string.IsNullOrEmpty(id))
             return null;
+
+        foreach (var kind in new[] { IdKind.Delegate, IdKind.Event, IdKind.Record, IdKind.Union, IdKind.Field, IdKind.Variant })
+            if (id.StartsWith(GetPrefix(kind), StringComparison.Ordinal))
+                return kind;
 
         // Check prefixes in order from longest to shortest to avoid partial matches.
         if (id.StartsWith(ConstructorPrefix))

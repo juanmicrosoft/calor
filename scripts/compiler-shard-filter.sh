@@ -28,17 +28,40 @@
 # run once in Tasks.Tests instead (#1590); the class-level CLI loops dominated
 # this shard's measured duration. The old two-host split dates from 7,978 cases;
 # each of its halves had grown to roughly a whole old suite before these repairs.
+# 0.30 (#1730): P moved from the complement to part 1, which balances the paired run
+# by measured time (local, paired: parts 239 / 295 / 279 / 507 s became about 337 /
+# 295 / 279 / 409 s). Cases at the 22,554 inventory: 6,305 / 4,941 / 5,777 / 5,523,
+# and 8 historical replays (CI coverage run 44743090058 counted 5,506 in part 4 at 22,562).
+#
+# HISTORICAL REPLAYS (0.30, #1730) are the fifth, separate part. Each test in
+# Category=HistoricalReplay rebuilds an archived compiler at its registered producer
+# commit and reruns one test with it (scripts/registered_ledger_historical_replay.py),
+# about 2-4 minutes on a hosted runner. Nine of them in the serial parts cost the
+# shard about half an hour, so the four parts exclude them and run-shard-tests.sh runs
+# them in their own test host beside the parts, on cores the serial suite leaves idle.
+# Coverage loops use --parts only: a replay measures an archived tree, not this one.
 #
 # Usage:
 #   bash scripts/compiler-shard-filter.sh --parts    # prints all part numbers
 # or:
 #   filter="$(bash scripts/compiler-shard-filter.sh --part 1)"  # raw filter, no eval
 # or:
+#   filter="$(bash scripts/compiler-shard-filter.sh --replay)"  # the historical replays
+# or:
+#   bash scripts/compiler-shard-filter.sh --pairs    # "1,4" and "2,3": parts the shard runs together
+#
+# PAIRS (0.30, #1730): the four parts run two at a time, each in its own test host (separate
+# environment, console and CALOR_HOME). Paired by measured duration so the pairs finish close
+# together: parts 1 and 4, then 2 and 3. Coverage loops still run --parts one at a time.
+# or:
 #   bash scripts/compiler-shard-filter.sh --self-test
 
 set -euo pipefail
 
-SHARD_LETTERS=("C D J U" "B F I Y" "A E S T V")
+SHARD_LETTERS=("C D J U P" "B F I Y" "A E S T V")
+REPLAY_FILTER="Category=HistoricalReplay"
+PAIRS=("1,4" "2,3")
+NOT_REPLAY="Category!=HistoricalReplay"
 FILTERS=()
 
 build_filters() {
@@ -49,14 +72,14 @@ build_filters() {
             include="${include:+$include|}FullyQualifiedName~Calor.Compiler.Tests.$letter"
             exclude="${exclude:+$exclude&}FullyQualifiedName!~Calor.Compiler.Tests.$letter"
         done
-        FILTERS+=("$include")
+        FILTERS+=("($include)&$NOT_REPLAY")
     done
     # Include future class initials and shared tests in the final complement.
-    FILTERS+=("$exclude")
+    FILTERS+=("$exclude&$NOT_REPLAY")
 }
 
 usage() {
-    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4]" >&2
+    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4 | --replay | --pairs]" >&2
     exit 2
 }
 
@@ -77,6 +100,16 @@ if [ "$#" -gt 0 ]; then
             esac
             exit 0
             ;;
+        --replay)
+            [ "$#" -eq 1 ] || usage
+            printf '%s\n' "$REPLAY_FILTER"
+            exit 0
+            ;;
+        --pairs)
+            [ "$#" -eq 1 ] || usage
+            printf '%s\n' "${PAIRS[@]}"
+            exit 0
+            ;;
         *) usage ;;
     esac
 fi
@@ -95,10 +128,21 @@ if [ "${1:-}" = "--self-test" ]; then
             seen="$seen $letter"
         done
     done
-    selected="$(printf '%s|' "${FILTERS[@]:0:3}")"
-    expected_negation="$(printf '%s' "${selected%|}" | sed 's/|/\&/g; s/FullyQualifiedName~/FullyQualifiedName!~/g')"
+    # Every part excludes the replays, which form the separate fifth part.
+    selected=""
+    for filter in "${FILTERS[@]:0:3}"; do
+        case "$filter" in
+            "("*")&$NOT_REPLAY") ;;
+            *) echo "FAIL: a letter part does not exclude the historical replays: $filter"; fail=1 ;;
+        esac
+        filter="${filter#(}"
+        selected="$selected${filter%)&$NOT_REPLAY}|"
+    done
+    expected_negation="$(printf '%s' "${selected%|}" | sed 's/|/\&/g; s/FullyQualifiedName~/FullyQualifiedName!~/g')&$NOT_REPLAY"
     [ "${FILTERS[3]}" = "$expected_negation" ] \
         || { echo "FAIL: shard 4 is not the complement of shards 1-3"; fail=1; }
+    [ "$(bash "$0" --replay)" = "$REPLAY_FILTER" ] && [ "$NOT_REPLAY" = "${REPLAY_FILTER/=/!=}" ] \
+        || { echo "FAIL: the replay part is not the exact complement of the replay exclusion"; fail=1; }
 
     # Word splitting must actually happen. The interactive shell used to develop this
     # is zsh, which does NOT split an unquoted variable, and the first version of this
@@ -111,6 +155,10 @@ if [ "${1:-}" = "--self-test" ]; then
 
     [ "$(bash "$0" --parts)" = "$(printf '%s\n' 1 2 3 4)" ] \
         || { echo "FAIL: part inventory differs from the shared partition"; fail=1; }
+    # The pairs name every part exactly once, two per pair.
+    [ "$(bash "$0" --pairs | tr ',' '\n' | sort)" = "$(bash "$0" --parts)" ] \
+        && [ "$(bash "$0" --pairs | grep -cx '[1-4],[1-4]')" = 2 ] \
+        || { echo "FAIL: the pairs do not name each part exactly once"; fail=1; }
     for part in 1 2 3 4; do
         [ "$(bash "$0" --part "$part")" = "${FILTERS[$((part - 1))]}" ] \
             || { echo "FAIL: raw filter interface differs for part $part"; fail=1; }
@@ -132,12 +180,14 @@ if [ "${1:-}" = "--self-test" ]; then
         || bash "$0" --part 1 extra >/dev/null 2>&1 \
         || bash "$0" --self-test extra >/dev/null 2>&1 \
         || bash "$0" --parts extra >/dev/null 2>&1 \
+        || bash "$0" --replay extra >/dev/null 2>&1 \
+        || bash "$0" --pairs extra >/dev/null 2>&1 \
         || bash "$0" --unknown >/dev/null 2>&1; then
         echo "FAIL: accepted invalid arguments"
         fail=1
     fi
 
-    [ "$fail" = "0" ] && echo "compiler-shard-filter self-test passed (four disjoint parts, complement exact)."
+    [ "$fail" = "0" ] && echo "compiler-shard-filter self-test passed (four disjoint parts and the replay part, complements exact)."
     exit "$fail"
 fi
 

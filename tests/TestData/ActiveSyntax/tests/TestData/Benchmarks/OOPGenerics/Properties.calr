@@ -1,0 +1,15 @@
+module Properties Properties
+  module PropertiesModule
+    func GetName public (string:name) → string
+      !
+      return name
+
+    func ValidateAge public (int:age) → int
+      !
+      requires age >= 0
+      requires age <= 150
+      return age
+
+    func ValidateEmail public (string:email, int:length) → bool
+      !
+      return length > 0

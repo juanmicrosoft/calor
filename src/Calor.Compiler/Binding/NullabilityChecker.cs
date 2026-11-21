@@ -87,22 +87,11 @@ internal static class NullabilityChecker
         || IsScalarString(type);
 
     /// <summary>
-    /// Returns true iff a value produced by <paramref name="source"/> may
-    /// be null AND the <paramref name="target"/> BoundType is a
-    /// non-nullable scalar <c>STRING</c> OR an <b>array whose element
-    /// type is a non-nullable STRING</b> (S6). Callers that observe true
-    /// emit the appropriate <c>Calor027X</c> diagnostic at their
-    /// call-site severity.
-    ///
-    /// <para>Returns false — no diagnostic — when:</para>
-    /// <list type="bullet">
-    ///   <item>The source's <c>Type.NullableAnnotation</c> is
-    ///     <c>NotAnnotated</c> (declared non-null).</item>
-    ///   <item>The target is not a scalar STRING or an array of STRING.</item>
-    ///   <item>The target's <c>NullableAnnotation</c> is <c>Annotated</c>
-    ///     (target accepts null), OR the target array's ELEMENT
-    ///     annotation is <c>Annotated</c> (element may be null by design).</item>
-    /// </list>
+    /// Detects incompatible nullable receiving contracts for supported scalar,
+    /// array and generic shapes. Closed source-reference payloads additionally
+    /// check container nullability and invariant nullable-writer aliases.
+    /// Unsupported or unresolved shapes return false, not a non-null proof.
+    /// Callers route supported findings through the existing Calor027X policy.
     /// </summary>
     public static bool IsPossiblyNullAssignedTo(BoundExpression source, BoundType target)
     {
@@ -117,21 +106,18 @@ internal static class NullabilityChecker
             // mismatch); a possibly-null-elements source assigned to a
             // non-null-elements array target trips the same predicate.
             ArrayBoundType array => CheckArrayTarget(source, array),
-            // S7 — whitelisted generic-instantiation STRING nullability
-            // (Option<T>, List<T>, IList<T>, IEnumerable<T>,
-            // IReadOnlyList<T>, ICollection<T>, IReadOnlyCollection<T>).
-            // Container's own annotation is orthogonal — only the
-            // position-0 type argument (payload / element) mismatch
-            // matters, symmetric to the S6 array shape.
-            GenericInstantiationBoundType generic => CheckGenericStringArgumentTarget(source, generic),
+            // Preserve S7's STRING rules; closed source-reference payloads
+            // also enforce container and invariant element contracts.
+            GenericInstantiationBoundType generic => CheckGenericReferenceTarget(source, generic),
             _ => false,
         };
     }
 
     private static bool CheckScalarStringTarget(BoundExpression source, NominalBoundType nominalTarget)
     {
-        // Target already declared nullable — accepting null is by design.
-        if (nominalTarget.NullableAnnotation == NullableAnnotation.Annotated) return false;
+        // Only a NotAnnotated destination promises non-null. Oblivious sources
+        // remain possibly-null when flowing into such a destination.
+        if (nominalTarget.NullableAnnotation != NullableAnnotation.NotAnnotated) return false;
 
         var isString = IsScalarString(nominalTarget);
         var isUserRef = !isString && nominalTarget.IsKnownReferenceType;
@@ -226,8 +212,8 @@ internal static class NullabilityChecker
     /// <summary>
     /// S7 shape gate: target is a whitelisted generic instantiation whose
     /// position-0 type argument is a non-nullable STRING. The Binder
-    /// (<see cref="Binder.TryParseGenericStringTarget"/>) is the only site
-    /// that builds this target shape today, so the whitelist is already
+    /// (<see cref="Binder.TryParseGenericStringTarget"/>) limits the legacy
+    /// target shapes, so the whitelist is already
     /// enforced upstream — this method only performs the source vs. target
     /// symmetry check. Non-generic sources or generic sources whose
     /// definition or payload shape don't match yield false (S7 does not
@@ -240,7 +226,7 @@ internal static class NullabilityChecker
         if (!IsScalarString(targetInner)) return false;
 
         // Target payload declared nullable — accepting null payloads is by design.
-        if (targetInner.NullableAnnotation == NullableAnnotation.Annotated) return false;
+        if (targetInner.NullableAnnotation != NullableAnnotation.NotAnnotated) return false;
 
         // Bridge only the known BCL aliases: unrelated namespaces sharing
         // a short name do not establish the same generic definition.
@@ -253,6 +239,58 @@ internal static class NullabilityChecker
 
         // Source payload must be provably non-null (NotAnnotated) to pass.
         return sourceInner.NullableAnnotation != NullableAnnotation.NotAnnotated;
+    }
+
+    internal static bool IsClosedSourceReference(NominalBoundType type) =>
+        type.IsKnownReferenceType
+        && type.Declaration?.IsDelegate != true
+        && type.RoslynSymbol?.TypeKind != Microsoft.CodeAnalysis.TypeKind.Delegate
+        && (type.Declaration is not null
+            || type.RoslynSymbol?.Locations.Any(location => location.IsInSource) == true);
+
+    internal static bool IsReferenceContainerDefinition(NominalBoundType definition) =>
+        definition.RoslynSymbol is { Arity: 1 } symbol
+        && symbol.ContainingNamespace.ToDisplayString() == "System.Collections.Generic"
+        && symbol.Name is "List" or "IList" or "ICollection"
+            or "IEnumerable" or "IReadOnlyList" or "IReadOnlyCollection"
+        && symbol.ContainingAssembly.GetTypeByMetadataName("System.Object")?.SpecialType
+            == Microsoft.CodeAnalysis.SpecialType.System_Object;
+
+    private static bool CheckGenericReferenceTarget(
+        BoundExpression source, GenericInstantiationBoundType target)
+    {
+        if (source is BoundNullLiteral && IsReferenceContainerDefinition(target.Definition)
+            && target.TypeArguments is [NominalBoundType element]
+            && IsClosedSourceReference(element))
+            return target.NullableAnnotation == NullableAnnotation.NotAnnotated;
+        var supplied = source.GenericNullabilityType ?? source.Type as GenericInstantiationBoundType;
+        if (supplied is null || target.TypeArguments is not [NominalBoundType receiving]
+            || supplied.TypeArguments is not [NominalBoundType value]
+            || !IsReferenceContainerDefinition(target.Definition)
+            || !IsReferenceContainerDefinition(supplied.Definition)
+            || !receiving.IsKnownReferenceType || !value.IsKnownReferenceType
+            || !IsClosedSourceReference(receiving) && !IsClosedSourceReference(value))
+            return CheckGenericStringArgumentTarget(source, target);
+
+        var sameDefinition = SameGenericDefinition(
+            supplied.Definition.QualifiedName, target.Definition.QualifiedName);
+        if (!sameDefinition && !supplied.Definition.RoslynSymbol!.AllInterfaces.Any(@interface =>
+                Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                    @interface.OriginalDefinition, target.Definition.RoslynSymbol!.OriginalDefinition)))
+            return false;
+
+        if (target.NullableAnnotation == NullableAnnotation.NotAnnotated
+            && supplied.NullableAnnotation != NullableAnnotation.NotAnnotated)
+            return true;
+
+        var requiresNonNull = receiving.NullableAnnotation == NullableAnnotation.NotAnnotated;
+        var providesNonNull = value.NullableAnnotation == NullableAnnotation.NotAnnotated;
+        // An invariant nullable-writer alias can invalidate the original non-null
+        // element contract, even though its receiving element accepts null.
+        return target.Definition.RoslynSymbol!.TypeParameters[0].Variance
+                == Microsoft.CodeAnalysis.VarianceKind.None
+            ? requiresNonNull != providesNonNull
+            : requiresNonNull && !providesNonNull;
     }
 
     internal static bool SameGenericDefinition(string a, string b)
@@ -275,14 +313,8 @@ internal static class NullabilityChecker
     /// String is the only in-scope element type for S3+S6 targets.
     /// </summary>
     private static bool IsScalarString(NominalBoundType type) =>
-        type.QualifiedName switch
-        {
-            "STRING" => true,
-            "string" => true,
-            "str" => true,
-            "System.String" => true,
-            _ => false,
-        };
+        type.RoslynSymbol?.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String
+        || type.QualifiedName is "STRING" or "string" or "str" or "System.String";
 
     /// <summary>
     /// Reads the <c>NullableAnnotation</c> from any <c>BoundType</c>
@@ -307,7 +339,7 @@ internal static class NullabilityChecker
         var canonical = TypeIdentity.Canonicalize(type.Name);
         return Binder.IsBuiltInValueTypeName(canonical)
             || TypeIdentity.IsKnownValueMetadataName(type.Name)
-            || TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical is not ("STRING" or "OBJECT" or "OPTION")
+            || TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical is not ("STRING" or "OBJECT")
                 ? NullableAnnotation.NotAnnotated
                 : null;
     }

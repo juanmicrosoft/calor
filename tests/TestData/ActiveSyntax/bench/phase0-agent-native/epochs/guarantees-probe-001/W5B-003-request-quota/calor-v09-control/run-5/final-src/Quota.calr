@@ -1,0 +1,34 @@
+module Quota Quota block
+  module QuotaModule public
+    func BaseAllowance (int:tier) → int
+      !
+      return (tier * 5)
+
+    func BurstBonus (int:priority) → int
+      !
+      return (priority * 2)
+
+    func GrantRequests (int:requested, int:maxAllowed) → int
+      !
+      => (result <= maxAllowed)
+      if (requested > maxAllowed)
+        return maxAllowed
+      return requested
+
+    func GrantForTier (int:tier, int:priority, int:maxAllowed) → int
+      !
+      let int:allowance = BaseAllowance(tier)
+      let int:bonus = BurstBonus(priority)
+      let int:requested = (allowance + bonus)
+      return GrantRequests(requested, maxAllowed)
+
+    func GrantWithMinimum (int:requested, int:maxAllowed, int:minGrant) → int
+      !
+      let int:capped = GrantRequests(requested, maxAllowed)
+      if (capped < minGrant)
+        return minGrant
+      return capped
+
+    func FormatGrant (int:amount) → string
+      !
+      return "granted: ${amount}"

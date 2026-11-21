@@ -39,6 +39,10 @@ namespace Calor.Compiler.Binding.Metadata;
 /// </summary>
 internal sealed class MetadataBinder
 {
+    private static readonly SymbolDisplayFormat ReceiverTypeFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+            | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
     private readonly MetadataContext _context;
     internal MetadataContext Context => _context;
 
@@ -46,6 +50,60 @@ internal sealed class MetadataBinder
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
+
+    internal MetadataBinderResult ResolveExpressionCall(
+        ITypeSymbol receiverType, string methodName, IReadOnlyList<MetadataArgument> arguments,
+        IReadOnlyList<ITypeSymbol> typeArguments, bool isStatic, bool preserveArrayAnnotations = false,
+        IReadOnlyList<string>? imports = null)
+    {
+        var receiver = receiverType.ToDisplayString(ReceiverTypeFormat);
+        if (!isStatic)
+            receiver = $"(({receiver})default!)";
+        var method = "@" + methodName.TrimStart('@');
+        if (typeArguments.Count > 0)
+            method += $"<{string.Join(", ", typeArguments.Select(type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))}>";
+        var scopes = EnumerateTypeParameters(receiverType)
+            .Concat(arguments.SelectMany(argument => EnumerateTypeParameters(argument.Type)))
+            .Concat(typeArguments.SelectMany(EnumerateTypeParameters))
+            .Select(parameter => parameter.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax()
+                .Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault())
+            .OfType<ClassDeclarationSyntax>()
+            .DistinctBy(scope => scope.SyntaxTree).ToArray();
+        if (scopes.Length > 1)
+            return MetadataBinderResult.CreateUnresolved("Call contains type parameters from incompatible lexical scopes.");
+        var scope = scopes.SingleOrDefault();
+        var result = QueryInvocation(BuildSyntheticSource(receiver, method, arguments, preserveArrayAnnotations, scope,
+                useArgumentLocals: true, imports: imports),
+                out var reason, requireValidSource: true)
+            ?? MetadataBinderResult.CreateUnresolved(reason ?? "Expression call resolution failed.");
+        return result with { ReceiverType = result.IsResolved ? receiverType : null };
+    }
+
+    internal AwaitExpressionInfo? ResolveAwait(ITypeSymbol awaitedType)
+    {
+        var typeName = awaitedType.ToDisplayString(ReceiverTypeFormat);
+        var tree = CSharpSyntaxTree.ParseText(
+            $"#nullable enable\nclass __CalorAwaitProbe {{ async global::System.Threading.Tasks.Task Probe() {{ await (({typeName})default!); }} }}");
+        var compilation = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        if (model.GetDiagnostics().Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            return null;
+        var expression = tree.GetRoot().DescendantNodes().OfType<AwaitExpressionSyntax>().Single();
+        if (!SymbolEqualityComparer.Default.Equals(model.GetTypeInfo(expression.Expression).Type, awaitedType))
+            return null;
+        var info = model.GetAwaitExpressionInfo(expression);
+        return info.GetAwaiterMethod is not null && info.IsCompletedProperty is not null && info.GetResultMethod is not null
+            ? info : null;
+    }
+
+    private static IEnumerable<ITypeParameterSymbol> EnumerateTypeParameters(ITypeSymbol type)
+        => type switch
+        {
+            ITypeParameterSymbol parameter => [parameter],
+            IArrayTypeSymbol array => EnumerateTypeParameters(array.ElementType),
+            INamedTypeSymbol named => named.TypeArguments.SelectMany(EnumerateTypeParameters),
+            _ => []
+        };
 
     /// <summary>
     /// Resolves a Calor call site. Returns a resolved
@@ -150,6 +208,44 @@ internal sealed class MetadataBinder
     /// <c>this[]</c>. Return the property symbol so downstream can bind to
     /// the getter/setter as needed.
     /// </summary>
+    /// <summary>
+    /// 0.30: the indexer an element access selects, by Roslyn's own lookup (inherited
+    /// and interface indexers included). Null when the probe does not bind to exactly one
+    /// readable or writable indexer.
+    /// </summary>
+    internal IPropertySymbol? ResolveElementAccess(ITypeSymbol receiverType, ITypeSymbol indexType)
+    {
+        var receiverName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var indexName = indexType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        if (_elementAccesses.TryGetValue((receiverName, indexName), out var cached))
+            return cached;
+        return _elementAccesses[(receiverName, indexName)] = ProbeElementAccess(receiverName, indexName);
+    }
+
+    private readonly Dictionary<(string Receiver, string Index), IPropertySymbol?> _elementAccesses = new();
+
+    private IPropertySymbol? ProbeElementAccess(string receiverName, string indexName)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "#nullable enable\nclass __CalorElementAccessProbe { void Probe() {\n" +
+            $"{indexName} __index = default!;\n" +
+            $"_ = (({receiverName})default!)[__index];\n" +
+            "} }");
+        var compilation = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        if (model.GetDiagnostics().Any(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+            return null;
+        var access = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().SingleOrDefault();
+        if (access is null)
+            return null;
+        if (model.GetSymbolInfo(access).Symbol is IPropertySymbol { IsIndexer: true } indexer)
+            return indexer;
+        // `list[^1]`: C# runs the receiver's int indexer through the implicit Index support.
+        return model.GetOperation(access) is IImplicitIndexerReferenceOperation
+            { IndexerSymbol: IPropertySymbol { IsIndexer: true } implicitIndexer }
+            ? implicitIndexer : null;
+    }
+
     public IPropertySymbol? ResolveIndexer(
         ITypeSymbol receiverType,
         IReadOnlyList<MetadataArgument> arguments)
@@ -284,7 +380,8 @@ internal sealed class MetadataBinder
     }
 
     internal static string[] BuildArgumentExpressions(
-        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false)
+        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false,
+        bool useArgumentLocals = false)
     {
         var exprs = new string[arguments.Count];
         for (int i = 0; i < arguments.Count; i++)
@@ -296,7 +393,7 @@ internal sealed class MetadataBinder
                 RefKind.Out => $"out __arg{i}",
                 RefKind.Ref => $"ref __arg{i}",
                 RefKind.In => $"in __arg{i}",
-                _ => $"(({argFq})default!)",
+                _ => useArgumentLocals ? $"__arg{i}" : $"(({argFq})default!)",
             };
             if (argument.Name is { Length: > 0 } name)
                 exprs[i] = $"@{name}: {exprs[i]}";
@@ -306,9 +403,10 @@ internal sealed class MetadataBinder
     }
 
     internal static string BuildArgumentLocals(
-        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false) =>
+        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false,
+        bool useArgumentLocals = false) =>
         string.Concat(arguments.Select((argument, index) =>
-            argument.RefKind == RefKind.None
+            argument.RefKind == RefKind.None && !useArgumentLocals
                 ? ""
                 : InArrayNullableContext(
                     $"{argument.Type.ToDisplayString(ArgumentTypeFormat(argument.Type, preserveArrayAnnotations))} __arg{index} = default!;\n",
@@ -333,22 +431,43 @@ internal sealed class MetadataBinder
 
     private static string BuildSyntheticSource(
         string receiverExpr, string methodName, IReadOnlyList<MetadataArgument> arguments,
-        bool preserveArrayAnnotations)
+        bool preserveArrayAnnotations, ClassDeclarationSyntax? typeParameterScope = null,
+        bool useArgumentLocals = false, IReadOnlyList<string>? imports = null)
     {
+        // `imports` are the calling module's using directives visible at the call
+        // (already filtered to namespaces present in this metadata set). The
+        // generated C# carries them too, and they are what bring an extension
+        // method such as LoggerExtensions.LogInformation into scope. Receivers
+        // and arguments are spelled with global:: names, so an import changes
+        // nothing here except which extension methods are candidates.
         return "#nullable enable\n" +
+            "using System;\n" +
             "using System.Linq;\n" +
             "using System.Collections.Generic;\n" +
-            "class __CalorS4Synth { static void __Probe() {\n" +
-            BuildArgumentLocals(arguments, preserveArrayAnnotations) +
-            $"    _ = {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments, preserveArrayAnnotations))});\n" +
+            "using System.Threading.Tasks;\n" +
+            string.Concat((imports ?? []).Select(line => line + "\n")) +
+            $"class __CalorS4Synth{typeParameterScope?.TypeParameterList} "
+            + $"{string.Join(" ", typeParameterScope?.ConstraintClauses.Select(clause => clause.ToString()) ?? [])}"
+            + " { static void __Probe() {\n" +
+            // A type-only native probe must not invent the constant-zero enum conversion.
+            BuildArgumentLocals(arguments, preserveArrayAnnotations, useArgumentLocals) +
+            $"    {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments, preserveArrayAnnotations, useArgumentLocals))});\n" +
             "} }\n";
     }
 
-    private MetadataBinderResult? QueryInvocation(string source, out string? unresolvedReason)
+    private MetadataBinderResult? QueryInvocation(
+        string source, out string? unresolvedReason, bool requireValidSource = false)
     {
         var tree = CSharpSyntaxTree.ParseText(source);
         var extended = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
         var model = extended.GetSemanticModel(tree);
+        var errors = model.GetDiagnostics().Where(diagnostic =>
+            diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        if (requireValidSource && errors.Length != 0)
+        {
+            unresolvedReason = string.Join("; ", errors.Select(diagnostic => $"{diagnostic.Id}: {diagnostic.GetMessage()}"));
+            return null;
+        }
         var invocation = tree.GetRoot()
             .DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
@@ -462,6 +581,7 @@ internal readonly struct MetadataBinderResult
     public string? UnresolvedReason { get; }
     public bool IsResolved => Symbol is not null;
     public IReadOnlyList<MetadataCallArgument> Arguments { get; }
+    internal ITypeSymbol? ReceiverType { get; init; }
     internal BoundType? LegacyReturnType { get; init; }
 
     private MetadataBinderResult(
@@ -609,7 +729,8 @@ internal readonly struct MetadataBinderResult
             && !named.TypeArguments.IsDefaultOrEmpty)
         {
             var definition = new NominalBoundType(
-                qualifiedName: named.ConstructedFrom.ToDisplayString(),
+                qualifiedName: named.ConstructedFrom.ToDisplayString(
+                    SymbolDisplayFormat.CSharpErrorMessageFormat.WithGenericsOptions(SymbolDisplayGenericsOptions.None)),
                 nullableAnnotation: Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious,
                 declaration: null,
                 roslynSymbol: named.ConstructedFrom);
@@ -619,7 +740,8 @@ internal readonly struct MetadataBinderResult
             return new GenericInstantiationBoundType(
                 definition,
                 args,
-                MapAnnotation(named.NullableAnnotation));
+                MapAnnotation(named.NullableAnnotation),
+                named);
         }
 
         return ToNominalBoundType(typeSymbol);

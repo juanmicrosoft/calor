@@ -21,7 +21,7 @@ repository benchmarks as an adoption result.
 - **The project has one maintainer.** The mitigation is a tested eject path:
   generated C# is yours and can be built without continuing to author Calor.
 - **Refinement types are not runtime-enforced.** Their obligations are
-  compile-time analysis. Contracts (`§Q` and `§S`) are the constructs that can
+  compile-time analysis. Contracts (`requires` and `=>`) are the constructs that can
   emit runtime checks.
 - **Waivers void guarantees.** `--permissive-effects` assumes unknown calls are
   pure. `--contract-mode off` removes contract checks. A review packet produced
@@ -71,20 +71,21 @@ The [full list of build settings](/docs/cli/init/#build-settings) is on the
 ## 2. Add a Small Module
 
 ```calor
-§M{m001:Pricing}
-  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32
-    §Q (>= cap 0)
-    §S (<= result cap)
-    §IF{if1} (> amount cap)
-      §R cap
-    §R amount
+module Pricing
+  func ClampToCap public (int:amount, int:cap) → int
+    !
+    requires cap >= 0
+    => result <= cap
+    if amount > cap
+      return cap
+    return amount
 ```
 
-- `§Q` preconditions and `§S` postconditions receive one of the documented
+- `requires` preconditions and `=>` postconditions receive one of the documented
   proof statuses where verification is requested. Only a clean, non-vacuous,
   assumption-free `proven` result can authorize guard removal; runtime checks
   also depend on contract mode and supported lowering.
-- `§E{...}` declares effects; `§E{}` is explicitly pure.
+- `! cw` declares console-write effects; a standalone `!` is explicitly pure.
 - A missing declared effect is an error with its call chain.
 
 ## 3. Import Dependency Effects
@@ -149,20 +150,22 @@ semantics. Everything else remains visible with its reason.
 
 ## 6. Keep the Eject Path Open
 
-`calor convert Module.calr` produces standalone C#. The eject suite
+`calor convert Module.calr` produces C# that no longer needs Calor source
+compilation. Retained contract guards still reference `Calor.Runtime`; keep that
+dependency and the original project references. The eject suite
 compiles and executes the result to pin these degradation rules:
 
 | Calor construct | After eject |
 |:----------------|:------------|
-| `§Q` | Runtime `ContractViolationException` guard |
-| `§S` | Runtime guard on return; conversion itself does not perform proof-based elision |
-| `§S` on a structured early/nested-return body | Shared postcondition exit when runtime checks are enabled |
-| `§S` on an opaque raw-C# body | Rejected with `Calor1001` |
-| `§S` on an iterator | Rejected with `Calor1004`; iterator postconditions have no defined semantics |
+| `requires` | Runtime `ContractViolationException` guard |
+| `=>` | Runtime guard on return; conversion itself does not perform proof-based elision |
+| `=>` on a structured early/nested-return body | Shared postcondition exit when runtime checks are enabled |
+| `=>` on an opaque raw-C# body | Rejected with `Calor1001` |
+| `=>` on an iterator | Rejected with `Calor1004`; iterator postconditions have no defined semantics |
 | `--contract-mode off` | Checks are stripped because the waiver requested it |
-| `§E` | No runtime footprint; the compile-time discipline disappears |
+| Effect row (`!`) | No runtime footprint; the compile-time discipline disappears |
 | Refinement obligation | Still analysis-only; no runtime guard is invented |
-| `Option` / `Result` | Ordinary `Calor.Runtime` generic types |
+| Nullable values and exceptions | Native .NET types and exception handling |
 | C# interop block | Original C# is emitted again |
 
 Ejecting costs the proof and effect discipline, not ownership of the generated

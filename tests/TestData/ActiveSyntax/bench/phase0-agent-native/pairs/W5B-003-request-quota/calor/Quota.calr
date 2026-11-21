@@ -1,0 +1,25 @@
+module Quota Quota block
+  module QuotaModule partial
+    func BaseAllowance (int:tier) → int
+      !
+      return (tier * 5)
+
+    func BurstBonus (int:priority) → int
+      !
+      return (priority * 2)
+
+    func GrantRequests (int:requested, int:maxAllowed) → int
+      !
+      => (result <= maxAllowed)
+      if (requested > (maxAllowed + 5))
+        return maxAllowed
+      return requested
+
+    func GrantForTier (int:tier, int:priority, int:maxAllowed) → int
+      !
+      let int:allowance = BaseAllowance(tier)
+      let int:bonus = BurstBonus(priority)
+      let int:requested = (allowance + bonus)
+      return GrantRequests(requested, maxAllowed)
+
+

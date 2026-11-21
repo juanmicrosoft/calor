@@ -1,0 +1,126 @@
+module L3M22 L3M22 block
+  module L3M22Module public
+
+    func l3m22_fn01 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24802)
+      if (x >= 24802)
+        return x
+      else
+        return 24802
+
+    func l3m22_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 1)
+      => (x >= 2)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24809)
+        return (acc + 24809)
+      else
+        return ((acc * 2) + 24809)
+
+    func l3m22_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24816)
+      let int:total = ((x * 3) + y)
+      if (total > 24816)
+        return 24816
+      return total
+
+    func l3m22_fn04 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24823)
+      if (x >= 24823)
+        return x
+      else
+        return 24823
+
+    func l3m22_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 51)
+
+    func l3m22_fn06 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24830)
+      if (x >= 24830)
+        return x
+      else
+        return 24830
+
+    func l3m22_fn07 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24837)
+      if (x >= 24837)
+        return x
+      else
+        return 24837
+
+    func l3m22_fn08 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24844)
+      if (x >= 24844)
+        return x
+      else
+        return 24844
+
+    func l3m22_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24851)
+      if (x >= 24851)
+        return x
+      else
+        return 24851
+
+    func l3m22_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24858)
+      let int:total = ((x * 3) + y)
+      if (total > 24858)
+        return 24858
+      return total
+
+    func l3m22_fn11 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24865)
+      if (x >= 24865)
+        return x
+      else
+        return 24865
+
+    func l3m22_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 5) + y)
+      if (acc > 24872)
+        return (acc + 24872)
+      else
+        return ((acc * 2) + 24872)
+
+    func l3m22_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 24879)
+      let int:total = ((x * 3) + y)
+      if (total < 24879)
+        return 24879
+      else
+        return total

@@ -1,0 +1,10 @@
+module FormatHeader FormatHeader
+  module FormatHeaderModule
+    func Format public (string:title) → string
+      !
+      return title
+
+    func Render public (string:title) → string
+      !
+      let header = Format(title)
+      return header

@@ -8,7 +8,7 @@ import agents from '../public/data/agent-benchmark-results.json';
 import refactoring from '../public/data/agent-refactoring-results.json';
 import provenance from '../public/data/benchmark-provenance.json';
 import featureSupport from '../public/data/feature-support.json';
-import { expandSupportLevels } from '../src/lib/feature-support';
+import { expandSupportLevels, supportLevelName } from '../src/lib/feature-support';
 
 const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-detection',
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
@@ -48,6 +48,15 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
   }
   await page.goto(`${base}${guide}`);
   const article = page.locator('article');
+  // Preserve the original claims; only their documented native spellings changed.
+  const nativeClaims = new Map([
+    ["Calor 0.22's bounded receiving-boundary checks",
+      'the receiving-boundary checks were introduced in Calor 0.22'],
+    ['?[str]', 'string[]?'],
+    ['[?str]', 'string?[]'],
+    ['List<?str>', 'List<string?>'],
+    ['?Widget', 'Widget?'],
+  ]);
   for (const text of ['Calor0272', 'Calor0273', 'Calor0274', 'Oblivious',
     'constructor inputs', 'not whole-program null safety', 'D3', 'D12', 'D14',
     "Calor 0.22's bounded receiving-boundary checks", '?[str]', '[?str]', 'List<?str>', '?Widget',
@@ -57,7 +66,7 @@ test('Calor 0.22 nullability guide is discoverable and its internal links and an
     'An early return after a null test does not currently narrow a later method argument',
     'This is a manual migration, not an automatic converter rewrite',
     'remains open']) {
-    await expect(article).toContainText(text);
+    await expect(article).toContainText(nativeClaims.get(text) ?? text);
   }
   const sidebar = page.getByRole('navigation', { name: 'Documentation', exact: true });
   await expect(sidebar.getByRole('link', { name: 'Nullability and .NET Interop', exact: true }))
@@ -80,7 +89,7 @@ test('current converter guides do not describe published releases as pending', a
   }
 });
 
-test('0.25 C# interoperability guide is discoverable, version-scoped and bounded', async ({ page }) => {
+test('C# interoperability guide is discoverable, development-scoped and bounded', async ({ page }) => {
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const guide = '/docs/guides/csharp-interoperability/';
   await page.route('https://**/*', route => route.abort());
@@ -100,6 +109,7 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
   }
   await expect(article).not.toContainText('not released yet');
   await expect(article).not.toContainText(/independently (reviewed|verified)/i);
+  await expect(article).not.toContainText(/0\.24,\s+the\s+latest release/);
   const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
     [...new Set(elements.map(element => element.getAttribute('href')!))]);
   for (const link of links) {
@@ -116,12 +126,13 @@ test('0.25 C# interoperability guide is discoverable, version-scoped and bounded
 // fenced code or a code span (any fence or backtick run) stays as written.
 test('search index expansion renders tags in prose and leaves code as written', () => {
   const tag = '<SupportLevel feature="record" />';
+  const level = supportLevelName('record');
   const cases: [string, string][] = [
-    [`a ${tag} b`, 'a NotSupported b'],
-    ['```\n' + tag + '\n```\nx ' + tag, '```\n' + tag + '\n```\nx NotSupported'],
+    [`a ${tag} b`, `a ${level} b`],
+    ['```\n' + tag + '\n```\nx ' + tag, '```\n' + tag + '\n```\nx ' + level],
     ['~~~\n' + tag + '\n~~~', '~~~\n' + tag + '\n~~~'],
     ['  ```\n  ' + tag + '\n  ```', '  ```\n  ' + tag + '\n  ```'],
-    ['`` ' + tag + ' `` and ' + tag, '`` ' + tag + ' `` and NotSupported'],
+    ['`` ' + tag + ' `` and ' + tag, '`` ' + tag + ' `` and ' + level],
     ['`' + tag + '`', '`' + tag + '`'],
     ['text\n\n    ' + tag + '\n', 'text\n\n    ' + tag + '\n'],
     ['<SupportLevel feature="not-a-feature" />', '<SupportLevel feature="not-a-feature" />'],

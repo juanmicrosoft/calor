@@ -13,7 +13,12 @@ public class NamespaceEmissionTests
     public void Compile_DottedNamespace_PreservesDots()
     {
         // Arrange: Calor source with dotted namespace
-        var source = "§M{m1:Calor.Runtime.Tests}\n§F{f1:Test:pub}\n§O{void}\n\n";
+        var source = """
+            module Tests Calor.Runtime.Tests block
+              module TestsModule public
+                func Test public () → void
+                  !
+            """;
 
         // Act
         var result = Program.Compile(source);
@@ -23,13 +28,19 @@ public class NamespaceEmissionTests
         Assert.NotNull(result.GeneratedCode);
         Assert.Contains("namespace Calor.Runtime.Tests", result.GeneratedCode);
         Assert.DoesNotContain("Calor_Runtime_Tests", result.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
     }
 
     [Fact]
     public void Compile_DottedNamespace_ModuleClassUsesLastSegment()
     {
         // Arrange: Calor source with dotted namespace and a function
-        var source = "§M{m1:Calor.Runtime.Tests}\n§F{f1:TestFunc:pub}\n§O{void}\n\n";
+        var source = """
+            module Tests Calor.Runtime.Tests block
+              module TestsModule public
+                func TestFunc public () → void
+                  !
+            """;
 
         // Act
         var result = Program.Compile(source);
@@ -40,13 +51,31 @@ public class NamespaceEmissionTests
         Assert.Contains("public static class TestsModule", result.GeneratedCode);
         Assert.DoesNotContain("Calor.Runtime.TestsModule", result.GeneratedCode);
         Assert.DoesNotContain("Calor_Runtime_TestsModule", result.GeneratedCode);
+        const string probe = """
+
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    Calor.Runtime.Tests.TestsModule.TestFunc();
+                    return typeof(Calor.Runtime.Tests.TestsModule).FullName!;
+                }
+            }
+            """;
+        Assert.Equal("Calor.Runtime.Tests.TestsModule",
+            InteropScope.RefOutImplementationTests.Run(result.GeneratedCode + probe));
     }
 
     [Fact]
     public void Compile_SimpleNamespace_NoDotsToPreserve()
     {
         // Arrange
-        var source = "§M{m1:MyNamespace}\n§F{f1:Test:pub}\n§O{void}\n\n";
+        var source = """
+            module MyNamespace MyNamespace block
+              module MyNamespaceModule public
+                func Test public () → void
+                  !
+            """;
 
         // Act
         var result = Program.Compile(source);
@@ -55,13 +84,19 @@ public class NamespaceEmissionTests
         Assert.False(result.HasErrors, GetErrors(result));
         Assert.NotNull(result.GeneratedCode);
         Assert.Contains("namespace MyNamespace", result.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
     }
 
     [Fact]
     public void Compile_DeepDottedNamespace_PreservesAllDots()
     {
         // Arrange
-        var source = "§M{m1:Company.Product.Feature.SubFeature.Tests}\n§F{f1:Test:pub}\n§O{void}\n\n";
+        var source = """
+            module Tests Company.Product.Feature.SubFeature.Tests block
+              module TestsModule public
+                func Test public () → void
+                  !
+            """;
 
         // Act
         var result = Program.Compile(source);
@@ -70,6 +105,7 @@ public class NamespaceEmissionTests
         Assert.False(result.HasErrors, GetErrors(result));
         Assert.NotNull(result.GeneratedCode);
         Assert.Contains("namespace Company.Product.Feature.SubFeature.Tests", result.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
     }
 
     [Fact]
@@ -99,6 +135,7 @@ public class NamespaceEmissionTests
         Assert.NotNull(compilationResult.GeneratedCode);
         Assert.Contains("namespace MyCompany.MyProduct.MyFeature", compilationResult.GeneratedCode);
         Assert.DoesNotContain("MyCompany_MyProduct_MyFeature", compilationResult.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(compilationResult.GeneratedCode).CompilationSuccess);
     }
 
     private static string GetErrors(CompilationResult result)

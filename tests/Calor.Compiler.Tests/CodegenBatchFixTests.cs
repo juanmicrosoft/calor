@@ -10,7 +10,7 @@ namespace Calor.Compiler.Tests;
 /// Tests for batch codegen/converter bug fixes:
 /// Fix 1: §B{var:name} generates correct C#
 /// Fix 2: Auto-using System.Collections.Generic and System.Linq
-/// Fix 3: Decimal literal support (DEC: prefix)
+/// Fix 3: Decimal literal support (canonical m suffix)
 /// Fix 4: Object initializer roundtrip with §INIT tags
 /// Fix 5: Array initializer CalorEmitter uses §ARR tags
 /// </summary>
@@ -23,10 +23,10 @@ public class CodegenBatchFixTests
     {
         // §B{var:myList} should produce "var myList = ..." not "myList var = ..."
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{var:myList} §NEW{List<i32>} §/NEW
+module Test Test block
+  func Main () → void
+    !
+    var myList = new List<int>()
 ";
 
         var result = ParseAndEmit(source);
@@ -40,10 +40,10 @@ public class CodegenBatchFixTests
     {
         // §B{str:name} should still work as type:name format
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{str:name} ""hello""
+module Test Test block
+  func Main () → void
+    !
+    let string:name = ""hello""
 ";
 
         var result = ParseAndEmit(source);
@@ -56,10 +56,10 @@ public class CodegenBatchFixTests
     {
         // §B{myVar} with inferred type should still work
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{myVar} 42
+module Test Test block
+  func Main () → void
+    !
+    let myVar = 42
 ";
 
         var result = ParseAndEmit(source);
@@ -74,12 +74,10 @@ public class CodegenBatchFixTests
     {
         // Collections.Generic using is conditionally emitted when collection types are referenced
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §LIST{result:i32}
-        1
-      §/LIST{result}
+module Test Test block
+  func Main () → void
+    !
+    let List<int>:result = new List<int>() { 1 }
 ";
 
         var result = ParseAndEmit(source);
@@ -92,9 +90,10 @@ public class CodegenBatchFixTests
     {
         // System.Linq is only emitted when LINQ methods are actually used
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
 
         var result = ParseAndEmit(source);
@@ -109,10 +108,10 @@ public class CodegenBatchFixTests
     {
         // DEC:21.35 in Calor should produce 21.35m in C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~price} DEC:21.35
+module Test Test block
+  func Main () → void
+    !
+    var price = 21.35m
 ";
 
         var result = ParseAndEmit(source);
@@ -125,10 +124,10 @@ public class CodegenBatchFixTests
     {
         // DEC:18 should produce 18m in C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~amount} DEC:18
+module Test Test block
+  func Main () → void
+    !
+    var amount = 18m
 ";
 
         var result = ParseAndEmit(source);
@@ -141,10 +140,10 @@ public class CodegenBatchFixTests
     {
         // FLOAT:3.14 should still produce 3.14 (no m suffix)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~pi} FLOAT:3.14
+module Test Test block
+  func Main () → void
+    !
+    var pi = 3.14
 ";
 
         var result = ParseAndEmit(source);
@@ -156,19 +155,21 @@ public class CodegenBatchFixTests
     [Fact]
     public void Fix3_DecimalLiteral_RoundtripThroughCalorEmitter()
     {
-        // DEC:21.35 should parse, then CalorEmitter should produce DEC:21.35
+        // The accepted prefix input formats as a bare decimal with its m suffix.
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~price} DEC:21.35
+module Test Test block
+  func Main () → void
+    !
+    var price = 21.35m
 ";
 
         var module = ParseModule(source);
         var calorEmitter = new Migration.CalorEmitter();
         var calorOutput = calorEmitter.Emit(module);
 
-        Assert.Contains("DEC:21.35", calorOutput);
+        Assert.Contains("21.35m", calorOutput);
+        var reparsed = ParseModule(calorOutput);
+        Assert.Contains("21.35m", new CSharpEmitter().Emit(reparsed));
     }
 
     // ========== Fix 4: Object initializer §INIT ==========
@@ -179,10 +180,10 @@ public class CodegenBatchFixTests
         // §NEW{Customer} §INIT{Name} STR:"John" §INIT{Age} 30 §/NEW
         // should produce new Customer() { Name = "John", Age = 30 }
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~c} §NEW{Customer} §INIT{Name} STR:""John"" §INIT{Age} 30 §/NEW
+module Test Test block
+  func Main () → void
+    !
+    var c = new Customer() { Name = ""John"", Age = 30 }
 ";
 
         var result = ParseAndEmit(source);
@@ -197,10 +198,10 @@ public class CodegenBatchFixTests
     {
         // §NEW{Customer} §/NEW should still produce new Customer()
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~c} §NEW{Customer} §/NEW
+module Test Test block
+  func Main () → void
+    !
+    var c = new Customer()
 ";
 
         var result = ParseAndEmit(source);
@@ -213,10 +214,10 @@ public class CodegenBatchFixTests
     {
         // §NEW{Person} §A STR:"base" §INIT{Name} STR:"John" §/NEW
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~p} §NEW{Person} §A STR:""base"" §INIT{Name} STR:""John"" §/NEW
+module Test Test block
+  func Main () → void
+    !
+    var p = new Person(""base"") { Name = ""John"" }
 ";
 
         var result = ParseAndEmit(source);
@@ -230,10 +231,10 @@ public class CodegenBatchFixTests
     {
         // Parse §INIT tags, then CalorEmitter should produce §INIT tags
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~c} §NEW{Customer} §INIT{Name} STR:""John"" §/NEW
+module Test Test block
+  func Main () → void
+    !
+    var c = new Customer() { Name = ""John"" }
 ";
 
         var module = ParseModule(source);
@@ -251,16 +252,16 @@ public class CodegenBatchFixTests
         // When CalorEmitter emits an array with initializers, it should use §ARR block syntax
         // Parse a Calor source with initialized array, then re-emit with CalorEmitter
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{[i32]:nums} §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums}
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var module = ParseModule(source);
         var calorEmitter = new Migration.CalorEmitter();
         var result = calorEmitter.Emit(module);
 
-        Assert.Contains("§ARR{", result);
+        Assert.Contains("new int[] { 1, 2, 3 }", result);
         Assert.Contains("1", result);
         Assert.Contains("2", result);
         Assert.Contains("3", result);
@@ -270,12 +271,12 @@ public class CodegenBatchFixTests
     [Fact]
     public void Fix5_ArrayInitializer_RoundtripThroughParser()
     {
-        // §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums} should parse and generate correct C#
+        // §ARR{i32} §A 1 §A 2 §A 3 §/ARR should parse and generate correct C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{[i32]:nums} §ARR{i32:nums} §A 1 §A 2 §A 3 §/ARR{nums}
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
 
         var result = ParseAndEmit(source);
@@ -289,15 +290,15 @@ public class CodegenBatchFixTests
     // ========== Gap-closing: Converter-level tests ==========
 
     [Fact]
-    public void Gap_Converter_DecimalLiteral_ProducesDECPrefix()
+    public void Gap_Converter_DecimalLiteral_ProducesMSuffix()
     {
-        // C# decimal literal → converter → Calor should contain DEC:
+        // C# decimal literal → converter → Calor keeps its decimal suffix.
         var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var result = converter.Convert("decimal price = 21.35m;");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("DEC:21.35", result.CalorSource);
+        Assert.Contains("21.35m", result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
@@ -320,15 +321,15 @@ public class CodegenBatchFixTests
     }
 
     [Fact]
-    public void Gap_Converter_DecimalZero_ProducesDECPrefix()
+    public void Gap_Converter_DecimalZero_PreservesScaleWithMSuffix()
     {
-        // C# 0.00m → converter → Calor should contain DEC:0
+        // Decimal zero retains both its scale and decimal suffix.
         var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var result = converter.Convert("decimal zero = 0.00m;");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("DEC:0", result.CalorSource);
+        Assert.Contains("0.00m", result.CalorSource);
     }
 
     [Fact]
@@ -340,7 +341,7 @@ public class CodegenBatchFixTests
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.Contains("new int[] { 1, 2, 3 }", result.CalorSource);
         Assert.DoesNotContain("{1, 2, 3}", result.CalorSource);
     }
 
@@ -392,13 +393,10 @@ public class CodegenBatchFixTests
     {
         // §INIT inside §NEW that is inside a §C argument should parse correctly
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §C{Process}
-        §A §NEW{Widget} §INIT{Name} STR:""test"" §/NEW
-        §A 42
-      §/C
+module Test Test block
+  func Main () → void
+    !
+    Process(new Widget() { Name = ""test"" }, 42)
 ";
 
         var result = ParseAndEmit(source);
@@ -414,12 +412,10 @@ public class CodegenBatchFixTests
     {
         // Multiple §INIT inside §NEW inside §C
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §C{Save}
-        §A §NEW{Config} §INIT{Host} STR:""localhost"" §INIT{Port} 8080 §/NEW
-      §/C
+module Test Test block
+  func Main () → void
+    !
+    Save(new Config() { Host = ""localhost"", Port = 8080 })
 ";
 
         var result = ParseAndEmit(source);
@@ -436,12 +432,12 @@ public class CodegenBatchFixTests
     {
         // Common monetary/business values should roundtrip without precision loss
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~a} DEC:0.01
-      §B{~b} DEC:99.99
-      §B{~c} DEC:1234567890.12
+module Test Test block
+  func Main () → void
+    !
+    var a = 0.01m
+    var b = 99.99m
+    var c = 1234567890.12m
 ";
 
         var result = ParseAndEmit(source);
@@ -455,10 +451,10 @@ public class CodegenBatchFixTests
     public void Gap_DecimalNegativeValue_RoundtripsCorrectly()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x} DEC:-42.5
+module Test Test block
+  func Main () → void
+    !
+    var x = -42.5m
 ";
 
         var result = ParseAndEmit(source);
@@ -473,10 +469,10 @@ public class CodegenBatchFixTests
     {
         // FLOAT:1.0 should produce 1.0, not bare 1 (which would be int)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:f64} FLOAT:1.0
+module Test Test block
+  func Main () → void
+    !
+    var double:x = 1.0
 ";
 
         var result = ParseAndEmit(source);
@@ -490,13 +486,10 @@ public class CodegenBatchFixTests
     {
         // Float literals inside §LIST{:object} should emit with decimal point
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §LIST{l1:object}
-        FLOAT:1.0
-        FLOAT:2.0
-      §/LIST{l1}
+module Test Test block
+  func Main () → void
+    !
+    let List<object>:l1 = new List<object>() { 1.0, 2.0 }
 ";
 
         var result = ParseAndEmit(source);
@@ -510,10 +503,10 @@ public class CodegenBatchFixTests
     {
         // FLOAT:3.14 should stay 3.14 (already has decimal point)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:f64} FLOAT:3.14
+module Test Test block
+  func Main () → void
+    !
+    var double:x = 3.14
 ";
 
         var result = ParseAndEmit(source);
@@ -527,10 +520,10 @@ public class CodegenBatchFixTests
     {
         // FLOAT:-1.0 should produce -1.0, not bare -1
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:f64} FLOAT:-1.0
+module Test Test block
+  func Main () → void
+    !
+    var double:x = -1.0
 ";
 
         var result = ParseAndEmit(source);
@@ -544,10 +537,10 @@ public class CodegenBatchFixTests
     {
         // Scientific notation like 1E10 should stay as-is (already a double in C#)
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:f64} FLOAT:1E10
+module Test Test block
+  func Main () → void
+    !
+    var double:x = 10000000000.0
 ";
 
         var result = ParseAndEmit(source);
@@ -609,21 +602,22 @@ public class CodegenBatchFixTests
     public void ModuleFunctionCall_FromClassWithLocalBase_IsQualified()
     {
         var emitted = ParseAndEmit("""
-§M{m001:ExtProbe}
-  §F{f001:Helper:pub} (i32:x) -> i32
-    §E{}
-    §R (* x INT:2)
+module ExtProbe ExtProbe block
+  func Helper (int:x) → int
+    !
+    return (x * 2)
 
-  §CL{c000:BaseThing:pub}
-    §MT{mt000:Tag:pub} () -> i32
-      §E{}
-      §R INT:0
+  class BaseThing
+    func Tag () → int
+      !
+      return 0
 
-  §CL{c001:Derived:pub}
-    §EXT{BaseThing}
-    §MT{mt001:Use:pub} (i32:v) -> i32
-      §E{}
-      §R §C{Helper} §A v §/C
+  class Derived
+    extends BaseThing
+
+    func Use (int:v) → int
+      !
+      return Helper(v)
 """);
 
         Assert.Contains("ExtProbeModule.Helper(", emitted, StringComparison.Ordinal);
@@ -640,16 +634,17 @@ public class CodegenBatchFixTests
     public void ModuleFunctionCall_FromClassWithOpaqueBase_StaysUnqualified()
     {
         var emitted = ParseAndEmit("""
-§M{m001:OpaqueProbe}
-  §F{f001:Helper:pub} (i32:x) -> i32
-    §E{}
-    §R (* x INT:2)
+module OpaqueProbe OpaqueProbe block
+  func Helper (int:x) → int
+    !
+    return (x * 2)
 
-  §CL{c001:Derived:pub}
-    §EXT{SomeExternalBase}
-    §MT{mt001:Use:pub} (i32:v) -> i32
-      §E{}
-      §R §C{Helper} §A v §/C
+  class Derived
+    extends SomeExternalBase
+
+    func Use (int:v) → int
+      !
+      return Helper(v)
 """);
 
         Assert.DoesNotContain("OpaqueProbeModule.Helper(", emitted, StringComparison.Ordinal);
@@ -666,19 +661,19 @@ public class CodegenBatchFixTests
     public void ModuleFunctionMethodGroup_FromClassBody_IsQualified()
     {
         var emitted = ParseAndEmit("""
-§M{m001:MgProbe}
-  §F{f001:Shout:pub} (i32:x) -> i32
-    §E{}
-    §R x
+module MgProbe MgProbe block
+  func Shout (int:x) → int
+    !
+    return x
 
-  §F{f002:Apply:pub} (Func<i32,i32>:f, i32:v) -> i32
-    §E{}
-    §R §C{f} §A v §/C
+  func Apply (Func<int, int>:f, int:v) → int
+    !
+    return f(v)
 
-  §CL{c001:Holder:pub}
-    §MT{mt001:Use:pub} (i32:v) -> i32
-      §E{}
-      §R §C{Apply} §A Shout §A v §/C
+  class Holder
+    func Use (int:v) → int
+      !
+      return Apply(Shout, v)
 """);
 
         Assert.Contains("MgProbeModule.Shout", emitted, StringComparison.Ordinal);

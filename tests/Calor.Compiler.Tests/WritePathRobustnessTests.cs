@@ -9,26 +9,73 @@ namespace Calor.Compiler.Tests;
 /// Phase 1 item 5 — write-path robustness. Covers:
 ///   1. Fault-tolerant indentation diagnostics with machine-applicable fixes
 ///      (tabs, mixed whitespace, non-standard widths, misaligned dedents,
-///      misaligned §EI/§EL clauses).
-///   2. <c>SourceHealer</c> (calor format --heal): closer stripping,
+///      misaligned else clauses).
+///   2. <c>SourceHealer</c> (calor format --heal): legacy-error preservation,
 ///      indentation re-derivation, chain-clause re-alignment, idempotence.
-///   3. The MCP calor_check auto-heal path.
+///   3. MCP calor_check refuses heuristic-only repairs.
 /// </summary>
 public class WritePathRobustnessTests
 {
+    [Fact]
+    public void CanonicalHealing_AlignsWordClausesAndReportsAmbiguity()
+    {
+        const string source = "module M\n    func F () → int\n        !\n        if true\n            return 1\n            else\n            return 2";
+        var healer = new SourceHealer();
+        var healed = healer.Heal(source);
+        Assert.Equal("module M\n  func F () → int\n    !\n    if true\n      return 1\n    else\n      return 2", healed);
+        Assert.Contains(healer.Ambiguities, ambiguity => ambiguity.Line == 7);
+        Assert.Equal(healed, healer.Heal(healed));
+        Assert.Empty(healer.Ambiguities);
+    }
+
+    [Fact]
+    public void CanonicalHealing_DoesNotEraseLegacyCloserErrors()
+    {
+        const string source = "module M\n  func F () → int\n    return 1\n§/M";
+        var healed = new SourceHealer().Heal(source);
+        Assert.Contains("§/M", healed);
+        var diagnostics = new DiagnosticBag();
+        new Lexer(healed, diagnostics).TokenizeAll();
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, Assert.Single(diagnostics.Errors).Code);
+    }
+
+    [Fact]
+    public void CanonicalHealing_PreservesRawUtf8BytesAndEscapedStringText()
+    {
+        const string payload = "§/M\r\nif (true) { /* 😀 */ }\r\n/// else";
+        var source = $"module M\n    raw member {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n    func F () → string\n        return \"§/M \\${{0}}\"";
+        var healed = new SourceHealer().Heal(source);
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(healed, diagnostics).TokenizeAll();
+        Assert.False(diagnostics.HasErrors);
+        Assert.Equal(payload, Assert.IsType<RawCSharpFrame>(tokens.Single(token => token.Value is RawCSharpFrame).Value).Code);
+        Assert.Contains("return \"§/M \\${0}\"", healed);
+        Assert.Equal(healed, new SourceHealer().Heal(healed));
+    }
+
+    [Fact]
+    public void CanonicalHealing_DoTailAlignsWithoutCapturingNestedWhileLoops()
+    {
+        const string source = "module M\n    func F () → void\n        do\n            while true\n                break\n            while false\n        return";
+        const string expected = "module M\n  func F () → void\n    do\n      while true\n        break\n    while false\n    return";
+        var healer = new SourceHealer();
+        Assert.Equal(expected, healer.Heal(source));
+        Assert.Equal(expected, healer.Heal(expected));
+    }
+
     private const string CanonicalFizzBuzz = """
-        §M{m1:FizzBuzz}
-          §F{f1:Main:pub} () -> void
-            §E{cw}
-            §L{l1:i:1:100:1}
-              §IF{i1} (== (% i 15) 0)
-                §P "FizzBuzz"
-              §EI (== (% i 3) 0)
-                §P "Fizz"
-              §EI (== (% i 5) 0)
-                §P "Buzz"
-              §EL
-                §P i
+        module FizzBuzz
+          func Main () → void
+            ! cw
+            for i from 1 to 100 step 1
+              if i % 15 == 0
+                System.Console.WriteLine("FizzBuzz")
+              else if i % 3 == 0
+                System.Console.WriteLine("Fizz")
+              else if i % 5 == 0
+                System.Console.WriteLine("Buzz")
+              else
+                System.Console.WriteLine(i)
         """;
 
     private static DiagnosticBag ParseSource(string source)
@@ -74,7 +121,7 @@ public class WritePathRobustnessTests
     [Fact]
     public void TabIndentation_ReportsSingleWarning_WithEditsForEveryTabLine()
     {
-        var source = "§M{m1:T}\n\t§F{f1:Main:pub} () -> void\n\t\t§P \"x\"";
+        var source = "module T\n\tfunc Main () → void\n\t\t! cw\n\t\tSystem.Console.WriteLine(\"x\")";
 
         var diagnostics = ParseSource(source);
 
@@ -83,11 +130,11 @@ public class WritePathRobustnessTests
             d => d.Code == DiagnosticCode.TabIndentation);
         var withFix = Assert.Single(diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.TabIndentation);
-        Assert.Equal(2, withFix.Fix.Edits.Count);
-        Assert.Contains("2 line(s)", warning.Message);
+        Assert.Equal(3, withFix.Fix.Edits.Count);
+        Assert.Contains("3 line(s)", warning.Message);
 
         var healed = ApplyAllFixes(source, diagnostics);
-        Assert.Equal("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"x\"", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"x\")", healed);
 
         var recheck = ParseSource(healed);
         Assert.False(recheck.HasErrors);
@@ -98,7 +145,7 @@ public class WritePathRobustnessTests
     public void MixedIndentation_ReportsError_WithFixThatHeals()
     {
         // Body line indented with tab + 2 spaces (3 columns, mixed).
-        var source = "§M{m1:T}\n  §F{f1:Main:pub} () -> void\n\t  §P \"x\"";
+        var source = "module T\n  func Main () → void\n    ! cw\n\t  System.Console.WriteLine(\"x\")";
 
         var diagnostics = ParseSource(source);
 
@@ -108,24 +155,24 @@ public class WritePathRobustnessTests
         Assert.Single(withFix.Fix.Edits);
 
         var healed = ApplyAllFixes(source, diagnostics);
-        Assert.Equal("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"x\"", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"x\")", healed);
         Assert.False(ParseSource(healed).HasErrors);
     }
 
     [Fact]
     public void NonStandardIndentWidth_FourSpaceFile_FixNormalizesInOnePass()
     {
-        var source = "§M{m1:T}\n    §F{f1:Main:pub} () -> void\n        §P \"a\"\n        §P \"b\"";
+        var source = "module T\n    func Main () → void\n        ! cw\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
 
         var diagnostics = ParseSource(source);
 
         Assert.False(diagnostics.HasErrors); // 4-space parses; canonical width is advisory
         var withFix = Assert.Single(diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.NonStandardIndentWidth);
-        Assert.Equal(3, withFix.Fix.Edits.Count); // §F line + both §P siblings
+        Assert.Equal(4, withFix.Fix.Edits.Count); // function line + effect row + both statement siblings
 
         var healed = ApplyAllFixes(source, diagnostics);
-        Assert.Equal("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"a\"\n    §P \"b\"", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"a\")\n    System.Console.WriteLine(\"b\")", healed);
 
         var recheck = ParseSource(healed);
         Assert.False(recheck.HasErrors);
@@ -137,7 +184,7 @@ public class WritePathRobustnessTests
     {
         // Third statement dedents to column 3 — matches no enclosing level
         // (levels are 0/2/4). The fix snaps to the deeper level (4).
-        var source = "§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"a\"\n   §P \"b\"";
+        var source = "module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"a\")\n   System.Console.WriteLine(\"b\")";
 
         var diagnostics = ParseSource(source);
 
@@ -153,23 +200,23 @@ public class WritePathRobustnessTests
     [Fact]
     public void MisalignedElseClause_InStatementPosition_ReportsFixAligningWithIf()
     {
-        // §EI dedented to the loop-body level (statement position): the
+        // Else-if dedented to the loop-body level (statement position): the
         // if-chain closed before the clause was seen.
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §L{l1:i:1:10:1}",
-            "      §IF{i1} (== i 1)",
-            "        §P \"a\"",
-            "    §EI (== i 2)",
-            "        §P \"b\"");
+            "module T",
+            "  func Main () → void\n    !",
+            "    for i from 1 to 10 step 1",
+            "      if i == 1",
+            "        System.Console.WriteLine(\"a\")",
+            "    else if i == 2",
+            "        System.Console.WriteLine(\"b\")");
 
         var diagnostics = ParseSource(source);
 
         Assert.True(diagnostics.HasErrors);
         var withFix = Assert.Single(diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.MisalignedElseClause);
-        Assert.Equal("      ", withFix.Fix.Edits[0].NewText); // aligned with §IF at column 7
+        Assert.Equal("      ", withFix.Fix.Edits[0].NewText); // aligned with if at column 7
 
         var healed = ApplyAllFixes(source, diagnostics);
         Assert.False(ParseSource(healed).HasErrors,
@@ -179,25 +226,25 @@ public class WritePathRobustnessTests
     [Fact]
     public void MisalignedElseClause_InFunctionWithNoIf_EmitsNoFix()
     {
-        // Reviewer probe: f1 contains a §IF at the same column as f2's stray
-        // §EI. Before the _lastIfToken function-boundary reset, the fix
-        // referenced f1's §IF — and because the clause already sat at that
+        // Reviewer probe: f1 contains an if at the same column as f2's stray
+        // else-if. Before the _lastIfToken function-boundary reset, the fix
+        // referenced f1's if — and because the clause already sat at that
         // column, applying it was a no-op: apply → identical file → same
         // error, forever (a probe-confirmed infinite agent loop).
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:A:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "  §F{f2:B:pub} () -> void",
-            "    §EI (== 1 2)",
-            "      §P \"b\"");
+            "module T",
+            "  func A () → void\n    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "  func B () → void\n    !",
+            "    else if 1 == 2",
+            "      System.Console.WriteLine(\"b\")");
 
         var diagnostics = ParseSource(source);
 
         Assert.True(diagnostics.HasErrors);
         Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.MisalignedElseClause);
-        // No fix: there is no §IF in this function to align with.
+        // No fix: there is no if in this function to align with.
         Assert.DoesNotContain(diagnostics.DiagnosticsWithFixes,
             d => d.Code == DiagnosticCode.MisalignedElseClause);
     }
@@ -206,17 +253,17 @@ public class WritePathRobustnessTests
     public void MisalignedElseClause_ClauseAlreadyAtIfColumn_EmitsNoNoOpFix()
     {
         // Same-function variant of the no-op hazard: the stray clause is
-        // already at its §IF's column, but the chain closed early because a
-        // statement at the same column ended the if. Re-indenting to the §IF
+        // already at its if's column, but the chain closed early because a
+        // statement at the same column ended the if. Re-indenting to the if
         // column would not change the file, so no fix may be emitted.
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:A:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "    §P \"x\"",
-            "    §EI (== 1 2)",
-            "      §P \"b\"");
+            "module T",
+            "  func A () → void\n    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "    System.Console.WriteLine(\"x\")",
+            "    else if 1 == 2",
+            "      System.Console.WriteLine(\"b\")");
 
         var diagnostics = ParseSource(source);
 
@@ -237,60 +284,61 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_TabIndentation_NormalizesToTwoSpaces()
     {
-        var source = "§M{m1:T}\n\t§F{f1:Main:pub} () -> void\n\t\t§P \"x\"";
+        var source = "module T\n\tfunc Main () → void\n\t\t! cw\n\t\tSystem.Console.WriteLine(\"x\")";
 
         var healed = new SourceHealer().Heal(source);
 
-        Assert.Equal("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"x\"", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"x\")", healed);
         Assert.False(ParseSource(healed).HasErrors);
     }
 
     [Fact]
     public void Heal_FourSpaceIndentation_NormalizesToTwoSpaces()
     {
-        var source = "§M{m1:T}\n    §F{f1:Main:pub} () -> void\n        §P \"a\"\n        §P \"b\"";
+        var source = "module T\n    func Main () → void\n        ! cw\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")";
 
         var healed = new SourceHealer().Heal(source);
 
-        Assert.Equal("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"a\"\n    §P \"b\"", healed);
+        Assert.Equal("module T\n  func Main () → void\n    ! cw\n    System.Console.WriteLine(\"a\")\n    System.Console.WriteLine(\"b\")", healed);
     }
 
     [Fact]
-    public void Heal_StripsStructuralClosers_AndDropsEmptiedLines()
+    public void Heal_RetiredStructuralClosers_RemainExplicitErrors()
     {
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §P \"x\"",
-            "  §/F{f1}",
-            "§/M{m1}");
+            "module T",
+            "  func Main () → void\n    !",
+            "    System.Console.WriteLine(\"x\")",
+            "  §/F",
+            "§/M");
 
         var healed = new SourceHealer().Heal(source);
 
-        Assert.Equal("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"x\"", healed);
-        Assert.False(ParseSource(healed).HasErrors);
+        Assert.Equal(source, healed);
+        Assert.Equal(2, ParseSource(healed).Errors.Count(error => error.Code == DiagnosticCode.UnknownSectionMarker));
     }
 
     [Fact]
     public void Heal_ElseClauseAtBodyLevel_RealignsWithIf()
     {
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "      §EI (== 1 2)", // written at body level
-            "        §P \"b\"");
+            "module T",
+            "  func Main () → void\n    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "      else if 1 == 2", // written at body level
+            "        System.Console.WriteLine(\"b\")");
 
         var healed = new SourceHealer().Heal(source);
 
         var expected = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "    §EI (== 1 2)",
-            "      §P \"b\"");
+            "module T",
+            "  func Main () → void",
+            "    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "    else if 1 == 2",
+            "      System.Console.WriteLine(\"b\")");
         Assert.Equal(expected, healed);
         Assert.False(ParseSource(healed).HasErrors);
     }
@@ -299,22 +347,23 @@ public class WritePathRobustnessTests
     public void Heal_ElseClauseDedentedTooFar_RealignsWithIf()
     {
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "§EI (== 1 2)", // dedented to module level
-            "      §P \"b\"");
+            "module T",
+            "  func Main () → void\n    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "else if 1 == 2", // dedented to module level
+            "      System.Console.WriteLine(\"b\")");
 
         var healed = new SourceHealer().Heal(source);
 
         var expected = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "    §EI (== 1 2)",
-            "      §P \"b\"");
+            "module T",
+            "  func Main () → void",
+            "    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "    else if 1 == 2",
+            "      System.Console.WriteLine(\"b\")");
         Assert.Equal(expected, healed);
         Assert.False(ParseSource(healed).HasErrors);
     }
@@ -322,33 +371,34 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_AmbiguousTrailingStatement_IsReportedWithOriginalLine()
     {
-        // Reviewer probe: §P "b" sits at the same column as the body-level
-        // §EI above it. Heal keeps it inside the clause body — a control-flow
+        // Reviewer probe: the call printing "b" sits at the same column as the body-level
+        // else-if above it. Heal keeps it inside the clause body — a control-flow
         // GUESS that must be surfaced, not silently applied.
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "      §EI (== 1 2)", // written at body level
-            "      §P \"b\"");    // ambiguous: clause body or statement after the chain?
+            "module T",
+            "  func Main () → void\n    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "      else if 1 == 2", // written at body level
+            "      System.Console.WriteLine(\"b\")"); // ambiguous: clause body or statement after the chain?
 
         var healer = new SourceHealer();
         var healed = healer.Heal(source);
 
         var ambiguity = Assert.Single(healer.Ambiguities);
-        Assert.Equal(6, ambiguity.Line);
-        Assert.Contains("§EI", ambiguity.Message);
-        Assert.Contains("line 5", ambiguity.Message);
+        Assert.Equal(7, ambiguity.Line);
+        Assert.Contains("'else'", ambiguity.Message);
+        Assert.Contains("line 6", ambiguity.Message);
 
-        // The guess itself: §P "b" healed into the else-if body.
+        // The guess itself: the call printing "b" healed into the else-if body.
         var expected = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub} () -> void",
-            "    §IF{i1} (== 1 1)",
-            "      §P \"a\"",
-            "    §EI (== 1 2)",
-            "      §P \"b\"");
+            "module T",
+            "  func Main () → void",
+            "    !",
+            "    if 1 == 1",
+            "      System.Console.WriteLine(\"a\")",
+            "    else if 1 == 2",
+            "      System.Console.WriteLine(\"b\")");
         Assert.Equal(expected, healed);
     }
 
@@ -361,39 +411,39 @@ public class WritePathRobustnessTests
     }
 
     [Fact]
-    public void Heal_UnclosedHeaderBrace_DoesNotVerbatimizeRestOfFile()
+    public void Heal_UnclosedSignatureParenthesis_DoesNotVerbatimizeRestOfFile()
     {
-        // Reviewer probe: `§F{f1:Main:pub ( )` leaves the header brace
+        // Reviewer probe: `func Main ( → void` leaves the signature parenthesis
         // unclosed. Before the continuation cap, every following line was
         // classified as bracket continuation and heal silently no-opped on
-        // the whole file. A continuation must end at a line starting with §.
+        // the whole file. A continuation must end at a canonical structural-word head.
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub ( ) -> void", // missing closing }
-            "      §P \"x\"",               // over-indented: must still normalize
-            "      §P \"y\"");
+            "module T",
+            "  func Main ( → void", // missing closing )
+            "      return",         // over-indented: must still normalize
+            "      return");
 
         var healed = new SourceHealer().Heal(source);
 
         var expected = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:Main:pub ( ) -> void",
-            "    §P \"x\"",
-            "    §P \"y\"");
+            "module T",
+            "  func Main ( → void",
+            "    return",
+            "    return");
         Assert.Equal(expected, healed);
     }
 
     [Fact]
     public void Heal_BracketContinuation_IsCappedAtTenLines()
     {
-        // An unclosed bracket followed by many non-§ lines: only the first
+        // An unclosed bracket followed by many non-header lines: only the first
         // ten remain verbatim continuations; past the cap, lines are
         // structural again (an unclosed bracket is assumed to be a typo).
         var continuation = Enumerable.Range(1, 11).Select(n => $"      line{n}");
         var source = string.Join('\n', new[]
         {
-            "§M{m1:T}",
-            "  §B{x:str} (concat \"a\"", // unclosed ( — continuation begins
+            "module T",
+            "  let string:x = string.Concat(\"a\"", // unclosed ( — continuation begins
         }.Concat(continuation));
 
         var healed = new SourceHealer().Heal(source).Split('\n');
@@ -408,38 +458,34 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_TrailingWhitespaceAndCrlf_Normalized()
     {
-        var source = "§M{m1:T}\r\n  §F{f1:Main:pub} () -> void   \r\n    §P \"x\"\t\r\n";
+        var source = "module T\r\n  func Main () → void   \r\n    !\n    System.Console.WriteLine(\"x\")\t\r\n";
 
         var healed = new SourceHealer().Heal(source);
 
-        Assert.Equal("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"x\"\n", healed);
+        Assert.Equal("module T\n  func Main () → void\n    !\n    System.Console.WriteLine(\"x\")\n", healed);
     }
 
     [Fact]
     public void Heal_RawBlockContent_IsPreservedVerbatim()
     {
-        var source = string.Join('\n',
-            "§M{m1:T}",
-            "    §F{f1:Main:pub} () -> void",
-            "        §RAW",
-            "   int x = 1;   ",
-            "\tConsole.WriteLine(x);",
-            "        §/RAW");
+        const string payload = "   int x = 1;   \n\tConsole.WriteLine(x);\n";
+        var length = System.Text.Encoding.UTF8.GetByteCount(payload);
+        var source = $"module T\n    func Main () → void\n        raw statement {length}\n{payload}";
 
         var healed = new SourceHealer().Heal(source);
 
         // Structure normalized, raw payload untouched.
         Assert.Contains("\n   int x = 1;   \n", healed);
         Assert.Contains("\n\tConsole.WriteLine(x);\n", healed);
-        Assert.StartsWith("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §RAW\n", healed);
+        Assert.StartsWith($"module T\n  func Main () → void\n    raw statement {length}\n", healed);
     }
 
     [Theory]
-    [InlineData("§M{m1:T}\n\t§F{f1:Main:pub} () -> void\n\t\t§P \"x\"")]
-    [InlineData("§M{m1:T}\n    §F{f1:Main:pub} () -> void\n        §P \"a\"\n        §P \"b\"")]
-    [InlineData("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §P \"x\"\n  §/F{f1}\n§/M{m1}")]
-    [InlineData("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §IF{i1} (== 1 1)\n      §P \"a\"\n      §EI (== 1 2)\n        §P \"b\"")]
-    [InlineData("§M{m1:T}\n  §F{f1:Main:pub} () -> void\n    §IF{i1} (== 1 1)\n      §P \"a\"\n§EI (== 1 2)\n      §P \"b\"")]
+    [InlineData("module T\n\tfunc Main () → void\n\t  !\n\t\tSystem.Console.WriteLine(\"x\")")]
+    [InlineData("module T\n    func Main () → void\n      !\n        System.Console.WriteLine(\"a\")\n        System.Console.WriteLine(\"b\")")]
+    [InlineData("module T\n  func Main () → void\n    System.Console.WriteLine(\"x\")\n  §/F\n§/M")]
+    [InlineData("module T\n  func Main () → void\n    !\n    if 1 == 1\n      System.Console.WriteLine(\"a\")\n      else if 1 == 2\n        System.Console.WriteLine(\"b\")")]
+    [InlineData("module T\n  func Main () → void\n    if 1 == 1\n      System.Console.WriteLine(\"a\")\nelse if 1 == 2\n      System.Console.WriteLine(\"b\")")]
     public void Heal_IsIdempotent(string source)
     {
         var healer = new SourceHealer();
@@ -451,21 +497,18 @@ public class WritePathRobustnessTests
     [Fact]
     public void Heal_MangledFizzBuzz_RestoresCompilingFile()
     {
-        // 4-space indentation, tab lines, a body-level §EI, and legacy closers.
+        // Four-space indentation and a body-level else-if with an ambiguous following statement.
         var mangled = string.Join('\n',
-            "§M{m1:FizzBuzz}",
-            "    §F{f1:Main:pub} () -> void",
-            "        §E{cw}",
-            "        §L{l1:i:1:100:1}",
-            "            §IF{i1} (== (% i 15) 0)",
-            "                §P \"FizzBuzz\"",
-            "                §EI (== (% i 3) 0)",
-            "                §P \"Fizz\"",
-            "            §EL",
-            "                §P i",
-            "        §/L{l1}",
-            "    §/F{f1}",
-            "§/M{m1}");
+            "module FizzBuzz",
+            "    func Main () → void\n      !",
+            "        ! cw",
+            "        for i from 1 to 100 step 1",
+            "            if i % 15 == 0",
+            "                System.Console.WriteLine(\"FizzBuzz\")",
+            "                else if i % 3 == 0",
+            "                System.Console.WriteLine(\"Fizz\")",
+            "            else",
+            "                System.Console.WriteLine(i)");
 
         var healed = new SourceHealer().Heal(mangled);
 
@@ -477,25 +520,23 @@ public class WritePathRobustnessTests
         Assert.DoesNotContain("§/M", healed);
     }
 
-    // ===== 3. MCP calor_check auto-heal =====
+    // ===== 3. MCP calor_check safe patches =====
 
     [Fact]
-    public async Task CheckTool_DiagnoseApply_HealsSourceWhenFixEditsAreNotEnough()
+    public async Task CheckTool_DiagnoseApply_LeavesAmbiguousDedentsForExplicitHeal()
     {
-        // Two dedent mismatches: only the first is reported with a fix (the
-        // lexer gates indentation errors to one per file), so applying fix
-        // edits alone still leaves a broken file — only the source healer
-        // can finish the repair.
+        // Choosing either enclosing indent level changes control flow. Keep
+        // the suggestion, but reserve the heuristic repair for explicit heal.
         var source = string.Join('\n',
-            "§M{m1:T}",
-            "  §F{f1:A:pub} () -> void",
-            "    §E{cw}",
-            "    §P \"a\"",
-            "   §P \"b\"",
-            "  §F{f2:B:pub} () -> void",
-            "    §E{cw}",
-            "    §P \"c\"",
-            "   §P \"d\"");
+            "module T",
+            "  func A () → void\n    !",
+            "    ! cw",
+            "    System.Console.WriteLine(\"a\")",
+            "   System.Console.WriteLine(\"b\")",
+            "  func B () → void\n    !",
+            "    ! cw",
+            "    System.Console.WriteLine(\"c\")",
+            "   System.Console.WriteLine(\"d\")");
 
         var tool = new Calor.Compiler.Mcp.Tools.CheckTool();
         var args = System.Text.Json.JsonDocument.Parse(
@@ -503,21 +544,21 @@ public class WritePathRobustnessTests
         var toolResult = await tool.ExecuteAsync(args);
 
         var doc = System.Text.Json.JsonDocument.Parse(toolResult.Content![0].Text!);
-        Assert.True(doc.RootElement.GetProperty("healed").GetBoolean());
+        Assert.False(doc.RootElement.TryGetProperty("healed", out _));
 
         var fixedSource = doc.RootElement.GetProperty("fixedSource").GetString();
-        Assert.NotNull(fixedSource);
-        Assert.False(ParseSource(fixedSource!).HasErrors,
-            $"healed fixedSource should parse:\n{fixedSource}");
+        Assert.Equal(source, fixedSource);
+        Assert.Equal(0, doc.RootElement.GetProperty("fixesApplied").GetInt32());
+        Assert.True(ParseSource(fixedSource!).HasErrors);
 
-        // When healed==true the response must describe fixedSource, not the
-        // pre-heal input: the heal fully repaired this file, so the recheck
-        // is clean and the tool result is not an error.
-        Assert.True(doc.RootElement.GetProperty("success").GetBoolean());
-        Assert.Equal(0, doc.RootElement.GetProperty("errorCount").GetInt32());
-        Assert.DoesNotContain(doc.RootElement.GetProperty("diagnostics").EnumerateArray(),
-            d => d.GetProperty("severity").GetString() == "error");
-        Assert.False(toolResult.IsError);
+        Assert.False(doc.RootElement.GetProperty("success").GetBoolean());
+        Assert.True(doc.RootElement.GetProperty("errorCount").GetInt32() > 0);
+        var diagnostic = doc.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .First(d => d.GetProperty("code").GetString() == DiagnosticCode.MixedIndentation);
+        Assert.True(diagnostic.TryGetProperty("suggestion", out _));
+        Assert.False(diagnostic.GetProperty("fix").GetProperty("isSafeToApply").GetBoolean());
+        Assert.True(toolResult.IsError);
+        Assert.False(ParseSource(new SourceHealer().Heal(source)).HasErrors);
     }
 
     [Fact]

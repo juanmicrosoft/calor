@@ -1,0 +1,22 @@
+module Inventory Inventory
+  module InventoryModule
+    func Restock public (int:current, int:quantity) → int
+      !
+      requires quantity > 0
+      => result > current
+      return current + quantity
+
+    func Sell public (int:current, int:quantity) → int
+      !
+      requires quantity > 0
+      requires current >= quantity
+      => result >= 0
+      return current - quantity
+
+    func InStock public (int:quantity) → bool
+      !
+      return quantity > 0
+
+    func NeedsReorder public (int:quantity, int:threshold) → bool
+      !
+      return quantity <= threshold

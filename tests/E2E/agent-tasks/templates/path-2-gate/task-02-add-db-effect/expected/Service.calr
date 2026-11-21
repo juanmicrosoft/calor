@@ -1,6 +1,5 @@
-§M{m002:Services}
-  §F{f002:PrepareDashboard:pub} (i32:userId) -> str
-    §E{db}
-    §B{settings} §C{LoadUserSettings} §A userId §/C
-    §R settings
-
+module Services Services block
+  func PrepareDashboard (int:userId) → string
+    ! db
+    let settings = LoadUserSettings(userId)
+    return settings

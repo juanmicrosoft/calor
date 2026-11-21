@@ -1,26 +1,27 @@
-§M{m1:FinallyReturn}
-  §F{f1:WithFinally:pub} (i32:x) -> i32
-    §B{~result} 0
-    §TR{t1}
-      §B{~result} (+ x 10)
-      §R result
-    §FI
-      §P "cleanup"
+module FinallyReturn FinallyReturn block
+  func WithFinally (int:x) → int
+    !
+    var result = 0
+    try
+      var result = (x + 10)
+      return result
+    finally
+      Console.WriteLine("cleanup")
 
-  §F{f2:FinallyNoReturn:pub} (i32:x) -> i32
-    §B{~result} 0
-    §TR{t1}
-      §B{~result} (+ x 10)
-    §CA{Exception:e}
-      §B{~result} -1
-    §FI
-      §P "finally executed"
-    §R result
+  func FinallyNoReturn (int:x) → int
+    !
+    var result = 0
+    try
+      var result = (x + 10)
+    catch Exception:e
+      var result = -1
+    finally
+      Console.WriteLine("finally executed")
+    return result
 
-  §F{f3:TryOnlyFinally:pub} () -> void
-    §E{cw}
-    §TR{t1}
-      §P "try block"
-    §FI
-      §P "finally block"
-
+  func TryOnlyFinally () → void
+    ! cw
+    try
+      Console.WriteLine("try block")
+    finally
+      Console.WriteLine("finally block")

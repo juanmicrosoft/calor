@@ -1,0 +1,99 @@
+module L3M01 L3M01 block
+  module L3M01Module public
+
+    func l3m01_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23633)
+      let int:total = ((x * 2) + y)
+      if (total > 23633)
+        return 23633
+      return total
+
+    func l3m01_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 84)
+
+    func l3m01_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 3)
+      requires (y >= 0)
+      => (result >= 23640)
+      let int:total = ((x * 5) + y)
+      if (total < 23640)
+        return 23640
+      else
+        return total
+
+    func l3m01_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23647)
+      let int:total = ((x * 5) + y)
+      if (total > 23647)
+        return 23647
+      return total
+
+    func l3m01_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 65)
+
+    func l3m01_fn06 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 22)
+
+    func l3m01_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 7)
+      requires (y >= 0)
+      => (result >= 23654)
+      let int:total = ((x * 3) + y)
+      if (total < 23654)
+        return 23654
+      else
+        return total
+
+    func l3m01_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23661)
+      let int:total = ((x * 3) + y)
+      if (total > 23661)
+        return 23661
+      return total
+
+    func l3m01_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 51)
+
+    func l3m01_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 63)
+
+    func l3m01_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23668)
+      let int:total = ((x * 2) + y)
+      if (total > 23668)
+        return 23668
+      return total
+
+    func l3m01_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23675)
+      let int:total = ((x * 3) + y)
+      if (total > 23675)
+        return 23675
+      return total
+
+    func l3m01_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 16)

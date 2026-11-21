@@ -1,0 +1,17 @@
+module OptionType OptionType
+  module OptionTypeModule
+    func HasValue public (bool:isSome) → bool
+      !
+      return isSome
+
+    func Unwrap public (int:value, bool:isSome) → int
+      !
+      requires isSome == true
+      return value
+
+    func GetOrElse public (int:value, int:fallback, bool:isSome) → int
+      !
+      if isSome
+        return value
+      else
+        return fallback

@@ -4,26 +4,39 @@ using System.Text.Json;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Incremental;
 using Calor.Compiler.Migration;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Compiler.Effects;
 
-internal sealed class CrossModuleTypeRegistry
+internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
 {
     private readonly Dictionary<string, List<TypeDefinitionNode>> _types = new(StringComparer.Ordinal);
     private readonly Dictionary<AstNode, ModuleNode> _modules = new();
     private readonly List<UsingDirectiveNode> _globalUsings;
     private readonly IReadOnlyDictionary<string, string>? _sourceHashes;
+    private readonly IReadOnlyDictionary<ModuleNode, string> _sourcePaths;
+    private readonly Dictionary<ContractMode, IReadOnlyList<SourceProjection>> _projections = [];
+    private readonly Dictionary<ContractMode, CallGraphAnalysis.SharedProjectionImage?> _sharedImages = [];
+    private IReadOnlyDictionary<string, CrossModuleFunctionTarget>? _crossModuleFunctions;
+    private bool _crossModuleFunctionsBuilt;
+    private readonly Dictionary<ModuleNode, (Binder Binder, DiagnosticBag Diagnostics)> _declarationBinders = [];
 
     internal string Fingerprint { get; }
     internal bool HasTypes => _types.Count != 0;
 
     private CrossModuleTypeRegistry(
         IReadOnlyList<ModuleNode> modules,
-        IReadOnlyDictionary<string, string>? sourceHashes)
+        IReadOnlyDictionary<string, string>? sourceHashes,
+        IReadOnlyDictionary<ModuleNode, string>? sourcePaths = null)
     {
         _sourceHashes = sourceHashes;
+        _sourcePaths = sourcePaths ?? new Dictionary<ModuleNode, string>();
         _globalUsings = modules.SelectMany(module => module.Usings)
             .Where(directive => directive.IsGlobal).ToList();
         foreach (var module in new PartialClassMerger().Merge(modules))
@@ -60,12 +73,274 @@ internal sealed class CrossModuleTypeRegistry
             }))
             .OrderBy(declaration => declaration, StringComparer.Ordinal);
         Fingerprint = Convert.ToHexString(SHA256.HashData(
-            Encoding.UTF8.GetBytes(string.Join("\n", declarations))));
+            Encoding.UTF8.GetBytes(string.Join("\n", declarations)
+                + "\n" + string.Join("\n", sourceHashes?.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => pair.Key + "=" + pair.Value) ?? []))));
     }
 
     internal static CrossModuleTypeRegistry Build(
         IReadOnlyList<ModuleNode> modules,
         IReadOnlyDictionary<string, string>? sourceHashes = null) => new(modules, sourceHashes);
+
+    internal static CrossModuleTypeRegistry Build(
+        IReadOnlyList<(ModuleNode Module, string Path)> sources,
+        IReadOnlyDictionary<string, string> sourceHashes) => new(
+            sources.Select(source => source.Module).ToArray(), sourceHashes,
+            sources.ToDictionary(source => source.Module, source => Path.GetFullPath(source.Path)));
+
+    public IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode)
+    {
+        if (!Contains(sourcePath))
+            return [];
+        return Projections(mode).Where(source =>
+            !BuildStateCache.GetPathComparer().Equals(source.Path, Path.GetFullPath(sourcePath!))).ToArray();
+    }
+
+    public CallGraphAnalysis.SharedProjectionImage? SharedImage(string? sourcePath, ContractMode mode)
+    {
+        if (!Contains(sourcePath))
+            return null;
+        var projections = Projections(mode);
+        lock (_sharedImages)
+        {
+            if (!_sharedImages.TryGetValue(mode, out var image))
+                _sharedImages[mode] = image = CallGraphAnalysis.SharedProjectionImage.Create(
+                    projections, mode, CrossModuleFunctions());
+            return image;
+        }
+    }
+
+    private bool Contains(string? sourcePath) => sourcePath is not null
+        && _sourcePaths.Values.Contains(Path.GetFullPath(sourcePath), BuildStateCache.GetPathComparer());
+
+    // Qualify cross-module calls exactly as the driver's emission does. An
+    // unqualified call into another module is CS0103 in its companion, and
+    // any companion error voids every Roslyn proof in the file being bound.
+    private IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctions()
+    {
+        lock (_projections)
+        {
+            if (!_crossModuleFunctionsBuilt)
+            {
+                _crossModuleFunctions = _sourcePaths.Count > 1
+                    ? CompilationDriver.BuildCrossModuleFunctionMap(_sourcePaths.Keys.ToList())
+                    : null;
+                _crossModuleFunctionsBuilt = true;
+            }
+            return _crossModuleFunctions;
+        }
+    }
+
+    // Every module's plain projection for one contract mode, emitted once per registry.
+    private IReadOnlyList<SourceProjection> Projections(ContractMode mode)
+    {
+        var crossModuleFunctions = CrossModuleFunctions();
+        lock (_projections)
+        {
+            if (_projections.TryGetValue(mode, out var projections))
+                return projections;
+            var emitted = new List<SourceProjection>();
+            foreach (var (module, path) in _sourcePaths)
+            {
+                var callables = new List<AstNode>();
+                var marker = "calor-source-callable-" + Guid.NewGuid().ToString("N") + ":";
+                var diagnostics = new DiagnosticBag();
+                var emitter = new CSharpEmitter(mode, null, null, diagnostics: diagnostics)
+                {
+                    CrossModuleFunctionModules = crossModuleFunctions,
+                    AnnotateSource = (_, text) => text,
+                    CallableOrigin = declaration =>
+                    {
+                        var index = callables.Count;
+                        callables.Add(declaration);
+                        return $"/*{marker}{index}*/";
+                    }
+                };
+                var text = emitter.Emit(module);
+                if (diagnostics.HasErrors)
+                    throw new InvalidOperationException(
+                        $"Cannot project source '{path}': "
+                        + string.Join("; ", diagnostics.Errors.Select(error => error.Message)));
+                emitted.Add(new(module, path, text, marker, callables));
+            }
+            _projections[mode] = projections = emitted;
+            return projections;
+        }
+    }
+
+    public SourceCallable? FindCallable(AstNode declaration)
+    {
+        if (declaration is not MethodNode method)
+            return null;
+        var owner = _sourcePaths.Keys.SelectMany(CallGraphAnalysis.EnumerateClasses)
+            .FirstOrDefault(candidate => CallGraphAnalysis.EnumerateMethods(candidate)
+                .Any(member => ReferenceEquals(member, method)));
+        if (owner is null)
+            return null;
+        var module = _sourcePaths.Keys.First(candidate =>
+            CallGraphAnalysis.EnumerateClasses(candidate).Contains(owner));
+        if (!_declarationBinders.TryGetValue(module, out var binding))
+        {
+            var diagnostics = new DiagnosticBag();
+            var binder = new Binder(diagnostics, _sourcePaths[module])
+            {
+                ResolveSourceCallConversions = false
+            };
+            binder.Bind(module, null, declarationsOnly: true);
+            _declarationBinders[module] = binding = (binder, diagnostics);
+        }
+        return binding.Diagnostics.HasErrors ? null
+            : new(method, owner, binding.Binder.FunctionSymbols[method], binding.Binder.ClassSymbols[owner]);
+    }
+
+    internal bool CanReuseIndependentOutput(string sourcePath, string output,
+        IReadOnlyDictionary<string, string> previousOutputs, ContractMode mode,
+        IReadOnlySet<string>? previousNativeGlobalModules = null)
+    {
+        if (_sourceHashes is null || _sourceHashes.Count != _sourcePaths.Count
+            || _sourcePaths.Count != previousOutputs.Count
+            || _sourcePaths.Keys.Any(module => !HasOnlyNativeNodes(module))
+            || !_sourcePaths.Values.Contains(Path.GetFullPath(sourcePath), BuildStateCache.GetPathComparer())
+            || !_sourcePaths.Values.All(previousOutputs.ContainsKey))
+            return false;
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in CompanionSources(sourcePath, mode))
+        {
+            var shared = previousNativeGlobalModules?.Contains(source.Path) == true
+                && IsNativeGlobalModule(source.Module);
+            if (!CollectContainerNames(source.Source, names, shared)
+                || !CollectContainerNames(previousOutputs[source.Path], names, shared))
+                return false;
+        }
+        var ownSharedModule = previousNativeGlobalModules?.Contains(sourcePath) == true
+            && IsNativeGlobalModule(_sourcePaths.Single(source =>
+                BuildStateCache.GetPathComparer().Equals(source.Value, Path.GetFullPath(sourcePath))).Key);
+        var root = CSharpSyntaxTree.ParseText(output).GetRoot();
+        // Inactive branches are disabled trivia, not syntax names.
+        if (root.ContainsDiagnostics || HasUnprovenTrivia(root))
+            return false;
+        // Only a proven native function wrapper may share its owner. Its member
+        // names and explicit GlobalModule references still participate in lookup.
+        return !root.DescendantNodes().OfType<SimpleNameSyntax>()
+                   .Any(name => names.Contains(name.Identifier.ValueText))
+            && !root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>()
+                   .Any(type => names.Contains(type.Identifier.ValueText)
+                       && !(ownSharedModule && IsSharedContainer(type)))
+            && !root.DescendantNodes().OfType<DelegateDeclarationSyntax>()
+                   .Any(type => names.Contains(type.Identifier.ValueText));
+
+        static bool HasUnprovenTrivia(SyntaxNode root) =>
+            root.DescendantTrivia(descendIntoTrivia: true).Any(trivia =>
+                trivia.IsKind(SyntaxKind.DisabledTextTrivia)
+                || trivia.IsDirective && trivia.GetStructure() is not
+                    (NullableDirectiveTriviaSyntax or LineDirectiveTriviaSyntax));
+
+        static bool IsSharedContainer(BaseTypeDeclarationSyntax type) =>
+            type is ClassDeclarationSyntax { Parent: CompilationUnitSyntax } cls
+            && cls.Identifier.ValueText == "GlobalModule"
+            && cls.Modifiers.Any(SyntaxKind.StaticKeyword)
+            && cls.Modifiers.Any(SyntaxKind.PartialKeyword)
+            && cls.TypeParameterList is null && cls.BaseList is null
+            && cls.AttributeLists.Count == 0;
+
+        // The wrapper the emitter writes for a namespaced module's top-level
+        // functions: `namespace N.M { public static partial class MModule { ... } }`
+        // (#1732). A companion declaring it is accepted like a non-partial static
+        // class: its own name, its namespace's names and every member name go into
+        // `names`, and its members must pass the same per-member rules.
+        //
+        // Why `partial` does not break the proof. A partial type gains members only
+        // from other declarations of the SAME type: same namespace, same name.
+        // - Other Calor outputs. If the output being reused declares or mentions
+        //   that type, its simple name is in `names` (collected from the old AND new
+        //   text of every companion), so the BaseTypeDeclaration and SimpleName
+        //   checks below reject it. Only the shared GlobalModule may be exempt, and
+        //   only with native provenance in both snapshots; a namespaced wrapper never
+        //   is. So no reused output can share a partial wrapper with an edited
+        //   module, and the test is by simple name, coarser than namespace + name.
+        // - Hand-written C# partials in an MSBuild project. They cannot change Calor
+        //   emission or Calor diagnostics: the per-file compile reads only Calor
+        //   sources, the companion projections built here, options and referenced
+        //   assemblies (all fingerprinted); CompileCalor passes project .cs files
+        //   only to generated-output validation. That validation, and csc, run over
+        //   every output, cached or fresh, plus the project sources on every build,
+        //   so a conflict with a hand-written partial still fails the build that
+        //   introduces it. This premise is not new: a single-file build has never
+        //   keyed its cache on hand-written C#.
+        // A user-declared `partial` module (any other class name) keeps the
+        // conservative rejection, as do generic, based or attributed wrappers.
+        static bool IsNamespacedModuleWrapper(ClassDeclarationSyntax type) =>
+            type.Parent is BaseNamespaceDeclarationSyntax ns
+            && type.Modifiers.Any(SyntaxKind.PartialKeyword)
+            && type.Identifier.ValueText == RightmostName(ns.Name) + "Module";
+
+        static string RightmostName(NameSyntax name) => name switch
+        {
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            AliasQualifiedNameSyntax alias => alias.Name.Identifier.ValueText,
+            _ => ""
+        };
+
+        static bool CollectContainerNames(string source, HashSet<string> names, bool shared)
+        {
+            var root = CSharpSyntaxTree.ParseText(source,
+                new CSharpParseOptions(LanguageVersion.Preview)).GetCompilationUnitRoot();
+            if (root.ContainsDiagnostics || root.AttributeLists.Count != 0
+                || root.DescendantNodes().OfType<UsingDirectiveSyntax>()
+                    .Any(directive => directive.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword))
+                || HasUnprovenTrivia(root))
+                return false;
+            return root.Members.All(Collect);
+
+            bool Collect(MemberDeclarationSyntax member)
+            {
+                switch (member)
+                {
+                    case BaseNamespaceDeclarationSyntax ns:
+                        foreach (var name in ns.Name.DescendantNodesAndSelf().OfType<SimpleNameSyntax>())
+                            names.Add(name.Identifier.ValueText);
+                        return ns.Members.All(Collect);
+                    case ClassDeclarationSyntax type when type.Modifiers.Any(SyntaxKind.StaticKeyword)
+                        && (!type.Modifiers.Any(SyntaxKind.PartialKeyword)
+                            || shared && IsSharedContainer(type)
+                            || IsNamespacedModuleWrapper(type))
+                        && type.TypeParameterList is null && type.BaseList is null
+                        && type.AttributeLists.Count == 0:
+                        names.Add(type.Identifier.ValueText);
+                        return type.Members.All(Collect);
+                    case MethodDeclarationSyntax method when method.Modifiers.Any(SyntaxKind.StaticKeyword)
+                        && method.AttributeLists.Count == 0
+                        && !method.ParameterList.Parameters.Any(parameter =>
+                            parameter.Modifiers.Any(SyntaxKind.ThisKeyword)):
+                        names.Add(method.Identifier.ValueText);
+                        return true;
+                    default:
+                        // Instance/partial types, initialization, constants,
+                        // operators and implicit extension lookup retain the
+                        // complete source fingerprint's conservative invalidation.
+                        return false;
+                }
+            }
+        }
+    }
+
+    internal static bool IsNativeGlobalModule(ModuleNode? module) =>
+        module is { Functions.Count: > 0 }
+        && module.Classes.Count == 0 && module.Interfaces.Count == 0
+        && module.Enums.Count == 0 && module.EnumExtensions.Count == 0
+        && module.Delegates.Count == 0 && module.RefinementTypes.Count == 0
+        && module.IndexedTypes.Count == 0
+        && module.Functions.All(function =>
+            CrossModuleFunctionTarget.Create(module, function) is { NamespaceIdentity.Length: 0 })
+        && HasOnlyNativeNodes(module);
+
+    internal static bool HasOnlyNativeNodes(AstNode node) =>
+        node is not (CSharpInteropBlockNode or RawCSharpNode or RawCSharpExpressionNode
+            or CompilerDirectiveNode or PreprocessorDirectiveNode
+            or TypePreprocessorBlockNode or MemberPreprocessorBlockNode)
+        && RecursiveAstWalker.GetAllChildren(node).All(HasOnlyNativeNodes);
 
     internal bool MatchesSourceHash(string path, string hash) =>
         _sourceHashes == null
@@ -76,6 +351,14 @@ internal sealed class CrossModuleTypeRegistry
         if (!MatchesSourceHash(path, BuildStateCache.ComputeContentHash(bytes)))
             throw new IOException(
                 $"Source '{path}' changed after cross-module declaration collection. Retry compilation.");
+    }
+
+    internal void EnsureSourceSnapshots()
+    {
+        if (_sourceHashes is null)
+            return;
+        foreach (var path in _sourceHashes.Keys)
+            EnsureSourceSnapshot(path, File.ReadAllBytes(path));
     }
 
     private static object MethodContract(

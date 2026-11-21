@@ -69,9 +69,9 @@ With `--format json` stdout carries exactly one
 moves to stderr, and a document is emitted on every path (including missing
 files). Exit codes are unchanged.
 
-```json
+```json illustrative
 {
-  "version": "1.1",
+  "version": "2.0",
   "command": "format",
   "diagnostics": [
     { "code": "Calor1340", "message": "File not found: …", "severity": "error",
@@ -120,8 +120,8 @@ This allows you to preview changes before applying them.
 ## Safe write mode
 
 Issue #760 is closed at the architecture boundary: source formatting no longer
-round-trips through the trivia-free AST and no formatter regex rewrites tag
-fields. `--write`, `lint --fix`, and LSP formatting use the same lossless
+round-trips through the trivia-free AST and no formatter regex rewrites
+declaration tokens. `--write`, `lint --fix`, and LSP formatting use the same lossless
 formatter and validation gates.
 
 Before replacing a file, Calor requires:
@@ -192,18 +192,21 @@ calor format Broken.calr --heal --check
 
 What it repairs:
 
-- **Forbidden structural closers** (`§/F`, `§/M`, …, `Calor0830`) are stripped; lines left empty by the strip are deleted
+- **Retired grammar is not migrated.** Legacy headers and closers remain
+  diagnostics; healing does not turn them into accepted native source.
 - **Indentation** is re-derived from the file's own relative nesting and normalized to 2 spaces per level (tabs expanded, 3-/4-space levels collapsed, misaligned dedents snapped to the nearest enclosing level)
-- **Chain clauses** (`§EI`/`§EL` for `§IF`, `§CA`/`§FI` for `§TR`) are re-aligned to the column of the opener they belong to
+- **Chain clauses** (`else` for `if`, `catch`/`finally` for `try`, and the
+  trailing `while` for `do`) are re-aligned to their opener's column
 - **Whitespace**: trailing whitespace stripped, CRLF → LF
 
-`§RAW`/`§CSHARP` payloads and multi-line bracketed expressions are preserved
-verbatim. The transform is idempotent: healing already-healed output changes
-nothing.
+Strings and converter-owned counted raw C# frames are shielded from line-based
+rewriting. Bracket-continuation indentation is preserved. These protections do
+not make healing lossless: eligible line endings outside protected regions
+normalize to LF. Healing already-healed output changes nothing.
 
 > **Warning — heal is NOT semantics-preserving.**
 > Healing guesses the author's intent. In particular, a statement written at
-> the same column as a misplaced `§EI`/`§EL` is *re-anchored into that
+> the same column as a misplaced `else` is *re-anchored into that
 > clause's body* — it could equally have been meant as a statement after the
 > if-chain. Every such control-flow guess is reported as a warning with its
 > `file:line` (and `--check` prints an `ambiguousDecisions` count per file).
@@ -230,15 +233,13 @@ MyModule.calr
 --- original
 +++ formatted
 @@ -5,7 +5,7 @@
- §F{f001:Calculate:pub}
-   §I{i32:a}
-   §I{i32:b}
--  §O{i32}
-+  §O{i32}
-   §Q (> a 0)
--§Q(>b 0)
-+  §Q (> b 0)
-   §R (+ a b)
+ module Math
+-    func Add (int:a, int:b) → int
+-        !
+-        return a + b
++  func Add (int:a, int:b) → int
++    !
++    return a + b
 ```
 
 Changes are highlighted:
@@ -271,26 +272,26 @@ The lossless Calor formatter applies these rules:
 ### Encoding and IDs
 
 - UTF-8, UTF-8 BOM, UTF-16 LE/BE BOM, and UTF-32 LE/BE BOM are retained
-- Structural IDs are never canonicalized by formatting. Use the dedicated
-  `calor fix --compact-ids` migration for ID changes; it classifies explicit
-  structural marker kinds rather than applying a generic identifier regex
+- Declaration IDs live in `.calor/ids.json`, not source. Formatting does not
+  rename declarations or reconcile ambiguous identity changes. The obsolete
+  `calor fix --compact-ids` migration option has been removed.
 
 ### Before and After
 
 ```calor
-// Before (inconsistent)
-§M{m001:Math}
+module FormatExample
     /// Adds two values.
-    §F{f001:Add:pub} (i32:a, i32:b) -> i32
-        §R (+ a b)
+    func Add (int:a, int:b) → int
+        !
+        return a + b
 ```
 
 ```calor
-// After (formatted)
-§M{m001:Math}
+module FormatExample
   /// Adds two values.
-  §F{f001:Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+  func Add (int:a, int:b) → int
+    !
+    return a + b
 ```
 
 ---

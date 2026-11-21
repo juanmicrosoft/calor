@@ -87,9 +87,10 @@ public class FormatCommandTests : IDisposable
     public void Format_SingleFile_ProducesFormattedOutput()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -105,12 +106,10 @@ public class FormatCommandTests : IDisposable
     public void Format_SingleFile_OutputIsDeterministic()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-        §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -131,9 +130,10 @@ public class FormatCommandTests : IDisposable
     {
         // Format the same source twice
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var filePath1 = CreateTestFile("test1.calr", source);
         var filePath2 = CreateTestFile("test2.calr", source);
@@ -152,9 +152,10 @@ public class FormatCommandTests : IDisposable
     public void Format_NotFormatted_OriginalDiffersFromFormatted()
     {
         // Source with inconsistent formatting (extra whitespace, etc.)
-        var source = @"§M{m001:Test}
-  §F{f001:Main:pub}
-    §O{void}";
+        var source = @"module Test Test block
+  func Main () → void
+    !
+    return";
         var filePath = CreateTestFile("test.calr", source);
 
         var result = FormatFile(filePath);
@@ -173,9 +174,10 @@ public class FormatCommandTests : IDisposable
     public void Format_WriteMode_ModifiesFile()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var filePath = CreateTestFile("test.calr", source);
         var originalContent = File.ReadAllText(filePath);
@@ -194,12 +196,10 @@ public class FormatCommandTests : IDisposable
     public void Format_WriteMode_PreservesSemantics()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-        §R (+ x y)
+module Test Test block
+  func Add (int:x, int:y) → int
+    !
+    return (x + y)
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -235,8 +235,8 @@ public class FormatCommandTests : IDisposable
     public void Format_InvalidSyntax_ReportsParseErrors()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
+§M{Test}
+  §F{Main:pub}
       §O{void}
         §INVALID_TOKEN
 ";
@@ -268,7 +268,7 @@ public class FormatCommandTests : IDisposable
     public void Format_CalorExtension_Processes()
     {
         var source = @"
-§M{m001:Test}
+module Test Test block
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -293,7 +293,7 @@ public class FormatCommandTests : IDisposable
     public void Format_CaseInsensitiveExtension_Processes()
     {
         var source = @"
-§M{m001:Test}
+module Test Test block
 ";
         // Test with uppercase extension
         var filePath = CreateTestFile("test.CALR", source);
@@ -314,13 +314,13 @@ public class FormatCommandTests : IDisposable
     public void Format_MultipleFiles_AllProcessed()
     {
         var source1 = @"
-§M{m001:Test1}
+module Test1 Test1 block
 ";
         var source2 = @"
-§M{m002:Test2}
+module Test2 Test2 block
 ";
         var source3 = @"
-§M{m003:Test3}
+module Test3 Test3 block
 ";
         var file1 = CreateTestFile("test1.calr", source1);
         var file2 = CreateTestFile("test2.calr", source2);
@@ -338,58 +338,8 @@ public class FormatCommandTests : IDisposable
         Assert.Contains("Test2", result2.Formatted);
         Assert.Contains("Test3", result3.Formatted);
     }
-
     #endregion
-
     #region Semantics-version refusal (#1084 item 1 / #1087)
-
-    /// <summary>
-    /// `calor format --check` on a §SEMVER{1.0.0} file must not exit 0: the lexer/parser
-    /// pipeline the formatter shares with the compiler refuses the retired major with
-    /// Calor0701, and the formatter reports that as a failed file (exit 2). The text
-    /// mode prints the diagnostic message on stderr; the JSON envelope on stdout
-    /// carries the code itself, so both are asserted.
-    /// </summary>
-    [Fact]
-    public async Task FormatCheck_LegacySemver_ExitsNonZero_WithCalor0701()
-    {
-        var file = CreateTestFile("legacy.calr", """
-            §M{m001:Legacy}
-              §SEMVER{1.0.0}
-              §F{f001:Answer:pub} () -> i32
-                §E{}
-                §R INT:42
-
-            """);
-
-        var originalOut = Console.Out;
-        var originalError = Console.Error;
-        var capturedOut = new StringWriter();
-        var capturedError = new StringWriter();
-        Console.SetOut(capturedOut);
-        Console.SetError(capturedError);
-        try
-        {
-            var textExit = await System.CommandLine.CommandExtensions.InvokeAsync(
-                Commands.FormatCommand.Create(), ["--check", file]);
-            Assert.NotEqual(0, textExit);
-
-            var jsonExit = await System.CommandLine.CommandExtensions.InvokeAsync(
-                Commands.FormatCommand.Create(), ["--check", "--format", "json", file]);
-            Assert.NotEqual(0, jsonExit);
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-        }
-
-        // Text mode: the Calor0701 message (with the migration pointer) reaches stderr.
-        Assert.Contains("refuses files written for an older major", capturedError.ToString());
-        Assert.Contains("issues/1084", capturedError.ToString());
-        // JSON envelope: the diagnostic code itself is on stdout.
-        Assert.Contains("Calor0701", capturedOut.ToString());
-    }
 
     #endregion
 

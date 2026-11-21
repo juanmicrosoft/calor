@@ -39,6 +39,19 @@ public sealed class ConversionResult
     public ConversionPathSummary Paths => ConversionPathSummary.From(this);
 }
 
+/// <summary>One output of an explicitly multi-file conversion, in source namespace order.</summary>
+public sealed record ConversionOutput(string FileName, ConversionResult Conversion);
+
+/// <summary>
+/// Project conversion outputs. Unsupported topologies retain the ordinary single-file result;
+/// a failed split never exposes a partially converted output set.
+/// </summary>
+public sealed record ProjectConversionResult(IReadOnlyList<ConversionOutput> Outputs)
+{
+    public bool Success => Outputs.Count > 0 && Outputs.All(output => output.Conversion.Success);
+    public bool IsSplit => Outputs.Count > 1;
+}
+
 /// <summary>
 /// Fidelity contract for C# to Calor conversion.
 /// </summary>
@@ -96,6 +109,8 @@ public sealed class ConversionOptions
     /// <summary>
     /// Fidelity contract for conversion. Lossless is the safe default; lossy
     /// substitutions and drops require explicit caller opt-in.
+    /// Lossy interop lowering retains a uniform annotation-disabled source context,
+    /// but does not certify effects or flatten lexical nullable directives.
     /// </summary>
     public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
 
@@ -208,6 +223,12 @@ public sealed class ConversionOptions
     public OutputKind OutputKind { get; set; } = OutputKind.DynamicallyLinkedLibrary;
 
     /// <summary>
+    /// Apply the System-only project import to original and generated C# equally.
+    /// False selects standalone validation; preserved source is never rewritten.
+    /// </summary>
+    public bool IncludeImplicitSystemUsing { get; set; }
+
+    /// <summary>
     /// Evaluated project nullable context used by semantic conversion. Per-file
     /// <c>#nullable</c> directives continue to override this compilation default.
     /// </summary>
@@ -236,31 +257,12 @@ public sealed class ConversionOptions
     public bool PassthroughOnError { get; set; } = false;
 
     /// <summary>
-    /// When the emitted Calor PARSES but does not survive the C# round trip,
-    /// preserve the offending member's original C# as a §CSHARP interop block
-    /// (#717's rewrap, extended by review C1(b)) instead of letting round-trip
-    /// validation fail the whole conversion — and only in a C#-preserving mode
-    /// (<see cref="ConversionContext.ShouldPreserveCSharp"/>: Lossless fidelity,
-    /// Interop mode, or <see cref="PassthroughOnError"/>). Setting this flag alone
-    /// in a mode that does not preserve C# changes nothing: there is no original
-    /// C# kept to rewrap with, so the conversion still reports the failure.
-    ///
-    /// <para>The axis is what the CALLER does on failure, not the mode it asked
-    /// for. The CLI discards the output entirely when conversion fails, so
-    /// rewrapping one member is strictly better than writing nothing, and no
-    /// consumer is left holding a degraded tree — <c>ConvertCommand</c> therefore
-    /// sets this true. Library callers read <see cref="ConversionResult.Ast"/>
-    /// even when <see cref="ConversionResult.Success"/> is false and must keep the
-    /// natively converted tree, so the default is false.</para>
+    /// Explicit rescue preference, recorded separately from fidelity.
+    /// Lossless conversion already rescues unusable output at member, type,
+    /// and whole-file boundaries without requiring this flag.
+    /// Historical lossy producers may request rescue in C#-preserving modes.
     /// </summary>
     public bool RescueUnusableMembers { get; set; } = false;
-
-    /// <summary>
-    /// Whether the emitter should elide `§/C` for zero-argument calls (v0.6.1 default behaviour).
-    /// Set to <c>false</c> to produce v0.6.0-compatible output that always emits explicit `§/C` closers.
-    /// Default is <c>true</c> (matches <see cref="ConversionContext.UseImplicitCallCloser"/>).
-    /// </summary>
-    public bool UseImplicitCallCloser { get; set; } = true;
 
     /// <summary>
     /// Whether lossless conversion validates generated C# as a standalone unit.
@@ -339,9 +341,746 @@ public sealed class CSharpToCalorConverter
         string csharpSource,
         string? sourceFile,
         CancellationToken cancellationToken)
+        => ConvertSingleFile(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
+
+    /// <summary>
+    /// 0.30: a file that is exactly one namespace with its own imports converts through the
+    /// scoped-import projection by default, as <c>calor convert</c> does (ConversionWriteTransaction).
+    /// That path compiles the original and certifies that declared metadata is unchanged; when it
+    /// refuses, the ordinary single-file path (preservation included) decides the file.
+    /// </summary>
+    private ConversionResult ConvertSingleFile(
+        string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
+    {
+        if (IsSingleScopedNamespace(csharpSource, sourceFile)
+            && ConvertProjectCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext)
+                .Outputs.Single().Conversion is { Success: true } scoped)
+            return scoped;
+        // The scoped path refuses an original it cannot compile (for example standalone code that
+        // relies on an implicit System import); the ordinary single-file path decides that file.
+        return ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+    }
+
+    /// <summary>
+    /// Explicitly allows native scoped imports and separate files for distinct top-level namespace blocks.
+    /// Each visitor uses the complete original syntax tree and project semantic context.
+    /// Other topologies and non-native conversions retain the single-result fidelity contract.
+    /// </summary>
+    public ProjectConversionResult ConvertProject(
+        string csharpSource, string? sourceFile = null, CancellationToken cancellationToken = default)
+        => ConvertProjectCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext: false);
+
+    internal ProjectConversionResult ConvertProjectCore(
+        string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        var tree = CSharpSyntaxTree.ParseText(
+            csharpSource, parseOptions, sourceFile ?? "", cancellationToken: cancellationToken);
+        var root = tree.GetCompilationUnitRoot(cancellationToken);
+        var namespaces = GetSplittableNamespaces(root);
+        var scopedImports = CanConvertScopedNamespaceImports(root);
+        if (namespaces.Count == 0 && !scopedImports)
+            return Single();
+        if (_options.Fidelity != ConversionFidelity.Lossless
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches)
+            return Single("Native namespace splitting requires lossless, all-branches conversion.");
+        var missingReferences = _options.References.Where(reference => !File.Exists(reference.Path)).ToArray();
+        if (missingReferences.Length > 0)
+        {
+            var context = CreateContext(sourceFile);
+            foreach (var reference in missingReferences)
+                context.AddError($"Namespace splitting requires the supplied reference: {reference.Path}",
+                    "namespace-split-source-validation");
+            return new([new(Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr"),
+                new ConversionResult { Success = false, Context = context })]);
+        }
+
+        // A missing sibling/reference is not authority to guess a selected source symbol.
+        var original = CSharpCompilation.Create("NamespaceSplitAnalysis",
+            GeneratedCSharpCompiler.AddImplicitUsings(
+                new[] { tree }.Concat(_options.AdditionalSemanticSyntaxTrees
+                    .Where(sibling => !IsSameSyntaxTree(sibling, tree))),
+                _options.IncludeImplicitSystemUsing),
+            GetSemanticMetadataReferences(),
+            new CSharpCompilationOptions(_options.OutputKind, allowUnsafe: true)
+                .WithNullableContextOptions(_options.NullableContextOptions ?? NullableContextOptions.Disable));
+        var originalErrors = original.GetDiagnostics(cancellationToken)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (originalErrors.Length > 0)
+        {
+            var context = CreateContext(sourceFile);
+            foreach (var error in originalErrors)
+                context.AddError($"Original C# cannot be split ({error.Id}): {error.GetMessage()}",
+                    "namespace-split-source-validation");
+            return new([new(Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr"),
+                new ConversionResult { Success = false, Context = context })]);
+        }
+
+        var outputs = new List<ConversionOutput>();
+        var originalSemanticModel = original.GetSemanticModel(tree);
+        for (var index = 0; index < (scopedImports ? 1 : namespaces.Count); index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = ConvertCore(csharpSource, sourceFile, cancellationToken,
+                capturePreservationContext, scopedImports ? null : namespaces[index].SpanStart,
+                originalSemanticModel, allowScopedNamespaceImports: scopedImports);
+            if (scopedImports)
+                result = TryConvertObliviousModule(csharpSource, sourceFile, result,
+                    cancellationToken, capturePreservationContext, allowScopedNamespaceImports: true);
+            if (!result.Success || result.Losses.Count != 0)
+                return Single("A namespace did not convert entirely natively.", result);
+            outputs.Add(new(scopedImports
+                ? Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr")
+                : GetNamespaceOutputPath(Path.GetFileName(sourceFile ?? "input.cs"), index), result));
+        }
+
+        var generated = new List<GeneratedCSharpSource>();
+        var modules = new List<ModuleNode>();
+        foreach (var output in outputs)
+        {
+            if (output.Conversion.CalorSource is not { } source || TryParseModule(source) is not { } module)
+                return Single("An emitted namespace module could not be parsed.");
+            modules.Add(module);
+        }
+        var registry = CrossModuleTypeRegistry.Build(modules);
+        foreach (var output in outputs)
+        {
+            var compiled = Program.Compile(output.Conversion.CalorSource!, null, new CompilationOptions
+            {
+                CrossModuleTypes = registry,
+                ProjectDirectory = _options.ProjectDirectory,
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+                DeferGeneratedOutputValidation = true,
+                CancellationToken = cancellationToken
+            });
+            if (compiled.HasErrors)
+                return Single("Native split Calor failed compilation: "
+                    + string.Join("; ", compiled.Diagnostics.Errors.Select(error => error.Message)));
+            generated.Add(new(compiled.GeneratedCode, output.FileName));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        var validation = GeneratedCSharpCompiler.Validate(generated, new GeneratedCSharpCompilationContext
+        {
+            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+            LanguageVersion = parseOptions.LanguageVersion,
+            DocumentationMode = parseOptions.DocumentationMode,
+            Features = parseOptions.Features,
+            PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
+            References = _options.References.Select(reference =>
+                new GeneratedCSharpReference(reference.Path, reference.Aliases)),
+            AdditionalSources = _options.AdditionalSemanticSyntaxTrees
+                .Where(sibling => !IsSameSyntaxTree(sibling, tree))
+                .Select(sibling => new GeneratedCSharpSource(
+                    sibling.GetText(cancellationToken).ToString(), sibling.FilePath)),
+            OutputKind = _options.OutputKind,
+            NullableContextOptions = _options.NullableContextOptions ?? NullableContextOptions.Disable
+        });
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!validation.CompilationSuccess)
+            return Single("The complete split output set failed C# validation: "
+                + string.Join("; ", validation.CompilationErrors.Select(error => error.GetMessage())));
+        if (scopedImports)
+        {
+            var generatedTree = CSharpSyntaxTree.ParseText(
+                generated.Single().Text, parseOptions, cancellationToken: cancellationToken);
+            var generatedCompilation = original.ReplaceSyntaxTree(tree, generatedTree);
+            var before = DeclaredTypeMetadata(original.GetSemanticModel(tree), root);
+            var after = DeclaredTypeMetadata(generatedCompilation.GetSemanticModel(generatedTree),
+                generatedTree.GetCompilationUnitRoot(cancellationToken));
+            if (!before.SequenceEqual(after, StringComparer.Ordinal))
+                return Single("Native scoped imports changed declared type/nullability metadata. Original: "
+                    + string.Join("; ", before.Except(after, StringComparer.Ordinal))
+                    + ". Generated: " + string.Join("; ", after.Except(before, StringComparer.Ordinal)));
+        }
+        foreach (var output in outputs)
+            output.Conversion.Context.RoundTrip = ConversionRoundTrip.Verified;
+        return new(outputs);
+
+        ProjectConversionResult Single(string? reason = null, ConversionResult? rejectedCandidate = null)
+        {
+            var result = ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+            if (reason != null)
+                result.Context.AddWarning(reason + " Retaining the single-file fidelity boundary.", "namespace-split-refused");
+            if (rejectedCandidate != null)
+                foreach (var issue in rejectedCandidate.Issues
+                    .DistinctBy(issue => (issue.Severity, issue.Message, issue.Feature,
+                        issue.Line, issue.Column, issue.Suggestion))
+                    .Where(issue => !result.Issues.Any(existing =>
+                        existing.Severity == issue.Severity && existing.Message == issue.Message
+                        && existing.Feature == issue.Feature && existing.Line == issue.Line
+                        && existing.Column == issue.Column && existing.Suggestion == issue.Suggestion)))
+                    result.Context.AddWarning(
+                        $"Rejected native namespace candidate ({issue.Severity}): {issue.Message}",
+                        issue.Feature, issue.Line, issue.Column, issue.Suggestion);
+            return new([new(Path.ChangeExtension(Path.GetFileName(sourceFile ?? "input.cs"), ".calr"), result)]);
+        }
+    }
+
+    internal static IReadOnlyList<NamespaceDeclarationSyntax> GetSplittableNamespaces(CompilationUnitSyntax root)
+    {
+        var namespaces = root.Members.OfType<NamespaceDeclarationSyntax>().ToArray();
+        if (root.SyntaxTree.Options.Kind != SourceCodeKind.Regular
+            || root.ContainsDiagnostics || root.ContainsDirectives
+            || root.AttributeLists.Count != 0 || root.Externs.Count != 0
+            || root.Usings.Any(directive => directive.Alias != null
+                || !directive.GlobalKeyword.IsKind(SyntaxKind.None))
+            || namespaces.Length < 2 || namespaces.Length != root.Members.Count
+            || namespaces.Any(scope => scope.Usings.Count != 0 || scope.Externs.Count != 0
+                || scope.Members.Count == 0
+                || scope.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>().Any())
+            || root.DescendantNodes().OfType<TypeDeclarationSyntax>().Any(type => type.BaseList != null)
+            || root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>()
+                .Any(type => type.Parent is TypeDeclarationSyntax)
+            || root.DescendantNodes().OfType<EqualsValueClauseSyntax>().Any(initializer =>
+                initializer.Parent is VariableDeclaratorSyntax { Parent.Parent: BaseFieldDeclarationSyntax }
+                    or PropertyDeclarationSyntax
+                && initializer.Value is not LiteralExpressionSyntax and not DefaultExpressionSyntax)
+            || namespaces.Select(scope => string.Concat(scope.Name.DescendantTokens().Select(token => token.ValueText)))
+                .Distinct(StringComparer.Ordinal).Count() != namespaces.Length)
+            return [];
+        return namespaces;
+    }
+
+    /// <summary>
+    /// True when <paramref name="source"/> is exactly one named namespace whose
+    /// local imports the scoped-import projection can carry natively.
+    /// </summary>
+    internal bool IsSingleScopedNamespace(string source, string? sourceFile)
+    {
+        var root = CSharpSyntaxTree.ParseText(source, GetEffectiveParseOptions(sourceFile), sourceFile ?? "")
+            .GetCompilationUnitRoot();
+        return _options.Fidelity == ConversionFidelity.Lossless
+            && _options.PreprocessorMode == PreprocessorConversionMode.PreserveAllBranches
+            && CanConvertScopedNamespaceImports(root);
+    }
+
+    private static bool CanConvertScopedNamespaceImports(
+        CompilationUnitSyntax root, bool allowRegionDirectives = false)
+        => root.SyntaxTree.Options.Kind == SourceCodeKind.Regular
+           && !root.ContainsDiagnostics
+           && (!root.ContainsDirectives || allowRegionDirectives
+               && root.DescendantTrivia(descendIntoTrivia: true)
+                   .Where(trivia => trivia.IsDirective)
+                   .All(trivia => trivia.GetStructure() is
+                       RegionDirectiveTriviaSyntax or EndRegionDirectiveTriviaSyntax))
+           && root.AttributeLists.Count == 0 && root.Externs.Count == 0
+           && root.Members.Count == 1
+           && root.Members[0] is BaseNamespaceDeclarationSyntax scope
+           && scope.Usings.Count > 0 && scope.Externs.Count == 0
+           && !scope.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>().Any()
+           && scope.Usings.All(directive => directive.UnsafeKeyword.IsKind(SyntaxKind.None)
+               && directive.NamespaceOrType is NameSyntax);
+
+    internal static string[] DeclaredTypeMetadata(SemanticModel model, CompilationUnitSyntax root)
+        => root.DescendantNodes()
+            .Where(node => node is MemberDeclarationSyntax or VariableDeclaratorSyntax)
+            .Select(node => model.GetDeclaredSymbol(node))
+            .Where(symbol => symbol is INamedTypeSymbol or IMethodSymbol or IPropertySymbol or IFieldSymbol or IEventSymbol)
+            .Select(symbol => $"{symbol!.Kind} {symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)} "
+                + $"{symbol.DeclaredAccessibility} static={symbol.IsStatic}: "
+                + (symbol switch
+                {
+                    INamedTypeSymbol type => TypeParameterMetadata(type.TypeParameters)
+                        + $"|{type.TypeKind}:{type.IsAbstract}:{type.IsSealed}|"
+                        + (type.BaseType is { } baseType ? DeclaredTypeKey(baseType) : "")
+                        + "|" + string.Join(",", type.Interfaces.Select(DeclaredTypeKey))
+                        + (type.DelegateInvokeMethod is { } invoke ? MethodTypes(invoke) : ""),
+                    IMethodSymbol method => MethodTypes(method),
+                    IPropertySymbol property => DeclaredTypeKey(property.Type) + Parameters(property.Parameters),
+                    IFieldSymbol field => DeclaredTypeKey(field.Type),
+                    IEventSymbol @event => DeclaredTypeKey(@event.Type),
+                    _ => ""
+                }))
+            .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+
+    private static string MethodTypes(IMethodSymbol method)
+        => $"{method.RefKind}:{DeclaredTypeKey(method.ReturnType)}{Parameters(method.Parameters)}"
+           + TypeParameterMetadata(method.TypeParameters);
+
+    private static string TypeParameterMetadata(IEnumerable<ITypeParameterSymbol> parameters)
+        => string.Join(",", parameters.Select(parameter =>
+            $"{parameter.Name}:{parameter.HasReferenceTypeConstraint}:{parameter.ReferenceTypeConstraintNullableAnnotation}:"
+            + string.Join(",", parameter.ConstraintTypes.Select(DeclaredTypeKey))));
+
+    private static string Parameters(IEnumerable<IParameterSymbol> parameters)
+        => "(" + string.Join(",", parameters.Select(parameter =>
+            $"{parameter.RefKind}:{DeclaredTypeKey(parameter.Type)}")) + ")";
+
+    private static string DeclaredTypeKey(ITypeSymbol type)
+        => $"{type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}[{type.NullableAnnotation}]"
+           + (type switch
+           {
+               IArrayTypeSymbol array => DeclaredTypeKey(array.ElementType),
+               INamedTypeSymbol named => "<" + string.Join(",", named.TypeArguments.Select(DeclaredTypeKey)) + ">"
+                   + (named.ContainingType is { } containing ? DeclaredTypeKey(containing) : ""),
+               IPointerTypeSymbol pointer => DeclaredTypeKey(pointer.PointedAtType),
+               IFunctionPointerTypeSymbol pointer => MethodTypes(pointer.Signature),
+               _ => ""
+           });
+
+    internal static string GetNamespaceOutputPath(string outputPath, int namespaceIndex)
+        => Path.Combine(Path.GetDirectoryName(outputPath) ?? "",
+            $"{Path.GetFileNameWithoutExtension(outputPath)}.namespace{namespaceIndex + 1}.calr");
+
+    internal ConversionResult ConvertWithPreservationContext(
+        string csharpSource, string? sourceFile = null, CancellationToken cancellationToken = default)
+        => ConvertWithContext(csharpSource, sourceFile, cancellationToken, capturePreservationContext: true);
+
+    private ConversionResult ConvertWithContext(
+        string csharpSource, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
+    {
+        // An annotation-disabled module certifies only in its oblivious form (see
+        // ObliviousCertificationFirst), so that form is tried first. The annotated
+        // conversion runs only when the oblivious one does not certify, and the
+        // oblivious candidate already evaluated is then reused, not converted again.
+        var obliviousFirst = ObliviousCertificationFirst(
+            csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+        ConversionResult result;
+        if (obliviousFirst?.Verified is { } verified)
+            result = verified;
+        else
+        {
+            result = ConvertCore(csharpSource, sourceFile, cancellationToken, capturePreservationContext);
+            result = TryConvertObliviousModule(csharpSource, sourceFile, result,
+                cancellationToken, capturePreservationContext, evaluated: obliviousFirst);
+        }
+        if (_options.Fidelity != ConversionFidelity.Lossless
+            || (result.Success && !result.Losses.Any(loss => loss.IsSemanticLoss)))
+            return result;
+
+        return PreserveOriginal(csharpSource, sourceFile, result, cancellationToken);
+    }
+
+    /// <summary>
+    /// The original compilation an oblivious module is certified against, or null when the
+    /// module needs no oblivious certification (its declarations carry no oblivious metadata,
+    /// or the original does not compile).
+    /// </summary>
+    private sealed record ObliviousOriginal(
+        CSharpParseOptions ParseOptions, SyntaxTree Tree, CompilationUnitSyntax Root,
+        CSharpCompilation Compilation, SemanticModel Model, string[] Before, OutputKind OutputKind)
+    {
+        /// <summary>
+        /// One module policy cannot represent lexical changes of annotation context: a nullable
+        /// directive anywhere, or any annotation-enabled position.
+        /// </summary>
+        internal bool HasLexicalNullableContext =>
+            Root.DescendantTrivia(descendIntoTrivia: true)
+                .Any(trivia => trivia.GetStructure() is NullableDirectiveTriviaSyntax)
+            || Root.DescendantNodes().OfType<TypeSyntax>().Any(type =>
+                Model.GetNullableContext(type.SpanStart).HasFlag(NullableContext.AnnotationsEnabled));
+    }
+
+    /// <summary>The evaluated oblivious candidate and every outcome its certification reports.</summary>
+    private sealed record ObliviousCandidate(
+        OutputKind OutputKind, ConversionResult Conversion, bool Admissible,
+        CompilationResult? Compiled, bool MetadataMatched, Diagnostic[] GeneratedErrors)
+    {
+        internal bool Certified => Admissible && Compiled is { HasErrors: false } && MetadataMatched;
+
+        internal ConversionResult? Verified { get; init; }
+    }
+
+    private ObliviousOriginal? PrepareObliviousOriginal(
+        string source, string? sourceFile, OutputKind outputKind, CancellationToken cancellationToken)
+    {
+        if (_options.Fidelity != ConversionFidelity.Lossless
+            || !_options.ValidateRoundTripCSharp
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches
+            || _options.References.Any(reference => !File.Exists(reference.Path)))
+            return null;
+
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        if (parseOptions.Kind != SourceCodeKind.Regular)
+            return null;
+        var tree = CSharpSyntaxTree.ParseText(source, parseOptions, sourceFile ?? "",
+            cancellationToken: cancellationToken);
+        var root = tree.GetCompilationUnitRoot(cancellationToken);
+        if (root.ContainsDiagnostics)
+            return null;
+        var original = CSharpCompilation.Create("ObliviousModuleAnalysis",
+            GeneratedCSharpCompiler.AddImplicitUsings(
+                new[] { tree }.Concat(_options.AdditionalSemanticSyntaxTrees
+                    .Where(sibling => !IsSameSyntaxTree(sibling, tree))),
+                _options.IncludeImplicitSystemUsing),
+            GetSemanticMetadataReferences(),
+            new CSharpCompilationOptions(outputKind, allowUnsafe: true)
+                .WithNullableContextOptions(_options.NullableContextOptions ?? NullableContextOptions.Disable));
+        var model = original.GetSemanticModel(tree);
+        if (original.GetDiagnostics(cancellationToken).Any(diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error))
+            return null;
+        var before = DeclaredTypeMetadata(model, root);
+        if (!before.Any(record => record.Contains("[None]", StringComparison.Ordinal)))
+            return null;
+        return new(parseOptions, tree, root, original, model, before, outputKind);
+    }
+
+    /// <summary>
+    /// Compiles generated C# inside the original compilation (its references with their aliases,
+    /// and sibling project trees) and compares declared type/nullability metadata.
+    /// </summary>
+    private static bool ObliviousMetadataMatches(
+        ObliviousOriginal original, string generated, out Diagnostic[] errors, CancellationToken cancellationToken)
+    {
+        var generatedTree = CSharpSyntaxTree.ParseText(generated, original.ParseOptions,
+            cancellationToken: cancellationToken);
+        var compilation = original.Compilation.ReplaceSyntaxTree(original.Tree, generatedTree);
+        errors = compilation.GetDiagnostics(cancellationToken)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        return errors.Length == 0
+            && original.Before.SequenceEqual(DeclaredTypeMetadata(compilation.GetSemanticModel(generatedTree),
+                generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal);
+    }
+
+    private ObliviousCandidate EvaluateObliviousCandidate(
+        string source, string? sourceFile, ObliviousOriginal original, CancellationToken cancellationToken,
+        bool capturePreservationContext, bool allowScopedNamespaceImports)
+    {
+        var candidate = ConvertCore(source, sourceFile, cancellationToken, capturePreservationContext,
+            originalSemanticModel: original.Model, allowScopedNamespaceImports: allowScopedNamespaceImports,
+            obliviousModule: true);
+        var entirelyNative = candidate.InteropPreservationCount == 0 && candidate.Losses.Count == 0;
+        var directPreservation = candidate.InteropPreservationCount > 0 && candidate.Losses.Count > 0
+            && candidate.Losses.All(loss => loss.Kind == ConversionLossKind.InteropPreserved
+                && loss.Path == ConversionPath.Interop);
+        if (!candidate.Success || !(entirelyNative || directPreservation)
+            || candidate.CalorSource is not { } calorSource)
+            return new(original.OutputKind, candidate, Admissible: false, Compiled: null,
+                MetadataMatched: false, GeneratedErrors: []);
+        // Reparse the actual deliverable and enforce the normal binder/effect
+        // checks. No unchecked output can authorize this recovery: the generated
+        // C# is compiled in the original context by ObliviousMetadataMatches below.
+        var compiled = Program.Compile(calorSource, sourceFile, new CompilationOptions
+        {
+            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+            ProjectDirectory = _options.ProjectDirectory,
+            DeferGeneratedOutputValidation = true,
+            CancellationToken = cancellationToken
+        });
+        if (compiled.HasErrors)
+            return new(original.OutputKind, candidate, Admissible: true, compiled,
+                MetadataMatched: false, GeneratedErrors: []);
+        var matched = ObliviousMetadataMatches(original, compiled.GeneratedCode, out var generatedErrors,
+            cancellationToken);
+        return new(original.OutputKind, candidate, Admissible: true, compiled, matched, generatedErrors);
+    }
+
+    /// <summary>
+    /// The oblivious certification, tried before the annotated conversion. It applies only to a
+    /// module whose original has no lexical nullable context and whose declaration metadata
+    /// changes when annotations are enabled. For such a module the annotated conversion cannot
+    /// certify: its C# is emitted under <c>#nullable enable</c> (the module is not marked oblivious
+    /// and the original carries no directive to preserve), so the context-sensitive declarations
+    /// that read <c>None</c> in the original cannot read <c>None</c> in it. So the result is the
+    /// one <see cref="TryConvertObliviousModule"/> would reach after converting twice.
+    /// </summary>
+    private ObliviousCandidate? ObliviousCertificationFirst(
+        string source, string? sourceFile, CancellationToken cancellationToken, bool capturePreservationContext)
+    {
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        if (parseOptions.Kind != SourceCodeKind.Regular)
+            return null;
+        // ConvertCore's own rule for a regular file.
+        var outputKind = CSharpSyntaxTree.ParseText(source, parseOptions, cancellationToken: cancellationToken)
+            .GetCompilationUnitRoot(cancellationToken).Members.OfType<GlobalStatementSyntax>().Any()
+            ? OutputKind.ConsoleApplication
+            : _options.OutputKind;
+        if (PrepareObliviousOriginal(source, sourceFile, outputKind, cancellationToken) is not { } original
+            || original.HasLexicalNullableContext)
+            return null;
+        // Some declarations read the same in both contexts (value types, an implicit object
+        // base). When all of them do, the annotated form can certify and is preferred, as before.
+        var enabled = original.Compilation.WithOptions(
+            original.Compilation.Options.WithNullableContextOptions(NullableContextOptions.Enable));
+        if (original.Before.SequenceEqual(
+                DeclaredTypeMetadata(enabled.GetSemanticModel(original.Tree), original.Root), StringComparer.Ordinal))
+            return null;
+        var evaluated = EvaluateObliviousCandidate(source, sourceFile, original, cancellationToken,
+            capturePreservationContext, allowScopedNamespaceImports: false);
+        if (!evaluated.Certified)
+            return evaluated;
+        evaluated.Conversion.Context.RoundTrip = ConversionRoundTrip.Verified;
+        return evaluated with { Verified = evaluated.Conversion };
+    }
+
+    private ConversionResult TryConvertObliviousModule(
+        string source, string? sourceFile, ConversionResult attempted,
+        CancellationToken cancellationToken, bool capturePreservationContext,
+        bool allowScopedNamespaceImports = false, ObliviousCandidate? evaluated = null)
+    {
+        var outputKind = Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var attemptedKind)
+            ? attemptedKind : _options.OutputKind;
+        if (PrepareObliviousOriginal(source, sourceFile, outputKind, cancellationToken) is not { } original)
+            return attempted;
+
+        // The certification compiles check the binder and effects here, and check the
+        // generated C# in ObliviousMetadataMatches, which compiles it inside the original compilation
+        // (its references with their aliases, and sibling project trees). Program.Compile's
+        // own standalone C# validation has neither, so a call into a referenced assembly or a
+        // sibling type failed it and a faithful native conversion was preserved whole.
+
+        // Preserved declarations also inherit the emitted nullable context.
+        if (attempted.Success && attempted.CalorSource is { } current)
+        {
+            var compiledCurrent = Program.Compile(current, sourceFile, new CompilationOptions
+            {
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+                ProjectDirectory = _options.ProjectDirectory,
+                DeferGeneratedOutputValidation = true,
+                CancellationToken = cancellationToken
+            });
+            if (!compiledCurrent.HasErrors
+                && ObliviousMetadataMatches(original, compiledCurrent.GeneratedCode, out _, cancellationToken))
+                return attempted;
+        }
+
+        ConversionResult PreserveUncertifiedModule(string? reason = null, ConversionResult? candidate = null)
+        {
+            if (reason != null)
+                attempted.Context.AddWarning(reason, "nullable-module-fidelity");
+            var result = attempted.Success
+                ? PreserveOriginal(source, sourceFile, attempted, cancellationToken)
+                : attempted;
+            // Candidate-only diagnostics explain the rejection, not the original preservation path.
+            var prefix = attempted.Success ? "Before whole-file preservation (Warning): " : "";
+            if (candidate != null)
+            {
+                foreach (var issue in candidate.Issues
+                    .DistinctBy(issue => (issue.Severity, issue.Message, issue.Feature,
+                        issue.Line, issue.Column, issue.Suggestion))
+                    .Where(issue => !attempted.Issues.Any(existing =>
+                        existing.Severity == issue.Severity && existing.Message == issue.Message
+                        && existing.Feature == issue.Feature && existing.Line == issue.Line
+                        && existing.Column == issue.Column && existing.Suggestion == issue.Suggestion)))
+                    result.Context.AddWarning(
+                        $"{prefix}Oblivious module candidate ({issue.Severity}): {issue.Message}",
+                        issue.Feature, issue.Line, issue.Column, issue.Suggestion);
+                foreach (var loss in candidate.Losses
+                    .DistinctBy(loss => (loss.Kind, loss.Feature, loss.Description, loss.Line))
+                    .Where(loss => !attempted.Losses.Any(existing =>
+                        existing.Kind == loss.Kind && existing.Feature == loss.Feature
+                        && existing.Description == loss.Description && existing.Line == loss.Line)))
+                    result.Context.AddWarning(
+                        $"{prefix}Oblivious module candidate ({loss.Kind}): {loss.Description}",
+                        loss.Feature, loss.Line);
+            }
+            return result;
+        }
+
+        if (original.HasLexicalNullableContext)
+            return PreserveUncertifiedModule(
+                "A single oblivious module context cannot represent the original lexical nullable contexts; "
+                + "the native replacement could not be certified.");
+
+        // ObliviousCertificationFirst evaluated this candidate against the same original when it
+        // used the same output kind; it is not converted a second time.
+        var candidateResult = evaluated is { } reuse && reuse.OutputKind == outputKind && !allowScopedNamespaceImports
+            ? reuse
+            : EvaluateObliviousCandidate(source, sourceFile, original, cancellationToken,
+                capturePreservationContext, allowScopedNamespaceImports);
+        var candidate = candidateResult.Conversion;
+        if (!candidateResult.Admissible)
+            return PreserveUncertifiedModule(
+                "The oblivious module candidate did not produce successful, entirely native Calor "
+                + "or direct, lossless member preservation; the replacement could not be certified.", candidate);
+        var compiled = candidateResult.Compiled!;
+        if (compiled.HasErrors)
+        {
+            foreach (var error in compiled.Diagnostics.Errors)
+                attempted.Context.AddWarning(
+                    $"Native oblivious module failed Calor compilation ({error.Code}): {error.Message}",
+                    "roundtrip-calor-validation", error.Span.Line, error.Span.Column);
+            return PreserveUncertifiedModule(candidate: candidate);
+        }
+        if (!candidateResult.MetadataMatched)
+        {
+            var generatedErrors = candidateResult.GeneratedErrors;
+            if (generatedErrors.Length == 0)
+                return PreserveUncertifiedModule(
+                    "The native projection changed declared type/nullability metadata; "
+                    + "a single oblivious module context could not certify a faithful replacement.", candidate);
+            foreach (var error in generatedErrors)
+            {
+                var span = error.Location.GetLineSpan().StartLinePosition;
+                attempted.Context.AddWarning(
+                    $"Native oblivious module failed C# validation ({error.Id}): {error.GetMessage()}",
+                    "roundtrip-csharp-validation", span.Line + 1, span.Character + 1);
+            }
+            return PreserveUncertifiedModule(candidate: candidate);
+        }
+        candidate.Context.RoundTrip = ConversionRoundTrip.Verified;
+        return candidate;
+    }
+
+    internal ConversionResult PreserveOriginal(
+        string source,
+        string? sourceFile,
+        ConversionResult attempted,
+        CancellationToken cancellationToken,
+        IEnumerable<ConversionIssue>? validationIssues = null)
+    {
+        var preservationStart = DateTime.UtcNow;
+        cancellationToken.ThrowIfCancellationRequested();
+        var parseOptions = GetEffectiveParseOptions(sourceFile);
+        var tree = CSharpSyntaxTree.ParseText(
+            source, parseOptions, sourceFile ?? "", cancellationToken: cancellationToken);
+        if (tree.GetDiagnostics(cancellationToken).Any(
+                diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            || _options.References.Any(reference => !File.Exists(reference.Path))
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches)
+        {
+            if (!attempted.Success)
+                return attempted;
+            attempted.Context.AddError(
+                "Original C# cannot be preserved: malformed source, missing references, or destructive preprocessor options.",
+                "original-csharp-validation");
+            return new ConversionResult
+            {
+                Success = false,
+                CalorSource = attempted.CalorSource,
+                Ast = attempted.Ast,
+                Context = attempted.Context,
+                Duration = attempted.Duration + (DateTime.UtcNow - preservationStart)
+            };
+        }
+
+        var context = CreateContext(sourceFile);
+        context.CapturePreservationContext = attempted.Context.CapturePreservationContext;
+        context.Metadata = attempted.Metadata;
+        context.OriginalSource = source;
+        if (context.CapturePreservationContext)
+            context.OriginalSyntaxTree = tree;
+        context.UserManifestRoot = ResolveUserManifestRoot();
+        context.Stats.TotalNodes = attempted.Context.Stats.TotalNodes;
+        context.Stats.InteropBlocksEmitted = 1;
+        foreach (var issue in attempted.Issues.Concat(validationIssues ?? []))
+            context.AddWarning(
+                $"Before whole-file preservation ({issue.Severity}): {issue.Message}",
+                issue.Feature, issue.Line, issue.Column, issue.Suggestion);
+        foreach (var loss in attempted.Losses)
+            context.AddWarning(
+                $"Before whole-file preservation ({loss.Kind}): {loss.Description}",
+                loss.Feature, loss.Line);
+        var trigger = validationIssues != null || attempted.Context.RoundTrip == ConversionRoundTrip.Failed
+            ? ConversionTrigger.RoundTripFailure
+            : attempted.Issues.Any(issue => issue.Feature is "generated-calor-validation" or "post-validation-fallback")
+                ? ConversionTrigger.ParseFailure : ConversionTrigger.UnsupportedConstruct;
+        context.RecordLoss(
+            ConversionLossKind.InteropPreserved,
+            "whole-file-preservation",
+            "Original compilation unit preserved exactly after native/member/type conversion or validation failed.",
+            1, ConversionPath.Rescue, trigger,
+            ConversionEnabledBy.LosslessFidelity);
+
+        var module = PreserveCompilationUnit(source, "whole-file-preservation",
+            "Native/member/type conversion or validation failed; preserve the original compilation unit.", context);
+        var calorSource = new CalorEmitter(context).Emit(module);
+        var compiled = Program.Compile(calorSource, sourceFile ?? "preserved.calr",
+            new CompilationOptions
+            {
+                DeferGeneratedOutputValidation = true,
+                CancellationToken = cancellationToken
+            });
+        if (compiled.HasErrors || !string.Equals(source, compiled.GeneratedCode, StringComparison.Ordinal))
+        {
+            foreach (var error in compiled.Diagnostics.Errors)
+                context.AddError(error.Message, "whole-file-preservation", error.Span.Line, error.Span.Column);
+            if (!compiled.HasErrors)
+                context.AddError("Whole-file preservation did not reproduce the original C# exactly.",
+                    "whole-file-preservation");
+        }
+        else
+        {
+            var originalValidation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(source, sourceFile ?? "original.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+                    LanguageVersion = parseOptions.LanguageVersion,
+                    DocumentationMode = parseOptions.DocumentationMode,
+                    SourceCodeKind = parseOptions.Kind,
+                    Features = parseOptions.Features,
+                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
+                    References = _options.References.Select(reference =>
+                        new GeneratedCSharpReference(reference.Path, reference.Aliases)),
+                    AdditionalSources = parseOptions.Kind == SourceCodeKind.Script
+                        ? null : _options.AdditionalSemanticSyntaxTrees
+                            .Where(sibling => !IsSameSyntaxTree(sibling, tree))
+                            .Select(sibling => new GeneratedCSharpSource(
+                                sibling.GetText(cancellationToken).ToString(), sibling.FilePath)),
+                    OutputKind = Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var originalKind)
+                        ? originalKind : _options.OutputKind,
+                    NullableContextOptions = _options.NullableContextOptions ?? NullableContextOptions.Disable
+                });
+            var originalErrors = originalValidation.SyntaxErrors
+                .Concat(originalValidation.CompilationErrors).ToList();
+            var incompleteContext = originalErrors.Any(error => error.Id is
+                "CS0246" or "CS0234" or "CS0103" or "CS0012" or "CS0518"
+                or "CS1069" or "CS0115" or "CS1061" or "CS0117"
+                or "CS8795" or "CS0759"
+                || (error.Id == "CS5001" && !_options.ReferencesAreComplete));
+            if (originalErrors.Any(error => error.Id is
+                    "CS0006" or "CS1504" or "CS8915" or "CS0104"
+                    || HasIntrinsicConversionError(error))
+                || (originalErrors.Count > 0 && !incompleteContext))
+                foreach (var error in originalErrors)
+                    context.AddError($"Original C# failed validation ({error.Id}): {error.GetMessage()}",
+                        "original-csharp-validation",
+                        error.Location.GetLineSpan().StartLinePosition.Line + 1);
+            // Exact source is faithful even when a standalone file lacks its project
+            // references. Keep that compile failure visible, never label it verified.
+            ValidateLosslessRoundTrip(
+                calorSource, context, _options.ValidateRoundTripCSharp,
+                parseOptions, Enum.TryParse<OutputKind>(attempted.Metadata.OutputKind, out var outputKind)
+                    ? outputKind : _options.OutputKind,
+                _options.NullableContextOptions ?? NullableContextOptions.Disable,
+                cancellationToken, refuseOnFailure: false);
+        }
+        return new ConversionResult
+        {
+            Success = !context.HasErrors,
+            Ast = module,
+            CalorSource = calorSource,
+            Context = context,
+            Duration = attempted.Duration + (DateTime.UtcNow - preservationStart)
+        };
+    }
+
+    private static bool HasIntrinsicConversionError(Diagnostic error)
+    {
+        if (error.Id is not ("CS0029" or "CS0266" or "CS0031")
+            || error.Location.SourceTree is not { } tree
+            || tree.GetRoot().FindNode(error.Location.SourceSpan,
+                getInnermostNodeForTie: true) is not ExpressionSyntax expression)
+            return false;
+
+        // Missing project types/generators can cause conversion and return-flow
+        // errors. Only a conversion between known built-in types is independent
+        // of that missing context.
+        var model = CSharpCompilation.Create(
+            "PreservationSourceValidation", [tree],
+            GeneratedCSharpCompiler.References)
+            .GetSemanticModel(tree);
+        var types = model.GetTypeInfo(expression);
+        return types.Type is { SpecialType: not SpecialType.None, TypeKind: not TypeKind.Error }
+            && types.ConvertedType is { SpecialType: not SpecialType.None, TypeKind: not TypeKind.Error };
+    }
+
+    private ConversionResult ConvertCore(
+        string csharpSource,
+        string? sourceFile,
+        CancellationToken cancellationToken,
+        bool capturePreservationContext,
+        int? namespaceStart = null,
+        SemanticModel? originalSemanticModel = null,
+        bool allowScopedNamespaceImports = false,
+        bool obliviousModule = false)
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
+        context.CapturePreservationContext = capturePreservationContext;
         context.UserManifestRoot = ResolveUserManifestRoot();
         context.OriginalSource = csharpSource;
         context.ReserveNamesFrom(_options.AdditionalSemanticSyntaxTrees);
@@ -354,6 +1093,7 @@ public sealed class CSharpToCalorConverter
             context.Metadata = new ConversionMetadata
             {
                 PreprocessorMode = _options.PreprocessorMode,
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
                 Configuration = _options.Configuration,
                 TargetFramework = _options.TargetFramework,
                 LanguageVersion = parseOptions.LanguageVersion.ToString(),
@@ -429,22 +1169,25 @@ public sealed class CSharpToCalorConverter
                         csharpSource,
                         parseOptions,
                         cancellationToken);
+                    context.RecordBranchSelection(csharpSource, stripResult.Source, () =>
+                    {
+                        foreach (var directive in stripResult.RemovedConditionalDirectives)
+                        {
+                            context.RecordLoss(ConversionLossKind.PreprocessorStripped,
+                                "preprocessor-directive",
+                                $"'{directive.Directive}' removed after Roslyn selected the active branch",
+                                directive.Line);
+                        }
+                        foreach (var directive in stripResult.RemovedNonconditionalDirectives)
+                        {
+                            context.RecordLoss(
+                                ConversionLossKind.DirectiveRemoved,
+                                directive.Feature,
+                                $"Inactive directive removed after Roslyn selected the active branch: '{directive.Directive}'",
+                                directive.Line);
+                        }
+                    });
                     csharpSource = stripResult.Source;
-                    foreach (var directive in stripResult.RemovedConditionalDirectives)
-                    {
-                        context.RecordLoss(ConversionLossKind.PreprocessorStripped,
-                            "preprocessor-directive",
-                            $"'{directive.Directive}' removed after Roslyn selected the active branch",
-                            directive.Line);
-                    }
-                    foreach (var directive in stripResult.RemovedNonconditionalDirectives)
-                    {
-                        context.RecordLoss(
-                            ConversionLossKind.DirectiveRemoved,
-                            directive.Feature,
-                            $"Inactive directive removed after Roslyn selected the active branch: '{directive.Directive}'",
-                            directive.Line);
-                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -458,11 +1201,15 @@ public sealed class CSharpToCalorConverter
             }
 
             // Step 1: Parse C# with Roslyn using the caller/project configuration.
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var syntaxTree = originalSemanticModel?.SyntaxTree ?? CSharpSyntaxTree.ParseText(
                 csharpSource,
                 parseOptions,
+                path: sourceFile ?? "",
                 cancellationToken: cancellationToken);
             var root = syntaxTree.GetCompilationUnitRoot();
+            if (context.CapturePreservationContext
+                && string.Equals(csharpSource, context.OriginalSource, StringComparison.Ordinal))
+                context.OriginalSyntaxTree = syntaxTree;
             // #1132: the tree actually converted (its preprocessor symbols) also reserves names.
             context.ReserveNamesFrom([syntaxTree]);
             effectiveOutputKind = parseOptions.Kind == SourceCodeKind.Script
@@ -482,18 +1229,10 @@ public sealed class CSharpToCalorConverter
 
             // Check for parse errors. Unexpected or unmatched directives are
             // never globally suppressed; callers receive an explicit parse error.
-            List<Microsoft.CodeAnalysis.Diagnostic> diagnostics;
-            try
-            {
-                diagnostics = root.GetDiagnostics()
+            var diagnostics = root.GetDiagnostics()
                     .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
                              && d.Id != "CS1029")
                     .ToList();
-            }
-            catch
-            {
-                diagnostics = new List<Microsoft.CodeAnalysis.Diagnostic>();
-            }
 
             if (diagnostics.Count > 0)
             {
@@ -518,12 +1257,25 @@ public sealed class CSharpToCalorConverter
             if (namespaceFeature != null)
                 context.RecordFeatureUsage(namespaceFeature);
 
-            if (_options.Fidelity == ConversionFidelity.Lossless
-                && RequiresWholeFileNamespaceInterop(root))
+            var lossyScopedImports = namespaceStart == null && !allowScopedNamespaceImports
+                && _options.Fidelity == ConversionFidelity.Lossy
+                && _options.PreprocessorMode == PreprocessorConversionMode.SelectActiveBranchLossy
+                && _options.ValidateRoundTripCSharp
+                && CanConvertScopedNamespaceImports(root, allowRegionDirectives: true)
+                && root.Usings.All(directive => directive.UnsafeKeyword.IsKind(SyntaxKind.None)
+                    && directive.NamespaceOrType is NameSyntax);
+            if (namespaceStart == null && RequiresWholeFileNamespaceInterop(root)
+                && !lossyScopedImports
+                && !(allowScopedNamespaceImports && CanConvertScopedNamespaceImports(root)))
             {
+                if (!context.PreservesCSharp)
+                {
+                    context.AddError("Native module headers cannot flatten this namespace or using topology.",
+                        feature: "namespace-topology");
+                    return new ConversionResult { Success = false, Context = context, Duration = DateTime.UtcNow - startTime };
+                }
                 return ConvertWholeFileNamespaceInterop(
                     csharpSource,
-                    root,
                     context,
                     startTime,
                     parseOptions,
@@ -532,25 +1284,61 @@ public sealed class CSharpToCalorConverter
             }
 
             // Step 2: Create semantic model for type inference (best-effort)
-            SemanticModel? semanticModel = null;
+            SemanticModel? semanticModel = originalSemanticModel;
             try
             {
-                var semanticTrees = new[] { syntaxTree }
-                    .Concat(_options.AdditionalSemanticSyntaxTrees.Where(tree =>
-                        !IsSameSyntaxTree(tree, syntaxTree)));
-                var compilation = CSharpCompilation.Create("ConversionAnalysis",
-                    semanticTrees,
-                    GetSemanticMetadataReferences(),
-                    new CSharpCompilationOptions(effectiveOutputKind)
-                        .WithNullableContextOptions(
-                            _options.NullableContextOptions
-                            ?? NullableContextOptions.Disable));
-                semanticModel = compilation.GetSemanticModel(syntaxTree);
+                if (semanticModel == null)
+                {
+                    var semanticTrees = new[] { syntaxTree }
+                        .Concat(_options.AdditionalSemanticSyntaxTrees.Where(tree =>
+                            !IsSameSyntaxTree(tree, syntaxTree)));
+                    var compilation = CSharpCompilation.Create("ConversionAnalysis",
+                        GeneratedCSharpCompiler.AddImplicitUsings(
+                            semanticTrees, _options.IncludeImplicitSystemUsing),
+                        GetSemanticMetadataReferences(),
+                        new CSharpCompilationOptions(effectiveOutputKind)
+                            .WithNullableContextOptions(
+                                _options.NullableContextOptions
+                                ?? NullableContextOptions.Disable));
+                    semanticModel = compilation.GetSemanticModel(syntaxTree);
+                }
             }
             catch
             {
                 // Semantic model creation is best-effort; proceed without it
             }
+
+            if (lossyScopedImports)
+            {
+                if (semanticModel == null || _options.References.Any(reference => !File.Exists(reference.Path)))
+                    context.AddError("Scoped namespace imports require the original semantic context and supplied references.",
+                        "scoped-namespace-source-validation");
+                else
+                    foreach (var error in semanticModel.Compilation.GetDiagnostics(cancellationToken)
+                        .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                        context.AddError($"Original C# cannot convert scoped imports ({error.Id}): {error.GetMessage()}",
+                            "scoped-namespace-source-validation",
+                            error.Location.GetLineSpan().StartLinePosition.Line + 1);
+                if (context.HasErrors)
+                    return new ConversionResult { Success = false, Context = context, Duration = DateTime.UtcNow - startTime };
+
+                // This path admits no lexical nullable directives, so a single
+                // module context can retain annotation-disabled declarations.
+                obliviousModule = !semanticModel!.GetNullableContext(root.SpanStart)
+                    .HasFlag(NullableContext.AnnotationsEnabled);
+            }
+
+            // Noncertifying lowering still preserves the source's annotation context.
+            if (_options.Fidelity == ConversionFidelity.Lossy
+                && _options.Mode == ConversionMode.Interop
+                && semanticModel != null
+                && !semanticModel.GetNullableContext(root.SpanStart)
+                    .HasFlag(NullableContext.AnnotationsEnabled)
+                && !root.DescendantTrivia(descendIntoTrivia: true)
+                    .Any(trivia => trivia.GetStructure() is NullableDirectiveTriviaSyntax)
+                && !semanticModel.Compilation.GetDiagnostics(cancellationToken)
+                    .Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                obliviousModule = true;
 
             // Visit C# AST and build Calor AST
             ModuleNode? calorAst;
@@ -561,8 +1349,15 @@ public sealed class CSharpToCalorConverter
                     context,
                     semanticModel,
                     cancellationToken,
-                    _options.NullableContextOptions.HasValue);
-                calorAst = visitor.Convert(root, moduleName);
+                    _options.NullableContextOptions.HasValue)
+                {
+                    PreserveObliviousDeclarations = obliviousModule
+                };
+                calorAst = visitor.Convert(root, moduleName,
+                    namespaceStart.HasValue
+                        ? root.Members.OfType<NamespaceDeclarationSyntax>()
+                            .Single(scope => scope.SpanStart == namespaceStart)
+                        : null);
             }
             catch (OperationCanceledException)
             {
@@ -628,7 +1423,8 @@ public sealed class CSharpToCalorConverter
             // standalone compile also fails when the file only depends on a sibling
             // file, and under PassthroughOnError a rescue that cannot recover would
             // refuse a conversion lossy mode used to complete.
-            var roundTripGate = _options.ValidateRoundTripCSharp
+            var roundTripGate = namespaceStart == null && !allowScopedNamespaceImports
+                && !lossyScopedImports && _options.ValidateRoundTripCSharp
                 && (_options.Fidelity == ConversionFidelity.Lossless
                     || _options.PreprocessorMode
                         == PreprocessorConversionMode.SelectActiveBranchLossy);
@@ -643,7 +1439,8 @@ public sealed class CSharpToCalorConverter
                 // rescue on its own as well. No user-visible change today (the
                 // CLI sets RescueUnusableMembers, and --passthrough sets both),
                 // but the contract now holds without relying on that pairing.
-                && (_options.RescueUnusableMembers || _options.PassthroughOnError)
+                && (_options.RescueUnusableMembers || _options.PassthroughOnError
+                    || _options.Fidelity == ConversionFidelity.Lossless)
                 && !context.HasErrors
                 && context.PreservesCSharp
                 && roundTripGate
@@ -724,7 +1521,8 @@ public sealed class CSharpToCalorConverter
             ValidateLosslessRoundTrip(
                 calorSource,
                 context,
-                _options.ValidateRoundTripCSharp,
+                namespaceStart == null && !allowScopedNamespaceImports
+                    && !lossyScopedImports && _options.ValidateRoundTripCSharp,
                 parseOptions,
                 effectiveOutputKind,
                 _options.NullableContextOptions
@@ -743,12 +1541,53 @@ public sealed class CSharpToCalorConverter
                     feature: "active-error-directive");
             }
 
+            if (lossyScopedImports && !context.HasErrors)
+            {
+                if (context.Losses.Any(loss => loss.Kind is
+                    ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback
+                    or ConversionLossKind.FallbackTodo or ConversionLossKind.Dropped))
+                    context.AddError("Scoped namespace imports require native declarations and bodies, not preservation or substitutions.",
+                        "scoped-namespace-fidelity");
+                else
+                {
+                    var compiled = Program.Compile(calorSource, sourceFile, new CompilationOptions
+                    {
+                        IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
+                        ProjectDirectory = _options.ProjectDirectory,
+                        StrictEffects = true,
+                        DeferGeneratedOutputValidation = true,
+                        CancellationToken = cancellationToken
+                    });
+                    foreach (var error in compiled.Diagnostics.Errors)
+                        context.AddError($"Native scoped imports failed Calor compilation: {error.Message}",
+                            "scoped-namespace-fidelity", error.Span.Line, error.Span.Column);
+                    if (!compiled.HasErrors)
+                    {
+                        var generatedTree = CSharpSyntaxTree.ParseText(
+                            compiled.GeneratedCode, parseOptions,
+                            syntaxTree.FilePath, cancellationToken: cancellationToken);
+                        var generatedCompilation = semanticModel!.Compilation.ReplaceSyntaxTree(syntaxTree, generatedTree);
+                        foreach (var error in generatedCompilation.GetDiagnostics(cancellationToken)
+                            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+                            context.AddError($"Native scoped imports failed C# validation ({error.Id}): {error.GetMessage()}",
+                                "scoped-namespace-fidelity");
+                        if (!DeclaredTypeMetadata(semanticModel, root).SequenceEqual(
+                                DeclaredTypeMetadata(generatedCompilation.GetSemanticModel(generatedTree),
+                                    generatedTree.GetCompilationUnitRoot(cancellationToken)), StringComparer.Ordinal))
+                            context.AddError("Native scoped imports changed declared type/nullability metadata.",
+                                "scoped-namespace-fidelity");
+                    }
+                }
+            }
+            if (lossyScopedImports)
+                context.RoundTrip = context.HasErrors ? ConversionRoundTrip.Failed : ConversionRoundTrip.Verified;
+
             var destructiveLosses = context.Losses.Count(loss => loss.IsSemanticLoss);
             if (_options.Fidelity == ConversionFidelity.Lossless && destructiveLosses > 0)
             {
                 context.AddError(
                     $"Lossless conversion refused {destructiveLosses} lossy substitution(s) or drop(s). " +
-                    "Use explicit lossy mode to acknowledge semantic loss.",
+                    "Faithful C# preservation is required instead.",
                     feature: "lossless-contract");
             }
 
@@ -766,8 +1605,8 @@ public sealed class CSharpToCalorConverter
             return new ConversionResult
             {
                 Success = !context.HasErrors,
-                CalorSource = calorSource,
-                Ast = calorAst,
+                CalorSource = lossyScopedImports && context.HasErrors ? null : calorSource,
+                Ast = lossyScopedImports && context.HasErrors ? null : calorAst,
                 Context = context,
                 Duration = DateTime.UtcNow - startTime
             };
@@ -807,38 +1646,57 @@ public sealed class CSharpToCalorConverter
             return new ConversionResult { Success = false, Context = context };
         }
 
-        // Use replacement fallback to handle files with unpaired surrogates
-        // (e.g., regex patterns containing \uD800-\uDBFF in string literals)
-        var encoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-        var source = await File.ReadAllTextAsync(csharpFilePath, encoding, cancellationToken);
+        // Decode strictly and retain source BOMs; malformed bytes must not
+        // become replacement text that could be reported as preserved.
+        var source = await ReadSourceFileAsync(csharpFilePath, cancellationToken);
         var result = Convert(source, csharpFilePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return result;
     }
 
+    internal static async Task<string> ReadSourceFileAsync(
+        string path, CancellationToken cancellationToken = default)
+    {
+        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        if (bytes.AsSpan().StartsWith(System.Text.Encoding.UTF32.GetPreamble()))
+            return new System.Text.UTF32Encoding(false, false, true).GetString(bytes);
+        var bigEndianUtf32 = new System.Text.UTF32Encoding(true, true, true);
+        if (bytes.AsSpan().StartsWith(bigEndianUtf32.GetPreamble()))
+            return bigEndianUtf32.GetString(bytes);
+        if (bytes.AsSpan().StartsWith(System.Text.Encoding.Unicode.GetPreamble()))
+            return new System.Text.UnicodeEncoding(false, false, true).GetString(bytes);
+        if (bytes.AsSpan().StartsWith(System.Text.Encoding.BigEndianUnicode.GetPreamble()))
+            return new System.Text.UnicodeEncoding(true, false, true).GetString(bytes);
+        // Decode the entire source, including a UTF-8 BOM, so exact passthrough
+        // does not silently remove it. Invalid byte sequences are read failures.
+        return new System.Text.UTF8Encoding(false, true).GetString(bytes);
+    }
+
     /// <summary>
     /// Converts a C# file and writes the output to an Calor file.
     /// </summary>
+    /// <remarks>
+    /// Persists original conversion context beside the output. Existing output
+    /// must match its saved generation exactly; edited or unassociated output
+    /// is retained and the refresh fails with an actionable I/O error.
+    /// </remarks>
     public async Task<ConversionResult> ConvertFileAndSaveAsync(
         string csharpFilePath,
         string? outputPath = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await ConvertFileAsync(csharpFilePath, cancellationToken);
-
+        using var generation = CreateGeneration(csharpFilePath,
+            outputPath ?? Path.ChangeExtension(csharpFilePath, ".calr"));
+        var result = await generation.ConvertAsync(cancellationToken);
         if (result.Success && result.CalorSource != null)
-        {
-            var calorPath = outputPath ?? Path.ChangeExtension(csharpFilePath, ".calr");
-            var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-            await ConversionFileWriter.WriteAtomicAsync(
-                calorPath,
-                result.CalorSource,
-                writeEncoding,
-                cancellationToken);
-        }
-
+            await generation.WriteAsync(result, cancellationToken);
         return result;
     }
+
+    internal ConversionGeneration CreateGeneration(
+        string sourcePath, string outputPath, bool dryRun = false, int? namespaceIndex = null,
+        bool projectConversion = false)
+        => new(this, _options, sourcePath, outputPath, dryRun, namespaceIndex, projectConversion);
 
     /// <summary>
     /// Detects the direction of conversion based on file extension.
@@ -966,8 +1824,9 @@ public sealed class CSharpToCalorConverter
     ///
     /// <para>The probe emit goes to a scratch context so the loss ledger sees
     /// exactly one emit, the real one in step 3. Rows travel back onto the tree in
-    /// hand by declaration id, which survives the round trip, and step 3 then
-    /// emits once with them.</para>
+    /// hand by the exact header offsets recorded by that probe emitter. Parser-local
+    /// identities do not survive a text round trip. Step 3 emits once with the
+    /// correlated rows; the correlation never becomes public syntax.</para>
     ///
     /// <para>Resolution must see what the later compile will see, or the two agree
     /// about the body and disagree about the manifests — see
@@ -976,9 +1835,12 @@ public sealed class CSharpToCalorConverter
     ///
     /// <para>Best-effort by design: a row that is missing or too narrow is a
     /// diagnostic on a later compile, never a reason to throw away a conversion
-    /// that otherwise succeeded. Synthesis only ever WIDENS a row, so a run that
+    /// that otherwise succeeded. Own-row synthesis only ever WIDENS a row, so a run that
     /// stops early — cap reached, unparseable probe, or an exception — leaves rows
     /// that are sound but possibly incomplete, and says so in the context.</para>
+    /// <para>Callback contracts use bound native parameter identities and strict
+    /// lambda body facts. Effect binders and position rows travel back through the
+    /// same declaration offsets; unproven returned rows are never copied as proof.</para>
     /// </summary>
     private void SynthesizeEffectRows(
         ModuleNode? module,
@@ -993,7 +1855,12 @@ public sealed class CSharpToCalorConverter
         var resolver = RentSynthesisResolver(_options.ProjectDirectory, _options.SolutionDirectory, context.UserManifestRoot);
         try
         {
-            var probe = new CalorEmitter(CreateContext(sourceFile)).Emit(module);
+            var declarationOffsets = new Dictionary<AstNode, int>(ReferenceEqualityComparer.Instance);
+            var emitter = new CalorEmitter(CreateContext(sourceFile))
+            {
+                EffectRowDeclarationEmitted = declarationOffsets.Add
+            };
+            var probe = emitter.Emit(module);
             var reparsed = TryParseModule(probe);
             if (reparsed == null)
             {
@@ -1003,8 +1870,11 @@ public sealed class CSharpToCalorConverter
                 return;
             }
 
-            var converged = EffectEnforcementPass.SynthesizeDeclaredRows(reparsed, resolver);
-            CopyEffectRows(reparsed, module);
+            var converged = EffectEnforcementPass.SynthesizeConvertedRows(reparsed, resolver);
+            CopyEffectRows(reparsed, module, declarationOffsets);
+            var binding = new Binding.Binder(new Diagnostics.DiagnosticBag());
+            binding.Bind(module, null, declarationsOnly: true);
+            binding.MaterializeUnknownCallableRows();
 
             if (!converged)
             {
@@ -1050,57 +1920,131 @@ public sealed class CSharpToCalorConverter
     }
 
     /// <summary>
-    /// Copies synthesised <c>§E</c> rows from the re-parsed module onto the tree
-    /// the converter holds, matching declarations by the id they carry through the
-    /// round trip (<c>f001</c>, <c>Class.m002</c>, <c>IFace.mt003</c>). A
-    /// declaration the round trip did not preserve simply keeps the row it has.
+    /// Copies synthesised boundary rows from the re-parsed module onto the tree
+    /// the converter holds. Non-public bodies omit their own inferred rows, but
+    /// retain callback positions and effect binders. Exact emitted header offsets
+    /// distinguish overloads, namespaces and conditional branches.
+    /// Every target must match before any rows are copied.
     /// </summary>
-    private static void CopyEffectRows(ModuleNode source, ModuleNode target)
+    private static void CopyEffectRows(
+        ModuleNode source, ModuleNode target, IReadOnlyDictionary<AstNode, int> declarationOffsets)
     {
-        var rows = new Dictionary<string, EffectsNode?>(StringComparer.Ordinal);
-        foreach (var (key, effects, _) in EnumerateRowSites(source))
-            rows[key] = effects;
+        // A record's header also starts its primary constructor; the declaration kind keeps
+        // a type's row and its members' rows apart.
+        var rows = EnumerateRowSites(source)
+            .GroupBy(site => (site.Declaration.Span.Start, Kind: site.Declaration.GetType()))
+            .Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single());
+        var assignments = new List<Action>();
 
-        foreach (var (key, _, assign) in EnumerateRowSites(target))
+        foreach (var (declaration, _, assign) in EnumerateRowSites(target))
         {
-            if (rows.TryGetValue(key, out var synthesized) && synthesized != null)
-                assign(synthesized);
+            // A constructor printed without its own header (a record's synthesized one)
+            // has no row position; it keeps its intrinsic contract. 0.30 (D1): so does an
+            // accessor or type the emitter printed without a recorded header.
+            if (declaration is ConstructorNode or PropertyAccessorNode or ClassDefinitionNode
+                && !declarationOffsets.ContainsKey(declaration))
+                continue;
+            if (!declarationOffsets.TryGetValue(declaration, out var offset)
+                || !rows.TryGetValue((offset, declaration.GetType()), out var synthesized))
+            {
+                throw new InvalidOperationException(
+                    $"Effect-row declaration at {declaration.Span} did not survive the probe emit/reparse.");
+            }
+            if (declaration is FunctionNode { Visibility: Visibility.Private or Visibility.Internal }
+                or MethodNode { Visibility: Visibility.Private or Visibility.Internal,
+                    IsAbstract: false, IsExtern: false })
+                // An inferred row cannot be unknown (Calor0410), so a non-public body
+                // that calls an API without an effect contract keeps ! unknown.
+                assignments.Add(() => assign(synthesized.Effects is { IsUnknown: true } unknown ? unknown : null));
+            else if (synthesized.Effects != null)
+                assignments.Add(() => assign(synthesized.Effects));
+            var sourceParameters = synthesized.Declaration switch
+            {
+                FunctionNode function => function.Parameters,
+                MethodNode method => method.Parameters,
+                _ => null
+            };
+            var targetParameters = declaration switch
+            {
+                FunctionNode function => function.Parameters,
+                MethodNode method => method.Parameters,
+                _ => null
+            };
+            if (sourceParameters == null || targetParameters == null)
+                continue;
+            if (sourceParameters.Count != targetParameters.Count
+                || !sourceParameters.Zip(targetParameters).All(pair => pair.First.Name == pair.Second.Name))
+                throw new InvalidOperationException("Callback parameters did not survive the probe emit/reparse.");
+            for (var index = 0; index < sourceParameters.Count; index++)
+            {
+                var sourceParameter = sourceParameters[index];
+                var targetParameter = targetParameters[index];
+                assignments.Add(() => targetParameter.Row = sourceParameter.Row);
+            }
+            if (synthesized.Declaration is FunctionNode sourceFunction && declaration is FunctionNode targetFunction)
+            {
+                assignments.Add(() => targetFunction.SetSynthesizedEffectParameters(sourceFunction.EffectParameters));
+                if (sourceFunction.Output != null && targetFunction.Output != null)
+                    assignments.Add(() => targetFunction.Output.Row = sourceFunction.Output.Row);
+            }
+            if (synthesized.Declaration is MethodNode sourceMethod && declaration is MethodNode targetMethod)
+            {
+                assignments.Add(() => targetMethod.SetSynthesizedEffectParameters(sourceMethod.EffectParameters));
+                if (sourceMethod.Output != null && targetMethod.Output != null)
+                    assignments.Add(() => targetMethod.Output.Row = sourceMethod.Output.Row);
+            }
         }
+        foreach (var assign in assignments)
+            assign();
     }
 
     /// <summary>
     /// Every declaration in a module that can carry a <c>§E</c> row, as
-    /// (key, current row, setter). Uses the same enumerators the effect pass keys
-    /// its facts with, so the two cannot disagree about what a declaration is
-    /// called.
+    /// (declaration, current row, setter). Uses the same reach as the effect pass,
+    /// while leaving parser-local identities inside their own trees.
     /// </summary>
-    private static IEnumerable<(string Key, EffectsNode? Effects, Action<EffectsNode> Assign)>
+    private static IEnumerable<(AstNode Declaration, EffectsNode? Effects, Action<EffectsNode?> Assign)>
         EnumerateRowSites(ModuleNode module)
     {
         foreach (var function in module.Functions)
-            yield return ($"F:{function.Id}", function.Effects, row => function.Effects = row);
+            yield return (function, function.Effects, row => function.Effects = row);
 
         foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
             foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
-                yield return ($"M:{cls.Name}.{method.Id}", method.Effects, row => method.Effects = row);
+                yield return (method, method.Effects, row => method.Effects = row);
+            foreach (var op in CallGraphAnalysis.EnumerateOperators(cls))
+                yield return (op, op.Effects, row => op.Effects = row);
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
+                yield return (ctor, ctor.Effects, row => ctor.Effects = row);
+            // 0.30 (D1): accessor rows and the type's static-initialization row.
+            foreach (var property in CallGraphAnalysis.EnumerateProperties(cls))
+                foreach (var accessor in new[] { property.Getter, property.Setter, property.Initer }.OfType<PropertyAccessorNode>())
+                    if (!accessor.IsAutoImplemented)
+                        yield return (accessor, accessor.Effects, row => accessor.Effects = row);
+            foreach (var indexer in CallGraphAnalysis.EnumerateIndexers(cls))
+                foreach (var accessor in new[] { indexer.Getter, indexer.Setter, indexer.Initer }.OfType<PropertyAccessorNode>())
+                    if (!accessor.IsAutoImplemented)
+                        yield return (accessor, accessor.Effects, row => accessor.Effects = row);
+            yield return (cls, cls.StaticInitializerEffects, row => cls.StaticInitializerEffects = row);
         }
 
         foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))
         {
             foreach (var signature in iface.Methods)
-                yield return ($"S:{iface.Name}.{signature.Id}", signature.Effects, row => signature.Effects = row);
+                yield return (signature, signature.Effects, row => signature.Effects = row);
         }
     }
 
     /// <summary>
-    /// #836 M2: counts raw-C# markers (§CSHARP{, §CS{, §RAW) in the emitted
+    /// #836 M2: counts raw-C# frames in the emitted
     /// Calor and records an <see cref="ConversionLossKind.EmitterFallback"/>
     /// loss for every marker beyond the ledgered interop preservations, so the
     /// "zero losses = fully native output" invariant holds even for fallbacks
     /// produced inside the CalorEmitter (which cannot reach the ledger yet).
     /// </summary>
-    private static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
+    internal static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
     {
         var markerLines = FindFallbackTokenLines(calorSource);
         var ledgered = context.Losses.Count(loss =>
@@ -1120,6 +2064,8 @@ public sealed class CSharpToCalorConverter
             .OfType<BaseNamespaceDeclarationSyntax>()
             .ToList();
         if (namespaceDeclarations.Count > 1)
+            return true;
+        if (namespaceDeclarations.Any(declaration => declaration.Usings.Count > 0))
             return true;
 
         return namespaceDeclarations.Count == 1
@@ -1142,28 +2088,12 @@ public sealed class CSharpToCalorConverter
 
     private ConversionResult ConvertWholeFileNamespaceInterop(
             string csharpSource,
-            CompilationUnitSyntax root,
             ConversionContext context,
             DateTime startTime,
             CSharpParseOptions parseOptions,
             OutputKind outputKind,
             CancellationToken cancellationToken)
         {
-            var interop = new CSharpInteropBlockNode(
-                new Parsing.TextSpan(
-                    0,
-                    csharpSource.Length,
-                    1,
-                    1),
-                csharpSource,
-                featureName: "namespace-topology",
-                reason:
-                    "Multiple lexical namespace scopes are preserved as one whole-file interop boundary in lossless mode.")
-            {
-                NamespaceIdentity = "",
-                NamespaceScopeId = "",
-                FullyQualifiedSymbolIdentity = "global::<compilation-unit>"
-            };
             context.RecordLoss(
                 ConversionLossKind.InteropPreserved,
                 "namespace-topology",
@@ -1175,24 +2105,12 @@ public sealed class CSharpToCalorConverter
                 feature: "namespace-topology",
                 line: 1);
 
-            var module = new ModuleNode(
-                GetRootSpan(root),
-                "m001",
-                "_global",
-                Array.Empty<UsingDirectiveNode>(),
-                Array.Empty<InterfaceDefinitionNode>(),
-                Array.Empty<ClassDefinitionNode>(),
-                Array.Empty<EnumDefinitionNode>(),
-                Array.Empty<EnumExtensionNode>(),
-                Array.Empty<DelegateDefinitionNode>(),
-                Array.Empty<FunctionNode>(),
-                new AttributeCollection(),
-                Array.Empty<IssueNode>(),
-                Array.Empty<AssumeNode>(),
-                Array.Empty<InvariantNode>(),
-                Array.Empty<DecisionNode>(),
-                null,
-                [interop]);
+            // R9: preserve the file as written, every #if branch included, not the selected text.
+            csharpSource = context.TakeWholeUnitPreservationSource(csharpSource);
+            var module = PreserveCompilationUnit(
+                csharpSource,
+                "namespace-topology",
+                "Multiple lexical namespace scopes are preserved as one whole-file interop boundary.", context);
             var calorSource = new CalorEmitter(context).Emit(module);
             if (!ParsesCleanly(calorSource))
             {
@@ -1219,14 +2137,29 @@ public sealed class CSharpToCalorConverter
             };
         }
 
-    private static Parsing.TextSpan GetRootSpan(CompilationUnitSyntax root)
+    // Transport-independent final fallback boundary. In particular, do not
+    // reconstruct source from Roslyn tokens or normalize literal indentation.
+    internal static ModuleNode PreserveCompilationUnit(
+        string source,
+        string feature,
+        string reason,
+        ConversionContext? context = null)
+    {
+        var span = new Parsing.TextSpan(0, source.Length, 1, 1);
+        var interop = new CSharpInteropBlockNode(
+            span, source, feature, reason,
+            isCompilationUnitPassthrough: true)
         {
-            var lineSpan = root.GetLocation().GetLineSpan();
-            return new Parsing.TextSpan(
-                root.SpanStart,
-                root.Span.Length,
-                lineSpan.StartLinePosition.Line + 1,
-                lineSpan.StartLinePosition.Character + 1);
+            NamespaceIdentity = "",
+            NamespaceScopeId = "",
+            FullyQualifiedSymbolIdentity = "global::<compilation-unit>"
+        };
+        context?.AssociatePreservation(interop, context.OriginalSyntaxTree?.GetRoot());
+        return new ModuleNode(
+            span, "m001", "_global",
+            [], [], [], [], [], [], [],
+            new AttributeCollection(),
+            [], [], [], [], null, [interop]);
     }
 
     private static List<int> FindFallbackTokenLines(string text)
@@ -1303,10 +2236,11 @@ public sealed class CSharpToCalorConverter
                     ? ConversionTrigger.RoundTripFailure
                     : null;
 
-        // #1144 (F6-REPORT-11): the visitor gives a global-namespace type the
-        // caller's ModuleName as its namespace identity, so the source side must
-        // use the same fallback or a custom module name disables the rescue.
-        var sources = CollectTopLevelTypeSources(root, context.ModuleName);
+        // #1144 (F6-REPORT-11): the source side must key a type exactly as the
+        // visitor does, or a custom module name disables the rescue. 0.30: ModuleName
+        // is only a file label and a global type keeps its global identity
+        // (`global::Probe`), so global sources are keyed without the module name.
+        var sources = CollectTopLevelTypeSources(root, globalNamespaceIdentity: null);
         var triggers = new List<string>();
 
         var failedClasses = new List<ClassDefinitionNode>();
@@ -1408,13 +2342,8 @@ public sealed class CSharpToCalorConverter
     }
 
     /// <summary>
-    /// #1144: which option made a #717 rescue reachable, and so whether it counts as
-    /// automatic rescue or as requested passthrough. The rescue needs two gates: C#
-    /// preservation (lossless fidelity, interop mode, or PassthroughOnError) and, for
-    /// a round-trip failure, RescueUnusableMembers or PassthroughOnError. It is an
-    /// automatic rescue only when both gates are open without PassthroughOnError;
-    /// so with both options on, lossless reports rescue (it would have fired without
-    /// the request) while lossy standard mode reports passthrough.
+    /// Records explicit rescue/passthrough preferences separately from default
+    /// lossless rescue. Historical lossy producers retain their requested path.
     /// </summary>
     private static (string Path, string EnabledBy) RescueProvenance(string trigger, ConversionContext context)
     {
@@ -1426,7 +2355,9 @@ public sealed class CSharpToCalorConverter
         if (trigger == ConversionTrigger.RoundTripFailure)
             return context.RescueUnusableMembers
                 ? (ConversionPath.Rescue, ConversionEnabledBy.RescueUnusableMembers)
-                : (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError);
+                : context.PassthroughOnError
+                    ? (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError)
+                    : (ConversionPath.Rescue, preserveGate);
         return (ConversionPath.Rescue, preserveGate);
     }
 
@@ -1454,7 +2385,7 @@ public sealed class CSharpToCalorConverter
         IReadOnlyList<DelegateDefinitionNode>? delegates = null)
     {
         var solo = new ModuleNode(
-            module.Span, module.Id, module.Name, module.Usings,
+            module.Span, module.LocalId, module.Name, module.Usings,
             interfaces ?? Array.Empty<InterfaceDefinitionNode>(),
             classes ?? Array.Empty<ClassDefinitionNode>(),
             enums ?? Array.Empty<EnumDefinitionNode>(),
@@ -1483,9 +2414,78 @@ public sealed class CSharpToCalorConverter
         OutputKind outputKind,
         CancellationToken cancellationToken)
     {
+        var compile = CompileRoundTrip(
+            calorSource, context, parseOptions, outputKind,
+            Enum.TryParse<NullableContextOptions>(context.Metadata.NullableContextOptions, out var nullableContext)
+                ? nullableContext
+                : NullableContextOptions.Disable,
+            cancellationToken);
+        return compile is { CompileCrash: null, Compiled.HasErrors: false, ValidationCrash: null, Validation: { } validation }
+            && validation.SyntaxErrors.Count == 0
+            && validation.CompilationErrors.Count == 0;
+    }
+
+    /// <summary>
+    /// Everything a round-trip compile reads. Two compiles with equal keys produce the same
+    /// result: <see cref="global::Calor.Compiler.Program.Compile(string, string?, CompilationOptions)"/>
+    /// and <see cref="GeneratedCSharpCompiler.Validate(IEnumerable{GeneratedCSharpSource}, GeneratedCSharpCompilationContext)"/>
+    /// receive nothing else. References are compared by path and aliases, in order.
+    /// </summary>
+    internal readonly record struct RoundTripCompileKey(
+        string CalorSource,
+        string? SourceFile,
+        CSharpParseOptions ParseOptions,
+        OutputKind OutputKind,
+        NullableContextOptions NullableContextOptions,
+        bool IncludeImplicitSystemUsing,
+        string References);
+
+    /// <summary>
+    /// One round-trip compile: the Calor compile (effects off, unknown calls permitted, as the
+    /// round trip has always run it) and, when that has no errors, the standalone compile of the
+    /// generated C#. A crash in either step is kept as the exception, for the caller to report.
+    /// </summary>
+    internal sealed record RoundTripCompile(
+        RoundTripCompileKey Key,
+        CompilationResult? Compiled,
+        Exception? CompileCrash,
+        GeneratedCSharpValidation? Validation,
+        Exception? ValidationCrash);
+
+    /// <summary>
+    /// The round-trip compile behind both <see cref="RoundTripCompiles"/> (the #717 rewrap gate)
+    /// and <see cref="RunRoundTripCheck"/> (the lossless check). A conversion asked both about the
+    /// same Calor under the same options, compiling it and its generated C# twice; the result is
+    /// now kept on the context and reused only when every input in <see cref="RoundTripCompileKey"/>
+    /// is equal. Cancellation is never cached.
+    /// </summary>
+    private static RoundTripCompile CompileRoundTrip(
+        string calorSource,
+        ConversionContext context,
+        CSharpParseOptions parseOptions,
+        OutputKind outputKind,
+        NullableContextOptions nullableContextOptions,
+        CancellationToken cancellationToken)
+    {
+        var references = context.Metadata.References
+            .Select(reference => new GeneratedCSharpReference(reference.Path, reference.Aliases))
+            .ToArray();
+        var key = new RoundTripCompileKey(
+            calorSource,
+            context.SourceFile,
+            parseOptions,
+            outputKind,
+            nullableContextOptions,
+            context.Metadata.IncludeImplicitSystemUsing,
+            string.Join("\n", references.Select(reference =>
+                reference.Path + "\t" + string.Join("\t", reference.Aliases))));
+        if (context.LastRoundTripCompile is { } previous && previous.Key == key)
+            return previous;
+
+        CompilationResult compiled;
         try
         {
-            var compileResult = global::Calor.Compiler.Program.Compile(
+            compiled = global::Calor.Compiler.Program.Compile(
                 calorSource,
                 context.SourceFile ?? "converted-output.calr",
                 new CompilationOptions
@@ -1495,40 +2495,47 @@ public sealed class CSharpToCalorConverter
                     DeferGeneratedOutputValidation = true,
                     CancellationToken = cancellationToken
                 });
-            if (compileResult.HasErrors)
-                return false;
-
-            var validation = GeneratedCSharpCompiler.Validate(
-                [new GeneratedCSharpSource(
-                    compileResult.GeneratedCode,
-                    context.SourceFile ?? "converted-output.g.cs")],
-                new GeneratedCSharpCompilationContext
-                {
-                    LanguageVersion = parseOptions.LanguageVersion,
-                    DocumentationMode = parseOptions.DocumentationMode,
-                    SourceCodeKind = parseOptions.Kind,
-                    Features = parseOptions.Features,
-                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
-                    References = context.Metadata.References.Select(
-                        reference => new GeneratedCSharpReference(
-                            reference.Path,
-                            reference.Aliases)),
-                    OutputKind = outputKind,
-                    NullableContextOptions = Enum.TryParse<NullableContextOptions>(
-                        context.Metadata.NullableContextOptions,
-                        out var nullableContext)
-                        ? nullableContext
-                        : NullableContextOptions.Disable
-                });
-            return validation.SyntaxErrors.Count == 0 && validation.CompilationErrors.Count == 0;
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            return context.LastRoundTripCompile = new(key, null, ex, null, null);
+        }
+
+        if (compiled.HasErrors)
+            return context.LastRoundTripCompile = new(key, compiled, null, null, null);
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(
+                    compiled.GeneratedCode,
+                    context.SourceFile ?? "converted-output.g.cs")],
+                new GeneratedCSharpCompilationContext
+                {
+                    IncludeImplicitSystemUsing = context.Metadata.IncludeImplicitSystemUsing,
+                    LanguageVersion = parseOptions.LanguageVersion,
+                    DocumentationMode = parseOptions.DocumentationMode,
+                    SourceCodeKind = parseOptions.Kind,
+                    Features = parseOptions.Features,
+                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
+                    References = references,
+                    OutputKind = outputKind,
+                    NullableContextOptions = nullableContextOptions
+                });
+            return context.LastRoundTripCompile = new(key, compiled, null, validation, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return context.LastRoundTripCompile = new(key, compiled, null, null, ex);
         }
     }
 
@@ -1723,8 +2730,7 @@ public sealed class CSharpToCalorConverter
             Fidelity = _options.Fidelity,
             Mode = _options.Mode,
             PassthroughOnError = _options.PassthroughOnError,
-            RescueUnusableMembers = _options.RescueUnusableMembers,
-            UseImplicitCallCloser = _options.UseImplicitCallCloser
+            RescueUnusableMembers = _options.RescueUnusableMembers
         };
     }
 
@@ -1806,10 +2812,14 @@ public sealed class CSharpToCalorConverter
         if (failures > 0 && !refuseOnFailure)
         {
             context.AddWarning(
-                $"Lossy output is unverified: the round-trip compile check found {failures} error(s), " +
-                "so the generated C# does not compile. The output was kept because lossy mode was requested; " +
-                "fix it by hand, or convert losslessly, which keeps a failing type as C# where it can.",
-                feature: LossyRoundTripUnverifiedFeature);
+                context.Fidelity == ConversionFidelity.Lossless
+                    ? $"Exact original C# was preserved, but the standalone round-trip compile check found {failures} error(s). " +
+                      "Writing is not proof of a build; supply the original project references and configuration."
+                    : $"Lossy output is unverified: the round-trip compile check found {failures} error(s), " +
+                      "so the generated C# does not compile. The output was kept because lossy mode was requested; " +
+                      "fix it by hand, or convert losslessly, which keeps a failing type as C# where it can.",
+                feature: context.Fidelity == ConversionFidelity.Lossless
+                    ? "preserved-roundtrip-unverified" : LossyRoundTripUnverifiedFeature);
         }
     }
 
@@ -1822,25 +2832,9 @@ public sealed class CSharpToCalorConverter
         CancellationToken cancellationToken,
         Action<string, string, int?, int?> fail)
     {
-        CompilationResult compileResult;
-        try
-        {
-            compileResult = global::Calor.Compiler.Program.Compile(
-                calorSource,
-                context.SourceFile ?? "converted-output.calr",
-                new CompilationOptions
-                {
-                    EnforceEffects = false,
-                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
-                    DeferGeneratedOutputValidation = true,
-                    CancellationToken = cancellationToken
-                });
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        var compile = CompileRoundTrip(
+            calorSource, context, parseOptions, outputKind, nullableContextOptions, cancellationToken);
+        if (compile.CompileCrash is { } ex)
         {
             fail(
                 $"Generated Calor validation crashed: {ex.GetType().Name}: {ex.Message}",
@@ -1848,10 +2842,11 @@ public sealed class CSharpToCalorConverter
             return;
         }
 
+        var compileResult = compile.Compiled!;
         foreach (var diagnostic in compileResult.Diagnostics.Errors)
         {
             fail(
-                $"Generated Calor failed compilation: {diagnostic.Message}",
+                $"Generated Calor failed compilation ({diagnostic.Code}): {diagnostic.Message}",
                 "roundtrip-calor-validation",
                 diagnostic.Span.Line,
                 diagnostic.Span.Column);
@@ -1862,46 +2857,23 @@ public sealed class CSharpToCalorConverter
             return;
         }
 
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var validation = GeneratedCSharpCompiler.Validate(
-                [new GeneratedCSharpSource(
-                    compileResult.GeneratedCode,
-                    context.SourceFile ?? "converted-output.g.cs")],
-                new GeneratedCSharpCompilationContext
-                {
-                    LanguageVersion = parseOptions.LanguageVersion,
-                    DocumentationMode = parseOptions.DocumentationMode,
-                    SourceCodeKind = parseOptions.Kind,
-                    Features = parseOptions.Features,
-                    PreprocessorSymbols = parseOptions.PreprocessorSymbolNames,
-                    References = context.Metadata.References.Select(
-                        reference => new GeneratedCSharpReference(
-                            reference.Path,
-                            reference.Aliases)),
-                    OutputKind = outputKind,
-                    NullableContextOptions = nullableContextOptions
-                });
-            foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
-            {
-                var span = diagnostic.Location.GetLineSpan().StartLinePosition;
-                fail(
-                    $"Round-tripped C# failed compilation ({diagnostic.Id}): {diagnostic.GetMessage()}",
-                    "roundtrip-csharp-validation",
-                    span.Line + 1,
-                    span.Character + 1);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        if (compile.ValidationCrash is { } crash)
         {
             fail(
-                $"Round-tripped C# validation crashed: {ex.GetType().Name}: {ex.Message}",
+                $"Round-tripped C# validation crashed: {crash.GetType().Name}: {crash.Message}",
                 "roundtrip-csharp-validation", null, null);
+            return;
+        }
+
+        var validation = compile.Validation!;
+        foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
+        {
+            var span = diagnostic.Location.GetLineSpan().StartLinePosition;
+            fail(
+                $"Round-tripped C# failed compilation ({diagnostic.Id}): {diagnostic.GetMessage()}",
+                "roundtrip-csharp-validation",
+                span.Line + 1,
+                span.Character + 1);
         }
     }
 
@@ -1924,6 +2896,10 @@ public sealed class CSharpToCalorConverter
         var regexLocation = typeof(System.Text.RegularExpressions.Regex).Assembly.Location;
         if (!string.IsNullOrEmpty(regexLocation))
             refs.Add(MetadataReference.CreateFromFile(regexLocation));
+
+        var concurrentLocation = typeof(System.Collections.Concurrent.ConcurrentDictionary<,>).Assembly.Location;
+        if (!string.IsNullOrEmpty(concurrentLocation))
+            refs.Add(MetadataReference.CreateFromFile(concurrentLocation));
 
         // Add System.Runtime for core types
         var runtimeDir = System.IO.Path.GetDirectoryName(objectLocation);
@@ -1995,9 +2971,10 @@ public sealed class CSharpToCalorConverter
         // Fall back to file name
         if (!string.IsNullOrEmpty(sourceFile))
         {
-            // Sanitize characters that are not valid in Calor module names
-            // (e.g., '#' from Verify snapshot filenames like "TestName#HintName.verified.cs")
-            return Path.GetFileNameWithoutExtension(sourceFile).Replace('#', '_');
+            // This is a file label, not a CLR namespace or static container.
+            var fileLabel = Path.GetFileNameWithoutExtension(sourceFile)
+                .Replace('#', '_').Replace(':', '_');
+            return CSharpEmitter.SanitizeIdentifier(fileLabel);
         }
 
         return "ConvertedModule";
@@ -2021,8 +2998,199 @@ public enum ConversionDirection
     CalorToCSharp
 }
 
+/// <summary>Owns one prepared generation base and its cooperating writer lock; conversion never writes output.</summary>
+internal sealed class ConversionGeneration(
+    CSharpToCalorConverter converter, ConversionOptions options, string sourcePath, string outputPath,
+    bool dryRun, int? namespaceIndex = null, bool projectConversion = false) : IDisposable
+{
+    private readonly string _sourcePath = Path.GetFullPath(sourcePath);
+    private readonly string _outputPath = Path.GetFullPath(outputPath);
+    private FileStream? _generationLock;
+    private string? _before;
+    private string? _beforeReceipt;
+    private IReadOnlyList<ConversionInputSnapshot> _inputs = [];
+    private ConversionResult? _result;
+    private bool _started;
+    private bool _writeAttempted;
+
+    internal string? Before => _before;
+    internal ConversionResult Result => _result
+        ?? throw new InvalidOperationException("No original conversion result has been captured.");
+
+    internal async Task<ConversionResult> ConvertAsync(CancellationToken cancellationToken = default)
+    {
+        if (_started) throw new InvalidOperationException("A generation can execute conversion only once.");
+        _started = true;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!File.Exists(_sourcePath))
+            return _result = await converter.ConvertFileAsync(_sourcePath, cancellationToken);
+
+        var receiptPath = _outputPath + ".conversion.json";
+        var artifacts = new[] { _outputPath, receiptPath, _outputPath + ".conversion.lock" };
+        var sourceIdentity = CanonicalPath.Resolve(_sourcePath);
+        if (artifacts.Any(path => Incremental.BuildStateCache.GetPathComparer()
+                .Equals(CanonicalPath.Resolve(path), sourceIdentity)))
+            throw new IOException("Conversion artifacts must not overwrite the original C# source.");
+        if (!dryRun)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_outputPath)!);
+            _generationLock = new FileStream(
+                _outputPath + ".conversion.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        _before = File.Exists(_outputPath)
+            ? await CSharpToCalorConverter.ReadSourceFileAsync(_outputPath, cancellationToken) : null;
+        _beforeReceipt = File.Exists(receiptPath)
+            ? await CSharpToCalorConverter.ReadSourceFileAsync(receiptPath, cancellationToken) : null;
+        if (_before != null || _beforeReceipt != null)
+        {
+            if (_before == null || _beforeReceipt == null)
+                throw new IOException("Existing output has no matching conversion generation context. Keep it and convert the original C# to a new destination.");
+            var previous = ConversionReceipt.Deserialize(_beforeReceipt);
+            if (!string.Equals(_before, previous.GeneratedCalor, StringComparison.Ordinal)
+                || !string.Equals(previous.Original.Path, _sourcePath, StringComparison.Ordinal))
+                throw new IOException("Generated Calor was edited or belongs to another original source. Keep those edits; automatic refresh is refused.");
+        }
+        _inputs = ConversionReceipt.CaptureInputs(
+            _sourcePath, converter.GetSemanticMetadataReferences(), options, cancellationToken);
+        if (_inputs.Any(input => artifacts.Any(path => Incremental.BuildStateCache.GetPathComparer()
+                .Equals(CanonicalPath.Resolve(path), CanonicalPath.Resolve(input.Path)))))
+            throw new IOException("Conversion artifacts must not overwrite original source or reference inputs.");
+        var original = await CSharpToCalorConverter.ReadSourceFileAsync(_sourcePath, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        ConversionResult result;
+        // 0.30: one named namespace with local imports needs no split, so the native
+        // scoped-import projection (formerly behind --split-namespaces) is the default.
+        // It falls back to the ordinary single-file path, preservation included.
+        var scopedDefault = !namespaceIndex.HasValue && !projectConversion
+            && converter.IsSingleScopedNamespace(original, _sourcePath);
+        if (namespaceIndex.HasValue || projectConversion || scopedDefault)
+        {
+            var project = converter.ConvertProjectCore(
+                original, _sourcePath, cancellationToken, capturePreservationContext: true);
+            if (scopedDefault && (project.IsSplit || !project.Outputs[0].Conversion.Success))
+                result = converter.ConvertWithPreservationContext(original, _sourcePath, cancellationToken);
+            else if (namespaceIndex.HasValue
+                    && (!project.IsSplit || namespaceIndex.Value >= project.Outputs.Count)
+                || !namespaceIndex.HasValue && project.IsSplit)
+            {
+                var refused = project.Outputs[0].Conversion;
+                refused.Context.AddError(
+                    "Native namespace splitting was refused. No partial split output may be committed.",
+                    "namespace-split-refused");
+                result = new ConversionResult { Success = false, Context = refused.Context };
+            }
+            else
+                result = project.Outputs[namespaceIndex ?? 0].Conversion;
+        }
+        else
+            result = converter.ConvertWithPreservationContext(original, _sourcePath, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return _result = result;
+    }
+
+    internal async Task WriteAsync(ConversionResult result, CancellationToken cancellationToken = default,
+        Action? outputWritten = null)
+    {
+        if (!ReferenceEquals(result, _result))
+            throw new InvalidOperationException("Only the actual captured conversion can be committed.");
+        var receipt = await PrepareReceiptAsync(result.CalorSource, cancellationToken);
+        await ConversionFileWriter.WriteGenerationAsync(
+            _outputPath, _before, _beforeReceipt, receipt, cancellationToken, outputWritten);
+    }
+
+    internal ConversionResult PreserveOriginal(CancellationToken cancellationToken,
+        IEnumerable<ConversionIssue> validationIssues)
+    {
+        if (_writeAttempted || Result.Context.OriginalSource == null)
+            throw new InvalidOperationException("Whole-file rescue requires the actual original conversion context before commit.");
+        return _result = converter.PreserveOriginal(
+            Result.Context.OriginalSource, _sourcePath, Result, cancellationToken, validationIssues);
+    }
+
+    internal async Task<ConversionReceipt> PrepareReceiptAsync(string? emittedSource,
+        CancellationToken cancellationToken)
+    {
+        if (_writeAttempted || _generationLock == null || !Result.Success || emittedSource == null)
+            throw new InvalidOperationException("A successful prepared generation can be written only once.");
+        if (!string.Equals(emittedSource, Result.CalorSource, StringComparison.Ordinal))
+            throw new IOException("Staged output differs from its actual captured conversion; commit refused.");
+        _writeAttempted = true;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!string.Equals(Result.Context.OriginalSource,
+                await CSharpToCalorConverter.ReadSourceFileAsync(_sourcePath, cancellationToken), StringComparison.Ordinal))
+            throw new IOException("Original C# changed during conversion; output was not refreshed.");
+        return ConversionReceipt.Capture(Result, options, _inputs);
+    }
+
+    internal Task VerifyPreparedAsync(ConversionReceipt receipt, CancellationToken cancellationToken)
+        => ConversionFileWriter.VerifyGenerationAsync(
+            _outputPath, _before, _beforeReceipt, receipt, cancellationToken);
+
+    internal Task FinalizeReceiptAsync(ConversionReceipt receipt)
+        => ConversionFileWriter.WriteReceiptAsync(_outputPath, _beforeReceipt, receipt);
+
+    public void Dispose()
+    {
+        _generationLock?.Dispose();
+        _generationLock = null;
+    }
+}
+
 internal static class ConversionFileWriter
 {
+    internal static async Task WriteGenerationAsync(
+        string path, string? before, string? beforeReceipt, ConversionReceipt receipt,
+        CancellationToken cancellationToken = default, Action? outputWritten = null)
+    {
+        var fullPath = Path.GetFullPath(path);
+        await VerifyGenerationAsync(fullPath, before, beforeReceipt, receipt, cancellationToken);
+        var directory = Path.GetDirectoryName(fullPath)!;
+        if (fullPath.EndsWith(".calr", StringComparison.OrdinalIgnoreCase)
+            && !Ids.DeclarationIdentityStore.IsAmbientRoot(directory))
+        {
+            var store = Ids.DeclarationIdentityStore.FindForActiveInput(fullPath)
+                ?? new Ids.DeclarationIdentityStore(directory);
+            store.Sync(before == null ? [] : [fullPath]);
+            store.Apply([new(fullPath, before, receipt.GeneratedCalor)]);
+        }
+        else
+        {
+            await WriteAtomicAsync(fullPath, receipt.GeneratedCalor, cancellationToken: cancellationToken);
+        }
+        outputWritten?.Invoke();
+        await WriteReceiptAsync(fullPath, beforeReceipt, receipt);
+    }
+
+    internal static async Task VerifyGenerationAsync(
+        string path, string? before, string? beforeReceipt, ConversionReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        ConversionReceipt.VerifyInputs(receipt.Inputs, cancellationToken);
+        if ((File.Exists(path) ? await CSharpToCalorConverter.ReadSourceFileAsync(path, cancellationToken) : null) != before
+            || (File.Exists(path + ".conversion.json")
+                ? await CSharpToCalorConverter.ReadSourceFileAsync(path + ".conversion.json", cancellationToken) : null) != beforeReceipt)
+            throw new IOException("Conversion output or generation context changed concurrently; refresh refused.");
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    internal static async Task WriteReceiptAsync(string path, string? beforeReceipt, ConversionReceipt receipt)
+    {
+        var receiptPath = path + ".conversion.json";
+        // Output and receipt are separate artifacts. An interrupted final receipt
+        // write leaves a detectable mismatch, never a trusted new generation.
+        try
+        {
+            if ((File.Exists(receiptPath) ? await CSharpToCalorConverter.ReadSourceFileAsync(receiptPath) : null) != beforeReceipt)
+                throw new IOException("Generation context changed concurrently.");
+            await WriteAtomicAsync(receiptPath, receipt.Serialize());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.DecoderFallbackException)
+        {
+            throw new IOException(
+                $"Output was written but its conversion context could not be saved: {ex.Message} Keep both artifacts; automatic refresh is blocked.", ex);
+        }
+    }
+
     public static void WriteAtomic(
         string path,
         string content,
@@ -2041,6 +3209,20 @@ internal static class ConversionFileWriter
         var directory = Path.GetDirectoryName(fullPath)
             ?? throw new InvalidOperationException($"Output path has no directory: {path}");
         Directory.CreateDirectory(directory);
+
+        if (fullPath.EndsWith(".calr", StringComparison.Ordinal)
+            && !Ids.DeclarationIdentityStore.IsAmbientRoot(directory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (encoding != null && encoding.CodePage != System.Text.Encoding.UTF8.CodePage)
+                throw new InvalidOperationException("Identity-managed Calor output must use UTF-8.");
+            var store = Ids.DeclarationIdentityStore.FindForActiveInput(fullPath)
+                ?? new Ids.DeclarationIdentityStore(directory);
+            var before = File.Exists(fullPath) ? await File.ReadAllTextAsync(fullPath, cancellationToken) : null;
+            store.Sync(before == null ? [] : [fullPath]);
+            store.Apply([new(fullPath, before, content)]);
+            return;
+        }
 
         var tempPath = Path.Combine(
             directory,
@@ -2108,21 +3290,12 @@ public static class Converter
         => ConvertCSharpToCalorAsync(csharpPath, outputPath, options: null);
 
     /// <summary>
-    /// Converts C# to Calor with optional <see cref="ConversionOptions"/> (e.g.
-    /// <c>UseImplicitCallCloser = false</c> for v0.6.0-compatible output).
+    /// Converts C# to Calor with optional <see cref="ConversionOptions"/>.
     /// </summary>
     public static async Task<ConversionResult> ConvertCSharpToCalorAsync(string csharpPath, string? outputPath, ConversionOptions? options)
     {
         var converter = options != null ? new CSharpToCalorConverter(options) : new CSharpToCalorConverter();
-        var result = await converter.ConvertFileAsync(csharpPath);
-
-        if (result.Success && result.CalorSource != null)
-        {
-            var calorPath = outputPath ?? Path.ChangeExtension(csharpPath, ".calr");
-            await ConversionFileWriter.WriteAtomicAsync(calorPath, result.CalorSource);
-        }
-
-        return result;
+        return await converter.ConvertFileAndSaveAsync(csharpPath, outputPath);
     }
 
     /// <summary>

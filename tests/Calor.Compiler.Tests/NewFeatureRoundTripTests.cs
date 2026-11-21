@@ -50,14 +50,13 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_CastExpression_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:CastTest:pub}
-    §I{object:x}
-    §O{i32}
-    §R (cast i32 x)
+module Test Test block
+  func CastTest (object:x) → int
+    !
+    return ((int)x)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("cast", formatted);
+        Assert.Contains("(int)x", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -65,11 +64,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_IsExpression_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:IsTest:pub}
-    §I{object:x}
-    §O{bool}
-    §R (is x str)
+module Test Test block
+  func IsTest (object:x) → bool
+    !
+    return (x is string)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("is", formatted);
@@ -80,11 +78,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_AsExpression_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:AsTest:pub}
-    §I{object:x}
-    §O{str}
-    §R (as x str)
+module Test Test block
+  func AsTest (object:x) → string
+    !
+    return (x as string)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("as", formatted);
@@ -95,14 +92,13 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedCast_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedCast:pub}
-    §I{object:x}
-    §O{i32}
-    §R (cast i32 (cast f64 x))
+module Test Test block
+  func NestedCast (object:x) → int
+    !
+    return ((int)((double)x))
 ";
         var (_, formatted, _) = FormatAndReparse(source);
-        Assert.Contains("cast", formatted);
+        Assert.Contains("((int)((double)x))", formatted);
     }
 
     #endregion
@@ -113,10 +109,10 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_AsyncFunction_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §AF{f001:GetDataAsync:pub}
-    §O{str}
-    §R ""data""
+module Test Test block
+  func GetDataAsync async () → string
+    !
+    return ""data""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.NotEmpty(formatted);
@@ -131,41 +127,39 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MatchStatement_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MatchTest:pub}
-    §I{i32:x}
-    §O{str}
-    §W{m1} x
-    §K 1
-      §R ""one""
-    §K 2
-      §R ""two""
-    §K _
-      §R ""other""
+module Test Test block
+  func MatchTest (int:x) → string
+    !
+    match x
+      case 1
+        return ""one""
+      case 2
+        return ""two""
+      case _
+        return ""other""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§W{", formatted);
-        Assert.Contains("§K", formatted);
+        Assert.Contains("match ", formatted);
+        Assert.Contains("case ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
     [Fact]
-    public void RoundTrip_MatchWithOptionPatterns_FormatsAndReparses()
+    public void RoundTrip_MatchWithNullablePatterns_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:OptMatch:pub}
-    §I{i32:x}
-    §O{i32}
-    §W{m1} x
-    §K §SM _
-      §R 1
-    §K §NN
-      §R 0
+module Test Test block
+  func OptMatch (int:x) → int
+    !
+    match x
+      case null
+        return 1
+      case _
+        return 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§SM", formatted);
-        Assert.Contains("§NN", formatted);
+        Assert.Contains("null", formatted);
+        Assert.Contains("case _", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -177,18 +171,16 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_PreconditionAndPostcondition_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §S (>= result 0)
-    §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (result >= 0)
+    return (a / b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§Q", formatted);
-        Assert.Contains("§S", formatted);
+        Assert.Contains("requires ", formatted);
+        Assert.Contains("=> ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -200,15 +192,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ForLoop_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:LoopTest:pub}
-    §O{void}
-    §E{cw}
-    §L{l1:i:0:10:1}
-      §C{Console.WriteLine} i
+module Test Test block
+  func LoopTest () → void
+    ! cw
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§L{", formatted);
+        Assert.Contains("for i from ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -216,16 +207,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_WhileLoop_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:WhileTest:pub}
-    §I{bool:running}
-    §O{void}
-    §E{cw}
-    §WH{w1} running
-      §P ""working""
+module Test Test block
+  func WhileTest (bool:running) → void
+    ! cw
+    while running
+      Console.WriteLine(""working"")
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§WH", formatted);
+        Assert.Contains("while ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -233,13 +222,12 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedLoops_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedLoop:pub}
-    §O{void}
-    §E{cw}
-    §L{l1:i:0:5:1}
-      §L{l2:j:0:5:1}
-        §C{Console.WriteLine} (+ i j)
+module Test Test block
+  func NestedLoop () → void
+    ! cw
+    for i from 0 to 5 step 1
+      for j from 0 to 5 step 1
+        Console.WriteLine((i + j))
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Single(reparsed.Functions);
@@ -253,21 +241,16 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_NestedIfElse_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedIf:pub}
-    §I{bool:a}
-    §I{bool:b}
-    §O{i32}
-    §IF{if1} a
-      §IF{if2} b
-        §R 2
-      §EL
-        §R 1
-    §EL
-      §R 0
+module Test Test block
+  func NestedIf (bool:a, bool:b) → int
+    !
+    if a
+      return (b ? 2 : 1)
+    else
+      return 0
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§IF{", formatted);
+        Assert.Contains("if ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -279,55 +262,55 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_FunctionWithEffects_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:PrintAll:pub}
-    §I{str:msg}
-    §O{void}
-    §E{cw}
-    §C{Console.WriteLine} msg
+module Test Test block
+  func PrintAll (string:msg) → void
+    ! cw
+    Console.WriteLine(msg)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§E{", formatted);
+        Assert.Contains("! cw", formatted);
         Assert.Single(reparsed.Functions);
     }
 
     #endregion
 
-    #region Option and Result Types
+    #region Nullable Values and Exceptions
 
     [Fact]
-    public void RoundTrip_OptionExpressions_FormatsAndReparses()
+    public void RoundTrip_NullableExpressions_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SomeTest:pub}
-    §O{i32}
-    §R §SM 42
-  §F{f002:NoneTest:pub}
-    §O{i32}
-    §R §NN{i32}
+module Test Test block
+  func SomeTest () → int?
+    !
+    return 42
+
+  func NoneTest () → int?
+    !
+    return null
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§SM", formatted);
-        Assert.Contains("§NN", formatted);
+        Assert.Contains("42", formatted);
+        Assert.Contains("null", formatted);
         Assert.Equal(2, reparsed.Functions.Count);
     }
 
     [Fact]
-    public void RoundTrip_ResultExpressions_FormatsAndReparses()
+    public void RoundTrip_ReturnAndThrow_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:OkTest:pub}
-    §O{i32}
-    §R §OK 42
-  §F{f002:ErrTest:pub}
-    §O{str}
-    §R §ERR ""error""
+module Test Test block
+  func OkTest () → int
+    !
+    return 42
+
+  func ErrTest () → string
+    !
+    throw new Exception(""error"")
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("OK", formatted);
-        Assert.Contains("ERR", formatted);
+        Assert.Contains("42", formatted);
+        Assert.Contains("throw ", formatted);
         Assert.Equal(2, reparsed.Functions.Count);
     }
 
@@ -339,16 +322,18 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_LiteralInReturn_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:IntLiteral:pub}
-    §O{i32}
-    §R 42
-  §F{f002:BoolLiteral:pub}
-    §O{bool}
-    §R true
-  §F{f003:StringLiteral:pub}
-    §O{str}
-    §R ""hello""
+module Test Test block
+  func IntLiteral () → int
+    !
+    return 42
+
+  func BoolLiteral () → bool
+    !
+    return true
+
+  func StringLiteral () → string
+    !
+    return ""hello""
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("42", formatted);
@@ -365,22 +350,17 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_MultipleFunctions_FormatsAndReparses()
     {
         var source = @"
-§M{m001:MathLib}
-  §F{f001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
-  §F{f002:Subtract:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (- a b)
-  §F{f003:Multiply:priv}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (* a b)
+module MathLib MathLib block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
+
+  func Subtract (int:a, int:b) → int
+    !
+    return (a - b)
+
+  func Multiply private (int:a, int:b) → int
+    return (a * b)
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
         Assert.Contains("Add", formatted);
@@ -397,24 +377,22 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_FunctionWithContractsEffectsAndControlFlow_FormatsAndReparses()
     {
         var source = @"
-§M{m001:ComplexTest}
-  §F{f001:Process:pub}
-    §I{i32:input}
-    §O{i32}
-    §E{cw}
-    §Q (> input 0)
-    §S (>= result 0)
-    §IF{if1} (> input 10)
-      §C{Console.WriteLine} ""big""
-      §R (* input 2)
-    §EL
-      §C{Console.WriteLine} ""small""
-      §R input
+module ComplexTest ComplexTest block
+  func Process (int:input) → int
+    ! cw
+    requires (input > 0)
+    => (result >= 0)
+    if (input > 10)
+      Console.WriteLine(""big"")
+      return (input * 2)
+    else
+      Console.WriteLine(""small"")
+      return input
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§Q", formatted);
-        Assert.Contains("§S", formatted);
-        Assert.Contains("§IF{", formatted);
+        Assert.Contains("requires ", formatted);
+        Assert.Contains("=> ", formatted);
+        Assert.Contains("if ", formatted);
         Assert.Single(reparsed.Functions);
     }
 
@@ -426,16 +404,14 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_BindStatements_FormatsAndReparses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:BindTest:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §B{sum} (+ a b)
-    §R sum
+module Test Test block
+  func BindTest (int:a, int:b) → int
+    !
+    let sum = (a + b)
+    return sum
 ";
         var (_, formatted, reparsed) = FormatAndReparse(source);
-        Assert.Contains("§B{", formatted);
+        Assert.Contains("let sum", formatted);
         Assert.DoesNotContain("§LET{", formatted);
         Assert.DoesNotContain("§MUT{", formatted);
         Assert.Single(reparsed.Functions);
@@ -446,20 +422,19 @@ public class NewFeatureRoundTripTests
     {
         // Typed immutable: {type:name}, typed mutable: {~name:type}
         var source = @"
-§M{m001:Test}
-  §F{f001:TypedBindTest:pub}
-    §I{i32:x}
-    §O{i32}
-    §B{i32:count} 0
-    §B{~total:i32} 0
-    §R count
+module Test Test block
+  func TypedBindTest (int:x) → int
+    !
+    let int:count = 0
+    var int:total = 0
+    return count
 ";
         var (original, formatted, reparsed) = FormatAndReparse(source);
 
         // Immutable typed bind should format as {type:name}
-        Assert.Contains("§B{i32:count}", formatted);
+        Assert.Contains("let int:count", formatted);
         // Mutable typed bind should format as {~name:type}
-        Assert.Contains("§B{~total:i32}", formatted);
+        Assert.Contains("var int:total", formatted);
 
         // Round-trip preserves semantics
         var func = Assert.Single(reparsed.Functions);
@@ -481,11 +456,11 @@ public class NewFeatureRoundTripTests
     {
         // Legacy CalorEmitter format: {name:const} should parse as immutable, no type
         var source = @"
-§M{m001:Test}
-  §F{f001:LegacyTest:pub}
-    §O{i32}
-    §B{count:const} 42
-    §R count
+module Test Test block
+  func LegacyTest () → int
+    !
+    let count = 42
+    return count
 ";
         var parsed = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -503,11 +478,11 @@ public class NewFeatureRoundTripTests
     {
         // Legacy format: {type:name:const} should parse as immutable with type
         var source = @"
-§M{m001:Test}
-  §F{f001:LegacyTypedTest:pub}
-    §O{i32}
-    §B{i32:count:const} 42
-    §R count
+module Test Test block
+  func LegacyTypedTest () → int
+    !
+    let int:count = 42
+    return count
 ";
         var parsed = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -528,13 +503,13 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ArrayInitialized_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §ARR{nums:i32} 1 2 3 §/ARR{nums}
+module Test Test block
+  func Main () → void
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
         var (_, formatted, _) = FormatAndReparse(source);
-        Assert.Contains("§ARR", formatted);
+        Assert.Contains("new int[] { 1, 2, 3 }", formatted);
         // Phase 4b: indent form — array literal blocks end by dedent, not §/ARR.
     }
 
@@ -542,13 +517,13 @@ public class NewFeatureRoundTripTests
     public void RoundTrip_ArraySized_FormatsAndReparses()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{[i32]:arr1} §ARR{i32:arr1:10}
+module Test Test block
+  func Main () → void
+    !
+    let int[]:arr1 = new arr1[10]
 ";
         var (_, formatted, _) = FormatAndReparse(source);
-        Assert.Contains("§ARR", formatted);
+        Assert.Contains("new arr1[10]", formatted);
     }
 
     #endregion
@@ -591,98 +566,88 @@ public class NewFeatureRoundTripTests
     [Theory]
     // position 1 — the declaration's own row
     [InlineData("""
-        §M{m001:R}
-          §F{f001:F:pub} () -> void
-            §E{cw}
-            §P "x"
-        """, "\n    §E{cw}\n")]
+        module R R block
+          func F () → void
+            ! cw
+            Console.WriteLine("x")
+        """, "\n    ! cw\n")]
     // position 2 — lambda literal. The emitter did not write this tag back before
     // this slice, so the row was silently dropped on every round trip.
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Main:pub} () -> void
-            §E{}
-            §B{f} §LAM{lam1:x:i32} §E{cw} (+ x INT:1) §/LAM{lam1}
-        """, "§LAM{lam1:x:i32} §E{cw}")]
+        module R R block
+          func Main () → void
+            !
+            let f = (int:x) ! cw => (x + 1)
+        """, "(int:x) ! cw =>")]
     // position 3 — delegate declaration. Emitted as `§E{[console, write]}` before
     // this slice: a stringified KeyValuePair that did not re-parse.
     [InlineData("""
-        §M{m001:R}
-          §DEL{d001:Handler}
-            §I{i32:x}
-            §O{void}
-            §E{cw}
-          §F{f001:Main:pub} () -> void
-            §E{}
-        """, "\n    §E{cw}\n")]
+        module R R block
+          delegate Handler (int:x) → void
+            ! cw
+
+          func Main () → void
+            !
+            return
+        """, "\n    ! cw\n")]
     // position 4 — parameter, tag form
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Apply:pub}
-            §I{Func<i32,i32>:transform} §E{cw}
-            §I{i32:value} = INT:1
-            §O{i32}
-            §E{cw}
-            §R INT:0
-        """, "§I{Func<i32, i32>:transform} §E{cw}")]
+        module R R block
+          func Apply (Func<int, int>:transform ! cw, int:value = 1) → int
+            ! cw
+            return 0
+        """, "Func<int, int>:transform ! cw")]
     // position 5 — parameter, inline form
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-            §E{cw}
-            §R INT:0
-        """, "Func<i32, i32>:transform §E{cw}")]
-    // position 6 — return, §O spelling
-    [InlineData("""
-        §M{m001:R}
-          §F{f001:Make:pub}
-            §O{Func<i32>} §E{cw}
-            §E{cw}
-            §R §LAM{lam1} INT:0 §/LAM{lam1}
-        """, "-> Func<i32> §E{cw}")]
+        module R R block
+          func Apply (Func<int, int>:transform ! cw, int:value) → int
+            ! cw
+            return 0
+        """, "Func<int, int>:transform ! cw")]
     // position 6 — return, arrow spelling
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Make:pub} () -> Func<i32> §E{cw}
-            §E{cw}
-            §R §LAM{lam1} INT:0 §/LAM{lam1}
-        """, "-> Func<i32> §E{cw}")]
+        module R R block
+          func Make () → Func<int> ! cw
+            ! cw
+            return () => 0
+        """, "→ Func<int> ! cw")]
     // position 7 — binding
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Main:pub} () -> void
-            §E{}
-            §B{f:Func<i32,i32>} §E{cw} §LAM{lam1:x:i32} (+ x INT:1) §/LAM{lam1}
-        """, "§B{Func<i32, i32>:f} §E{cw}")]
+        module R R block
+          func Main () → void
+            !
+            let Func<int, int>:f ! cw = (int:x) => (x + 1)
+        """, "let Func<int, int>:f ! cw")]
     // position 8 — field
     [InlineData("""
-        §M{m001:R}
-          §CL{c001:C:pub}
-            §FLD{Action<i32>:onChange:pri} §E{cw}
-            §MT{mt001:M:pub} () -> void
-              §E{}
-        """, "§FLD{Action<i32>:onChange:priv} §E{cw}")]
+        module R R block
+          class C
+            field Action<int>:onChange private ! cw
+            func M () → void
+              !
+              return
+        """, "field Action<int>:onChange private ! cw")]
     // an empty row is not the same as no row (§3.5) and must survive
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Apply:pub} (Func<i32,i32>:a §E{}, Func<i32,i32>:b) -> i32
-            §E{}
-            §R INT:0
-        """, "Func<i32, i32>:a §E{}")]
+        module R R block
+          func Apply (Func<int, int>:a !, Func<int, int>:b) → int
+            !
+            return 0
+        """, "Func<int, int>:a !,")]
     // the `eff` binder, written last in the type-parameter list
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Map:pub}<T, eff e> (Func<i32,i32>:f §E{e}) -> i32
-            §E{e}
-            §R INT:0
-        """, "<T,eff e>")]
+        module R R block
+          func Map <T,! e> (Func<int, int>:f ! e) → int
+            ! e
+            return 0
+        """, "<T,! e>")]
     // …and written FIRST, which is why EffectParameterInfo carries an Ordinal
     [InlineData("""
-        §M{m001:R}
-          §F{f001:Map:pub}<eff e, T> (Func<i32,i32>:f §E{e}) -> i32
-            §E{e}
-            §R INT:0
-        """, "<eff e,T>")]
+        module R R block
+          func Map <! e,T> (Func<int, int>:f ! e) → int
+            ! e
+            return 0
+        """, "<! e,T>")]
     public void RowRoundTrips_ParseEmitParse(string source, string expectedInEmitted)
     {
         var module = Parse(source, out var diagnostics);

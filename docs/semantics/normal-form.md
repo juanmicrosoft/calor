@@ -17,7 +17,7 @@ established by the shipped compiler.
 
 When compiling directly to a backend language (like C#), semantic decisions can become implicit:
 
-```calor
+```text
 result = f(a(), b()) + c()
 ```
 
@@ -26,7 +26,10 @@ Direct compilation to C# might produce:
 var result = f(a(), b()) + c();
 ```
 
-This **delegates** evaluation order to C#. If C# changes its evaluation order (or if a different backend has different rules), the code's behavior changes silently.
+C# specifies left-to-right argument and operand evaluation, so direct emission
+can rely on that rule. A different backend would need its own conforming
+implementation; a hypothetical change is not evidence that C# order is
+unspecified.
 
 **CNF prevents this by making every semantic decision explicit in the IR.**
 
@@ -43,15 +46,14 @@ The design aims to enforce the modeled rules before backend emission. That
 requires complete, validated lowering and backend integration; neither follows
 merely from having a CNF representation.
 
-### 1.2 Proposed Pipeline Position (Not the Production Path)
+### 1.3 Proposed Pipeline Position (Not the Production Path)
 
 ```
-Source → Parser → AST → TypeChecker → Binder → [CNF Lowering] → CNF → [Backend] → Output
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                                       NEW: This specification
+Production: Source → Lexer/Parser → AST → Binder/Checks/Analysis → C# Emitter → C#
+Prototype:  AST → CnfLowering → CNF → CnfValidator / CnfPrettyPrinter
 ```
 
-### 1.3 Design Principles
+### 1.4 Design Principles
 
 - **Explicit over implicit**: Every semantic operation is a visible node
 - **Flat structure**: No deeply nested expressions
@@ -64,7 +66,15 @@ Source → Parser → AST → TypeChecker → Binder → [CNF Lowering] → CNF 
 
 ### 2.1 Expressions (Atomic)
 
-CNF expressions are always atomic - they reference either literals, variables, or the results of previous operations.
+The design requires operation operands to be atomic: literals or references
+to previous results. Binary, unary and call nodes are operations, not themselves
+atomic operands. The C# shapes below are schematic design excerpts, not exact
+constructor/API definitions; see the implementation files for those signatures.
+
+The retained prototype skips some unsupported statements and substitutes
+placeholders for some unsupported expressions. `ExpressionCallNode` explicitly
+throws `NotSupportedException`. This prototype is not authority for accepting
+arbitrary native source or claiming equivalent executable output.
 
 #### CnfLiteral
 
@@ -196,9 +206,10 @@ public sealed class CnfBranch : CnfStatement
 }
 ```
 
-#### CnfLoop
+#### CnfLoop (Design Only)
 
-Unconditional loop construct.
+Proposed unconditional loop construct. The retained implementation uses
+branches and labels instead and has no `CnfLoop` node.
 
 ```csharp
 public sealed class CnfLoop : CnfStatement
@@ -285,8 +296,10 @@ Every complex expression is decomposed into a sequence of assignments to tempora
 
 **Source:**
 ```calor
-§R (+ (* a b) c)
-// return (a * b) + c
+module NormalBinary
+  func Value (int:a, int:b, int:c) → int
+    !
+    return a * b + c
 ```
 
 **CNF:**
@@ -300,8 +313,17 @@ return t2
 
 **Source:**
 ```calor
-§C{f} §C{a} §/C §C{b} §/C §C{c} §/C §/C
-// f(a(), b(), c())
+module NormalCalls
+  func Mark (int:value) → int
+    ! cw
+    System.Console.Write(value)
+    return value
+  func Combine (int:a, int:b, int:c) → int
+    !
+    return a * 100 + b * 10 + c
+  func Main () → int
+    ! cw
+    return Combine(Mark(1), Mark(2), Mark(3))
 ```
 
 **CNF:**
@@ -312,7 +334,10 @@ t3 = CnfCall("c", [])
 t4 = CnfCall("f", [t1, t2, t3])
 ```
 
-This enforces left-to-right evaluation order.
+The diagram names the arguments schematically. For `NormalCalls`, those
+temporaries hold `Mark(1)`, `Mark(2)` and `Mark(3)`, respectively, before
+`Combine` runs. On the production path, `Main()` writes `123` once and returns
+`123`. Running that source does not establish complete CNF lowering coverage.
 
 ### 3.2 Short-Circuit Lowering
 
@@ -322,7 +347,10 @@ Logical operators are lowered to control flow.
 
 **Source:**
 ```calor
-A && B
+module NormalAnd
+  func Both (bool:left, bool:right) → bool
+    !
+    return left && right
 ```
 
 **CNF:**
@@ -351,7 +379,10 @@ CnfLabel("end_and")
 
 **Source:**
 ```calor
-A || B
+module NormalOr
+  func Either (bool:left, bool:right) → bool
+    !
+    return left || right
 ```
 
 **CNF:**
@@ -368,7 +399,7 @@ end_block:
 ### 3.3 Conditional Expression Lowering
 
 **Source:**
-```calor
+```calor-fragment
 condition ? whenTrue : whenFalse
 ```
 
@@ -390,10 +421,10 @@ end_block:
 #### If Statement
 
 **Source:**
-```calor
-§IF{if1} (condition)
+```calor-fragment
+if condition
   then_body
-§EL
+else
   else_body
 ```
 
@@ -412,8 +443,8 @@ end_label:
 #### While Loop
 
 **Source:**
-```calor
-§WH{w1} (condition)
+```calor-fragment
+while condition
   body
 ```
 
@@ -430,8 +461,8 @@ loop_exit:
 #### For Loop
 
 **Source:**
-```calor
-§L{for1:i:0:10:1}
+```calor-fragment
+for i = 0; i < 10; i = i + 1
   body
 ```
 
@@ -448,14 +479,19 @@ loop_body:
 loop_exit:
 ```
 
+This is the reevaluated semicolon form. The separate
+`for i from start to end step stepValue` form snapshots bounds and step once,
+includes its endpoint, rejects a zero step, and ends on checked range overflow.
+The simple diagram above is not a lowering specification for that form.
+
 ### 3.5 Match Expression Lowering
 
 **Source:**
-```calor
-§W{sw1:expr} target
-  §K pattern1 → body1
-  §K pattern2 → body2
-  §K _ → default
+```calor-fragment
+return match target
+  case pattern1 → body1
+  case pattern2 → body2
+  case _ → fallback
 ```
 
 **CNF:**
@@ -486,9 +522,11 @@ match_end:
 
 **Source:**
 ```calor
-§F{f1:myFunc:pub} (i32:x) -> i32
-  §Q (> x 0)
-  §R x
+module NormalRequires
+  func Positive (int:x) → int
+    !
+    requires x > 0
+    return x
 ```
 
 **CNF:**
@@ -505,9 +543,11 @@ precond_ok:
 
 **Source:**
 ```calor
-§F{f1:myFunc:pub} (i32:expr) -> i32
-  §S (> result 0)
-  §R expr
+module NormalEnsures
+  func Positive (int:value) → int
+    !
+    => result > 0
+    return value
 ```
 
 **CNF:**
@@ -548,15 +588,13 @@ public enum CnfType
 {
     Void,
     Bool,
-    Int,     // i32
-    Long,    // i64
-    Float,   // f32
-    Double,  // f64
+    Int,     // native int
+    Long,    // native long
+    Float,   // native float
+    Double,  // native double
     String,
     Object,  // Reference types
     Array,   // Array types (with element type)
-    Option,  // Option<T>
-    Result,  // Result<T,E>
 }
 ```
 
@@ -594,7 +632,11 @@ All operands of `CnfBinaryOp`, `CnfUnaryOp`, `CnfCall`, `CnfConversion` must be 
 
 ### 7.4 Definite Assignment
 
-Variables must be assigned before use.
+Variables must be assigned before use. This is a design obligation, not a
+property fully established by the current validator. Its traversal records
+definitions and checks atomic binary/unary/call operands and label targets;
+it is not path-sensitive definite-assignment or type-consistency analysis.
+Use a fresh validator per function because its errors persist across calls.
 
 ---
 
@@ -615,7 +657,6 @@ public interface ICnfVisitor<T>
     T Visit(CnfAssign node);
     T Visit(CnfSequence node);
     T Visit(CnfBranch node);
-    T Visit(CnfLoop node);
     T Visit(CnfReturn node);
     T Visit(CnfThrow node);
     T Visit(CnfLabel node);
@@ -631,14 +672,19 @@ public interface ICnfVisitor<T>
 ### Source
 
 ```calor
-§F{f1:sumIfPositive:pub}
-  §I{i32:a} §I{i32:b}
-  §O{i32}
-  §Q (&& (> a 0) (> b 0))
-  §R (+ a b)
+module NormalSum
+  func SumIfPositive (int:a, int:b) → int
+    !
+    requires a > 0 && b > 0
+    return a + b
 ```
 
 ### CNF
+
+This is an explanatory target shape, not a production lowering transcript.
+The prototype does not implement full postcondition or checked-overflow
+semantics; the ordinary compiler enforces its supported runtime contracts
+and native arithmetic policy independently.
 
 ```
 sumIfPositive:

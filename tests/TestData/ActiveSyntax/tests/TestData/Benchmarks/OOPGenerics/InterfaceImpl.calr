@@ -1,0 +1,17 @@
+module InterfaceImpl InterfaceImpl
+  module InterfaceImplModule
+    func AreaCircle public (float:radius) → float
+      !
+      requires radius > 0
+      return 3.14159265 * (radius * radius)
+
+    func AreaSquare public (float:side) → float
+      !
+      requires side > 0
+      return side * side
+
+    func AreaTriangle public (float:@base, float:height) → float
+      !
+      requires @base > 0
+      requires height > 0
+      return (@base * height) / 2

@@ -1,0 +1,109 @@
+module L1M33 L1M33 block
+  module L1M33Module public
+
+    func l1m33_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M29.L2M29Module.l2m29_fn12(x, 23)
+      return (v1 + y)
+
+    func l1m33_fn02 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21722)
+      if (x >= 21722)
+        return x
+      else
+        return 21722
+
+    func l1m33_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M08.L2M08Module.l2m08_fn08(x, 33)
+      return (v1 + y)
+
+    func l1m33_fn04 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M01.L2M01Module.l2m01_fn07(x, 48)
+      let int:v2 = L2M09.L2M09Module.l2m09_fn10(x, 48)
+      return ((v1 + v2) + y)
+
+    func l1m33_fn05 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 21729)
+        return (acc + 21729)
+      else
+        return ((acc * 2) + 21729)
+
+    func l1m33_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 21736)
+      let int:total = ((x * 3) + y)
+      if (total < 21736)
+        return 21736
+      else
+        return total
+
+    func l1m33_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21743)
+      let int:total = ((x * 3) + y)
+      if (total > 21743)
+        return 21743
+      return total
+
+    func l1m33_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21750)
+      let int:total = ((x * 3) + y)
+      if (total > 21750)
+        return 21750
+      return total
+
+    func l1m33_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21757)
+      if (x >= 21757)
+        return x
+      else
+        return 21757
+
+    func l1m33_fn10 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M19.L2M19Module.l2m19_fn08(x, 79)
+      return (v1 + y)
+
+    func l1m33_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M19.L2M19Module.l2m19_fn12(x, 34)
+      return (v1 + y)
+
+    func l1m33_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 1)
+      requires (y >= 0)
+      => (result >= 21764)
+      let int:total = ((x * 5) + y)
+      if (total < 21764)
+        return 21764
+      else
+        return total
+
+    func l1m33_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 21771)
+      let int:total = ((x * 5) + y)
+      if (total < 21771)
+        return 21771
+      else
+        return total

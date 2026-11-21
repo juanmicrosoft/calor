@@ -220,7 +220,7 @@ public class IteratorAccessorConversionTests
         // and nothing was rescued after the fact.
         Assert.Equal(preserved, losses.Count(loss => loss == "iterator-accessor"));
         Assert.DoesNotContain("post-validation-fallback", losses);
-        Assert.Equal(preserved, Regex.Matches(calor, @"§CSHARP\{").Count);
+        Assert.Equal(preserved, RawFrameAssertions.GetFrames(calor).Length);
 
         // Default compile (effects enforced), then run: same observable behavior.
         var compilation = Program.Compile(calor, row + ".calr",
@@ -233,16 +233,17 @@ public class IteratorAccessorConversionTests
     [Theory]
     [InlineData("F4-ITER-01")]
     [InlineData("F4-ITER-02")]
-    public void NoFallback_RefusesExplicitly(string row)
+    public void NoFallback_PreservesExplicitlyAndRetainsReason(string row)
     {
         // `calor convert --no-fallback` turns every unsupported feature into an error.
         // The iterator accessor is refused by name; no Calor is produced to mislead.
         var result = new CSharpToCalorConverter(ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: false, verbose: false, explain: false, noFallback: true,
-            passthrough: false, explicitCallClosers: false)).Convert(R0Fixture(row));
-        Assert.False(result.Success);
+            passthrough: false)).Convert(R0Fixture(row));
+        Assert.True(result.Success);
         Assert.Contains(result.Issues, issue => issue.Feature == "iterator-accessor"
-            && issue.Severity == ConversionIssueSeverity.Error);
+            && issue.Severity == ConversionIssueSeverity.Warning);
+        Assert.Contains(result.Losses, loss => loss.Feature == "whole-file-preservation");
     }
 
     [Fact]
@@ -258,21 +259,10 @@ public class IteratorAccessorConversionTests
         Assert.Equal(SupportLevel.NotSupported, FeatureSupport.GetSupportLevel("iterator-accessor"));
     }
 
-    [Fact]
-    public void NativeYieldInAnAccessor_IsStillCalor0209()
-    {
-        // F4-ITER-03: the regression control. Native illegal yields stay rejected.
-        var calor = File.ReadAllText(Path.Combine(
-            CliTestHarness.FindRepoRoot(), R0Fixtures, "F4-ITER-03.calr.txt"));
-        var compilation = Program.Compile(calor, "F4-ITER-03.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0209");
-    }
-
     [Theory]
-    [InlineData("public IEnumerable<int> Gen() { yield return 1; yield break; }", "§YIELD")]
-    [InlineData("public IEnumerable<int> Seq => Gen(); private IEnumerable<int> Gen() { yield return 1; }", "§PROP")]
-    [InlineData("public IEnumerable<int> Seq { get { return new List<int> { 1 }; } }", "§PROP")]
+    [InlineData("public IEnumerable<int> Gen() { yield return 1; yield break; }", "yield 1")]
+    [InlineData("public IEnumerable<int> Seq => Gen(); private IEnumerable<int> Gen() { yield return 1; }", "property ")]
+    [InlineData("public IEnumerable<int> Seq { get { return new List<int> { 1 }; } }", "property ")]
     public void NonIteratorAccessors_StayNative(string members, string marker)
     {
         // Negative controls: iterator methods and accessors that merely return a
@@ -281,7 +271,7 @@ public class IteratorAccessorConversionTests
             "using System.Collections.Generic;\npublic class C\n{\n" + members + "\n}\n");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Contains(marker, result.CalorSource);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "iterator-accessor");
     }
 
@@ -296,7 +286,7 @@ public class IteratorAccessorConversionTests
             }
             """);
         Assert.True(result.Success);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.DoesNotMatch(@"§Y(IELD|BRK)", result.CalorSource!);
         Assert.DoesNotContain(result.Issues, issue => issue.Feature == "iterator-accessor");
     }
@@ -408,7 +398,7 @@ public class IteratorAccessorConversionTests
             case Surface.CliDefault or Surface.CliPassthrough:
                 return Library(ConvertCommand.BuildCSharpToCalorOptions(
                     benchmark: false, verbose: false, explain: false, noFallback: false,
-                    passthrough: surface == Surface.CliPassthrough, explicitCallClosers: false));
+                    passthrough: surface == Surface.CliPassthrough));
             case Surface.McpDefault or Surface.McpPassthroughOnError or Surface.McpPassthroughOnErrorModuleName:
             {
                 var args = new Dictionary<string, object> { ["source"] = source };

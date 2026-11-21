@@ -18,10 +18,9 @@ namespace Calor.Compiler.Tests.ConversionReporting;
 public class LossyRoundTripReportingTests : IDisposable
 {
     /// <summary>
-    /// A private static property with accessor bodies: the lossy output does not compile (CS0273/CS0274).
-    /// #1632 fixed the previous input, a label before the last statement, whose statement was dropped.
+    /// A `string?` local returned as `string` still fails the round trip (Calor0273); C# only warns.
     /// </summary>
-    private const string TrailingLabel = "public class G { static int p; static int P { get { return p; } set { p = value; } } public int M(int x) { P = x; return P; } }";
+    private const string NullableArray = ConversionPathReportingTests.RoundTripFailure;
 
     /// <summary>A second, unrelated input: yield inside try/finally emits C# that does not compile.</summary>
     private const string YieldInTryFinally =
@@ -33,7 +32,7 @@ public class LossyRoundTripReportingTests : IDisposable
     /// <summary>Negative control with a recorded lossy drop (the destructor) whose output still compiles.</summary>
     private const string Destructor = "public class D { public int V = 1; ~D() { V = 0; } public int M() => V; }";
 
-    private static readonly string[] FailingInputs = [TrailingLabel, YieldInTryFinally];
+    private static readonly string[] FailingInputs = [NullableArray, YieldInTryFinally];
 
     private readonly string _tempDir = Directory.CreateTempSubdirectory("calor-1514-").FullName;
 
@@ -92,14 +91,13 @@ public class LossyRoundTripReportingTests : IDisposable
     }
 
     [Fact]
-    public void Library_Lossless_IsUnchanged_RefusesAndReportsTheFailedCheck()
+    public void Library_Lossless_PreservesAndVerifiesWithoutOptIn()
     {
-        var refused = Convert(TrailingLabel, new ConversionOptions());
-        Assert.False(refused.Success);
-        Assert.Equal("refused", refused.Paths.Outcome);
-        Assert.Equal(ConversionRoundTrip.Failed, refused.Paths.RoundTrip);
-        Assert.Contains(refused.Issues, i =>
-            i.Severity == ConversionIssueSeverity.Error && i.Feature == "roundtrip-csharp-validation");
+        var refused = Convert(NullableArray, new ConversionOptions());
+        Assert.True(refused.Success);
+        Assert.Equal("preserved", refused.Paths.Outcome);
+        Assert.Equal(ConversionRoundTrip.Verified, refused.Paths.RoundTrip);
+        Assert.NotEmpty(refused.Losses);
         Assert.DoesNotContain(refused.Issues, i => i.Feature == "lossy-roundtrip-unverified");
 
         var native = Convert(Plain, new ConversionOptions());
@@ -141,7 +139,7 @@ public class LossyRoundTripReportingTests : IDisposable
         // depends on a sibling file also fails a standalone compile, and a rescue that cannot
         // recover would turn PassthroughOnError's completed lossy conversion into a refusal
         // (Issue769NamespaceTopologyTests pins that case).
-        var result = Convert(TrailingLabel, new ConversionOptions
+        var result = Convert(NullableArray, new ConversionOptions
         {
             Fidelity = ConversionFidelity.Lossy,
             PassthroughOnError = true
@@ -200,26 +198,29 @@ public class LossyRoundTripReportingTests : IDisposable
     private static JsonElement Data(string stdout) => JsonDocument.Parse(stdout).RootElement.GetProperty("data");
 
     [Fact]
-    public void Cli_Lossy_FailingRoundTrip_WritesOutput_ExitsTwo_AndSaysSo()
+    public void Cli_Default_MissingProjectReferences_WritesExactUnverifiedSource()
     {
-        foreach (var source in FailingInputs)
+        foreach (var source in new[] { "public class Derived : MissingBase { }" })
         {
-            var (exit, stdout, stderr, output) = Cli(source, "--lossy");
+            var (exit, stdout, stderr, output) = Cli(source);
 
             Assert.True(exit == 2, $"exit {exit}\n{stdout}\n{stderr}");
             Assert.True(File.Exists(output));
             Assert.DoesNotContain("✓ Conversion successful", stdout);
             Assert.Contains("✗ Round-trip check failed: the generated C# does not compile", stdout);
-            Assert.Contains("it is unverified (exit 2)", stdout);
+            Assert.Contains("build is unverified (exit 2)", stdout);
+            Assert.DoesNotContain("--lossy", stdout);
+            Assert.Equal(source, Program.Compile(File.ReadAllText(output), output,
+                new CompilationOptions { DeferGeneratedOutputValidation = true }).GeneratedCode);
         }
     }
 
     [Fact]
-    public void Cli_LossyJson_FailingRoundTrip_ReportsUnverified()
+    public void Cli_DefaultJson_MissingProjectReferences_ReportsUnverified()
     {
-        foreach (var source in FailingInputs)
+        foreach (var source in new[] { "public class Derived : MissingBase { }" })
         {
-            var (exit, stdout, stderr, output) = Cli(source, "--lossy", "--format", "json");
+            var (exit, stdout, stderr, output) = Cli(source, "--format", "json");
 
             Assert.True(exit == 2, stderr);
             Assert.True(File.Exists(output));
@@ -233,20 +234,20 @@ public class LossyRoundTripReportingTests : IDisposable
             var diagnostics = JsonDocument.Parse(stdout).RootElement.GetProperty("diagnostics").EnumerateArray()
                 .Select(d => d.GetProperty("message").GetString()!)
                 .ToList();
-            Assert.Contains(diagnostics, m => m.StartsWith("[lossy-roundtrip-unverified]", StringComparison.Ordinal));
+            Assert.Contains(diagnostics, m => m.StartsWith("[preserved-roundtrip-unverified]", StringComparison.Ordinal));
         }
     }
 
     [Fact]
-    public void Cli_Lossy_ValidOutput_StaysClean()
+    public void Cli_Default_ValidOutput_StaysClean()
     {
-        var (exit, stdout, stderr, output) = Cli(Plain, "--lossy");
+        var (exit, stdout, stderr, output) = Cli(Plain);
         Assert.True(exit == 0, stderr);
         Assert.True(File.Exists(output));
         Assert.Contains("✓ Conversion successful", stdout);
         Assert.DoesNotContain("Round-trip check failed", stdout);
 
-        var (jsonExit, json, jsonErr, _) = Cli(Plain, "--lossy", "--format", "json");
+        var (jsonExit, json, jsonErr, _) = Cli(Plain, "--format", "json");
         Assert.True(jsonExit == 0, jsonErr);
         var paths = Data(json).GetProperty("conversionPaths");
         Assert.Equal("native", paths.GetProperty("outcome").GetString());
@@ -256,7 +257,7 @@ public class LossyRoundTripReportingTests : IDisposable
     [Fact]
     public void Cli_Default_IsUnchanged_RescuesAndVerifies()
     {
-        var (exit, stdout, stderr, _) = Cli(TrailingLabel, "--format", "json");
+        var (exit, stdout, stderr, _) = Cli(NullableArray, "--format", "json");
         Assert.True(exit == 0, stderr);
         var paths = Data(stdout).GetProperty("conversionPaths");
         Assert.Equal("preserved", paths.GetProperty("outcome").GetString());
@@ -278,7 +279,7 @@ public class LossyRoundTripReportingTests : IDisposable
         var documented = JsonDocument.Parse(example.Groups[1].Value).RootElement
             .EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
 
-        var (_, stdout, _, _) = Cli(TrailingLabel, "--lossy", "--format", "json");
+        var (_, stdout, _, _) = Cli(NullableArray, "--format", "json");
         var actual = Data(stdout).GetProperty("conversionPaths")
             .EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
         Assert.Equal(documented, actual);
@@ -311,26 +312,24 @@ public class LossyRoundTripReportingTests : IDisposable
     }
 
     [Fact]
-    public async Task Mcp_Lossy_FailingRoundTrip_IsAnError_WithUnverifiedOutcome()
+    public async Task Mcp_RemovedLossyMode_IsAnErrorWithoutWriting()
     {
         foreach (var source in FailingInputs)
         {
             var output = Path.Combine(_tempDir, $"mcp{Guid.NewGuid():N}.calr");
-            var (isError, payload) = await Mcp("calor_convert", new { source, fidelity = "lossy", outputPath = output });
+            var result = await new Calor.Compiler.Mcp.Tools.ConvertTool().ExecuteAsync(
+                JsonSerializer.SerializeToElement(new { source, fidelity = "lossy", outputPath = output }));
 
-            Assert.True(isError);
-            Assert.False(string.IsNullOrEmpty(payload.GetProperty("calorSource").GetString()));
-            Assert.True(File.Exists(output));
-            var paths = payload.GetProperty("lossSummary").GetProperty("paths");
-            Assert.Equal("unverified", paths.GetProperty("outcome").GetString());
-            Assert.Equal("failed", paths.GetProperty("roundTrip").GetString());
+            Assert.True(result.IsError);
+            Assert.Contains("Only lossless", result.Content[0].Text);
+            Assert.False(File.Exists(output));
         }
     }
 
     [Fact]
-    public async Task Mcp_Lossy_ValidOutput_StaysClean()
+    public async Task Mcp_Default_ValidOutput_StaysClean()
     {
-        var (isError, payload) = await Mcp("calor_convert", new { source = Plain, fidelity = "lossy" });
+        var (isError, payload) = await Mcp("calor_convert", new { source = Plain });
 
         Assert.False(isError);
         var paths = payload.GetProperty("lossSummary").GetProperty("paths");
@@ -339,7 +338,7 @@ public class LossyRoundTripReportingTests : IDisposable
     }
 
     [Fact]
-    public async Task McpBatch_ProjectMigration_ReportsDeferred()
+    public async Task McpBatch_ProjectMigration_ReportsProjectVerification()
     {
         // Project migration compiles every generated file together, so each file's
         // own check is deferred to that step rather than skipped silently.
@@ -353,6 +352,6 @@ public class LossyRoundTripReportingTests : IDisposable
         var file = Assert.Single(payload.GetProperty("files").EnumerateArray());
         var paths = file.GetProperty("conversionPaths");
         Assert.Equal("native", paths.GetProperty("outcome").GetString());
-        Assert.Equal("deferred", paths.GetProperty("roundTrip").GetString());
+        Assert.Equal("verified", paths.GetProperty("roundTrip").GetString());
     }
 }

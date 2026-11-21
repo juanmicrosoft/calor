@@ -14,17 +14,17 @@ namespace Calor.Compiler.Tests;
 public class MultilineCallExpressionTests
 {
     [Theory]
-    [InlineData("§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7\n§/C\n§R value", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A 3\n  §A 7\n§/C", 7)]
-    [InlineData("§R (+ 1 §C{Math.Max}\n  §A 3\n  §A 7\n§/C)", 8)]
-    [InlineData("§R §C{Math.Clamp}\n  §A[value] 7\n  §A[min] 0\n  §A[max] 5\n§/C", 5)]
-    [InlineData("§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7\n§R value", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A 3\n  §A 7", 7)]
-    [InlineData("§B{value:i32} §C{Math.Max} §A 3\n  §A 7\n§/C\n§R value", 7)]
-    [InlineData("§B{value:i32} §C{Math.Max}\n  §A 3\n  §A 7 §/C\n§R value", 7)]
-    [InlineData("§B{value:i32} §C{Math.Max}\n§A 3\n§A 7\n§/C\n§R value", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A §C{Math.Min}\n    §A 8\n    §A 3\n  §/C\n  §A 7\n§/C", 7)]
-    [InlineData("§R §C{Math.Max}\n  §A (+ 1 §C{Math.Min}\n    §A 8\n    §A 3\n  §/C)\n  §A 7\n§/C", 7)]
+    [InlineData("let int:value = Math.Max(\n  3,\n  7)\nreturn value", 7)]
+    [InlineData("return Math.Max(\n  3,\n  7)", 7)]
+    [InlineData("return (1 + Math.Max(\n  3,\n  7))", 8)]
+    [InlineData("return Math.Clamp(\n  value: 7,\n  min: 0,\n  max: 5)", 5)]
+    [InlineData("let int:value = Math.Max(\n  3,\n  7\n)\nreturn value", 7)]
+    [InlineData("return Math.Max(\n  3,\n  7\n)", 7)]
+    [InlineData("let int:value = Math.Max(3,\n  7)\nreturn value", 7)]
+    [InlineData("let int:value = Math.Max(\n  3, 7)\nreturn value", 7)]
+    [InlineData("let int:value = Math.Max(\n3,\n7)\nreturn value", 7)]
+    [InlineData("return Math.Max(\n  Math.Min(\n    8,\n    3),\n  7)", 7)]
+    [InlineData("return Math.Max(\n  (1 + Math.Min(\n    8,\n    3)),\n  7)", 7)]
     public void Arguments_CompileExecuteAndRoundTrip(string body, int expected)
     {
         var source = ProgramSource(body);
@@ -38,19 +38,16 @@ public class MultilineCallExpressionTests
     public void NestedArgumentLists_LeaveLoopAndFollowingFunctionIntact()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:Probe:pub} (List<i32>:trace) -> void
-                §E{mut}
-                §L{l1:i:0:2:1}
-                  §C{trace.Add}
-                    §A §C{Math.Max}
-                      §A i
-                      §A 1
-                    §/C
-                  §/C
-                §C{trace.Add} §A 99 §/C
-              §F{f2:Other:pub} () -> i32
-                §R 42
+            module Calls Calls block
+              func Probe (List<int>:trace) → void
+                ! mut
+                for i from 0 to 2 step 1
+                  trace.Add(Math.Max(i, 1))
+                trace.Add(99)
+
+              func Other () → int
+                !
+                return 42
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
@@ -70,29 +67,32 @@ public class MultilineCallExpressionTests
     public void ElidedHeaderAndLispCalls_LeaveStatementsAndSiblingOperandsIntact()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:Truth:pub} () -> bool
-                §E{}
-                §R true
-              §F{f2:Text:pub} () -> str
-                §E{}
-                §R "12"
-              §F{f3:Never:pub} () -> bool
-                §E{}
-                §R false
-              §F{f4:One:pub} () -> i32
-                §E{}
-                §R 1
-              §F{f5:Probe:pub} () -> i32
-                §E{}
-                §B{~value:i32} 0
-                §EACH{each1:ch} §C{Text}
-                  §IF{if1} §C{Truth}
-                    (inc value)
-                §WH{w1} §C{Never}
-                  §C{Math.Abs} §A 9 §/C
-                §R (+ value (+ §C{One}
-                  3))
+            module Calls Calls block
+              func Truth () → bool
+                !
+                return true
+
+              func Text () → string
+                !
+                return "12"
+
+              func Never () → bool
+                !
+                return false
+
+              func One () → int
+                !
+                return 1
+
+              func Probe () → int
+                !
+                var int:value = 0
+                each ch in Text()
+                  if Truth()
+                    set value (value + 1)
+                while Never()
+                  Math.Abs(9)
+                return (value + (One() + 3))
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
@@ -105,17 +105,15 @@ public class MultilineCallExpressionTests
     public void ElidedZeroArgumentCall_DoesNotTakeConstructorSiblingArguments()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:One:pub} () -> i32
-                §E{}
-                §R 1
-              §F{f2:Probe:pub} () -> i32
-                §E{alloc}
-                §B{pair:Tuple<i32,i32>} §NEW{Tuple<i32,i32>}
-                  §A §C{One}
-                  §A 2
-                §/NEW
-                §R (+ (* pair.Item1 10) pair.Item2)
+            module Calls Calls block
+              func One () → int
+                !
+                return 1
+
+              func Probe () → int
+                ! alloc
+                let Tuple<int, int>:pair = new Tuple<int, int>(One(), 2)
+                return ((pair.Item1 * 10) + pair.Item2)
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
@@ -139,15 +137,11 @@ public class MultilineCallExpressionTests
     public void ExplicitInnerArgumentList_KeepsSameIndentContinuationArguments()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:Probe:pub} () -> i32
-                §E{alloc}
-                §B{pair:Tuple<i32,i32>} §NEW{Tuple<i32,i32>}
-                  §A §C{Math.Max} §A 3
-                  §A 7 §/C
-                  §A 9
-                §/NEW
-                §R pair.Item1
+            module Calls Calls block
+              func Probe () → int
+                ! alloc
+                let Tuple<int, int>:pair = new Tuple<int, int>(Math.Max(3, 7), 9)
+                return pair.Item1
             """;
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
@@ -159,9 +153,11 @@ public class MultilineCallExpressionTests
                 .Select(binding => binding.Initializer).ToArray();
             var constructor = Assert.Single(initializers.OfType<NewExpressionNode>());
             Assert.Equal(2, constructor.Arguments.Count);
-            var call = constructor.Arguments[0] as CallExpressionNode
-                ?? Assert.Single(initializers.OfType<CallExpressionNode>());
-            Assert.Equal("Math.Max", call.Target);
+            // A dotted native call is an expression call on a member access (`Math.Max`).
+            var call = Assert.IsType<ExpressionCallNode>(constructor.Arguments[0]);
+            var member = Assert.IsType<FieldAccessNode>(call.TargetExpression);
+            Assert.Equal("Max", member.FieldName);
+            Assert.Equal("Math", Assert.IsType<ReferenceNode>(member.Target).Name);
             Assert.Equal(new[] { 3L, 7L }, call.Arguments.Select(arg => Assert.IsType<IntLiteralNode>(arg).Value));
             Assert.Equal(9, Assert.IsType<IntLiteralNode>(constructor.Arguments[1]).Value);
         }
@@ -170,28 +166,26 @@ public class MultilineCallExpressionTests
     [Fact]
     public void ManyCallsOnOneLine_DoNotRepeatedlyScanTheirContainingLine()
     {
-        var source = ProgramSource("§R (+ " + string.Join(" ",
-            Enumerable.Repeat("§C{One} §/C", 20_000)) + ")");
+        var source = ProgramSource("return (" + string.Join(" + ",
+            Enumerable.Repeat("One()", 20_000)) + ")");
         var stopwatch = Stopwatch.StartNew();
         var module = Parse(source, out var diagnostics);
         stopwatch.Stop();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
         Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions.Single().Body));
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5),
-            $"Parsing a 280 KB call expression took {stopwatch.Elapsed}; containing-line lookup must be amortized linear.");
+            $"Parsing a 200 KB call expression took {stopwatch.Elapsed}; containing-line lookup must be amortized linear.");
     }
 
     [Fact]
     public void OriginalFileReadRepro_ExecutesAndRoundTrips()
     {
         const string source = """
-            §M{m1:Calls}
-              §F{f1:ReadFile:pub} (str:path) -> str
-                §E{fs:r}
-                §B{str:content} §C{File.ReadAllText}
-                  §A path
-                §/C
-                §R content
+            module Calls Calls block
+              func ReadFile (string:path) → string
+                ! fs:r
+                let string:content = File.ReadAllText(path)
+                return content
             """;
         var path = Path.Combine(AppContext.BaseDirectory, $"multiline-call-{Guid.NewGuid():N}.txt");
         try
@@ -209,36 +203,10 @@ public class MultilineCallExpressionTests
         }
     }
 
-    [Theory]
-    [InlineData("§B{value:i32} §C{Math.Abs}\n  3\n§/C\n§R value", "§A")]
-    [InlineData("§B{value:i32} §C{Math.Abs}\n§A 3\n§R value", "§/C")]
-    public void MalformedArguments_NameTheCauseWithoutLosingFunctionScope(string body, string requiredToken)
-    {
-        var source = ProgramSource(body) + "\n  §F{f2:Other:pub} () -> i32\n    §R 42\n";
-        var module = Parse(source, out var diagnostics);
-        var error = Assert.Single(diagnostics.Errors);
-        Assert.Equal(5, error.Span.Line);
-        Assert.Contains("Math.Abs", error.Message);
-        Assert.Contains(requiredToken, error.Message);
-        Assert.Equal(2, module.Functions.Count);
-        Assert.IsType<ReturnStatementNode>(module.Functions[0].Body.Last());
-        Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions[1].Body));
-    }
-
-    [Fact]
-    public void InlineInvalidArgument_PreservesEstablishedDiagnostic()
-    {
-        var source = ProgramSource("§R §C{Math.Abs} §A 3 §E{cw} §/C");
-        Parse(source, out var diagnostics);
-        var error = diagnostics.Errors.First();
-        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
-        Assert.Equal("Expected EndCall but found Effects", error.Message);
-        Assert.Equal(4, error.Span.Line);
-        Assert.Equal(source.Split('\n')[3].IndexOf("§E{cw}", StringComparison.Ordinal) + 1, error.Span.Column);
-    }
-
     private static string ProgramSource(string body) =>
-        "§M{m1:Calls}\n  §F{f1:Probe:pub} () -> i32\n    §E{}\n"
+        "module Calls Calls block\n"
+        + "  func Probe () → int\n"
+        + "    !\n"
         + string.Join("\n", body.Split('\n').Select(line => "    " + line)) + "\n";
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)

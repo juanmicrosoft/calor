@@ -91,7 +91,7 @@ public sealed class GuardDiscovery
         {
             ObligationId = obligation.Id,
             Description = $"Add precondition requiring '{paramName}' satisfies the refinement",
-            CalorExpression = $"§Q ({condStr})",
+            CalorExpression = $"requires {condStr}",
             InsertionKind = "precondition",
             Confidence = "high"
         });
@@ -100,8 +100,8 @@ public sealed class GuardDiscovery
         guards.Add(new DiscoveredGuard
         {
             ObligationId = obligation.Id,
-            Description = $"Add runtime guard at function entry for '{paramName}'",
-            CalorExpression = $"§IF{{g1}} (! ({condStr})) → §R (err \"Refinement violated: {paramName}\")",
+            Description = $"Add runtime guard at function entry for '{paramName}' (the row needs throw, alloc)",
+            CalorExpression = Guard(condStr, $"Refinement violated: {paramName}"),
             InsertionKind = "if_guard",
             Confidence = "medium"
         });
@@ -119,7 +119,7 @@ public sealed class GuardDiscovery
         {
             ObligationId = obligation.Id,
             Description = "Add precondition that implies the proof obligation",
-            CalorExpression = $"§Q ({condStr})",
+            CalorExpression = $"requires {condStr}",
             InsertionKind = "precondition",
             Confidence = "high"
         });
@@ -128,8 +128,8 @@ public sealed class GuardDiscovery
         guards.Add(new DiscoveredGuard
         {
             ObligationId = obligation.Id,
-            Description = "Add guard before the proof obligation site",
-            CalorExpression = $"§IF{{g1}} (! ({condStr})) → §R (err \"Proof obligation violated\")",
+            Description = "Add guard before the proof obligation site (the row needs throw, alloc)",
+            CalorExpression = Guard(condStr, "Proof obligation violated"),
             InsertionKind = "if_guard",
             Confidence = "medium"
         });
@@ -146,7 +146,7 @@ public sealed class GuardDiscovery
         {
             ObligationId = obligation.Id,
             Description = "Add assertion before the assignment",
-            CalorExpression = $"§PROOF{{p1:subtype}} ({condStr})",
+            CalorExpression = $"proof {condStr}",
             InsertionKind = "assert",
             Confidence = "medium"
         });
@@ -162,8 +162,8 @@ public sealed class GuardDiscovery
         guards.Add(new DiscoveredGuard
         {
             ObligationId = obligation.Id,
-            Description = "Add bounds check before array access",
-            CalorExpression = $"§IF{{g1}} (! ({condStr})) → §R (err \"Index out of bounds\")",
+            Description = "Add bounds check before array access (the row needs throw, alloc)",
+            CalorExpression = Guard(condStr, "Index out of bounds"),
             InsertionKind = "if_guard",
             Confidence = "high"
         });
@@ -174,39 +174,37 @@ public sealed class GuardDiscovery
     /// <summary>
     /// Formats an obligation condition as a readable Calor expression string.
     /// </summary>
+    /// <summary>A native guard: throw when the condition does not hold. Failure uses exceptions.</summary>
+    private static string Guard(string condition, string message) =>
+        $"if !({condition})\n  throw new InvalidOperationException(\"{message}\")";
+
+    /// <summary>The condition in native infix form, for example <c>x >= 0 && x < n</c>.</summary>
     private static string FormatCondition(ExpressionNode condition, string? selfRefReplacement)
     {
         return condition switch
         {
             BinaryOperationNode binOp => FormatBinaryOp(binOp, selfRefReplacement),
-            UnaryOperationNode unOp => $"(! {FormatCondition(unOp.Operand, selfRefReplacement)})",
-            IntLiteralNode intLit => $"INT:{intLit.Value}",
-            BoolLiteralNode boolLit => $"BOOL:{(boolLit.Value ? "true" : "false")}",
+            UnaryOperationNode unOp => $"{unOp.Operator.ToCSharpOperator()}{Operand(unOp.Operand, selfRefReplacement)}",
+            IntLiteralNode intLit => intLit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            BoolLiteralNode boolLit => boolLit.Value ? "true" : "false",
             ReferenceNode refNode => refNode.Name,
-            SelfRefNode => selfRefReplacement ?? "#",
+            SelfRefNode => selfRefReplacement ?? "value",
             _ => condition.GetType().Name
         };
     }
 
     private static string FormatBinaryOp(BinaryOperationNode binOp, string? selfRefReplacement)
     {
-        var left = FormatCondition(binOp.Left, selfRefReplacement);
-        var right = FormatCondition(binOp.Right, selfRefReplacement);
-        var op = binOp.Operator switch
-        {
-            BinaryOperator.GreaterOrEqual => ">=",
-            BinaryOperator.GreaterThan => ">",
-            BinaryOperator.LessOrEqual => "<=",
-            BinaryOperator.LessThan => "<",
-            BinaryOperator.Equal => "==",
-            BinaryOperator.NotEqual => "!=",
-            BinaryOperator.And => "&&",
-            BinaryOperator.Or => "||",
-            BinaryOperator.Add => "+",
-            BinaryOperator.Subtract => "-",
-            _ => binOp.Operator.ToString()
-        };
-        return $"{op} {left} {right}";
+        var left = Operand(binOp.Left, selfRefReplacement);
+        var right = Operand(binOp.Right, selfRefReplacement);
+        return $"{left} {binOp.Operator.ToCSharpOperator()} {right}";
+    }
+
+    /// <summary>A nested operation is parenthesized so the printed text keeps the tree's grouping.</summary>
+    private static string Operand(ExpressionNode operand, string? selfRefReplacement)
+    {
+        var text = FormatCondition(operand, selfRefReplacement);
+        return operand is BinaryOperationNode ? $"({text})" : text;
     }
 
     /// <summary>

@@ -12,7 +12,8 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public sealed class PropertyNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
@@ -102,7 +103,7 @@ public sealed class PropertyNode : AstNode
         EffectsNode? row = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
@@ -146,7 +147,8 @@ public sealed class PropertyNode : AstNode
 /// </summary>
 public sealed class IndexerNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string TypeName { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
@@ -180,7 +182,7 @@ public sealed class IndexerNode : AstNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Visibility = visibility;
         Modifiers = modifiers;
@@ -252,6 +254,15 @@ public sealed class PropertyAccessorNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }
 
+    /// <summary>
+    /// 0.30: the accessor's optional own effect row, written on its own line under
+    /// <c>get</c>/<c>set</c>/<c>init</c>. Without one the body is held to the intrinsic
+    /// accessor contract (<c>mut</c>, <c>alloc</c>, Calor0423); with one it may also perform
+    /// the declared effects, and <c>! unknown</c> admits any effect. Readers are charged the
+    /// body's computed effects and the declared row.
+    /// </summary>
+    public EffectsNode? Effects { get; set; }
+
     public bool IsAutoImplemented => Body.Count == 0;
 
 
@@ -268,11 +279,18 @@ public sealed class PropertyAccessorNode : AstNode
 /// </summary>
 public sealed class ConstructorNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public Visibility Visibility { get; }
     public bool IsStatic { get; }
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public IReadOnlyList<RequiresNode> Preconditions { get; }
+    /// <summary>
+    /// 0.30: the constructor's optional own effect row. Without one the body is held to
+    /// the intrinsic initialization contract (<c>mut</c>, <c>alloc</c>); with one it may
+    /// also perform the declared effects, and <c>! unknown</c> admits any effect.
+    /// </summary>
+    public EffectsNode? Effects { get; set; }
     public ConstructorInitializerNode? Initializer { get; }
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
@@ -322,7 +340,7 @@ public sealed class ConstructorNode : AstNode
         bool isStatic)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Visibility = visibility;
         IsStatic = isStatic;
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));

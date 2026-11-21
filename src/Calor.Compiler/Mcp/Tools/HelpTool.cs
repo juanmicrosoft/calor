@@ -6,6 +6,7 @@ using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
 using Calor.Compiler.SelfTest;
 using Calor.Compiler.Telemetry;
+using Calor.Compiler.Diagnostics;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -17,26 +18,26 @@ public sealed class HelpTool : McpToolBase
 {
     // ── Lazy-loaded resources ────────────────────────────────────────
     private static readonly Lazy<SyntaxDocumentation?> SyntaxDoc = new(LoadSyntaxDocumentation);
-    private static Lazy<string> SkillContent = new(LoadSkillContent);
+    private static Lazy<string> ReferenceContent = new(LoadReferenceContent);
     private static readonly Lazy<List<ErrorPattern>> ErrorPatterns = new(LoadErrorPatterns);
 
     /// <summary>
-    /// Environment variable to override the skill file path.
+    /// Environment variable to override the generated reference path.
     /// </summary>
-    public const string SkillFilePathEnvVar = "CALOR_SKILL_FILE";
+    public const string ReferenceFilePathEnvVar = "CALOR_REFERENCE_FILE";
 
     /// <summary>
-    /// Resets the cached skill content. Used for testing environment variable overrides.
+    /// Resets the cached reference content. Used for testing environment variable overrides.
     /// </summary>
     internal static void ResetCacheForTesting()
     {
-        SkillContent = new Lazy<string>(LoadSkillContent);
+        ReferenceContent = new Lazy<string>(LoadReferenceContent);
     }
 
     public override string Name => "calor_help";
 
     public override string Description =>
-        "Get help with Calor syntax, feature support, error explanations, or working examples";
+        "Get help with Calor syntax through one or two closest complete examples, conversion feature support, error explanations, or the example catalog";
 
     public override McpToolAnnotations? Annotations => new() { ReadOnlyHint = true, IdempotentHint = true };
 
@@ -47,16 +48,16 @@ public sealed class HelpTool : McpToolBase
                 "action": {
                     "type": "string",
                     "enum": ["syntax", "features", "error", "example"],
-                    "description": "Help topic. syntax=C# to Calor syntax mapping (fuzzy match), features=feature support registry, error=explain error code/message, example=load working Calor examples",
+                    "description": "syntax=closest complete canonical examples (at most two), features=conversion support, error=explain diagnostic, example=existing example catalog",
                     "default": "syntax"
                 },
                 "query": {
                     "type": "string",
-                    "description": "C# construct or feature topic to look up (e.g., 'object instantiation', 'for loop', 'async', 'overview'). Used with action=syntax."
+                    "description": "Syntax topic or task (e.g., 'for loop', 'async', 'dictionary'). overview gives a concise overview; reference gives the full reference. Used with action=syntax."
                 },
                 "feature": {
                     "type": "string",
-                    "description": "Query a specific feature by name (e.g., 'named-argument', 'with-expression'). Used with action=features."
+                    "description": "Alias for query with action=syntax; conversion feature name with action=features."
                 },
                 "supportLevel": {
                     "type": "string",
@@ -103,24 +104,21 @@ public sealed class HelpTool : McpToolBase
     private Task<McpToolResult> HandleSyntax(JsonElement? arguments)
     {
         var query = GetString(arguments, "query");
-
-        // If query provided, use SyntaxLookupTool fuzzy matching
-        if (!string.IsNullOrWhiteSpace(query))
-        {
-            return HandleSyntaxLookup(query);
-        }
-
-        // Fall back to feature parameter for SyntaxHelpTool topic-based help
-        var feature = GetString(arguments, "feature");
-        if (!string.IsNullOrEmpty(feature))
-        {
-            return HandleSyntaxHelp(feature);
-        }
-
-        return Task.FromResult(McpToolResult.Error("Missing required parameter: query"));
+        if (string.IsNullOrWhiteSpace(query))
+            query = GetString(arguments, "feature");
+        if (string.IsNullOrWhiteSpace(query))
+            return Task.FromResult(McpToolResult.Error("Missing required parameter: query"));
+        query = query.Trim();
+        if (query.Equals("reference", StringComparison.OrdinalIgnoreCase) || ResolveCategory(query) == "overview")
+            return HandleSyntaxHelp(query);
+        return HandleSyntaxLookup(query);
     }
 
     #region SyntaxLookup (fuzzy C# → Calor mapping)
+
+    internal static string GetSyntaxTemplate(string constructId) =>
+        SyntaxDoc.Value?.Constructs.Single(c => c.Id == constructId).CalorSyntax
+        ?? throw new InvalidOperationException("Syntax documentation not available");
 
     private Task<McpToolResult> HandleSyntaxLookup(string query)
     {
@@ -131,46 +129,77 @@ public sealed class HelpTool : McpToolBase
         }
 
         var matches = FindConstructMatches(doc, query);
-
         if (matches.Count == 0)
         {
+            if (CalorTelemetry.IsInitialized)
+                CalorTelemetry.Instance.TrackSyntaxHelpQuery(query, ResolveCategory(query), 0, null);
             var availableConstructs = doc.Constructs
                 .Select(c => c.CSharpConstruct)
-                .OrderBy(c => c)
+                .OrderBy(c => c, StringComparer.Ordinal)
                 .ToList();
 
             return Task.FromResult(McpToolResult.Json(new LookupResult
             {
                 Found = false,
                 Query = query,
-                Message = $"No matches found for '{query}'",
-                AvailableConstructs = availableConstructs
+                Feature = query,
+                Examples = [],
+                Message = $"No canonical executable example matches '{query}'. Try a specific syntax topic; use action=features for conversion capabilities.",
+                AvailableConstructs = availableConstructs,
+                AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList()
             }));
         }
 
         var bestMatch = matches[0];
+        var candidates = bestMatch.Examples
+            .Select((example, index) => (Example: example, Index: index,
+                ProgramId: bestMatch.Programs.ElementAtOrDefault(index),
+                Score: ExampleMatchScore(example.Calor, bestMatch.Programs.ElementAtOrDefault(index) ?? "", query)))
+            .Where(e => e.ProgramId != null && SelfCheck.ExemplarCompileChecker.StartsWithModule(e.Example.Calor.Split('\n'))
+                && e.Example.Calor.Contains('\n'))
+            .ToList();
+        var hasPreciseExample = candidates.Any(c => c.Score > 0);
+        var examples = candidates
+            .Where(e => !hasPreciseExample || e.Score > 0)
+            .OrderByDescending(e => e.Score)
+            .ThenBy(e => e.Index)
+            .DistinctBy(e => e.Example.Calor, StringComparer.Ordinal)
+            .Take(2)
+            .Select(e => new SyntaxExampleOutput
+            {
+                ProgramId = e.ProgramId!,
+                CSharp = e.Example.CSharp,
+                Calor = e.Example.Calor
+            }).ToList();
         var result = new LookupResult
         {
-            Found = true,
+            Found = examples.Count > 0,
             Query = query,
+            Feature = query,
             Construct = bestMatch.CSharpConstruct,
             CalorSyntax = bestMatch.CalorSyntax,
             Description = bestMatch.Description,
-            Examples = bestMatch.Examples.Select(e => new SyntaxExampleOutput
-            {
-                CSharp = e.CSharp,
-                Calor = e.Calor
-            }).ToList(),
-            OtherMatches = matches.Skip(1).Take(3).Select(m => m.CSharpConstruct).ToList()
+            Examples = examples,
+            Message = examples.Count == 0
+                ? "This topic has no canonical executable example. Use action=features for conversion capabilities; no unrelated example was substituted."
+                : null,
+            OtherMatches = matches.Skip(1).Take(3).Select(m => m.CSharpConstruct).ToList(),
+            AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList()
         };
+        if (CalorTelemetry.IsInitialized)
+            CalorTelemetry.Instance.TrackSyntaxHelpQuery(query, ResolveCategory(query),
+                examples.Count, examples.Count > 0 ? bestMatch.CSharpConstruct : null);
 
         return Task.FromResult(McpToolResult.Json(result));
     }
 
     private static List<SyntaxConstruct> FindConstructMatches(SyntaxDocumentation doc, string query)
     {
-        var queryLower = query.ToLowerInvariant();
-        var queryTerms = queryLower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        // Only category names expand to their primary alias. Precise topics such
+        // as foreach or postcondition must not broaden to their entire category.
+        var topic = FeatureAliases.TryGetValue(query, out var aliases) ? aliases[0] : query;
+        var queryLower = NormalizeQuery(topic);
+        var queryTerms = QueryTerms(queryLower);
 
         var scored = new List<(SyntaxConstruct Construct, int Score)>();
 
@@ -185,95 +214,81 @@ public sealed class HelpTool : McpToolBase
 
         return scored
             .OrderByDescending(s => s.Score)
+            .ThenBy(s => s.Construct.Id, StringComparer.Ordinal)
             .Select(s => s.Construct)
             .ToList();
     }
 
     private static int CalculateMatchScore(SyntaxConstruct construct, string queryLower, string[] queryTerms)
     {
-        var score = 0;
+        var name = NormalizeQuery(construct.CSharpConstruct);
+        var keywords = construct.Keywords.Select(NormalizeQuery).Distinct(StringComparer.Ordinal).ToList();
+        if (name == queryLower) return 10_000;
+        if (keywords.Contains(queryLower)) return 9_000 + (ContainsTerm(name, queryLower) ? 100 : 0);
+        if (queryLower.StartsWith('§') && construct.CalorSyntax.Contains(queryLower, StringComparison.OrdinalIgnoreCase))
+            return 8_000;
 
-        // Exact match on construct name (highest priority)
-        if (construct.CSharpConstruct.Equals(queryLower, StringComparison.OrdinalIgnoreCase))
-        {
-            score += 1000;
-        }
-
-        // Construct name contains query
-        if (construct.CSharpConstruct.Contains(queryLower, StringComparison.OrdinalIgnoreCase))
-        {
-            score += 500;
-        }
-
-        // Query contains construct name
-        if (queryLower.Contains(construct.CSharpConstruct.ToLowerInvariant()))
-        {
-            score += 400;
-        }
-
-        // Keyword matches
-        foreach (var keyword in construct.Keywords)
-        {
-            var keywordLower = keyword.ToLowerInvariant();
-
-            // Exact keyword match
-            if (queryTerms.Contains(keywordLower))
-            {
-                score += 100;
-            }
-            // Query contains keyword
-            else if (queryLower.Contains(keywordLower))
-            {
-                score += 50;
-            }
-            // Keyword contains query term
-            else if (queryTerms.Any(t => keywordLower.Contains(t)))
-            {
-                score += 25;
-            }
-        }
-
-        // Description matches (lower priority)
-        foreach (var term in queryTerms)
-        {
-            if (construct.Description.Contains(term, StringComparison.OrdinalIgnoreCase))
-            {
-                score += 10;
-            }
-        }
-
-        // Calor syntax tag match
-        if (queryLower.StartsWith("§") && construct.CalorSyntax.Contains(queryLower, StringComparison.OrdinalIgnoreCase))
-        {
-            score += 200;
-        }
-
+        var score = keywords.Where(k => ContainsTerm(queryLower, k) && QueryTerms(k).Any(queryTerms.Contains))
+            .Sum(k => 100 + k.Length);
+        score += queryTerms.Count(t => ContainsTerm(name, t) || keywords.Any(k => ContainsTerm(k, t))) * 50;
+        if (ContainsTerm(queryLower, name)) score += 500;
+        // With no name or keyword hit, prose admits a construct only when EVERY significant
+        // query term appears in both its description and an example. One shared word is
+        // not a match: `unknown_feature_xyz` must not land on the `! unknown` effect row.
+        var significantTerms = queryTerms.Where(t => t.Length > 2).ToArray();
+        if (score == 0 && (significantTerms.Length == 0 || !significantTerms.All(t =>
+                ContainsTerm(construct.Description, t) && construct.Examples.Any(e => ContainsTerm(e.Calor, t)))))
+            return 0;
+        // Program IDs and actual code help distinguish precise built-ins from
+        // broad topic names; prose alone never admits an unrelated result.
+        score += construct.Examples.Select((e, i) =>
+            ExampleMatchScore(e.Calor, construct.Programs.ElementAtOrDefault(i) ?? "", queryLower)).DefaultIfEmpty().Max();
         return score;
     }
 
+    private static string NormalizeQuery(string query)
+        => Regex.Replace(query.Trim().ToLowerInvariant().Replace('_', ' ').Replace('-', ' '), @"\s+", " ");
+
+    private static string[] QueryTerms(string query)
+    {
+        var terms = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return terms.Length == 1 ? terms : terms.Where(t => t is not
+            ("a" or "an" or "the" or "how" or "do" or "i" or "to" or "in" or "for" or "with" or "please" or "show" or "me")).ToArray();
+    }
+
+    private static bool ContainsTerm(string text, string term)
+        => term.Length > 0 && Regex.IsMatch(text, $@"(?<![\p{{L}}\p{{N}}_]){Regex.Escape(term)}(?![\p{{L}}\p{{N}}_])",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static int ExampleMatchScore(string source, string programId, string query)
+        => QueryTerms(NormalizeQuery(query)).Count(t => t.Length > 1
+            && (ContainsTerm(source, t) || ContainsTerm(programId.Replace('_', ' '), t))) * 20;
+
     #endregion
 
-    #region SyntaxHelp (topic-based documentation)
+    #region SyntaxHelp (explicit overview and reference)
 
+    // Query terms that select a topic. Native keywords come first; the retired `§` markers stay
+    // as recognized synonyms so a query in the old spelling still finds the native topic.
     private static readonly Dictionary<string, string[]> FeatureAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["async"] = ["async", "await", "§AF", "§AMT", "§AWAIT", "§ASYNC"],
-        ["contracts"] = ["contract", "§Q", "§S", "precondition", "postcondition", "requires", "ensures"],
-        ["effects"] = ["effect", "§E", "side effect", "cw", "cr", "fs:"],
-        ["loops"] = ["loop", "for", "for loop", "foreach", "while", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
+        ["contracts"] = ["contract", "invariant", "proof", "§Q", "§S", "precondition", "postcondition", "requires", "ensures"],
+        ["effects"] = ["effect", "effect row", "§E", "side effect", "cw", "cr", "fs:"],
+        ["loops"] = ["loop", "for", "for loop", "foreach", "each", "while", "break", "continue", "§L{", "§WH{", "§DO{", "§BK", "§CN"],
         ["conditionals"] = ["if", "if statement", "if-else", "else", "conditional", "§IF{", "§EI", "§EL", "ternary"],
-        ["functions"] = ["function", "§F{", "§I{", "§O{", "§R", "return", "parameter", "extension method", "params", "default parameter", "ref", "out", "in"],
+        ["functions"] = ["function", "func", "§F{", "§I{", "§O{", "§R", "return", "parameter", "extension method", "params", "default parameter", "ref", "out", "in"],
         ["classes"] = ["class", "§CL{", "§EXT{", "§IMPL{", "inheritance", "interface", "static class"],
         ["generics"] = ["generic", "<T>", "§WHERE", "type parameter", "constraint"],
         ["collections"] = ["list", "dict", "array", "§LIST{", "§DICT{", "§ARR", "§IDX"],
-        ["patterns"] = ["pattern", "match", "switch", "§W{", "§K", "§SW{", "is pattern", "combinator", "relational pattern", "positional", "property pattern"],
+        ["patterns"] = ["pattern", "match", "switch", "§W{", "§K", "is pattern", "combinator", "relational pattern", "positional", "property pattern"],
         ["exceptions"] = ["try", "catch", "throw", "exception", "§TR{", "§CA", "§TH"],
         ["lambdas"] = ["lambda", "delegate", "§LAM{", "§DEL{", "nested delegate"],
         ["strings"] = ["string", "str", "concat", "substr", "interpolation"],
         ["types"] = ["type", "i32", "i64", "f32", "f64", "bool", "void"],
         ["records"] = ["record", "§D{", "union", "§T{", "§V{"],
-        ["enums"] = ["enum", "§EN{", "§ENUM{"],
-        ["constructors"] = ["constructor", "§CTOR{", "§BASE", "§THIS"],
+        ["enums"] = ["enum", "§EN{"],
+        ["constructors"] = ["constructor", "ctor", "§CTOR{", "§BASE", "§THIS"],
         ["properties"] = ["property", "§PROP{", "§GET", "§SET", "field", "§FLD{"],
         ["structs"] = ["struct", "§ST{", "value type"],
         ["operators"] = ["operator", "§OP{", "overload", "arithmetic"],
@@ -299,86 +314,14 @@ public sealed class HelpTool : McpToolBase
     {
         try
         {
-            var content = SkillContent.Value;
-            if (string.IsNullOrEmpty(content))
-            {
-                return Task.FromResult(McpToolResult.Error("Syntax documentation not available"));
-            }
-
-            var resolvedCategory = ResolveCategory(feature);
-
-            // Handle overview request — return curated language reference
-            if (resolvedCategory == "overview")
-            {
-                return Task.FromResult(HandleOverview(feature, content));
-            }
-
-            var sections = ExtractRelevantSections(content, feature);
-
-            // Track telemetry
-            if (CalorTelemetry.IsInitialized)
-            {
-                var matchedSectionNames = sections.Count > 0
-                    ? string.Join(";", sections.Select(s => s.Title).Take(5))
-                    : null;
-                CalorTelemetry.Instance.TrackSyntaxHelpQuery(
-                    feature, resolvedCategory, sections.Count, matchedSectionNames);
-            }
-
-            if (sections.Count == 0)
-            {
-                var availableFeatures = string.Join(", ", FeatureAliases.Keys.OrderBy(k => k));
-                return Task.FromResult(McpToolResult.Text(
-                    $"No documentation found for '{feature}'. Available features: {availableFeatures}"));
-            }
-
-            // Truncate if total content exceeds budget to prevent token overflow
-            const int maxContentChars = 15_000;
-            var totalChars = sections.Sum(s => s.Content.Length);
-            List<string>? omittedTitles = null;
-
-            if (totalChars > maxContentChars)
-            {
-                var kept = new List<SyntaxSection>();
-                var budget = 0;
-                omittedTitles = new List<string>();
-
-                foreach (var section in sections)
-                {
-                    if (budget + section.Content.Length <= maxContentChars || kept.Count == 0)
-                    {
-                        kept.Add(section);
-                        budget += section.Content.Length;
-                    }
-                    else
-                    {
-                        omittedTitles.Add(section.Title);
-                    }
-                }
-
-                // Add a tip section listing omitted titles
-                if (omittedTitles.Count > 0)
-                {
-                    kept.Add(new SyntaxSection
-                    {
-                        Title = "Truncated — additional sections available",
-                        Content = $"Response truncated ({totalChars} chars). " +
-                                  $"Query these sections individually for full content:\n" +
-                                  string.Join("\n", omittedTitles.Select(t => $"- {t}"))
-                    });
-                }
-
-                sections = kept;
-            }
-
-            var output = new SyntaxHelpOutput
+            if (!feature.Equals("reference", StringComparison.OrdinalIgnoreCase))
+                return Task.FromResult(HandleOverview(feature));
+            return Task.FromResult(McpToolResult.Json(new SyntaxHelpOutput
             {
                 Feature = feature,
-                Sections = sections,
-                AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k).ToList()
-            };
-
-            return Task.FromResult(McpToolResult.Json(output));
+                Sections = [new SyntaxSection { Title = "Complete Calor Reference", Content = ReferenceContent.Value }],
+                AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList()
+            }));
         }
         catch (Exception ex)
         {
@@ -386,309 +329,21 @@ public sealed class HelpTool : McpToolBase
         }
     }
 
-    private static McpToolResult HandleOverview(string feature, string content)
+    private static McpToolResult HandleOverview(string feature)
     {
-        // Extract the "Supported C# Features — Quick Reference" table and
-        // "Syntax Quick Reference" section from the skills doc for a curated overview
-        var overviewSections = new List<SyntaxSection>();
-
-        // 1. Extract the quick reference table
-        var headerPattern = new Regex(@"^## (.+)$", RegexOptions.Multiline);
-        var matches = headerPattern.Matches(content);
-
-        for (var i = 0; i < matches.Count; i++)
-        {
-            var match = matches[i];
-            var title = match.Groups[1].Value.Trim();
-            var startIndex = match.Index;
-            var endIndex = (i + 1 < matches.Count) ? matches[i + 1].Index : content.Length;
-            var sectionContent = content[startIndex..endIndex].Trim();
-
-            if (title.Contains("Quick Reference", StringComparison.OrdinalIgnoreCase) ||
-                title.Contains("Core Syntax", StringComparison.OrdinalIgnoreCase) ||
-                title.Equals("Properties", StringComparison.OrdinalIgnoreCase) ||
-                title.Equals("Indexers", StringComparison.OrdinalIgnoreCase) ||
-                title.Contains("Structure Tags", StringComparison.OrdinalIgnoreCase))
-            {
-                overviewSections.Add(new SyntaxSection
-                {
-                    Title = title,
-                    Content = sectionContent
-                });
-            }
-        }
-
-        // 2. Add a compact syntax cheatsheet as the first section
-        overviewSections.Insert(0, new SyntaxSection
+        var overview = new SyntaxSection
         {
             Title = "Calor Language Overview",
-            Content = """
-                ## Calor Language Overview
-
-                Calor is a DSL that compiles to C# on .NET 10. All constructs use section markers (§).
-
-                Calor is **indent-only**: a block's body is indented (2 spaces per level) under its
-                opener and ends at the next dedent. There are **NO structural closing tags** — never
-                write §/M, §/F, §/L, §/I, §/CL, §/MT, §/TR, etc. (The inline call closer §/C is still
-                valid and optional; §RAW…§/RAW, §CSHARP{…}§/CSHARP and §PP…§/PP keep their delimiters.)
-
-                ### Core Tags
-                ```
-                §M{id:Name}              Module (body indented)
-                §F{id:name:vis} (type:name, ...) -> retType   Function (body indented)
-                §B{name}                 Immutable binding (§B{name} expr)
-                §B{~name}                Mutable binding (§B{~name} expr)
-                §I{type:name}             Parameter (explicit form; alt. to the (…) signature)
-                §I{type:name:this}        Extension method parameter (C# 'this' modifier)
-                §I{type:name:ref}         Ref parameter
-                §I{type:name:out}         Out parameter
-                §I{type:name:in}          In (readonly ref) parameter
-                §I{type:name:params}      Params array parameter
-                §I{type:name}=expr        Parameter with default value
-                §O{type}                  Return type (explicit form; alt. to -> retType)
-                §R expr                   Return statement
-                §C{obj.Method} §A arg §/C Method call with argument
-                ```
-
-                ### Control Flow
-                ```
-                §IF{id} (cond)  /  §EI (cond2)  /  §EL      If/ElseIf/Else (bodies indented)
-                §IF{id} (cond) → §R expr                    Inline if (single statement)
-                §L{id:var:from:to:step}                     For loop (body indented)
-                §EACH{var:collection}                       Foreach loop (body indented)
-                §WH{id} (cond)                              While loop (body indented)
-                §W{expr}  then  §K{pattern} → result        Match/Switch (arms indented)
-                §GOTO{label}                                          Goto label
-                §GOTO{CASE:expr}                                      Goto case expr
-                §GOTO{DEFAULT}                                        Goto default
-                ```
-
-                ### Types and Classes
-                ```
-                §CL{id:Name:vis}          Class (body indented)
-                §CL{id:Name:vis:stat}     Static class
-                §CL{id:Name:vis:struct}   Struct
-                §IFACE{id:Name}           Interface (body indented)
-                §MT{id:name:vis} (type:name, ...) -> retType   Method (body indented)
-                §CTOR{id:vis}             Constructor (body indented)
-                §BASE arg1 arg2           Constructor chaining to base class
-                §THIS arg1 arg2           Constructor chaining to another constructor
-                §PROP{id:Name:type:vis}   Property (body indented)
-                §IXER{id:type:vis}        Indexer (body indented)
-                §FLD{type:name:vis}       Field
-                §FLD{type:name:vis:volatile} Volatile field
-                §EXT{BaseClass}           Extends
-                §IMPL{Interface}          Implements
-                §EN{id:Name}              Enum (body indented)
-                §SYNC{id}                 Lock/synchronization block (body indented)
-                ```
-
-                ### Properties and Indexers (compact forms)
-                ```
-                §PROP{id:Name:type:vis:get,set}                      Auto-property
-                §IXER{id:type:vis:get,set} (type:param)              Auto-indexer
-                §IXER{id:type:vis:get,set} (type:p1, type:p2)        Multi-param indexer
-                ```
-
-                ### Contracts and Effects
-                ```
-                §Q (expr)                 Precondition (requires)
-                §S (expr)                 Postcondition (ensures)
-                §INV (expr)               Invariant
-                §E{effect1,effect2}       Effect declarations
-                ```
-
-                ### Async, Exceptions, and Resources
-                ```
-                §AF{id:name:vis} (type:name, ...) -> retType   Async function (body indented)
-                §AMT{id:name:vis} (type:name, ...) -> retType  Async method (body indented)
-                §AWAIT expr               Await expression
-                §TR{id}  /  §CA{Type:var}  /  §FI    Try/Catch/Finally (bodies indented; §CA{Type:var} WHEN (cond) for filters)
-                §TH expr                  Throw
-                §USE{var} expr            Using statement (body indented)
-                §YIELD expr               Yield return
-                §YBRK                     Yield break
-                ```
-
-                ### Lambdas, Delegates, Events
-                ```
-                §LAM{id:param:type} body §/LAM{id}   Lambda expression
-                §DEL{id:Name:vis}                     Delegate type (also inside §CL)
-                §EVT{id:Name:vis:type}                Event
-                §EADD body §/EADD                     Event add accessor
-                §EREM body §/EREM                     Event remove accessor
-                §OP{id:operator:vis}                  Operator overload
-                ```
-
-                ### Tuples and Null Operators
-                ```
-                (Type1, Type2)            Tuple type
-                (expr1, expr2)            Tuple literal
-                (?? left right)           Null-coalescing (left ?? right)
-                (?. target Member)        Null-conditional (target?.Member)
-                ```
-
-                ### Collections
-                ```
-                §LIST{id:type}            List<T>
-                §DICT{id:ktype:vtype}     Dictionary<K,V>
-                §HSET{id:type}            HashSet<T>
-                §IDX coll index           Element access
-                §PUSH coll item           Add to list/set
-                §PUT dict key value       Add/update dict entry
-                §RANGE start end          Range: start..end (for slicing)
-                §^ n                      Index from end: ^n
-                ```
-
-                ### Preprocessor and Interop
-                ```
-                §PP{CONDITION} ... §PPE ... §/PP{CONDITION}   #if/#else/#endif
-                §CSHARP{code}§/CSHARP                         Raw C# passthrough (member-level)
-                §RAW ... §/RAW                                Raw C# block
-                §UNSAFE{id}                                   Unsafe block (body indented)
-                ```
-
-                ### Typed Literals
-                ```
-                INT:42    STR:"hello"    BOOL:true    FLOAT:3.14    DECIMAL:18.00
-                ```
-
-                ### Visibility: pub, priv, prot, int, protint
-                ### Modifiers: stat, abs, virt, over, seal, req, partial, volatile
-
-                ### Parameter Modifiers
-                ```
-                :this     Extension method (first param)
-                :ref      Ref parameter
-                :out      Out parameter
-                :in       In (readonly ref) parameter
-                :params   Params array
-                =expr     Default value (e.g., §I{i32:count}=INT:0)
-                ```
-
-                **Key rule**: If a C# construct has a Calor tag, use it natively. Only use §CSHARP for constructs without native support.
-
-                Query a specific feature for detailed syntax and examples (e.g., 'async', 'indexers', 'contracts').
-                """
-        });
-
-        // Track telemetry
+            Content = EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.overview.md")
+        };
         if (CalorTelemetry.IsInitialized)
-        {
-            var matchedNames = string.Join(";", overviewSections.Select(s => s.Title).Take(5));
-            CalorTelemetry.Instance.TrackSyntaxHelpQuery(
-                feature, "overview", overviewSections.Count, matchedNames);
-        }
-
-        var output = new SyntaxHelpOutput
+            CalorTelemetry.Instance.TrackSyntaxHelpQuery(feature, "overview", 1, overview.Title);
+        return McpToolResult.Json(new SyntaxHelpOutput
         {
             Feature = feature,
-            Sections = overviewSections,
-            AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k).ToList()
-        };
-
-        return McpToolResult.Json(output);
-    }
-
-    private static List<SyntaxSection> ExtractRelevantSections(string content, string feature)
-    {
-        var sections = new List<SyntaxSection>();
-        var searchTerms = GetSearchTerms(feature);
-
-        // Split content by ## headers
-        var headerPattern = new Regex(@"^## (.+)$", RegexOptions.Multiline);
-        var matches = headerPattern.Matches(content);
-
-        for (var i = 0; i < matches.Count; i++)
-        {
-            var match = matches[i];
-            var title = match.Groups[1].Value.Trim();
-            var startIndex = match.Index;
-            var endIndex = (i + 1 < matches.Count) ? matches[i + 1].Index : content.Length;
-            var sectionContent = content[startIndex..endIndex].Trim();
-
-            // Check if this section is relevant
-            if (IsSectionRelevant(title, sectionContent, searchTerms))
-            {
-                sections.Add(new SyntaxSection
-                {
-                    Title = title,
-                    Content = sectionContent
-                });
-            }
-        }
-
-        // If no sections found by header, try to find template sections
-        if (sections.Count == 0)
-        {
-            var templatePattern = new Regex(@"### Template: (.+?)\n(```calor\n[\s\S]+?```)", RegexOptions.Multiline);
-            var templateMatches = templatePattern.Matches(content);
-
-            foreach (Match match in templateMatches)
-            {
-                var title = match.Groups[1].Value.Trim();
-                var templateContent = match.Groups[2].Value.Trim();
-
-                if (searchTerms.Any(term =>
-                    title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                    IsContentMatch(templateContent, term)))
-                {
-                    sections.Add(new SyntaxSection
-                    {
-                        Title = $"Template: {title}",
-                        Content = templateContent
-                    });
-                }
-            }
-        }
-
-        return sections;
-    }
-
-    private static string[] GetSearchTerms(string feature)
-    {
-        // Check for direct alias match
-        foreach (var (key, aliases) in FeatureAliases)
-        {
-            if (key.Equals(feature, StringComparison.OrdinalIgnoreCase) ||
-                aliases.Any(a => a.Equals(feature, StringComparison.OrdinalIgnoreCase)))
-            {
-                return aliases;
-            }
-        }
-
-        // Fall back to the feature itself as search term
-        return [feature];
-    }
-
-    private static bool IsSectionRelevant(string title, string content, string[] searchTerms)
-    {
-        return searchTerms.Any(term =>
-            title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-            IsContentMatch(content, term));
-    }
-
-    /// <summary>
-    /// Matches a search term against section content. Short plain-text terms (≤ 3 chars)
-    /// use word-boundary matching to prevent false positives like "for" in "information"
-    /// or "if" in "specific". Calor tokens and longer terms use substring matching.
-    /// </summary>
-    private static bool IsContentMatch(string text, string term)
-    {
-        // Calor-specific tokens (§, {, <, [) are already very specific — use substring matching
-        if (term.Contains('§') || term.Contains('{') || term.Contains('<') || term.Contains('['))
-        {
-            return text.Contains(term, StringComparison.OrdinalIgnoreCase);
-        }
-
-        // Short terms (≤ 3 chars) use word-boundary matching to avoid false positives
-        if (term.Length <= 3)
-        {
-            return Regex.IsMatch(text, $@"\b{Regex.Escape(term)}\b", RegexOptions.IgnoreCase);
-        }
-
-        // Longer terms are specific enough for substring matching
-        return text.Contains(term, StringComparison.OrdinalIgnoreCase);
+            Sections = [overview],
+            AvailableFeatures = FeatureAliases.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList()
+        });
     }
 
     private static string? ResolveCategory(string feature)
@@ -810,6 +465,25 @@ public sealed class HelpTool : McpToolBase
         {
             var patterns = ErrorPatterns.Value;
             var matchList = FindMatchingErrorPatterns(patterns, error);
+            var explanation = DiagnosticText.Explanation(error);
+
+            if (explanation != null)
+            {
+                return Task.FromResult(McpToolResult.Json(new
+                {
+                    query = error,
+                    explanation,
+                    matches = matchList.Select(p => new ErrorExplanation
+                    {
+                        Id = p.Id,
+                        Title = p.Title,
+                        Description = p.Description,
+                        WrongExample = p.WrongExample,
+                        CorrectExample = p.CorrectExample,
+                        Explanation = p.Explanation
+                    }).ToList()
+                }));
+            }
 
             if (matchList.Count == 0)
             {
@@ -1001,101 +675,17 @@ public sealed class HelpTool : McpToolBase
         PropertyNameCaseInsensitive = true
     };
 
-    private static SyntaxDocumentation? LoadSyntaxDocumentation()
+    private static SyntaxDocumentation LoadSyntaxDocumentation() =>
+        JsonSerializer.Deserialize<SyntaxDocumentation>(
+            EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.calor-syntax-documentation.json"), JsonOptions)
+        ?? throw new InvalidDataException("Packaged syntax documentation is empty.");
+
+    private static string LoadReferenceContent()
     {
-        try
-        {
-            // Try embedded resource first
-            var assembly = Assembly.GetExecutingAssembly();
-            var resourceName = "Calor.Compiler.Resources.calor-syntax-documentation.json";
-
-            using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream != null)
-            {
-                using var reader = new StreamReader(stream);
-                var json = reader.ReadToEnd();
-                return JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
-            }
-
-            // Fall back to file system (for development)
-            var projectRoot = FindProjectRoot();
-            if (projectRoot != null)
-            {
-                var filePath = Path.Combine(projectRoot, "src", "Calor.Compiler", "Resources", "calor-syntax-documentation.json");
-                if (File.Exists(filePath))
-                {
-                    var json = File.ReadAllText(filePath);
-                    return JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
-                }
-            }
-
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string LoadSkillContent()
-    {
-        // 1. Check environment variable first (highest priority)
-        var envPath = Environment.GetEnvironmentVariable(SkillFilePathEnvVar);
-        if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath))
-        {
-            try
-            {
-                return File.ReadAllText(envPath);
-            }
-            catch
-            {
-                // Fall through to other methods
-            }
-        }
-
-        // 2. Look for project root by walking up directories
-        var projectRoot = FindProjectRoot();
-        if (projectRoot != null)
-        {
-            var skillPath = Path.Combine(projectRoot, "tests", "Calor.Evaluation", "Skills", "calor-language-skills.md");
-            if (File.Exists(skillPath))
-            {
-                try
-                {
-                    return File.ReadAllText(skillPath);
-                }
-                catch
-                {
-                    // Fall through
-                }
-            }
-        }
-
-        // 3. Try NuGet tool installation path
-        var nugetSkillPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Skills", "calor-language-skills.md");
-        if (File.Exists(nugetSkillPath))
-        {
-            try
-            {
-                return File.ReadAllText(nugetSkillPath);
-            }
-            catch
-            {
-                // Fall through
-            }
-        }
-
-        // 4. Fall back to embedded resource (always available in NuGet tool installations)
-        try
-        {
-            return EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.calor-language-skills.md");
-        }
-        catch
-        {
-            // Resource not found
-        }
-
-        return "";
+        var path = Environment.GetEnvironmentVariable(ReferenceFilePathEnvVar);
+        if (!string.IsNullOrEmpty(path))
+            return File.ReadAllText(path);
+        return EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.current-language-reference.md");
     }
 
     private static List<ErrorPattern> LoadErrorPatterns()
@@ -1201,6 +791,9 @@ public sealed class HelpTool : McpToolBase
 
         [JsonPropertyName("examples")]
         public List<SyntaxExample> Examples { get; set; } = new();
+
+        [JsonPropertyName("programs")]
+        public List<string> Programs { get; set; } = new();
     }
 
     private sealed class SyntaxExample
@@ -1235,6 +828,13 @@ public sealed class HelpTool : McpToolBase
         [JsonPropertyName("query")]
         public required string Query { get; init; }
 
+        [JsonPropertyName("feature")]
+        public required string Feature { get; init; }
+
+        [JsonPropertyName("examples")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<SyntaxExampleOutput>? Examples { get; init; }
+
         [JsonPropertyName("construct")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Construct { get; init; }
@@ -1247,10 +847,6 @@ public sealed class HelpTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Description { get; init; }
 
-        [JsonPropertyName("examples")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<SyntaxExampleOutput>? Examples { get; init; }
-
         [JsonPropertyName("message")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Message { get; init; }
@@ -1262,10 +858,16 @@ public sealed class HelpTool : McpToolBase
         [JsonPropertyName("availableConstructs")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? AvailableConstructs { get; init; }
+
+        [JsonPropertyName("availableFeatures")]
+        public required List<string> AvailableFeatures { get; init; }
     }
 
     private sealed class SyntaxExampleOutput
     {
+        [JsonPropertyName("programId")]
+        public required string ProgramId { get; init; }
+
         [JsonPropertyName("csharp")]
         public required string CSharp { get; init; }
 
@@ -1302,8 +904,15 @@ public sealed class HelpTool : McpToolBase
 
     #region FeatureSupport Models
 
+    private const string FeatureSupportGuidance =
+        "C# conversion capabilities and preservation boundaries, not an authoring grammar. "
+        + "Use action=syntax for current forms. Raw interop is converter-owned; do not handwrite passthrough frames.";
+
     private sealed class FeatureQueryResult
     {
+        [JsonPropertyName("guidance")]
+        public string Guidance => FeatureSupportGuidance;
+
         [JsonPropertyName("feature")]
         public required string Feature { get; init; }
 
@@ -1321,6 +930,9 @@ public sealed class HelpTool : McpToolBase
 
     private sealed class FeatureListResult
     {
+        [JsonPropertyName("guidance")]
+        public string Guidance => FeatureSupportGuidance;
+
         [JsonPropertyName("supportLevel")]
         public required string SupportLevel { get; init; }
 
@@ -1347,6 +959,9 @@ public sealed class HelpTool : McpToolBase
 
     private sealed class FeatureSummaryResult
     {
+        [JsonPropertyName("guidance")]
+        public string Guidance => FeatureSupportGuidance;
+
         [JsonPropertyName("totalFeatures")]
         public int TotalFeatures { get; init; }
 

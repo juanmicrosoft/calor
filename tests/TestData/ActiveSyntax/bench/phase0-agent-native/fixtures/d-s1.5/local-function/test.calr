@@ -1,0 +1,60 @@
+module Fixture Fixture block overflow unchecked
+  using System
+  using Calor.Runtime
+  module LocalFunctionFixture
+    func Add (int:x) → int
+      !
+      return unchecked((x + 1000))
+
+    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Run%28%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20int%20__calorPostconditionResult0... 1752
+
+        public static int Run()
+        {
+            int __calorPostconditionResult0;
+            int shadowed = Add(2);
+            if (shadowed != 3)
+            {
+                __calorPostconditionResult0 = unchecked(-1);
+                goto __calorPostconditionExit0;
+            }
+
+            int squared = Square(4);
+            if (squared != 16)
+            {
+                __calorPostconditionResult0 = unchecked(-2);
+                goto __calorPostconditionExit0;
+            }
+
+            int factorial = Fact(5);
+            if (factorial != 120)
+            {
+                __calorPostconditionResult0 = unchecked(-3);
+                goto __calorPostconditionExit0;
+            }
+
+            __calorPostconditionResult0 = unchecked(unchecked(unchecked(shadowed * 10000) + unchecked(squared * 100)) + factorial % 100);
+            goto __calorPostconditionExit0;
+            static int Add(int x)
+            {
+                return unchecked(x + 1);
+            }
+
+            static int Square(int n)
+            {
+                return unchecked(n * n);
+            }
+
+            static int Fact(int n)
+            {
+                if (n <= 1)
+                {
+                    return 1;
+                }
+
+                return unchecked(n * Fact(unchecked(n - 1)));
+            }
+
+            __calorPostconditionExit0:
+            if (!(__calorPostconditionResult0 == 31620)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __calorPostconditionResult0 == 31620", "m003", Calor.Runtime.ContractKind.Ensures, startOffset: 184, length: 20, sourceFile: null, line: 7, column: 7, condition: "__calorPostconditionResult0 == 31620");
+            return __calorPostconditionResult0;
+        }

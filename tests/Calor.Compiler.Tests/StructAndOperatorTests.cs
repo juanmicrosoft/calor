@@ -137,9 +137,9 @@ public class StructAndOperatorTests
     public void Parser_StructModifier_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Foo:struct}
-                §FLD{i32:Value:pub}
+            module Test
+              class Foo struct
+                field int:Value public
             """;
 
         var compilationResult = Program.Compile(
@@ -158,9 +158,9 @@ public class StructAndOperatorTests
     public void Parser_ReadonlyStructModifier_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Point:struct,readonly}
-                §FLD{f64:X:pub}
+            module Test
+              class Point struct readonly
+                field double:X public
             """;
 
         var compilationResult = Program.Compile(
@@ -591,12 +591,12 @@ public class StructAndOperatorTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        // W1 Slice 3 (#773): records (including their operators) are preserved
-        // verbatim as §CSHARP interop while the registry marks them
-        // NotSupported — nothing is dropped.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("operator +(Money a, Money b)", interop.CSharpCode);
+        Assert.Empty(result.Losses);
+        Assert.Empty(result.Ast!.InteropBlocks);
+        var record = Assert.Single(result.Ast.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Single(record.OperatorOverloads);
+        Assert.Contains("operator +(Money a, Money b)", new CSharpEmitter().Emit(result.Ast));
     }
 
     [Fact]
@@ -615,12 +615,12 @@ public class StructAndOperatorTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        // W1 Slice 3 (#773): records (including conversion operators) are
-        // preserved verbatim as §CSHARP interop while the registry marks them
-        // NotSupported — nothing is dropped.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("implicit operator double(Celsius c)", interop.CSharpCode);
+        Assert.Empty(result.Losses);
+        Assert.Empty(result.Ast!.InteropBlocks);
+        var record = Assert.Single(result.Ast.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Single(record.OperatorOverloads);
+        Assert.Contains("implicit operator double(Celsius c)", new CSharpEmitter().Emit(result.Ast));
     }
 
     #endregion
@@ -673,16 +673,14 @@ public class StructAndOperatorTests
     public void CSharpEmitter_OperatorWithPrecondition_EmitsContractCheck()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Vector:struct}
-                §FLD{f64:X:pub}
-                §FLD{f64:Y:pub}
-                §MT{m1:op_Addition:pub:static}
-                    §I{i32:a}
-                    §I{i32:b}
-                    §O{i32}
-                    §Q (>= a INT:0)
-                    §R (+ a b)
+            module Test
+              class Vector struct
+                field double:X public
+                field double:Y public
+                op + (int:a, int:b) → int
+                  ! unknown
+                  requires a >= 0
+                  return a + b
             """;
 
         var compilationResult = Program.Compile(
@@ -708,15 +706,13 @@ public class StructAndOperatorTests
     public void CSharpEmitter_OperatorWithPostcondition_EmitsResultCheck()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Counter:struct}
-                §FLD{i32:Value:pub}
-                §MT{m1:op_Addition:pub:static}
-                    §I{i32:a}
-                    §I{i32:b}
-                    §O{i32}
-                    §S (>= result INT:0)
-                    §R (+ a b)
+            module Test
+              class Counter struct
+                field int:Value public
+                op + (int:a, int:b) → int
+                  ! unknown
+                  => result >= 0
+                  return a + b
             """;
 
         var compilationResult = Program.Compile(

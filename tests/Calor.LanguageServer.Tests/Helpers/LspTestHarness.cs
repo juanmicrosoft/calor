@@ -41,20 +41,9 @@ public static class LspTestHarness
     public static string WrapInFunction(string bodySource)
     {
         return $$"""
-            §M{m001:TestModule}
-              §F{f001:TestFunc}
+            §M{TestModule}
+              §F{TestFunc}
                 {{bodySource}}
-            """;
-    }
-
-    /// <summary>
-    /// Wraps source code in a module for testing.
-    /// </summary>
-    public static string WrapInModule(string moduleContent)
-    {
-        return $$"""
-            §M{m001:TestModule}
-              {{moduleContent}}
             """;
     }
 

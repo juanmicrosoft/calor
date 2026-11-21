@@ -12,9 +12,9 @@ Calor makes these things explicit:
 
 | Feature | Calor Syntax | Benefit |
 |---------|--------------|---------|
-| Side effects | `§E{cw,fr,net}` | Know effects without reading implementation |
-| Contracts | `§Q` (requires), `§S` (ensures) | Generate tests, verify correctness |
-| Unique IDs | `§F{f001:Main}` | Precise references that survive refactoring |
+| Side effects | `! cw, fs:r` | Know effects without reading implementation |
+| Contracts | `requires condition`, `=> condition` | Generate tests, verify correctness |
+| Stable declaration identity | Tooling-owned `.calor/ids.json` | Precise references that survive refactoring |
 | Clear structure | Indentation-based nesting (no closing tags) | Unambiguous scope boundaries |
 
 ## Quick Start
@@ -32,11 +32,11 @@ calor --input program.calr --output program.g.cs
 
 ## Example
 
-```
-§M{m001:Hello}
-  §F{f001:Main:pub} () -> void
-    §E{cw}
-    §P "Hello from Calor!"
+```calor
+module Hello
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello from Calor!")
 ```
 
 ## Documentation

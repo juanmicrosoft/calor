@@ -21,10 +21,12 @@ arithmetic. See
 When you write contracts in Calor:
 
 ```calor
-§F{f001:Square:pub} (i32:x) -> i32
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
+module SquareBoundaries
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x
 ```
 
 Native Calor checks this integer multiplication for overflow. `x = 46340`
@@ -77,20 +79,20 @@ Z3 verification supports:
 
 | Calor | Z3 | Description |
 |:------|:---|:------------|
-| `(+ a b)` | `a + b` | Addition |
-| `(- a b)` | `a - b` | Subtraction |
-| `(* a b)` | `a * b` | Multiplication |
-| `(/ a b)` | `a div b` | Division |
-| `(% a b)` | `a mod b` | Modulo |
-| `(== a b)` | `a = b` | Equality |
-| `(!= a b)` | `a ≠ b` | Inequality |
-| `(< a b)` | `a < b` | Less than |
-| `(<= a b)` | `a ≤ b` | Less or equal |
-| `(> a b)` | `a > b` | Greater than |
-| `(>= a b)` | `a ≥ b` | Greater or equal |
-| `(&& p q)` | `p ∧ q` | Logical and |
-| `(\|\| p q)` | `p ∨ q` | Logical or |
-| `(! p)` | `¬p` | Logical not |
+| `a + b` | `a + b` | Addition |
+| `a - b` | `a - b` | Subtraction |
+| `a * b` | `a * b` | Multiplication |
+| `a / b` | `a div b` | Division |
+| `a % b` | `a mod b` | Modulo |
+| `a == b` | `a = b` | Equality |
+| `a != b` | `a ≠ b` | Inequality |
+| `a < b` | `a < b` | Less than |
+| `a <= b` | `a ≤ b` | Less or equal |
+| `a > b` | `a > b` | Greater than |
+| `a >= b` | `a ≥ b` | Greater or equal |
+| `p && q` | `p ∧ q` | Logical and |
+| `p \|\| q` | `p ∨ q` | Logical or |
+| `!p` | `¬p` | Logical not |
 
 Integer arithmetic is modeled with fixed-width bit-vectors and C#-compatible
 promotion rules where supported—not arbitrary-precision integers. Verification
@@ -134,10 +136,21 @@ The default solver budget is 5 seconds per contract. Use `--timeout` with
 
 ### Function Calls
 
-Contracts referencing other functions cannot be verified:
+A contract that calls a source function is outside the verifier's modeled
+subset, even when that function is pure. The normal runtime path can execute
+it. Here `Identity(1)` returns `1`, but the postcondition proof reports
+`unsupported`:
 
 ```calor
-§S (> (strlen s) 0)  ; Unsupported - function call
+module FunctionCallBoundary
+  func Positive (int:value) → bool
+    !
+    return value > 0
+  func Identity (int:x) → int
+    !
+    requires x > 0
+    => Positive(result)
+    return x
 ```
 
 ### Floating Point
@@ -184,22 +197,22 @@ there is no silent static-only fallback. See the
 
 Simple arithmetic and comparison contracts verify quickly:
 
-```calor
-§Q (>= x 0)
-§S (>= result 0)
+```calor-fragment
+requires x >= 0
+=> result >= 0
 ```
 
 ### Separate Concerns
 
 Split complex contracts into multiple simpler ones:
 
-```calor
-; Instead of:
-§S (and (>= result 0) (< result 100))
+```calor-fragment
+// Instead of:
+=> result >= 0 && result < 100
 
-; Use:
-§S (>= result 0)
-§S (< result 100)
+// Use:
+=> result >= 0
+=> result < 100
 ```
 
 ### Treat Every Non-Proven Status as Information
@@ -231,7 +244,7 @@ Calor is **not** a proof assistant like LEAN, Isabelle, or Rocq. The distinction
 
 | Aspect | Proof Assistants | Calor |
 |:-------|:-----------------|:------|
-| You write | Proofs (tactics, lemmas) | Contracts (§Q, §S) |
+| You write | Proofs (tactics, lemmas) | Contracts (`requires`, `=>`) |
 | Verification | Must complete to compile | Optional; reports seven verdicts and removes only eligible clean proven guards |
 | Scope | Arbitrary mathematical properties | Practical software contracts |
 | Expertise | Type theory, proof tactics | Software engineering |
@@ -246,13 +259,16 @@ theorem sqrt_positive (x : ℝ) (h : x ≥ 0) : √x ≥ 0 := by
 ```
 
 In Calor, you declare the contract and request Z3 verification with `--verify`.
-This floating-point example reports `unsupported`, which is an honest result:
+This example squares its input; it does not calculate a square root.
+`Square(2.0)` returns `4.0`, but its floating-point proof reports `unsupported`:
 
 ```calor
-§F{f001:Sqrt}(x: f64) -> f64
-  §Q (>= x 0.0)
-  §S (>= result 0.0)
-  §R (* x x)
+module FloatingProofBoundary
+  func Square (double:x) → double
+    !
+    requires x >= 0.0
+    => result >= 0.0
+    return x * x
 ```
 
 An inconclusive proof does not authorize guard removal. Runtime checks still
@@ -265,20 +281,25 @@ Calor's verification is deliberately bounded:
 
 - **5-second timeout** per contract (configurable via `--verification-timeout` on compile or `--timeout` on `calor verify`)
 - **A positive modeled-forms whitelist** rather than arbitrary math
-- **Graceful degradation** to runtime checks
+- **Retained runtime checks** when the contract mode enables them and lowering is supported
 
-This is a feature, not a limitation. Verification never blocks your build indefinitely, and you don't need expertise in formal methods to benefit from it.
+The solver budget bounds each attempt, not the total duration of every build.
+Review the supported model and inconclusive results rather than treating an
+optional proof attempt as a whole-program guarantee.
 
 ---
 
 ## Z3 Installation
 
-Z3 is bundled with the Calor compiler via the `Microsoft.Z3` NuGet package. No separate installation is required.
+Published compiler packages include supported Z3 assets. A source build also
+requires the repository's verified native assets; run
+`src/Calor.Compiler/scripts/download-z3.sh` (or its PowerShell counterpart)
+before building. See the [installation guide](/docs/getting-started/installation/).
 
 If Z3 native libraries are missing on your platform, the compiler will:
 1. Report `unavailable`
 2. Skip the Z3 attempt
-3. Continue compilation normally with all runtime checks
+3. Retain otherwise-emitted checks when the contract mode and body lowering support them
 
 ---
 
@@ -286,7 +307,7 @@ If Z3 native libraries are missing on your platform, the compiler will:
 
 Z3 verification results are automatically cached to disk. When you recompile a file with unchanged contracts, the compiler retrieves cached results instead of re-running Z3. This provides:
 
-- **Faster incremental builds**: Unchanged contracts verify in milliseconds instead of seconds
+- **Reuse on eligible incremental builds**: A matching entry can avoid a solver attempt
 - **Reduced CI load**: Build servers benefit from cached results across runs
 - **Deterministic cache keys**: The same normalized obligation, settings,
   compiler semantics, and solver version reuse the same result
@@ -302,19 +323,15 @@ To disable caching (e.g., for debugging), use `--no-cache`. To clear the cache, 
 
 ## Beyond Contracts: Refinement Types
 
-Contracts verify *behavior* — preconditions and postconditions on function boundaries. **Refinement types** extend this to *type-level constraints*: instead of asserting `(>= x 0)` as a precondition, you declare the parameter as `§I{i32:x} | (>= # INT:0)` and the constraint becomes part of the type itself.
+Contracts constrain behavior at function boundaries. A refinement type would
+instead attach a predicate to a type. Retired named refinements, inline
+refinement predicates, and proof-statement tags are not current native source
+forms; do not copy them from historical examples.
 
-The obligation engine is an evolution of the assume-negate-check pattern described above:
-
-1. **Generation** — The compiler creates verification obligations for every refined parameter and `§PROOF` statement
-2. **Solving** — Each obligation goes through the same Z3 pipeline: assume preconditions, negate the condition, check satisfiability
-3. **Guard Discovery** — For failed obligations, the engine discovers the simplest guard that would discharge them, validated by Z3
-4. **Policy** — Configurable policies (default, strict, permissive) control whether failures are errors, warnings, or runtime guards
-
-Where contracts are function-level assertions, refinement types are type-level
-constraints that feed the obligation engine. Refinement obligations are
-compile-time analysis only and do not emit runtime guards; review packets
-repeat that disclosure on every run that contains refinements.
+Use ordinary .NET types and native `requires` clauses for current input
+constraints. This does not create a new nominal type, validate every assignment,
+or prove every caller safe. The retained internal refinement obligation engine
+is compile-time analysis, not a native runtime-guard guarantee.
 
 - [Refinement Types Reference](/docs/syntax-reference/refinement-types/)
 - [Dependent Types Tutorial](/docs/guides/dependent-types-tutorial/)

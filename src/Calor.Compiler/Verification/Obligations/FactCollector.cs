@@ -201,7 +201,7 @@ public sealed class FactCollector
                 continue;
             HasOpaqueEntry |= IsOpaque(predicate);
             EntryMayThrow |= MayThrow(predicate);
-            var fact = SubstituteSelfRefStatic(predicate, param.Name);
+            var fact = SubstituteContractSelf(predicate, param.Name);
             if (IsStaleAfterEntry(fact))
                 DroppedFactNames.UnionWith(ReferencedNames(fact));
             else
@@ -248,6 +248,12 @@ public sealed class FactCollector
             switch (stmt)
             {
                 case ForStatementNode forStmt:
+                    if (forStmt.Condition != null)
+                    {
+                        var tested = AddGuardFact(forStmt.Condition, forStmt.Body);
+                        Walk(forStmt.Body, reachedExactly && tested && !MayThrow(forStmt.Condition));
+                        break;
+                    }
                     var bounded = CollectFromForLoop(forStmt) && !MayThrow(forStmt.From) && !MayThrow(forStmt.To);
                     Walk(forStmt.Body, reachedExactly && bounded);
                     break;
@@ -466,7 +472,7 @@ public sealed class FactCollector
                 || SharesEmittedName(name))
                 return "shares its C# name with another variable, so its value at the proof is not known";
             if (bind.IsMutable)
-                return "is mutable (§B{~...}), so its value at the proof is not modeled";
+                return "is mutable (var), so its value at the proof is not modeled";
             if (rebound.Contains(name) || _parameterNames.Contains(name))
                 return "is reassigned, passed by reference, or shadows another variable, so its value at the proof is not modeled";
             if (bind.Initializer is not { } definition)
@@ -650,7 +656,7 @@ public sealed class FactCollector
     private bool CollectFromForLoop(ForStatementNode forStmt)
     {
         var dummySpan = new TextSpan(0, 0, 1, 1);
-        var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
+        var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName, isVerbatim: true);
 
         var isPositiveStep = forStmt.Step is IntLiteralNode { Value: > 0 }
             or UnaryOperationNode
@@ -867,7 +873,7 @@ public sealed class FactCollector
     public static ExpressionNode SubstituteSelfRefStatic(ExpressionNode expr, string variableName)
         => SubstituteSelfRefStatic(
             expr,
-            new ReferenceNode(expr.Span, variableName));
+            new ReferenceNode(expr.Span, variableName, isVerbatim: true));
 
     /// <summary>
     /// Substitutes SelfRefNode (#) with an arbitrary expression.
@@ -881,6 +887,42 @@ public sealed class FactCollector
             ? new BoolLiteralNode(expr.Span, false)
             : substituted;
     }
+
+    internal static ExpressionNode SubstituteContractSelf(ExpressionNode expression, string name)
+        // A failed substitution must remain unmodeled, not become false and
+        // manufacture an unsatisfiable precondition set (a vacuous proof).
+        => SubstituteSelfRef(expression, new ReferenceNode(expression.Span, name, isVerbatim: true));
+
+    internal static bool IsPlainCallArgument(ExpressionNode argument)
+        => DescendantsAndSelf(argument).All(IsPlainDefinitionNode);
+
+    /// <summary>
+    /// Simultaneous substitution: replacements are caller expressions and must
+    /// never be traversed again as if they were callee parameter names.
+    /// Non-plain forms are refused rather than approximated or captured.
+    /// </summary>
+    internal static ExpressionNode? SubstituteCallParameters(
+        ExpressionNode expression,
+        IReadOnlyDictionary<string, ExpressionNode> arguments)
+        => expression switch
+        {
+            ReferenceNode reference when !reference.Name.Contains('.')
+                => arguments.GetValueOrDefault(reference.Name, reference),
+            IntLiteralNode or BoolLiteralNode => expression,
+            BinaryOperationNode binary
+                when SubstituteCallParameters(binary.Left, arguments) is { } left
+                    && SubstituteCallParameters(binary.Right, arguments) is { } right
+                => new BinaryOperationNode(binary.Span, binary.Operator, left, right),
+            UnaryOperationNode unary when !IsIncrement(unary)
+                && SubstituteCallParameters(unary.Operand, arguments) is { } operand
+                => new UnaryOperationNode(unary.Span, unary.Operator, operand),
+            ConditionalExpressionNode conditional
+                when SubstituteCallParameters(conditional.Condition, arguments) is { } condition
+                    && SubstituteCallParameters(conditional.WhenTrue, arguments) is { } whenTrue
+                    && SubstituteCallParameters(conditional.WhenFalse, arguments) is { } whenFalse
+                => new ConditionalExpressionNode(conditional.Span, condition, whenTrue, whenFalse),
+            _ => null
+        };
 
     private static ExpressionNode SubstituteSelfRef(
         ExpressionNode expr,
@@ -975,6 +1017,20 @@ public sealed class FactCollector
                     stringOperation.Operation,
                     arguments,
                     stringOperation.ComparisonMode);
+        }
+
+        if (expr is CharOperationNode character)
+        {
+            return new CharOperationNode(character.Span, character.Operation,
+                character.Arguments.Select(argument => SubstituteSelfRef(argument, replacement)).ToArray());
+        }
+
+        if (expr is CallExpressionNode call)
+        {
+            return new CallExpressionNode(call.Span, call.Target,
+                call.Arguments.Select(argument => SubstituteSelfRef(argument, replacement)).ToArray(),
+                call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments, call.CalleeSpan,
+                call.ReceiverSpan);
         }
 
         if (expr is ImplicationExpressionNode implication)

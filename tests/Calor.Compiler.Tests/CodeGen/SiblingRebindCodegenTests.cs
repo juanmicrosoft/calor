@@ -23,18 +23,19 @@ public class SiblingRebindCodegenTests
     [InlineData(true, 2, 20)]
     public void StatementMatch_SiblingBindingsHaveExecutableLexicalScopes(bool mutable, int input, int expected)
     {
-        var modifier = mutable ? "~" : "";
+        var modifier = mutable ? "var" : "let";
         var source = $$"""
-            §M{m:SwitchScope}
-              §F{f:Probe:pub} (i32:x) -> i32
-                §W{w} x
-                  §K 1
-                    §B{ {{modifier}}v:i32} 10
-                    §R v
-                  §K _
-                    §B{ {{modifier}}v:i32} 20
-                    §R v
-            """.Replace("§B{ ", "§B{");
+            module SwitchScope SwitchScope block
+              func Probe (int:x) → int
+                !
+                match x
+                  case 1
+                    {{modifier}} int:v = 10
+                    return v
+                  case _
+                    {{modifier}} int:v = 20
+                    return v
+            """;
         var generated = Emit(source);
         var sections = CSharpSyntaxTree.ParseText(generated).GetRoot()
             .DescendantNodes().OfType<SwitchSectionSyntax>().ToArray();
@@ -54,28 +55,29 @@ public class SiblingRebindCodegenTests
     [InlineData(true, 2, 2, 40)]
     public void NestedStatementMatches_KeepSiblingBindingsIndependent(bool mutable, int x, int y, int expected)
     {
-        var modifier = mutable ? "~" : "";
+        var modifier = mutable ? "var" : "let";
         var source = $$"""
-            §M{m:NestedSwitchScope}
-              §F{f:Probe:pub} (i32:x, i32:y) -> i32
-                §W{outer} x
-                  §K 1
-                    §W{inner1} y
-                      §K 1
-                        §B{ {{modifier}}v:i32} 10
-                        §R v
-                      §K _
-                        §B{ {{modifier}}v:i32} 20
-                        §R v
-                  §K _
-                    §W{inner2} y
-                      §K 1
-                        §B{ {{modifier}}v:i32} 30
-                        §R v
-                      §K _
-                        §B{ {{modifier}}v:i32} 40
-                        §R v
-            """.Replace("§B{ ", "§B{");
+            module NestedSwitchScope NestedSwitchScope block
+              func Probe (int:x, int:y) → int
+                !
+                match x
+                  case 1
+                    match y
+                      case 1
+                        {{modifier}} int:v = 10
+                        return v
+                      case _
+                        {{modifier}} int:v = 20
+                        return v
+                  case _
+                    match y
+                      case 1
+                        {{modifier}} int:v = 30
+                        return v
+                      case _
+                        {{modifier}} int:v = 40
+                        return v
+            """;
         Emit(source);
         Assert.Equal(expected, TestHarness.Execute(source, "Probe", [x, y]).ReturnValue);
     }
@@ -87,24 +89,25 @@ public class SiblingRebindCodegenTests
     [InlineData(true, 2, 30)]
     public void StatementMatch_BindingsAfterSwitchAndSiblingIfRetainTheirScopes(bool mutable, int input, int expected)
     {
-        var modifier = mutable ? "~" : "";
+        var modifier = mutable ? "var" : "let";
         var source = $$"""
-            §M{m:AfterSwitchScope}
-              §F{f:Probe:pub} (i32:x) -> i32
-                §B{~total:i32} 0
-                §W{w} x
-                  §K 1
-                    §B{ {{modifier}}v:i32} 10
-                    §B{~total} v
-                  §K _
-                    §B{ {{modifier}}v:i32} 20
-                    §B{~total} v
-                §B{after:i32} 3
-                §IF{i} true
-                  §B{ {{modifier}}v:i32} 7
-                  §B{~total} (+ total v)
-                §R (+ total after)
-            """.Replace("§B{ ", "§B{");
+            module AfterSwitchScope AfterSwitchScope block
+              func Probe (int:x) → int
+                !
+                var int:total = 0
+                match x
+                  case 1
+                    {{modifier}} int:v = 10
+                    var total = v
+                  case _
+                    {{modifier}} int:v = 20
+                    var total = v
+                let int:after = 3
+                if true
+                  {{modifier}} int:v = 7
+                  var total = (total + v)
+                return (total + after)
+            """;
         var generated = Emit(source);
         Assert.Equal(3, Regex.Matches(generated, @"\bint v = ").Count);
         Assert.Equal(expected, TestHarness.Execute(source, "Probe", [input]).ReturnValue);
@@ -114,14 +117,15 @@ public class SiblingRebindCodegenTests
     public void StatementMatch_ArmBindingCannotEscapeSwitch()
     {
         var result = Program.Compile("""
-            §M{m:SwitchScope}
-              §F{f:Probe:pub} (i32:x) -> i32
-                §W{w} x
-                  §K 1
-                    §B{v:i32} 10
-                  §K _
-                    §B{v:i32} 20
-                §R v
+            module SwitchScope SwitchScope block
+              func Probe (int:x) → int
+                !
+                match x
+                  case 1
+                    let int:v = 10
+                  case _
+                    let int:v = 20
+                return v
             """, "escape.calr");
         Assert.True(result.HasErrors);
         Assert.Empty(result.GeneratedCode);
@@ -139,9 +143,16 @@ public class SiblingRebindCodegenTests
     public void SiblingMutableRebind_ReDeclaresInEachBlock()
     {
         var cs = Emit(
-            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
-            "    §IF{i2} (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n");
+            "module S S block\n" +
+            "  func Do (bool:a, bool:b) → int\n" +
+            "    !\n" +
+            "    if (a == true)\n" +
+            "      var int:x = 1\n" +
+            "      return x\n" +
+            "    if (b == true)\n" +
+            "      var int:x = 2\n" +
+            "      return x\n" +
+            "    return 0\n");
 
         // Two independent declarations in the two sibling blocks — not a reassignment
         // of an out-of-scope local.
@@ -152,8 +163,15 @@ public class SiblingRebindCodegenTests
     public void AccumulatorRebind_StaysAReassignment()
     {
         var cs = Emit(
-            "§M{m:S}\n  §F{f:Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n    §B{~i} 2\n" +
-            "    §WH{w1} (<= i n)\n      §B{~result} (* result i)\n      §B{~i} (+ i 1)\n    §R result\n");
+            "module S S block\n" +
+            "  func Fact (int:n) → int\n" +
+            "    !\n" +
+            "    var result = 1\n" +
+            "    var i = 2\n" +
+            "    while (i <= n)\n" +
+            "      var result = (result * i)\n" +
+            "      var i = (i + 1)\n" +
+            "    return result\n");
 
         // Declared once, reassigned inside the loop (no shadowing re-declaration).
         Assert.Single(Regex.Matches(cs, @"\b(var|int) result = 1"));

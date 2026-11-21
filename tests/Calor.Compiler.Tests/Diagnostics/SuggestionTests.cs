@@ -46,10 +46,10 @@ public class SuggestionTests
     }
 
     [Theory]
-    [InlineData("typeof", "Use (typeof Type)")]
-    [InlineData("new", "§NEW")]
+    [InlineData("typeof", "typeof(Type)")]
+    [InlineData("new", "new Type(arg1, arg2)")]
     [InlineData("await", "await")]
-    [InlineData("null", "Option types")]
+    [InlineData("null", "nullable type")]
     [InlineData("ToString", "Use (str expr)")]
     [InlineData("Contains", "Use (contains s substring)")]
     [InlineData("++", "Use (inc x)")]
@@ -87,16 +87,16 @@ public class SuggestionTests
     #region SectionMarkerSuggestions Tests
 
     [Theory]
-    [InlineData("FU", "F")] // Short typo - one character difference
-    [InlineData("MOD", "M")] // Prefix typo
-    [InlineData("CLL", "CL")] // Typo - one character off from CL (class)
-    [InlineData("IFF", "IF")] // Typo - one character off
-    [InlineData("ELL", "EL")] // Typo of EL (else) - one character off
-    [InlineData("WR", "WR")] // Exact match (where)
-    [InlineData("LAM", "LAM")] // Exact match (lambda)
-    [InlineData("FL", "FL")] // Exact match (field)
-    [InlineData("FF", "F")] // One character off from F
-    public void FindSimilarMarker_WithTypoOrLongForm_ReturnsSuggestion(string input, string expected)
+    [InlineData("modul", "module")]
+    [InlineData("clas", "class")]
+    [InlineData("funcc", "func")]
+    [InlineData("iff", "if")]
+    [InlineData("elsee", "else")]
+    [InlineData("whenn", "when")]
+    [InlineData("recordd", "record")]
+    [InlineData("whille", "while")]
+    [InlineData("requires", "requires")]
+    public void CanonicalKeywordSuggestion_WithTypo_ReturnsExactWord(string input, string expected)
     {
         var suggestion = SectionMarkerSuggestions.FindSimilarMarker(input);
 
@@ -105,69 +105,87 @@ public class SuggestionTests
     }
 
     [Theory]
-    [InlineData("/FU", "/F")]
-    [InlineData("/MOD", "/M")]
-    [InlineData("/CLL", "/CL")]
-    public void FindSimilarMarker_WithClosingTag_ReturnsSuggestion(string input, string expected)
+    [InlineData("/CALL")]
+    [InlineData("/LMA")]
+    [InlineData("/RAWW")]
+    [InlineData("/CSHAR")]
+    [InlineData("/var")]
+    [InlineData("§func")]
+    public void CanonicalKeywordSuggestion_DoesNotHealRetiredTags(string input)
     {
-        var suggestion = SectionMarkerSuggestions.FindSimilarMarker(input);
+        Assert.Null(SectionMarkerSuggestions.FindSimilarMarker(input));
+    }
 
-        Assert.NotNull(suggestion);
-        Assert.Equal(expected, suggestion);
+    [Theory]
+    [InlineData("RECORD")]
+    [InlineData("DATA")]
+    [InlineData("TYPE")]
+    [InlineData("VARIANT")]
+    [InlineData("/IF")]
+    [InlineData("/FUNC")]
+    [InlineData("/MOD")]
+    public void FindSimilarMarker_RemovedExpandedForm_DoesNotRecommendRemovedSyntax(string input)
+    {
+        Assert.Null(SectionMarkerSuggestions.FindSimilarMarker(input));
     }
 
     [Fact]
-    public void GetCommonMarkers_ReturnsCommonMarkers()
+    public void CanonicalKeywordSuggestion_CatalogMatchesTheLexerExactly()
+    {
+        var expected = Lexer.KeywordNames
+            .Order(StringComparer.Ordinal);
+        Assert.Equal(expected, SectionMarkerSuggestions.AllMarkers.Order(StringComparer.Ordinal));
+        Assert.DoesNotContain(SectionMarkerSuggestions.AllMarkers, word => word.Any(char.IsUpper) || word.StartsWith('/'));
+        Assert.All(SectionMarkerSuggestions.MarkerDescriptions.Keys,
+            marker => Assert.Contains(marker, SectionMarkerSuggestions.AllMarkers));
+    }
+
+    [Theory]
+    [InlineData("D")]
+    [InlineData("SM")]
+    [InlineData("NN")]
+    [InlineData("OK")]
+    [InlineData("ERR")]
+    [InlineData("SMX")]
+    [InlineData("NNE")]
+    [InlineData("ERRR")]
+    public void Lexer_RemovedCarrierAndRecordSyntax_NeverSuggestsUnregisteredMarkers(string marker)
+    {
+        var diagnostics = new DiagnosticBag();
+        new Lexer("§" + marker, diagnostics).TokenizeAll();
+
+        Assert.Contains(diagnostics.Errors, error => error.Code == DiagnosticCode.UnknownSectionMarker);
+        Assert.DoesNotContain(marker, SectionMarkerSuggestions.AllMarkers);
+        Assert.DoesNotContain(marker, SectionMarkerSuggestions.MarkerDescriptions.Keys);
+        Assert.All(diagnostics.DiagnosticsWithFixes, diagnostic =>
+        {
+            var edit = Assert.Single(diagnostic.Fix.Edits);
+            Assert.NotEqual("§" + marker, edit.NewText);
+            Assert.Contains(edit.NewText[1..], Lexer.KeywordNames);
+        });
+    }
+
+    [Fact]
+    public void CanonicalKeywordSuggestion_CommonWordsNeverTeachSigils()
     {
         var markers = SectionMarkerSuggestions.GetCommonMarkers();
 
-        Assert.Contains("§M", markers);
-        Assert.Contains("§F", markers);
-        Assert.Contains("§B", markers);
-        Assert.Contains("Module", markers);
-        Assert.Contains("Function", markers);
+        Assert.Contains("module", markers);
+        Assert.Contains("func", markers);
+        Assert.Contains("let", markers);
+        Assert.DoesNotContain("§", markers);
     }
-
     #endregion
-
     #region Parser Integration Tests
-
-    [Fact]
-    public void Parser_UnknownOperator_WithTypo_ShowsSuggestion()
-    {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")";
-        var result = Program.Compile(
-            source,
-            "test.calr",
-            new CompilationOptions { DeferGeneratedOutputValidation = true });
-
-        Assert.True(result.HasErrors);
-        var error = result.Diagnostics.First(d => d.IsError);
-        Assert.Contains("cotains", error.Message);
-        Assert.Contains("contains", error.Message);
-        Assert.Contains("Did you mean", error.Message);
-    }
 
     [Fact]
     public void Parser_NameofOperator_CompilesSuccessfully()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} (i32:x) -> str §R (nameof x)";
+        var source = "module Test Test block\n  func Fn private (int:x) → string\n    return nameof(x)";
         var result = Program.Compile(source, "test.calr");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
         Assert.Contains("nameof(x)", result.GeneratedCode);
-    }
-
-    [Fact]
-    public void Parser_UnknownOperator_NoSuggestion_ShowsValidOperators()
-    {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (xyzqwerty 1 2)";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        var error = result.Diagnostics.First(d => d.IsError);
-        Assert.Contains("xyzqwerty", error.Message);
-        Assert.Contains("arithmetic", error.Message);
     }
 
     #endregion
@@ -175,7 +193,7 @@ public class SuggestionTests
     #region Lexer Integration Tests
 
     [Fact]
-    public void Lexer_UnknownSectionMarker_WithTypo_ShowsSuggestion()
+    public void Lexer_UnknownSectionMarker_WithTypo_DoesNotSuggestAnotherSigil()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§FUNC", diagnostics);
@@ -184,15 +202,16 @@ public class SuggestionTests
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
         Assert.Contains("FUNC", error.Message);
-        Assert.Contains("§F", error.Message);
-        Assert.Contains("Did you mean", error.Message);
+        Assert.Contains("removed", error.Message);
+        Assert.DoesNotContain("Did you mean", error.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Fact]
     public void Lexer_UnknownClosingTag_WithTypo_ShowsSuggestion()
     {
         var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer("§M{test} §/MODULE{test}", diagnostics);
+        var lexer = new Lexer("module test\n§/MODULE{test}", diagnostics);
         lexer.TokenizeAll();
 
         Assert.True(diagnostics.HasErrors);
@@ -214,21 +233,23 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Lexer_UnknownClosingTag_WithSuggestion_ShowsSingleSlash()
+    public void Lexer_RemovedModuleCloser_DoesNotRecommendAnotherStructuralCloser()
     {
         var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer("§M{test} §/MOD{test}", diagnostics);
+        var lexer = new Lexer("module test\n§/MOD{test}", diagnostics);
         lexer.TokenizeAll();
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
         Assert.Contains("§/MOD", error.Message);
         Assert.DoesNotContain("§//MOD", error.Message);
-        Assert.Contains("Did you mean", error.Message);
+        Assert.DoesNotContain("Did you mean", error.Message);
+        Assert.Contains("dedent", error.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Fact]
-    public void Lexer_UnknownSectionMarker_NoSuggestion_ShowsCommonMarkers()
+    public void Lexer_UnknownSectionMarker_NoSuggestion_ShowsNativeBoundaryGuidance()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§XYZQWERTY", diagnostics);
@@ -237,11 +258,11 @@ public class SuggestionTests
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
         Assert.Contains("XYZQWERTY", error.Message);
-        Assert.Contains("Common markers", error.Message);
+        Assert.Contains("canonical lowercase words", error.Message);
     }
 
     [Fact]
-    public void Lexer_CastSectionMarker_ShowsCastSyntaxHint()
+    public void Lexer_CastSectionMarker_RejectsPrefixSyntax()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§CAST", diagnostics);
@@ -249,12 +270,13 @@ public class SuggestionTests
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
-        Assert.Contains("(cast", error.Message);
+        Assert.Contains("removed", error.Message);
+        Assert.Contains("ordinary C# expression punctuation", error.Message);
         Assert.DoesNotContain("Did you mean '§CA", error.Message);
     }
 
     [Fact]
-    public void Lexer_CastSectionMarker_CaseInsensitive()
+    public void Lexer_MixedCaseCastSectionMarker_IsAlsoRetired()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§Cast", diagnostics);
@@ -262,7 +284,8 @@ public class SuggestionTests
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
-        Assert.Contains("(cast", error.Message);
+        Assert.Contains("'§Cast'", error.Message);
+        Assert.Contains("removed", error.Message);
     }
 
     [Fact]
@@ -290,7 +313,7 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Lexer_InvalidSectionOperator_EmitsCalor0007()
+    public void Lexer_InvalidSectionOperator_IsRejectedAtTheSectionBoundary()
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer("§?X", diagnostics);
@@ -298,10 +321,22 @@ public class SuggestionTests
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, error.Code);
+        Assert.Contains("§?X", error.Message);
+        Assert.Contains("removed", error.Message);
+        Assert.DoesNotContain("§??", error.Message);
+        Assert.DoesNotContain("§?.", error.Message);
+    }
+
+    [Fact]
+    public void Lexer_AsciiArrow_EmitsCalor0007WithNativeGuidance()
+    {
+        var diagnostics = new DiagnosticBag();
+        new Lexer("->", diagnostics).TokenizeAll();
+        var error = Assert.Single(diagnostics.Errors);
         Assert.Equal(DiagnosticCode.InvalidSectionOperator, error.Code);
-        Assert.Contains("§?", error.Message);
-        Assert.Contains("§??", error.Message);
-        Assert.Contains("§?.", error.Message);
+        Assert.Contains("→", error.Message);
+        Assert.Contains("!p || q", error.Message);
     }
 
     [Fact]
@@ -316,58 +351,16 @@ public class SuggestionTests
         var error = diagnostics.First(d => d.IsError);
         Assert.Equal(DiagnosticCode.UnexpectedCharacter, error.Code);
     }
-
     #endregion
-
     #region Fix Generation Tests
-
-    [Fact]
-    public void Parser_UnknownOperator_WithTypo_GeneratesFix()
-    {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-
-        // Check that a fix was generated
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes;
-        Assert.NotEmpty(fixDiagnostics);
-
-        var fix = fixDiagnostics.First();
-        Assert.Contains("contains", fix.Fix.Description);
-        Assert.Single(fix.Fix.Edits);
-        Assert.Equal("contains", fix.Fix.Edits[0].NewText);
-    }
-
     #endregion
-
     #region Fix Application Tests
 
-    [Fact]
-    public void ApplyFix_OperatorTypo_ProducesValidCode()
-    {
-        // Source with typo
-        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes;
-        Assert.NotEmpty(fixDiagnostics);
-
-        // Apply the fix
-        var fix = fixDiagnostics.First();
-        var fixedSource = ApplyFix(source, fix.Fix);
-
-        // Verify the fixed code compiles
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors, $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
-
     [Theory]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")", "cotains", "contains")]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\")", "uper", "upper")]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (lowwer \"HELLO\")", "lowwer", "lower")]
-    [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (substrr \"hello\" 0 2)", "substrr", "substr")]
+    [InlineData("§M{Test} §F{Fn} §O{bool} §R (cotains \"hello\" \"h\")", "cotains", "contains")]
+    [InlineData("§M{Test} §F{Fn} §O{str} §R (uper \"hello\")", "uper", "upper")]
+    [InlineData("§M{Test} §F{Fn} §O{str} §R (lowwer \"HELLO\")", "lowwer", "lower")]
+    [InlineData("§M{Test} §F{Fn} §O{str} §R (substrr \"hello\" 0 2)", "substrr", "substr")]
     public void ApplyFix_VariousTypos_ProducesValidCode(string source, string typo, string expected)
     {
         var result = Program.Compile(source, "test.calr");
@@ -501,46 +494,26 @@ public class SuggestionTests
         Assert.NotNull(OperatorSuggestions.GetCSharpHint("TYPEOF"));
     }
 
-    [Fact]
-    public void Parser_MultipleTyposOnSameLine_GeneratesMultipleFixes()
+    [Theory]
+    [InlineData("(abss(ngative(5)))")]
+    [InlineData("abss(ngative(5))")]
+    public void Parser_NestedNativeCalls_AreNotUnknownPrefixOperators(string expression)
     {
-        // Source with multiple typos on the same line
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §B{x} (abss (ngative 5)) §R x";
-        var result = Program.Compile(source, "test.calr");
+        var diagnostics = new DiagnosticBag();
+        var source = $"module Test Test block\n  func Fn private () → int\n    let x = {expression}\n    return x";
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
 
-        Assert.True(result.HasErrors);
-
-        // Should have at least 2 errors for the two typos
-        var unknownOpErrors = result.Diagnostics.Where(d => d.Code == DiagnosticCode.InvalidOperator).ToList();
-        Assert.True(unknownOpErrors.Count >= 2, $"Expected at least 2 unknown operator errors, got {unknownOpErrors.Count}");
-    }
-
-    [Fact]
-    public void Parser_NestedTypos_GeneratesCorrectFixes()
-    {
-        // Nested structure with typos at different levels
-        var source = @"§M{m001:Test}
-  §F{f001:Fn}
-    §O{str}
-    §P{s:str} ""test""
-    §L{l001:i:0:10:1}
-      §B{x} (cotains s ""t"")
-    §R s";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes;
-
-        // Should have a fix for "cotains" -> "contains"
-        var containsFix = fixDiagnostics.FirstOrDefault(d => d.Fix.Edits.Any(e => e.NewText == "contains"));
-        Assert.NotNull(containsFix);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var binding = Assert.IsType<Ast.BindStatementNode>(Assert.Single(module.Functions).Body[0]);
+        var outer = Assert.IsType<Ast.CallExpressionNode>(binding.Initializer);
+        Assert.IsType<Ast.CallExpressionNode>(Assert.Single(outer.Arguments));
     }
 
     [Fact]
     public void Parser_UnicodeInIdentifier_NoSuggestionCrash()
     {
         // Unicode characters should not cause crashes
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (εpsılοn 5)";
+        var source = "§M{Test} §F{Fn} §O{i32} §R (εpsılοn 5)";
         var result = Program.Compile(source, "test.calr");
 
         // Should not crash, may or may not have suggestions
@@ -548,40 +521,28 @@ public class SuggestionTests
     }
 
     [Fact]
-    public void Parser_OperatorWithNumbers_NoSuggestion()
-    {
-        // Operators with numbers that don't match any valid operator
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (add123 5 3)";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        // Should have an error but possibly no fix if too different from valid operators
-        var error = result.Diagnostics.First(d => d.Code == DiagnosticCode.InvalidOperator);
-        Assert.Contains("add123", error.Message);
-    }
-
-    [Fact]
     public void Parser_ExactMatchOperator_NoError()
     {
         // Exact match should not produce error
-        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (contains \"hello\" \"h\")";
+        var source = "module Test Test block\n  func Fn private () → bool\n    return (\"hello\").Contains(\"h\")";
         var result = Program.Compile(source, "test.calr");
 
         Assert.False(result.HasErrors);
     }
 
     [Fact]
-    public void Lexer_ClosingTagWithTypo_GeneratesSuggestion()
+    public void Lexer_ClosingTagWithTypo_StillRequiresDedent()
     {
         // Closing tag with a typo
         var diagnostics = new DiagnosticBag();
-        var lexer = new Lexer("§M{test} §/MODUL{test}", diagnostics);
+        var lexer = new Lexer("module test\n§/MODUL{test}", diagnostics);
         lexer.TokenizeAll();
 
         Assert.True(diagnostics.HasErrors);
         var error = diagnostics.First(d => d.IsError);
-        // Should suggest §/M for §/MODUL
         Assert.Contains("MODUL", error.Message);
+        Assert.Contains("dedent", error.Message);
+        Assert.Empty(diagnostics.DiagnosticsWithFixes);
     }
 
     [Theory]
@@ -595,7 +556,7 @@ public class SuggestionTests
     public void Parser_ShortOperators_HandleCorrectly(string op, bool shouldError)
     {
         var left = op == "??" ? "x" : "5";
-        var source = $"§M{{m001:Test}} §F{{f001:Fn}} §I{{?i32:x}} §O{{i32}} §R ({op} {left} 3)";
+        var source = $"module Test Test block\n  func Fn private (int?:x) → int\n    return ({left} {op} 3)";
         var result = Program.Compile(
             source,
             "test.calr",
@@ -603,141 +564,8 @@ public class SuggestionTests
 
         Assert.Equal(shouldError, result.HasErrors);
     }
-
     #endregion
-
     #region End-to-End Agent Simulation Tests
-
-    /// <summary>
-    /// Simulates an AI agent workflow:
-    /// 1. Receive source with errors
-    /// 2. Get diagnostics with fixes
-    /// 3. Apply fixes
-    /// 4. Verify fixed code compiles
-    /// </summary>
-    [Fact]
-    public void AgentSimulation_ApplyOperatorFixes_ProducesValidCode()
-    {
-        // Source with string operator typo that can be fixed
-        var source = @"§M{m001:Test}
-  §F{f001:Check}
-    §O{bool}
-    §R (cotains ""hello"" ""h"")";
-
-        // Step 1: Get diagnostics
-        var result = Program.Compile(source, "test.calr");
-        Assert.True(result.HasErrors, "Source should have errors");
-
-        // Step 2: Get operator fix
-        var fixes = result.Diagnostics.DiagnosticsWithFixes
-            .Where(d => d.Code == DiagnosticCode.InvalidOperator)
-            .ToList();
-        Assert.NotEmpty(fixes);
-
-        // Step 3: Verify fix suggests "contains"
-        Assert.Equal("contains", fixes[0].Fix.Edits[0].NewText);
-
-        // Step 4: Apply fix and verify
-        var fixedSource = source.Replace("cotains", "contains");
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors,
-            $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
-
-    /// <summary>
-    /// Tests that an agent can fix a single operator typo end-to-end.
-    /// </summary>
-    [Fact]
-    public void AgentSimulation_SingleTypoFix_ProducesValidCode()
-    {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")";
-
-        // Step 1: Compile and get diagnostics
-        var result = Program.Compile(source, "test.calr");
-        Assert.True(result.HasErrors);
-
-        // Step 2: Find the typo fix
-        var typoFix = result.Diagnostics.DiagnosticsWithFixes
-            .FirstOrDefault(d => d.Fix.Edits.Any(e => e.NewText == "contains"));
-        Assert.NotNull(typoFix);
-
-        // Step 3: Apply the fix
-        var fixedSource = ApplyFix(source, typoFix.Fix);
-
-        // Step 4: Verify it compiles
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors,
-            $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
-
-    /// <summary>
-    /// Tests the MCP workflow: diagnose, apply fix, verify.
-    /// </summary>
-    [Fact]
-    public async Task AgentSimulation_McpWorkflow_ProducesValidCode()
-    {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\")";
-
-        // Step 1: Call diagnose tool (simulated)
-        var tool = new Calor.Compiler.Mcp.Tools.CheckTool();
-        var args = System.Text.Json.JsonDocument.Parse($"{{\"action\": \"diagnose\", \"source\": {System.Text.Json.JsonSerializer.Serialize(source)}}}").RootElement;
-        var toolResult = await tool.ExecuteAsync(args);
-
-        Assert.NotNull(toolResult.Content);
-        var json = toolResult.Content[0].Text!;
-        var doc = System.Text.Json.JsonDocument.Parse(json);
-
-        // Step 2: Extract fix from JSON
-        var diagnostics = doc.RootElement.GetProperty("diagnostics");
-        Assert.True(diagnostics.GetArrayLength() > 0);
-
-        var diagnostic = diagnostics[0];
-        Assert.True(diagnostic.TryGetProperty("fix", out var fix));
-        var newText = fix.GetProperty("edits")[0].GetProperty("newText").GetString();
-        Assert.Equal("upper", newText);
-
-        // Step 3: Apply fix manually (agent would do this)
-        var fixedSource = source.Replace("uper", newText!);
-
-        // Step 4: Verify via diagnose tool
-        var fixedArgs = System.Text.Json.JsonDocument.Parse($"{{\"action\": \"diagnose\", \"source\": {System.Text.Json.JsonSerializer.Serialize(fixedSource)}}}").RootElement;
-        var fixedResult = await tool.ExecuteAsync(fixedArgs);
-        var fixedJson = fixedResult.Content[0].Text!;
-        var fixedDoc = System.Text.Json.JsonDocument.Parse(fixedJson);
-
-        Assert.True(fixedDoc.RootElement.GetProperty("success").GetBoolean());
-        Assert.Equal(0, fixedDoc.RootElement.GetProperty("errorCount").GetInt32());
-    }
-
-    /// <summary>
-    /// Tests iterative fix application (some fixes may reveal new errors).
-    /// Uses direct string replacement based on fix suggestions.
-    /// </summary>
-    [Fact]
-    public void AgentSimulation_IterativeFixes_EventuallyConverges()
-    {
-        var source = @"§M{m001:Test}
-  §F{f001:Complex}
-    §O{str}
-    §R (uper ""hello"")";
-
-        // First iteration: fix "uper" -> "upper"
-        var result = Program.Compile(source, "test.calr");
-        Assert.True(result.HasErrors);
-
-        var fixes = result.Diagnostics.DiagnosticsWithFixes.ToList();
-        Assert.NotEmpty(fixes);
-
-        // Apply fix using newText from the fix suggestion
-        var fix = fixes.First();
-        Assert.Equal("upper", fix.Fix.Edits[0].NewText);
-        var fixedSource = source.Replace("uper", fix.Fix.Edits[0].NewText);
-
-        // Second iteration: should compile
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors,
-            $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
 
     #endregion
 }

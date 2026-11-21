@@ -67,7 +67,7 @@ public sealed class LlmResponseCache
             }
 
             // Mark as from cache
-            return entry.Result with { FromCache = true };
+            return entry.Result with { FromCache = true, Cost = 0m };
         }
         catch
         {

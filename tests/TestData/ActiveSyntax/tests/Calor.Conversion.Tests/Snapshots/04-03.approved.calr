@@ -1,0 +1,20 @@
+module Test_04_03 Test_04_03 overflow unchecked
+  using System
+
+  class Shape public
+    func Area public virtual () → double
+      !
+      return 0
+
+  class Circle public
+    extends Shape
+
+    property double:Radius public
+      get
+
+    ctor public (double:radius)
+      set Radius radius
+
+    func Area public override () → double
+      !
+      return (Math.PI * Radius) * Radius

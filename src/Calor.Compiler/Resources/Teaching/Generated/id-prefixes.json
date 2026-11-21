@@ -1,0 +1,4 @@
+{
+  "prefixes": [],
+  "format": "Source declarations carry no IDs. Tooling owns stable identity in .calor/ids.json; use tooling for renames. Legacy source-ID prefixes are not syntax."
+}

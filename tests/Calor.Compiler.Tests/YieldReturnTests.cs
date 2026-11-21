@@ -38,7 +38,7 @@ public class YieldReturnTests
     [Fact]
     public void Lexer_Yield_TokenizesCorrectly()
     {
-        var tokens = Tokenize("§YIELD", out var diagnostics);
+        var tokens = Tokenize("yield", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
         Assert.Contains(tokens, t => t.Kind == TokenKind.Yield);
@@ -47,10 +47,11 @@ public class YieldReturnTests
     [Fact]
     public void Lexer_YieldBreak_TokenizesCorrectly()
     {
-        var tokens = Tokenize("§YBRK", out var diagnostics);
+        var tokens = Tokenize("yield break", out var diagnostics);
 
         Assert.False(diagnostics.HasErrors);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.YieldBreak);
+        Assert.Contains(tokens, t => t.Kind == TokenKind.Yield);
+        Assert.Contains(tokens, t => t.Kind == TokenKind.Break);
     }
 
     #endregion
@@ -61,10 +62,10 @@ public class YieldReturnTests
     public void Parser_YieldReturn_ParsesExpression()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
-                    §O{i32}
-                    §YIELD 42
+            module TestModule
+              func GetNumbers public () → int
+                !
+                yield 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -81,10 +82,10 @@ public class YieldReturnTests
     public void Parser_YieldBreak_ParsesCorrectly()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
-                    §O{i32}
-                    §YBRK
+            module TestModule
+              func GetNumbers public () → int
+                !
+                yield break
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -98,11 +99,10 @@ public class YieldReturnTests
     public void Parser_YieldReturnWithReference_ParsesCorrectly()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetItems:pub}
-                    §I{i32:x}
-                    §O{i32}
-                    §YIELD x
+            module TestModule
+              func GetItems public (int:x) → int
+                !
+                yield x
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -141,7 +141,7 @@ public class YieldReturnTests
         var emitter = new CSharpEmitter();
         var exception = Assert.Throws<InvalidOperationException>(
             () => node.Accept(emitter));
-        Assert.Contains("§YBRK", exception.Message);
+        Assert.Contains("yield break", exception.Message);
     }
 
     [Fact]
@@ -160,12 +160,12 @@ public class YieldReturnTests
     public void CSharpEmitter_IteratorFunction_WrapsReturnType()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
-                    §O{i32}
-                    §YIELD 1
-                    §YIELD 2
-                    §YIELD 3
+            module TestModule
+              func GetNumbers public () → int
+                !
+                yield 1
+                yield 2
+                yield 3
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -229,7 +229,7 @@ public class YieldReturnTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(result.Ast!);
 
-        Assert.Contains("§YIELD", output);
+        Assert.Contains("yield 42", output);
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public class YieldReturnTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(result.Ast!);
 
-        Assert.Contains("§YBRK", output);
+        Assert.Contains("yield break", output);
     }
 
     [Fact]
@@ -275,8 +275,9 @@ public class YieldReturnTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(result.Ast!);
 
-        Assert.Contains("§YIELD", output);
-        Assert.Contains("§YBRK", output);
+        Assert.Contains("yield 1", output);
+        Assert.Contains("yield 2", output);
+        Assert.Contains("yield break", output);
     }
 
     #endregion
@@ -372,21 +373,10 @@ public class YieldReturnTests
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
 
-        // Method should contain a for loop and a yield break
-        bool hasYieldReturn = false;
-        bool hasYieldBreak = false;
-
-        foreach (var stmt in method.Body)
-        {
-            if (stmt is YieldBreakStatementNode) hasYieldBreak = true;
-            if (stmt is IfStatementNode)
-            {
-                hasYieldReturn = result.CalorSource!.Contains("§YIELD");
-            }
-        }
-
-        Assert.True(hasYieldReturn, "Should contain yield return inside for loop");
-        Assert.True(hasYieldBreak, "Should contain yield break");
+        var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
+        var yielded = Assert.IsType<YieldReturnStatementNode>(Assert.Single(loop.Body));
+        Assert.Equal("i", Assert.IsType<ReferenceNode>(yielded.Expression).Name);
+        Assert.IsType<YieldBreakStatementNode>(method.Body[1]);
         Assert.DoesNotContain(result.Losses, loss =>
             loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }
@@ -457,12 +447,12 @@ public class YieldReturnTests
     public void E2E_CalorSource_WithYield_CompilesToCSharp()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
-                    §O{i32}
-                    §YIELD 1
-                    §YIELD 2
-                    §YIELD 3
+            module TestModule
+              func GetNumbers public () → int
+                !
+                yield 1
+                yield 2
+                yield 3
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -477,11 +467,11 @@ public class YieldReturnTests
     public void E2E_CalorSource_WithYieldBreak_CompilesToCSharp()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §F{f1:GetNumbers:pub}
-                    §O{i32}
-                    §YIELD 1
-                    §YBRK
+            module TestModule
+              func GetNumbers public () → int
+                !
+                yield 1
+                yield break
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -500,13 +490,13 @@ public class YieldReturnTests
     public void E2E_CalorClassMethod_WithYield_WrapsReturnType()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c1:NumberGenerator}
-                    §MT{m1:GetNumbers:pub}
-                        §O{i32}
-                        §YIELD 1
-                        §YIELD 2
-                        §YIELD 3
+            module TestModule
+              class NumberGenerator
+                func GetNumbers public () → int
+                  !
+                  yield 1
+                  yield 2
+                  yield 3
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -521,12 +511,12 @@ public class YieldReturnTests
     public void E2E_CalorClassMethod_WithYieldBreak_CompilesToCSharp()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c1:Service}
-                    §MT{m1:GetItems:pub}
-                        §O{string}
-                        §YIELD "hello"
-                        §YBRK
+            module TestModule
+              class Service
+                func GetItems public () → string
+                  !
+                  yield "hello"
+                  yield break
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -563,8 +553,9 @@ public class YieldReturnTests
         // AST → Calor source
         var calorEmitter = new CalorEmitter();
         var calorSource = calorEmitter.Emit(conversionResult.Ast!);
-        Assert.Contains("§YIELD", calorSource);
-        Assert.Contains("§YBRK", calorSource);
+        Assert.Contains("yield 1", calorSource);
+        Assert.Contains("yield 2", calorSource);
+        Assert.Contains("yield break", calorSource);
 
         // Calor source → re-parse → C#
         var compilationResult = Program.Compile(calorSource);
@@ -742,10 +733,9 @@ public class YieldReturnTests
     public void Parser_RefModifier_ParsedFromCalorSyntax()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Process:pub}
-                    §I{i32:value:ref}
-                    §O{void}
+            module TestModule
+              func Process public (ref int:value) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -760,10 +750,9 @@ public class YieldReturnTests
     public void Parser_OutModifier_ParsedFromCalorSyntax()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Process:pub}
-                    §I{i32:value:out}
-                    §O{void}
+            module TestModule
+              func Process public (out int:value) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -778,10 +767,9 @@ public class YieldReturnTests
     public void Parser_ParamsModifier_ParsedFromCalorSyntax()
     {
         var source = """
-            §M{m1:TestModule}
-                §F{f1:Process:pub}
-                    §I{string:values:params}
-                    §O{void}
+            module TestModule
+              func Process public (params string:values) → void
+                !
             """;
 
         var module = Parse(source, out var diagnostics);

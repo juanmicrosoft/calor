@@ -1,0 +1,16 @@
+module Zip Zip
+  module ZipModule
+    func Add public (int:a, int:b) → int
+      !
+      return a + b
+
+    func Multiply public (int:a, int:b) → int
+      !
+      return a * b
+
+    func ZipLength public (int:lenA, int:lenB) → int
+      !
+      if lenA < lenB
+        return lenA
+      else
+        return lenB

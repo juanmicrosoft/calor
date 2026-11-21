@@ -201,7 +201,7 @@ public class ConverterImprovementTests
             Assert.Equal("object", identity.TargetType);
             Assert.IsType<ReferenceNode>(identity.Operand);
         }
-        Assert.Contains("§TH", result.CalorSource);
+        Assert.Contains("throw ", result.CalorSource);
         Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
@@ -229,8 +229,9 @@ public class ConverterImprovementTests
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
         var ret = Assert.IsType<ReturnStatementNode>(method.Body[0]);
-        var refNode = Assert.IsType<ReferenceNode>(ret.Expression);
-        Assert.Equal("default", refNode.Name);
+        var zero = Assert.IsType<IntLiteralNode>(ret.Expression);
+        Assert.Equal(0, zero.Value);
+        Assert.Empty(result.Losses);
     }
 
     [Fact]
@@ -379,7 +380,7 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = newExpr.Accept(emitter);
 
-        Assert.Contains("§/NEW", output);
+        Assert.Contains("new List<int>()", output);
     }
 
     [Fact]
@@ -421,6 +422,8 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = fieldAccess.Accept(emitter);
 
+        // 0.30: after `this` (which ends its own token) member access prints unspaced, and
+        // `this.Name` still reparses as a FieldAccessNode on `this`.
         Assert.Equal("this.Name", output);
         Assert.DoesNotContain("§THIS", output);
     }
@@ -626,13 +629,12 @@ public class ConverterImprovementTests
     public void Parser_NewExpressionWithClosingTag_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service}
-                §MT{m2:Create:pub}
-                    §O{string}
-                    §E{alloc}
-                    §B{string:x} §NEW{StringBuilder} §A "hello" §/NEW
-                    §R x
+            module Test Test block
+              class Service internal
+                func Create () → string
+                  ! alloc
+                  let string:x = new StringBuilder("hello")
+                  return x
             """;
 
         var compilationResult = Program.Compile(
@@ -648,13 +650,12 @@ public class ConverterImprovementTests
     public void Parser_NewExpressionWithoutArgs_ClosingTagParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service}
-                §MT{m2:Create:pub}
-                    §O{string}
-                    §E{alloc}
-                    §B{List<i32>:items} §NEW{List<i32>} §/NEW
-                    §R items
+            module Test Test block
+              class Service internal
+                func Create () → string
+                  ! alloc
+                  let List<int>:items = new List<int>()
+                  return items
             """;
 
         var compilationResult = Program.Compile(
@@ -671,13 +672,12 @@ public class ConverterImprovementTests
     {
         // Backward compatibility: §/NEW is optional
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service}
-                §MT{m2:Create:pub}
-                    §O{string}
-                    §E{alloc}
-                    §B{string:x} §NEW{StringBuilder} §A "hello"
-                    §R x
+            module Test Test block
+              class Service internal
+                func Create () → string
+                  ! alloc
+                  let string:x = new StringBuilder("hello")
+                  return x
             """;
 
         var compilationResult = Program.Compile(
@@ -729,8 +729,8 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = newExpr.Accept(emitter);
 
-        Assert.Contains("§NEW{List}", output);
-        Assert.Contains("§/NEW", output);
+        Assert.Contains("new List(", output);
+        Assert.Contains("new List()", output);
     }
 
     #endregion
@@ -754,10 +754,10 @@ public class ConverterImprovementTests
             }
             """;
 
-        // C# → Calor (emitter produces §/NEW)
+        // C# → Calor (emitter produces a native new expression)
         var conversionResult = _converter.Convert(csharp);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
-        Assert.Contains("§/NEW", conversionResult.CalorSource!);
+        Assert.Contains("new MyException(\"test error\")", conversionResult.CalorSource!);
 
         // Calor → C# (parser consumes §/NEW)
         var compilationResult = Program.Compile(conversionResult.CalorSource!);
@@ -906,11 +906,13 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
 
-        // Upper bound should be (- 3 1) for the proven constant range.
-        var to = Assert.IsType<BinaryOperationNode>(loop.To);
-        Assert.Equal(BinaryOperator.Subtract, to.Operator);
-        var right = Assert.IsType<IntLiteralNode>(to.Right);
-        Assert.Equal(1, right.Value);
+        // 0.30: an exclusive bound is kept as the native loop condition `(i < 3)` instead of
+        // being rewritten to the inclusive bound `(- 3 1)`.
+        var condition = Assert.IsType<BinaryOperationNode>(loop.Condition);
+        Assert.Equal(BinaryOperator.LessThan, condition.Operator);
+        Assert.Equal(3, Assert.IsType<IntLiteralNode>(condition.Right).Value);
+        Assert.NotNull(loop.Update);
+        Assert.Contains("for i = 0; (i < 3); @i = (@i + 1)", result.CalorSource);
     }
 
     [Fact]
@@ -961,10 +963,11 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         var cls = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(cls.Methods);
-        var scope = Assert.IsType<IfStatementNode>(method.Body[0]);
-        var loop = Assert.Single(scope.ThenBody.OfType<WhileStatementNode>());
-        Assert.Contains(loop.Body.OfType<IfStatementNode>(), guard =>
-            guard.ElseBody?.SingleOrDefault() is BreakStatementNode);
+        // 0.30: the native loop keeps its condition and re-evaluates `arr.Length` on every
+        // iteration (no while-loop lowering is needed to keep that).
+        var loop = Assert.IsType<ForStatementNode>(Assert.Single(method.Body));
+        Assert.True(loop.ReevaluatesCondition);
+        Assert.Contains("for i = 0; (i < arr.Length); @i = (@i + 1)", result.CalorSource);
         Assert.DoesNotContain(result.Losses, loss =>
             loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "for");
     }
@@ -992,11 +995,11 @@ public class ConverterImprovementTests
         var method = Assert.Single(cls.Methods);
         var loop = Assert.IsType<ForStatementNode>(method.Body[0]);
 
-        // Upper bound should be (+ 0 1) for the proven constant range.
-        var to = Assert.IsType<BinaryOperationNode>(loop.To);
-        Assert.Equal(BinaryOperator.Add, to.Operator);
-        var right = Assert.IsType<IntLiteralNode>(to.Right);
-        Assert.Equal(1, right.Value);
+        // 0.30: the exclusive bound stays the native loop condition `(i > 0)`.
+        var condition = Assert.IsType<BinaryOperationNode>(loop.Condition);
+        Assert.Equal(BinaryOperator.GreaterThan, condition.Operator);
+        Assert.Equal(0, Assert.IsType<IntLiteralNode>(condition.Right).Value);
+        Assert.Contains("for i = 10; (i > 0); @i = (@i - 1)", result.CalorSource);
     }
 
     #endregion
@@ -1197,43 +1200,44 @@ public class ConverterImprovementTests
     #region Modifier Abbreviation Tests
 
     [Fact]
-    public void CalorEmitter_StaticClass_EmitsStatAbbreviation()
+    public void CalorEmitter_NamedModule_EmitsNoRedundantStaticModifier()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Helper:pub:stat}
+            module TestMod TestMod block
+              module Helper
             """;
 
         var ast = Parse(source);
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains(":stat}", output);
-        Assert.DoesNotContain(":static}", output);
+        Assert.Contains("module Helper", output);
+        Assert.DoesNotContain("static", output);
+        Assert.DoesNotContain("module Helper static", output);
     }
 
     [Fact]
     public void CalorEmitter_SealedClass_EmitsSealAbbreviation()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Final:pub:seal}
+            module TestMod TestMod block
+              class Final sealed
             """;
 
         var ast = Parse(source);
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains(":seal}", output);
+        Assert.Contains("class Final sealed", output);
         Assert.DoesNotContain(":sealed}", output);
     }
 
     [Fact]
-    public void RoundTrip_StaticClass_PreservesModifier()
+    public void RoundTrip_NamedModule_PreservesStaticIdentity()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Helper:pub:stat}
+            module TestMod TestMod block
+              module Helper
             """;
 
         // Step 1: Parse original
@@ -1255,7 +1259,7 @@ public class ConverterImprovementTests
     public void CalorEmitter_SealedMethod_EmitsSealAbbreviation()
     {
         // Use C# converter to get a sealed override method in the AST,
-        // then verify CalorEmitter emits "seal" not "sealed"
+        // then verify CalorEmitter emits the canonical "override sealed" modifiers
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var csharp = """
             public class Base
@@ -1275,23 +1279,23 @@ public class ConverterImprovementTests
         var output = emitter.Emit(result.Ast!);
 
         Assert.Contains("seal", output);
-        Assert.DoesNotContain("sealed", output);
+        Assert.Contains("override sealed", output);
     }
 
     [Fact]
     public void CalorEmitter_StaticField_EmitsStatAbbreviation()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Counter:pub}
-                  §FLD{i32:Count:pub:stat}
+            module TestMod TestMod block
+              class Counter
+                field int:Count static
             """;
 
         var ast = Parse(source);
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        Assert.Contains(":stat}", output);
+        Assert.Contains("field int:Count static", output);
         Assert.DoesNotContain(":static}", output);
     }
 
@@ -1301,20 +1305,19 @@ public class ConverterImprovementTests
         // Parse Calor source with a static property, verify CalorEmitter
         // emits "stat" in the PROP tag (not "static")
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Counter:pub}
-                  §PROP{p1:Count:i32:pub:stat}
-                    §GET
-                    §SET
-                  §/PROP{p1}
+            module TestMod TestMod block
+              class Counter
+                property int:Count static
+                  get
+                  set
             """;
 
         var ast = Parse(source);
         var emitter = new CalorEmitter();
         var output = emitter.Emit(ast);
 
-        // Property tag should include stat modifier (compact form may have accessor suffix)
-        Assert.Contains(":stat:", output);
+        // Property tag should include stat modifier (accessors follow on indented lines)
+        Assert.Contains("property int:Count static", output);
         Assert.DoesNotContain(":static:", output);
     }
 
@@ -1322,12 +1325,11 @@ public class ConverterImprovementTests
     public void RoundTrip_StaticProperty_PreservesModifier()
     {
         var source = """
-            §M{m1:TestMod}
-              §CL{c1:Counter:pub}
-                  §PROP{p1:Instance:Counter:pub:stat}
-                    §GET
-                    §SET
-                  §/PROP{p1}
+            module TestMod TestMod block
+              class Counter
+                property Counter:Instance static
+                  get
+                  set
             """;
 
         // Parse → emit → reparse
@@ -1498,7 +1500,9 @@ public class ConverterImprovementTests
         // First param (value) should have no default
         // Second param (prefix) should have default "["
         // Third param (suffix) should have default "]"
-        var lines = output.Split('\n').Where(l => l.TrimStart().StartsWith("§I{")).ToList();
+        // Parameters are inline in the native function header: (type:name = default, ...)
+        var header = output.Split('\n').Single(l => l.TrimStart().StartsWith("func Format "));
+        var lines = header[(header.IndexOf('(') + 1)..header.IndexOf(')')].Split(", ").ToList();
         Assert.Equal(3, lines.Count);
         Assert.DoesNotContain("=", lines[0]);
         Assert.Contains("= \"[\"", lines[1]);
@@ -1566,13 +1570,11 @@ public class ConverterImprovementTests
     public void Parser_DefaultParameterValue_ParsesDirectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Greet:pub}
-                    §I{str:name}
-                    §I{str:greeting} = "Hello"
-                    §O{str}
-                    §R greeting
+            module Test Test block
+              class Service
+                func Greet (string:name, string:greeting = "Hello") → string
+                  !
+                  return greeting
             """;
 
         var ast = Parse(calorSource);
@@ -1590,13 +1592,11 @@ public class ConverterImprovementTests
     public void Parser_DefaultNumericParameterValue_ParsesCorrectly()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Add:pub}
-                    §I{i32:a}
-                    §I{i32:b} = 0
-                    §O{i32}
-                    §R (+ a b)
+            module Test Test block
+              class Service
+                func Add (int:a, int:b = 0) → int
+                  !
+                  return (a + b)
             """;
 
         var ast = Parse(calorSource);
@@ -1668,8 +1668,9 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(result.Ast!);
 
-        // Should emit the enum member access as a default value
-        Assert.Contains("= StringComparison.Ordinal", output);
+        // Should emit the enum member access as a default value (a structural member access
+        // prints spaced in native Calor).
+        Assert.Contains("StringComparison:comparison = StringComparison.Ordinal", output);
     }
 
     [Fact]
@@ -1691,8 +1692,8 @@ public class ConverterImprovementTests
         var emitter = new CalorEmitter();
         var output = emitter.Emit(result.Ast!);
 
-        // Negative literal emits as unary negate: (- 1)
-        Assert.Contains("= (- 1)", output);
+        // Negative literal emits as parenthesized negation: (-1)
+        Assert.Contains("= (-1)", output);
     }
 
     [Fact]
@@ -1700,13 +1701,11 @@ public class ConverterImprovementTests
     {
         // Existing Calor files without default values should continue to parse correctly
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Greet:pub}
-                    §I{str:name}
-                    §I{str:greeting}
-                    §O{str}
-                    §R greeting
+            module Test Test block
+              class Service
+                func Greet (string:name, string:greeting) → string
+                  !
+                  return greeting
             """;
 
         var ast = Parse(calorSource);
@@ -1724,14 +1723,11 @@ public class ConverterImprovementTests
     public void RoundTrip_DefaultEnumParameter_PreservesFieldAccess()
     {
         var calorSource = """
-            §M{m1:Test}
-              §CL{c1:Service:pub}
-                §MT{m1:Compare:pub}
-                    §I{str:a}
-                    §I{str:b}
-                    §I{StringComparison:comparison} = StringComparison.Ordinal
-                    §O{bool}
-                    §R true
+            module Test Test block
+              class Service
+                func Compare (string:a, string:b, StringComparison:comparison = StringComparison.Ordinal) → bool
+                  !
+                  return true
             """;
 
         // Parse → emit → reparse
@@ -1777,7 +1773,9 @@ public class ConverterImprovementTests
         var output = emitter.Emit(result.Ast!);
 
         // Constructor parameter should have default value
-        var lines = output.Split('\n').Where(l => l.TrimStart().StartsWith("§I{")).ToList();
+        // Parameters are inline in the native constructor header: ctor (type:name = default)
+        var header = output.Split('\n').Single(l => l.TrimStart().StartsWith("ctor "));
+        var lines = header[(header.IndexOf('(') + 1)..header.IndexOf(')')].Split(", ").ToList();
         Assert.Single(lines);
         Assert.Contains("= 30", lines[0]);
     }
@@ -1788,15 +1786,22 @@ public class ConverterImprovementTests
 
     // #777 (WS-W4 D4): local functions are never hoisted to a module-level §F (the
     // orphaned call site build-breaks, or silently rebinds to a same-named member).
-    // 0.25 F3 (#847): a non-capturing one converts in place to a nested §F, and
-    // target-typed `new()` in it takes the LOCAL function's return type.
+    // #1600: safe non-capturing locals become same-point static lambda bindings.
+    // Target-typed `new()` must still use the local callable's return type.
 
     private static NewExpressionNode LocalReturnedNew(ConversionResult result)
     {
         var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
-        var local = Assert.IsType<LocalFunctionStatementNode>(method.Body[0]);
-        var ret = Assert.IsType<ReturnStatementNode>(Assert.Single(local.Function.Body));
-        return Assert.IsType<NewExpressionNode>(ret.Expression);
+        var binding = Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.Equal("Local", binding.Name);
+        var lambda = Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.True(lambda.IsStatic);
+        Assert.Empty(lambda.Parameters);
+        Assert.DoesNotContain(method.Body, statement => statement is LocalFunctionStatementNode);
+        return lambda.ExpressionBody is { } expression
+            ? Assert.IsType<NewExpressionNode>(expression)
+            : Assert.IsType<NewExpressionNode>(
+                Assert.IsType<ReturnStatementNode>(Assert.Single(lambda.StatementBody!)).Expression);
     }
 
     [Fact]
@@ -1920,7 +1925,7 @@ public class ConverterImprovementTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "LocalAsync");
         Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains("§CSHARP", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!);
     }
 
     [Fact]
@@ -1969,8 +1974,8 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var emitted = new CalorFormatter().Format(result.Ast!);
-        Assert.DoesNotContain("NEW{object}", emitted);
-        Assert.Contains("NEW{Exception}", emitted);
+        Assert.DoesNotContain("new object(", emitted);
+        Assert.Contains("new Exception(", emitted);
     }
 
     [Fact]
@@ -2011,8 +2016,8 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var emitted = new CalorFormatter().Format(result.Ast!);
-        Assert.DoesNotContain("NEW{object}", emitted);
-        Assert.Contains("NEW{ArgumentException}", emitted);
+        Assert.DoesNotContain("new object(", emitted);
+        Assert.Contains("new ArgumentException(", emitted);
     }
 
     [Fact]
@@ -2031,7 +2036,7 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         var emitted = new CalorFormatter().Format(result.Ast!);
-        Assert.DoesNotContain("NEW{object}", emitted);
+        Assert.DoesNotContain("new object(", emitted);
     }
 
     #endregion

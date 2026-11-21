@@ -1,0 +1,12 @@
+module Test_13_02 Test_13_02 overflow unchecked
+  class VerbatimDemo public
+    field int:@object private
+    field string:@class private
+
+    ctor public (int:@object, string:@class)
+      set this.@object @object
+      set this.@class @class
+
+    func Process public (string:@namespace, int:@event)
+      !
+      let result = @namespace + @event.ToString()

@@ -1,0 +1,9 @@
+module SealedClass SealedClass
+  module SealedClassModule
+    func GetValue public (int:value) → int
+      !
+      return value
+
+    func IsImmutable public () → bool
+      !
+      return true

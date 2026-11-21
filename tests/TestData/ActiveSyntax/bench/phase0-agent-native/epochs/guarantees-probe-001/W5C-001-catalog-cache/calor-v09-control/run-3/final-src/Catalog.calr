@@ -1,0 +1,40 @@
+module Catalog Catalog block
+  module CatalogModule public
+    func SnapshotLine (string:name, int:count) → string
+      !
+      return (name + ("=" + count.ToString()))
+
+    func SaveSnapshot (string:path, string:name, int:count) → void
+      ! fs:w
+      let string:line = SnapshotLine(name, count)
+      File.WriteAllText(path, line)
+
+    func ReadSnapshot (string:path) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      return File.ReadAllText(path)
+
+    func SummaryOf (string:content) → string
+      !
+      return ("catalog[" + (content.Length.ToString() + "]"))
+
+    func LoadSummary (string:path) → string
+      ! fs:r
+      let string:content = ReadSnapshot(path)
+      return SummaryOf(content)
+
+    func HasCatalog (string:path) → bool
+      ! fs:r
+      let string:content = ReadSnapshot(path)
+      return (content.Length > 0)
+
+    func DescribeCatalog (string:path) → string
+      ! fs:r
+      return ("catalog: " + LoadSummary(path))
+
+    func CatalogSize (string:path) → int
+      ! fs:r
+      let string:content = ReadSnapshot(path)
+      return content.Length

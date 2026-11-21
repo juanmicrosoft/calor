@@ -181,6 +181,17 @@ public record TaskTestCase
 /// </summary>
 public record TaskScoring
 {
+    public TaskScoring() { }
+
+    // Explicit JSON weights must not inherit the legacy contract bonus.
+    [JsonConstructor]
+    public TaskScoring(double compilation = 0.3, double testCases = 0.5, double contracts = 0)
+    {
+        Compilation = compilation;
+        TestCases = testCases;
+        Contracts = contracts;
+    }
+
     /// <summary>
     /// Weight for successful compilation (0-1).
     /// </summary>
@@ -199,7 +210,10 @@ public record TaskScoring
     /// <summary>
     /// Validates that weights sum to 1.0.
     /// </summary>
-    public bool IsValid => Math.Abs(Compilation + TestCases + Contracts - 1.0) < 0.001;
+    public bool IsValid => Compilation is >= 0 and <= 1
+        && TestCases is >= 0 and <= 1
+        && Contracts is >= 0 and <= 1
+        && Math.Abs(Compilation + TestCases + Contracts - 1.0) < 0.001;
 }
 
 /// <summary>

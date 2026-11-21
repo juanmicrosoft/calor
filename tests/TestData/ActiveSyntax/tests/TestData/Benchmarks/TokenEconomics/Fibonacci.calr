@@ -1,0 +1,16 @@
+module Fibonacci Fibonacci
+  module FibonacciModule
+    func Calculate public (int:n) → int
+      !
+      if n <= 1
+        return n
+      else
+        var a = 0
+        var b = 1
+        var i = 2
+        while i <= n
+          let temp = a + b
+          var a = b
+          var b = temp
+          var i = i + 1
+        return b

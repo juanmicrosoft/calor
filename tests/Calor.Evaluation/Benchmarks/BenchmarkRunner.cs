@@ -14,12 +14,15 @@ public class BenchmarkRunner
     private readonly BenchmarkRunnerOptions _options;
 
     public BenchmarkRunner(BenchmarkRunnerOptions? options = null)
+        : this(new TestDataAdapter(TestDataAdapter.GetTestDataPath(), TestDataAdapter.GetBenchmarkPath()), options)
+    {
+    }
+
+    internal BenchmarkRunner(TestDataAdapter adapter, BenchmarkRunnerOptions? options = null)
     {
         _options = options ?? new BenchmarkRunnerOptions();
-
-        var testDataPath = TestDataAdapter.GetTestDataPath();
-        var benchmarkPath = TestDataAdapter.GetBenchmarkPath();
-        _adapter = new TestDataAdapter(testDataPath, benchmarkPath);
+        _adapter = adapter;
+        var benchmarkPath = adapter.BenchmarkPath;
 
         // Initialize static metrics only
         // LLM-based metrics (TaskCompletion, Safety, EffectDiscipline) require
@@ -225,7 +228,22 @@ public class BenchmarkRunner
     }
 
     /// <summary>
-    /// Runs bug scenario evaluations from the manifest.
+    /// Loads current bug inputs through the same required-mirror contract as ordinary benchmarks.
+    /// </summary>
+    internal async Task<(EvaluationContext Buggy, EvaluationContext Fixed)> LoadBugScenarioInputsAsync(BugEntry bug)
+    {
+        Task<EvaluationContext> Create(string calor, string csharp) => _adapter.CreateContextAsync(new BenchmarkEntry
+        {
+            Id = bug.Id,
+            CalorFile = calor,
+            CSharpFile = csharp,
+            Level = bug.Level
+        });
+        return (await Create(bug.CalorBuggy, bug.CSharpBuggy), await Create(bug.CalorFixed, bug.CSharpFixed));
+    }
+
+    /// <summary>
+    /// Runs current bug scenario evaluations; input failures propagate before calculation.
     /// </summary>
     private async Task RunBugScenariosAsync(BenchmarkManifest manifest, EvaluationResult result)
     {
@@ -238,18 +256,9 @@ public class BenchmarkRunner
 
         foreach (var bug in manifest.BugScenarios)
         {
+            var (buggy, fixedInput) = await LoadBugScenarioInputsAsync(bug);
             try
             {
-                var buggyCalorPath = Path.Combine(_adapter.BenchmarkPath, bug.CalorBuggy);
-                var fixedCalorPath = Path.Combine(_adapter.BenchmarkPath, bug.CalorFixed);
-                var buggyCSharpPath = Path.Combine(_adapter.BenchmarkPath, bug.CSharpBuggy);
-                var fixedCSharpPath = Path.Combine(_adapter.BenchmarkPath, bug.CSharpFixed);
-
-                var buggyCalor = File.Exists(buggyCalorPath) ? await File.ReadAllTextAsync(buggyCalorPath) : "";
-                var fixedCalor = File.Exists(fixedCalorPath) ? await File.ReadAllTextAsync(fixedCalorPath) : "";
-                var buggyCSharp = File.Exists(buggyCSharpPath) ? await File.ReadAllTextAsync(buggyCSharpPath) : "";
-                var fixedCSharp = File.Exists(fixedCSharpPath) ? await File.ReadAllTextAsync(fixedCSharpPath) : "";
-
                 var bugDesc = new BugDescription
                 {
                     Id = bug.Id,
@@ -259,9 +268,12 @@ public class BenchmarkRunner
                 };
 
                 var detectionResult = errorCalc.EvaluateBuggyCode(
-                    buggyCalor, fixedCalor, buggyCSharp, fixedCSharp, bugDesc);
+                    buggy.CalorSource, fixedInput.CalorSource, buggy.CSharpSource, fixedInput.CSharpSource, bugDesc);
 
                 result.BugDetectionResults.Add(detectionResult);
+                result.BugScenarioInputs.Add(new BugScenarioInputMetadata(bug.Id,
+                    new Dictionary<string, object>(buggy.Metadata),
+                    new Dictionary<string, object>(fixedInput.Metadata)));
 
                 if (_options.Verbose)
                     Console.WriteLine($"Bug scenario {bug.Id}: Calor={detectionResult.CalorDetectionScore:F2}, C#={detectionResult.CSharpDetectionScore:F2}");
@@ -338,6 +350,7 @@ public class BenchmarkRunner
             FileName = entry.Name ?? entry.Id,
             Level = entry.Level,
             Features = entry.Features,
+            InputMetadata = new Dictionary<string, object>(context.Metadata),
             CalorSuccess = context.CalorCompilation.Success,
             CSharpSuccess = context.CSharpCompilation.Success
         };

@@ -1,0 +1,48 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_rf162s3n461k",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Contracts",
+      "Signature": ""
+    },
+    {
+      "Id": "m_a80s1apy8esg",
+      "File": "input.calr",
+      "Container": "Contracts",
+      "Kind": 0,
+      "Name": "ContractsModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_wz3v652dy8pk",
+      "File": "input.calr",
+      "Container": "Contracts.ContractsModule\u00600",
+      "Kind": 5,
+      "Name": "Divide",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022},{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    },
+    {
+      "Id": "mt_41sz902mq80b",
+      "File": "input.calr",
+      "Container": "Contracts.ContractsModule\u00600",
+      "Kind": 5,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    },
+    {
+      "Id": "mt_bzdc4dwsfr8m",
+      "File": "input.calr",
+      "Container": "Contracts.ContractsModule\u00600",
+      "Kind": 5,
+      "Name": "Square",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[{\u0022type\u0022:\u0022i32\u0022,\u0022modifier\u0022:\u0022None\u0022}],\u0022output\u0022:\u0022i32\u0022}"
+    }
+  ]
+}

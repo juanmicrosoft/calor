@@ -89,8 +89,8 @@ a declaration:
 `--effects` and `--file` cannot be used together: one asks about a single
 declaration's effects, the other about a whole file.
 
-The command calls a declaration's list of effects its **row** — the set of
-things written between the braces of `§E{…}`. You will see the word in the
+The command calls a declaration's list of effects its **row** — the codes on
+its `!` header, such as `! cw` for console output or `!` for pure. You will see the word in the
 `--row` option, in the output of `calor query effects`, and in the messages
 below. It always means the same thing: this declaration's effects.
 
@@ -148,7 +148,7 @@ calor query effects Leaky
 query: effect row of app.calr:11:11 function Leaky — declared [pure], inferred cw, does not fit — Calor0410 fires (undeclared: cw)
 ```
 
-`declared` is what the `§E{…}` line says. `inferred` is what the compiler
+`declared` is what the `!` header says. `inferred` is what the compiler
 worked out the body really does. The verdict is not recomputed for the query —
 it is the compiler's own verdict, recorded when the index was built and read
 back out. If the compiler had to assume something, the answer says what it
@@ -205,9 +205,8 @@ Because `command` is `"query"` for every facet, the `data.facet` field is what
 tells a program which answer it is holding. Its values are `callers`, `callees`,
 `impact`, `impact-effects` (that is `impact --effects`), and `effects`.
 
-The text output of every facet is unchanged from 0.15, character for character.
-`--json` on `callers`, `callees`, and `impact` is new in 0.16, as are the
-`facet` field and the `residual` object below; nothing was removed or renamed.
+The locations above are illustrative, not fixed output for today's source.
+Names and source positions depend on the indexed program.
 
 The other three facets — `symbol`, `contracts`, and `assumptions` — are text
 only.
@@ -231,6 +230,14 @@ That list is the **residual**: everything the index could not account for. In
 `--json` output it is the `residual` object, and it appears only when `partial`
 is `true`. It holds `unresolvedCalls`, `ambiguousCallees`, `unreadableFiles`,
 and `effectRowsUnavailable`.
+
+A call to a .NET library member that the binder resolves, such as
+`Console.WriteLine(s)` or `s.ToUpper()`, is not a call into your project, so it
+is not in the residual. A member call the index cannot place is listed as
+`<expression-call>`. That covers three cases: an invocation of a delegate or
+other computed value, a call on a receiver that did not bind, and a call to an
+overridable library member (`o.ToString()`, an interface method) that one of
+your own types might override or implement.
 
 "3 callers" printed over a silently dropped fourth is the mistake this is here
 to prevent. Read the residual before you trust a count.

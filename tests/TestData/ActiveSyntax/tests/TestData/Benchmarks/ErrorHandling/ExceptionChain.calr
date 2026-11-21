@@ -1,0 +1,10 @@
+module ExceptionChain ExceptionChain
+  module ExceptionChainModule
+    func WrapError public (int:code) → int
+      !
+      return code
+
+    func ErrorLevel public (int:depth) → int
+      !
+      => result >= 0
+      return depth

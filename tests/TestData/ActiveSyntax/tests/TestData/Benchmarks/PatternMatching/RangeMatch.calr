@@ -1,0 +1,13 @@
+module RangeMatch RangeMatch
+  module RangeMatchModule
+    func AgeGroup public (int:age) → int
+      !
+      requires age >= 0
+      if age < 13
+        return 0
+      else if age < 20
+        return 1
+      else if age < 65
+        return 2
+      else
+        return 3

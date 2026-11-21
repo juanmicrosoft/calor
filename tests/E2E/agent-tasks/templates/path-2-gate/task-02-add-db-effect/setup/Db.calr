@@ -1,4 +1,4 @@
-§M{m001:DataAccess}
-  §F{f001:LoadUserSettings:pub} (i32:userId) -> str
-    §R "settings-stub"
-
+module DataAccess DataAccess block
+  func LoadUserSettings (int:userId) → string
+    !
+    return "settings-stub"

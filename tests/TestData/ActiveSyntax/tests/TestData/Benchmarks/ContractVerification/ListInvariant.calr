@@ -1,0 +1,23 @@
+module ListInvariant ListInvariant
+  module ListInvariantModule
+    func AddLength public (int:len) → int
+      !
+      requires len >= 0
+      => result > len
+      => result == len + 1
+      return len + 1
+
+    func RemoveLength public (int:len) → int
+      !
+      requires len > 0
+      => result < len
+      => result >= 0
+      return len - 1
+
+    func ConcatLength public (int:lenA, int:lenB) → int
+      !
+      requires lenA >= 0
+      requires lenB >= 0
+      => result >= lenA
+      => result >= lenB
+      return lenA + lenB

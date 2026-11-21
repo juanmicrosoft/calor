@@ -1,0 +1,9 @@
+module Test_13_05 Test_13_05 overflow unchecked
+  class PatternDemo public
+    func Classify public (object:obj) → string
+      !
+      return match obj
+        case var @string → "empty string"
+        case var @string → "long string"
+        case int n when n > 0 → "positive"
+        case _ → "other"

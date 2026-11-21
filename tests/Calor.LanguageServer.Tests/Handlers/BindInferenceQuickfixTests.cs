@@ -11,53 +11,55 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class BindInferenceQuickfixTests
 {
     [Fact]
-    public void Calor0251_NoneInitializer_SurfacesOptionFix()
+    public void RemovedNoneInitializer_DoesNotSuggestRemovedType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
+            §M{Test}
+              §F{Foo:pub}
                 §O{void}
                 §B{x} §NN
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
 
-        var fix = Assert.Single(fixes, f => f.Code == "Calor0251");
-        Assert.Single(fix.Fix.Edits);
-        Assert.Equal(":Option<object>", fix.Fix.Edits[0].NewText);
-        Assert.Contains("Option<object>", fix.Fix.Description);
+        Assert.DoesNotContain(fixes, f => f.Code == "Calor0251");
+        Assert.DoesNotContain(fixes, f => f.Fix.Description.Contains("Option"));
     }
 
     [Fact]
-    public void Calor0252_VecEmpty_SurfacesVecFix()
+    public void Calor0252_VecEmpty_SurfacesListTypeFix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                §O{void}
-                §B{xs} §C{Vec.empty}
+            module Test Test block
+              func Foo () → void
+                !
+                let xs = Vec.empty()
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
 
         var fix = Assert.Single(fixes, f => f.Code == "Calor0252");
-        Assert.Equal(":Vec<object>", fix.Fix.Edits[0].NewText);
+        var edit = Assert.Single(fix.Fix.Edits);
+        Assert.Equal("List<object>:", edit.NewText);
+        Assert.Equal((4, 9), (edit.StartLine, edit.StartColumn));
     }
 
     [Fact]
-    public void Calor0253_AmbiguousNumeric_SurfacesF64Fix()
+    public void Calor0253_AmbiguousNumeric_SurfacesDoubleFix()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                §O{void}
-                §B{x} (+ INT:0 FLOAT:0.0)
+            module Test Test block
+              func Foo () → void
+                !
+                let x = (0 + 0.0)
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
 
         var fix = Assert.Single(fixes, f => f.Code == "Calor0253");
-        Assert.Equal(":f64", fix.Fix.Edits[0].NewText);
+        var edit = Assert.Single(fix.Fix.Edits);
+        Assert.Equal("double:", edit.NewText);
+        Assert.Equal((4, 9), (edit.StartLine, edit.StartColumn));
     }
 
     [Fact]
@@ -66,10 +68,10 @@ public class BindInferenceQuickfixTests
         // Explicit type annotation bypasses strict-inference checks; the LSP
         // should not surface any Calor0251-0253 quick-fixes.
         var source = """
-            §M{m001:Test}
-              §F{f001:Foo:pub}
-                §O{void}
-                §B{x:Option<i32>} §NN
+            module Test Test block
+              func Foo () → void
+                !
+                let int?:x = null
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);

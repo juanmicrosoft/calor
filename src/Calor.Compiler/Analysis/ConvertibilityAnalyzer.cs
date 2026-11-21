@@ -73,7 +73,8 @@ public sealed class ConvertibilityAnalyzer
     /// <summary>
     /// Full analysis: static analysis + conversion attempt + optional compilation check.
     /// </summary>
-    public ConvertibilityResult Analyze(string csharpSource, string filePath = "input.cs")
+    public ConvertibilityResult Analyze(string csharpSource, string filePath = "input.cs",
+        bool includeImplicitSystemUsing = false)
     {
         var sw = Stopwatch.StartNew();
 
@@ -112,6 +113,7 @@ public sealed class ConvertibilityAnalyzer
         {
             var converter = new CSharpToCalorConverter(new ConversionOptions
             {
+                IncludeImplicitSystemUsing = includeImplicitSystemUsing,
                 GracefulFallback = true,
                 Explain = true
             });
@@ -141,6 +143,7 @@ public sealed class ConvertibilityAnalyzer
                 {
                     var compileOptions = new CompilationOptions
                     {
+                        IncludeImplicitSystemUsing = includeImplicitSystemUsing,
                         EnforceEffects = false,
                         UnknownCallPolicy = UnknownCallPolicy.Permissive
                     };
@@ -259,7 +262,7 @@ public sealed class ConvertibilityAnalyzer
     /// Analyzes all C# files in a directory.
     /// </summary>
     public async Task<DirectoryConvertibilityResult> AnalyzeDirectoryAsync(
-        string directoryPath, bool quick = false)
+        string directoryPath, bool quick = false, bool includeImplicitSystemUsing = false)
     {
         var sw = Stopwatch.StartNew();
         var absolutePath = Path.GetFullPath(directoryPath);
@@ -272,7 +275,7 @@ public sealed class ConvertibilityAnalyzer
             var relativePath = Path.GetRelativePath(absolutePath, file);
             var result = quick
                 ? AnalyzeQuick(source, relativePath)
-                : Analyze(source, relativePath);
+                : Analyze(source, relativePath, includeImplicitSystemUsing);
             results.Add(result);
         }
 

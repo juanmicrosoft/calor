@@ -390,7 +390,15 @@ public sealed class DocumentState : IDisposable
             var parserTokens = new Lexer(source, new DiagnosticBag()).TokenizeAllForParser();
             cancellationToken.ThrowIfCancellationRequested();
             ast = new Parser(parserTokens, diagnostics).Parse();
+            RawCSharpFrame.ValidateInteropReasons(parserTokens, diagnostics);
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (!diagnostics.HasErrors && Uri.IsFile)
+            {
+                if (File.Exists(Uri.LocalPath) && File.ReadAllText(Uri.LocalPath) == source)
+                    Calor.Compiler.Ids.DeclarationIdentityStore.SyncActiveFileInExistingProject(Uri.LocalPath);
+                Calor.Compiler.Ids.DeclarationIdentityStore.AttachIfRegistered(Uri.LocalPath, source, ast);
+            }
 
             if (ast != null && !diagnostics.HasErrors)
             {

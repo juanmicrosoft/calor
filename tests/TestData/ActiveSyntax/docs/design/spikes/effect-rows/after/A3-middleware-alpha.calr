@@ -1,0 +1,13 @@
+module MiddlewareAlpha MiddlewareAlpha block
+  interface IPipelineBehavior
+    func Handle <! e> (int:request, Func<int>:next ! e) → int
+      ! e
+
+  class PassThroughBehavior
+    implements IPipelineBehavior
+
+    func Handle <! f> (int:request, Func<int>:next ! f) → int
+      ! f
+      return next()
+
+

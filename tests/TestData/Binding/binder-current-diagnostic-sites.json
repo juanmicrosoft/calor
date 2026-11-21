@@ -1,0 +1,3566 @@
+{
+  "FluentValidation/src/CommonAssemblyInfo.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation.Tests/CultureScope.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation.Tests/Person.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation.Tests/TestMessages.Designer.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/AssemblyInfo.FluentValidation.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/AsyncValidatorInvokedSynchronouslyException.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Enums.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Internal/ChildRulesContainer.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Internal/IValidatorSelector.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Resources/ILanguageManager.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/AlbanianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3524,
+        "End": 3528,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3524,
+        "End": 3528,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/ArabicLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3198,
+        "End": 3202,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3198,
+        "End": 3202,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/AzerbaijaneseLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3513,
+        "End": 3517,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3513,
+        "End": 3517,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/BengaliLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3296,
+        "End": 3300,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3296,
+        "End": 3300,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/BosnianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3244,
+        "End": 3248,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3244,
+        "End": 3248,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/BulgarianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3430,
+        "End": 3434,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3430,
+        "End": 3434,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/CatalanLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3378,
+        "End": 3382,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3378,
+        "End": 3382,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/ChineseSimplifiedLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2677,
+        "End": 2681,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2677,
+        "End": 2681,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/ChineseTraditionalLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2680,
+        "End": 2684,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2680,
+        "End": 2684,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/CroatianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3220,
+        "End": 3224,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3220,
+        "End": 3224,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/CzechLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3510,
+        "End": 3514,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3510,
+        "End": 3514,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/DanishLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3308,
+        "End": 3312,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3308,
+        "End": 3312,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/DutchLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3544,
+        "End": 3548,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3544,
+        "End": 3548,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/EnglishLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3427,
+        "End": 3431,
+        "Line": 40,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3427,
+        "End": 3431,
+        "Line": 40,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/EstonianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3153,
+        "End": 3157,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3153,
+        "End": 3157,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/FinnishLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3194,
+        "End": 3198,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3194,
+        "End": 3198,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/FrenchLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3424,
+        "End": 3428,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3424,
+        "End": 3428,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/GeorgianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3315,
+        "End": 3319,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3315,
+        "End": 3319,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/GermanLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3534,
+        "End": 3538,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3534,
+        "End": 3538,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/GreekLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3949,
+        "End": 3953,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3949,
+        "End": 3953,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/HebrewLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3110,
+        "End": 3114,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3110,
+        "End": 3114,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/HindiLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3351,
+        "End": 3355,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3351,
+        "End": 3355,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/HungarianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3671,
+        "End": 3675,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3671,
+        "End": 3675,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/IcelandicLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3348,
+        "End": 3352,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3348,
+        "End": 3352,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/IndonesianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3364,
+        "End": 3368,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3364,
+        "End": 3368,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/ItalianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3400,
+        "End": 3404,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3400,
+        "End": 3404,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/JapaneseLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2912,
+        "End": 2916,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2912,
+        "End": 2916,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/KazakhLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3467,
+        "End": 3471,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3467,
+        "End": 3471,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/KhmerLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3219,
+        "End": 3223,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3219,
+        "End": 3223,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/KoreanLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2910,
+        "End": 2914,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 2910,
+        "End": 2914,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/LatvianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3505,
+        "End": 3509,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3505,
+        "End": 3509,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/MacedonianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3655,
+        "End": 3659,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3655,
+        "End": 3659,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/NorwegianBokmalLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3296,
+        "End": 3300,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3296,
+        "End": 3300,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/NorwegianNynorskLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3302,
+        "End": 3306,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3302,
+        "End": 3306,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/PersianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3303,
+        "End": 3307,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3303,
+        "End": 3307,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/PolishLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3654,
+        "End": 3658,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3654,
+        "End": 3658,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/PortugueseBrazilLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3332,
+        "End": 3336,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3332,
+        "End": 3336,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/PortugueseLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3329,
+        "End": 3333,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3329,
+        "End": 3333,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/RomanianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3510,
+        "End": 3514,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3510,
+        "End": 3514,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/RomanshLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3495,
+        "End": 3499,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3495,
+        "End": 3499,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/RussianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3405,
+        "End": 3409,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3405,
+        "End": 3409,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/SerbianCyrillicLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3243,
+        "End": 3247,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3243,
+        "End": 3247,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/SerbianLatinLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3253,
+        "End": 3257,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3253,
+        "End": 3257,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/SlovakLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3537,
+        "End": 3541,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3537,
+        "End": 3541,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/SlovenianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3196,
+        "End": 3200,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3196,
+        "End": 3200,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/SpanishLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3396,
+        "End": 3400,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3396,
+        "End": 3400,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/SwedishLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3399,
+        "End": 3403,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3399,
+        "End": 3403,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/TajikLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3366,
+        "End": 3370,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3366,
+        "End": 3370,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/TamilLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3634,
+        "End": 3638,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3634,
+        "End": 3638,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/TeluguLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3456,
+        "End": 3460,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3456,
+        "End": 3460,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/ThaiLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3170,
+        "End": 3174,
+        "Line": 36,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3170,
+        "End": 3174,
+        "Line": 36,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/TurkishLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3350,
+        "End": 3354,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3350,
+        "End": 3354,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/UkrainianLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3267,
+        "End": 3271,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3267,
+        "End": 3271,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/UzbekCyrillicLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3424,
+        "End": 3428,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3424,
+        "End": 3428,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/UzbekLatinLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3507,
+        "End": 3511,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3507,
+        "End": 3511,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/VietnameseLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3347,
+        "End": 3351,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3347,
+        "End": 3351,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Resources/Languages/WelshLanguage.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3367,
+        "End": 3371,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0273",
+        "Start": 3367,
+        "End": 3371,
+        "Line": 38,
+        "Column": 18,
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027string?\u0027 or add an explicit non-null check at the interop boundary.",
+        "SpanText": "null"
+      }
+    ]
+  },
+  "FluentValidation/src/FluentValidation/Validators/ComparableComparer.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Validators/NoopPropertyValidator.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Validators/NotNullValidator.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "FluentValidation/src/FluentValidation/Validators/NullValidator.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR.Contracts/INotification.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR.Contracts/IRequest.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR.Contracts/IStreamRequest.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/IMediator.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/INotificationHandler.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/INotificationPublisher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/IPublisher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/IRequestHandler.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/ISender.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/IStreamRequestHandler.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/Internal/ObjectDetails.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/MicrosoftExtensionsDI/RequestExceptionActionProcessorStrategy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 2091,
+        "End": 2107,
+        "Line": 29,
+        "Column": 7,
+        "Message": "Undefined variable \u0027ServiceRegistrar\u0027",
+        "SpanText": "ServiceRegistrar"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2177,
+        "End": 2193,
+        "Line": 30,
+        "Column": 7,
+        "Message": "Undefined variable \u0027ServiceRegistrar\u0027",
+        "SpanText": "ServiceRegistrar"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2254,
+        "End": 2270,
+        "Line": 31,
+        "Column": 7,
+        "Message": "Undefined variable \u0027ServiceRegistrar\u0027",
+        "SpanText": "ServiceRegistrar"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/NotificationHandlerExecutor.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/NotificationPublishers/ForeachAwaitPublisher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/Pipeline/IRequestExceptionAction.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/Pipeline/IRequestPostProcessor.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/Pipeline/IRequestPreProcessor.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/Pipeline/RequestExceptionHandlerState.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/Registration/ServiceRegistrar.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 7729,
+        "End": 7796,
+        "Line": 124,
+        "Column": 75,
+        "Message": "Undefined variable \u0027RequestExceptionActionProcessorStrategy.ApplyForUnhandledExceptions\u0027",
+        "SpanText": "RequestExceptionActionProcessorStrategy.ApplyForUnhandledExceptions"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 8625,
+        "End": 8650,
+        "Line": 132,
+        "Column": 134,
+        "Message": "Undefined variable \u0027ServiceLifetime.Transient\u0027",
+        "SpanText": "ServiceLifetime.Transient"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 9035,
+        "End": 9060,
+        "Line": 137,
+        "Column": 135,
+        "Message": "Undefined variable \u0027ServiceLifetime.Transient\u0027",
+        "SpanText": "ServiceLifetime.Transient"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 10156,
+        "End": 10181,
+        "Line": 149,
+        "Column": 107,
+        "Message": "Undefined variable \u0027ServiceLifetime.Transient\u0027",
+        "SpanText": "ServiceLifetime.Transient"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/TypeForwardings.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "MediatR/src/MediatR/Wrappers/RequestHandlerWrapper.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Capturing/DepthLimiter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Capturing/MessageTemplateProcessor.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Capturing/PropertyBinder.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 1005,
+        "End": 1012,
+        "Line": 18,
+        "Column": 11,
+        "Message": "Undefined variable \u0027SelfLog\u0027",
+        "SpanText": "SelfLog"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Capturing/PropertyValueConverter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Capturing/TrimConfiguration.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/BatchingOptions.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/ILoggerSettings.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 1787,
+        "End": 1792,
+        "Line": 28,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2750,
+        "End": 2755,
+        "Line": 46,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4444,
+        "End": 4449,
+        "Line": 78,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 5497,
+        "End": 5502,
+        "Line": 91,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 5532,
+        "End": 5537,
+        "Line": 92,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 955,
+        "End": 960,
+        "Line": 14,
+        "Column": 32,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1015,
+        "End": 1020,
+        "Line": 15,
+        "Column": 22,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1073,
+        "End": 1078,
+        "Line": 16,
+        "Column": 30,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1131,
+        "End": 1136,
+        "Line": 17,
+        "Column": 22,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1187,
+        "End": 1192,
+        "Line": 18,
+        "Column": 28,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1256,
+        "End": 1261,
+        "Line": 19,
+        "Column": 35,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1335,
+        "End": 1340,
+        "Line": 20,
+        "Column": 38,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 994,
+        "End": 999,
+        "Line": 19,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1072,
+        "End": 1077,
+        "Line": 21,
+        "Column": 9,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 3203,
+        "End": 3208,
+        "Line": 59,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 3238,
+        "End": 3243,
+        "Line": 60,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4100,
+        "End": 4105,
+        "Line": 71,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 5042,
+        "End": 5047,
+        "Line": 82,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 423,
+        "End": 428,
+        "Line": 9,
+        "Column": 32,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 485,
+        "End": 490,
+        "Line": 10,
+        "Column": 24,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/LoggerFilterConfiguration.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 910,
+        "End": 915,
+        "Line": 19,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 407,
+        "End": 412,
+        "Line": 9,
+        "Column": 32,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 467,
+        "End": 472,
+        "Line": 10,
+        "Column": 22,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/LoggerMinimumLevelConfiguration.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 1543,
+        "End": 1548,
+        "Line": 30,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1868,
+        "End": 1889,
+        "Line": 38,
+        "Column": 17,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2112,
+        "End": 2131,
+        "Line": 44,
+        "Column": 17,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2343,
+        "End": 2368,
+        "Line": 50,
+        "Column": 17,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2552,
+        "End": 2573,
+        "Line": 56,
+        "Column": 17,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2789,
+        "End": 2808,
+        "Line": 62,
+        "Column": 17,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 3014,
+        "End": 3033,
+        "Line": 68,
+        "Column": 17,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4004,
+        "End": 4009,
+        "Line": 79,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4036,
+        "End": 4041,
+        "Line": 80,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 665,
+        "End": 670,
+        "Line": 11,
+        "Column": 32,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 726,
+        "End": 731,
+        "Line": 12,
+        "Column": 23,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 820,
+        "End": 825,
+        "Line": 14,
+        "Column": 24,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/LoggerSettingsConfiguration.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 656,
+        "End": 661,
+        "Line": 15,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1571,
+        "End": 1576,
+        "Line": 26,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 340,
+        "End": 345,
+        "Line": 8,
+        "Column": 32,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Configuration/LoggerSinkConfiguration.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 2715,
+        "End": 2720,
+        "Line": 43,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2760,
+        "End": 2765,
+        "Line": 44,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4943,
+        "End": 4948,
+        "Line": 68,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 5037,
+        "End": 5055,
+        "Line": 69,
+        "Column": 60,
+        "Message": "Undefined variable \u0027LevelAlias.Minimum\u0027",
+        "SpanText": "LevelAlias.Minimum"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 5165,
+        "End": 5172,
+        "Line": 73,
+        "Column": 9,
+        "Message": "Undefined variable \u0027SelfLog\u0027",
+        "SpanText": "SelfLog"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 6953,
+        "End": 6958,
+        "Line": 94,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 6988,
+        "End": 6993,
+        "Line": 95,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 7846,
+        "End": 7851,
+        "Line": 105,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 7885,
+        "End": 7890,
+        "Line": 106,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 10340,
+        "End": 10345,
+        "Line": 133,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 10374,
+        "End": 10379,
+        "Line": 134,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 10539,
+        "End": 10570,
+        "Line": 137,
+        "Column": 33,
+        "Message": "Undefined variable \u0027OptionalInterfaceForwardingSink\u0027",
+        "SpanText": "OptionalInterfaceForwardingSink"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 10596,
+        "End": 10627,
+        "Line": 137,
+        "Column": 90,
+        "Message": "Undefined variable \u0027OptionalInterfaceForwardingSink\u0027",
+        "SpanText": "OptionalInterfaceForwardingSink"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 11282,
+        "End": 11287,
+        "Line": 148,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 432,
+        "End": 437,
+        "Line": 11,
+        "Column": 32,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 490,
+        "End": 495,
+        "Line": 12,
+        "Column": 20,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Context/EnricherStack.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Context/LogContext.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 2525,
+        "End": 2530,
+        "Line": 34,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 3366,
+        "End": 3371,
+        "Line": 47,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4909,
+        "End": 4914,
+        "Line": 70,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 5995,
+        "End": 6014,
+        "Line": 91,
+        "Column": 21,
+        "Message": "Undefined variable \u0027EnricherStack.Empty\u0027",
+        "SpanText": "EnricherStack.Empty"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 6193,
+        "End": 6212,
+        "Line": 97,
+        "Column": 48,
+        "Message": "Undefined variable \u0027EnricherStack.Empty\u0027",
+        "SpanText": "EnricherStack.Empty"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 6237,
+        "End": 6256,
+        "Line": 98,
+        "Column": 23,
+        "Message": "Undefined variable \u0027EnricherStack.Empty\u0027",
+        "SpanText": "EnricherStack.Empty"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 6418,
+        "End": 6437,
+        "Line": 104,
+        "Column": 23,
+        "Message": "Undefined variable \u0027EnricherStack.Empty\u0027",
+        "SpanText": "EnricherStack.Empty"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 6676,
+        "End": 6695,
+        "Line": 111,
+        "Column": 48,
+        "Message": "Undefined variable \u0027EnricherStack.Empty\u0027",
+        "SpanText": "EnricherStack.Empty"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Context/LogContextEnricher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Constants.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/CustomDefaultMethodImplementationAttribute.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Enrichers/ConditionalEnricher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Enrichers/EmptyEnricher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Enrichers/FixedPropertyEnricher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Enrichers/PropertyEnricher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Enrichers/SafeAggregateEnricher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Filters/DelegateFilter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/IBatchedLogEventSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/IDestructuringPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/ILogEventEnricher.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/ILogEventFilter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/ILogEventPropertyFactory.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/ILogEventPropertyValueFactory.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/ILogEventSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/ILoggingFailureListener.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/IMessageTemplateParser.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/IScalarConversionPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/ISetLoggingFailureListener.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/LevelOverrideMap.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 1333,
+        "End": 1351,
+        "Line": 21,
+        "Column": 28,
+        "Message": "Undefined variable \u0027LevelAlias.Minimum\u0027",
+        "SpanText": "LevelAlias.Minimum"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 420,
+        "End": 425,
+        "Line": 9,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 561,
+        "End": 579,
+        "Line": 11,
+        "Column": 64,
+        "Message": "Undefined variable \u0027LevelAlias.Minimum\u0027",
+        "SpanText": "LevelAlias.Minimum"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Logger.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/LoggingFailureKind.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/LoggingLevelSwitch.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/LoggingLevelSwitchChangedEventArgs.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/MessageTemplateFormatMethodAttribute.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Pipeline/MessageTemplateCache.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Pipeline/SilentLogger.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/PropertiesInlineArray.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/AggregateSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/Batching/BatchingSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/ConditionalSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/DisposingAggregateSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/Fallback/DelegatingLoggingFailureListener.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/FilteringSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/RestrictedSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/SafeAggregateSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Core/Sinks/SecondaryLoggerSink.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Data/LogEventPropertyValueRewriter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Data/LogEventPropertyValueVisitor.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 1029,
+        "End": 1034,
+        "Line": 14,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 3034,
+        "End": 3039,
+        "Line": 61,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Debugging/LoggingFailedException.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Debugging/SelfLog.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 791,
+        "End": 796,
+        "Line": 16,
+        "Column": 19,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/DictionaryValue.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/EventProperty.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 898,
+        "End": 903,
+        "Line": 20,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 929,
+        "End": 945,
+        "Line": 21,
+        "Column": 7,
+        "Message": "Undefined variable \u0027LogEventProperty\u0027",
+        "SpanText": "LogEventProperty"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/LevelAlias.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/LogEvent.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 4136,
+        "End": 4141,
+        "Line": 78,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4556,
+        "End": 4574,
+        "Line": 86,
+        "Column": 43,
+        "Message": "Undefined variable \u0027EventProperty.None\u0027",
+        "SpanText": "EventProperty.None"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4961,
+        "End": 4966,
+        "Line": 96,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 5447,
+        "End": 5465,
+        "Line": 106,
+        "Column": 43,
+        "Message": "Undefined variable \u0027EventProperty.None\u0027",
+        "SpanText": "EventProperty.None"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 6392,
+        "End": 6397,
+        "Line": 121,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1299,
+        "End": 1304,
+        "Line": 34,
+        "Column": 27,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1356,
+        "End": 1361,
+        "Line": 35,
+        "Column": 23,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2491,
+        "End": 2496,
+        "Line": 50,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2913,
+        "End": 2918,
+        "Line": 56,
+        "Column": 105,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/LogEventLevel.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/LogEventProperty.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 1847,
+        "End": 1852,
+        "Line": 46,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 730,
+        "End": 735,
+        "Line": 19,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1120,
+        "End": 1138,
+        "Line": 29,
+        "Column": 43,
+        "Message": "Undefined variable \u0027EventProperty.None\u0027",
+        "SpanText": "EventProperty.None"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/LogEventPropertyValue.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/MessageTemplate.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 3702,
+        "End": 3707,
+        "Line": 78,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 3738,
+        "End": 3743,
+        "Line": 79,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 3770,
+        "End": 3793,
+        "Line": 80,
+        "Column": 7,
+        "Message": "Undefined variable \u0027MessageTemplateRenderer\u0027",
+        "SpanText": "MessageTemplateRenderer"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1638,
+        "End": 1643,
+        "Line": 35,
+        "Column": 16,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1695,
+        "End": 1700,
+        "Line": 36,
+        "Column": 34,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2255,
+        "End": 2262,
+        "Line": 51,
+        "Column": 13,
+        "Message": "Undefined variable \u0027SelfLog\u0027",
+        "SpanText": "SelfLog"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/ScalarValue.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/SequenceValue.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Events/StructureValue.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Filters/Matching.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 516,
+        "End": 521,
+        "Line": 10,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 576,
+        "End": 611,
+        "Line": 11,
+        "Column": 35,
+        "Message": "Undefined variable \u0027Constants.SourceContextPropertyName\u0027",
+        "SpanText": "Constants.SourceContextPropertyName"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1090,
+        "End": 1095,
+        "Line": 19,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Formatting/Display/LevelOutputFormat.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 2000,
+        "End": 2019,
+        "Line": 11,
+        "Column": 35,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2037,
+        "End": 2043,
+        "Line": 12,
+        "Column": 16,
+        "Message": "Undefined variable \u0027Casing\u0027",
+        "SpanText": "Casing"
+      },
+      {
+        "Code": "Calor0274",
+        "Start": 2109,
+        "End": 2115,
+        "Line": 13,
+        "Column": 33,
+        "Message": "Instance receiver for \u0027string.Length.get\u0027 must be proven non-null, but the value may be null (source annotation: \u0027Annotated\u0027). Add an explicit non-null guard, a non-null fallback, or use conditional access.",
+        "SpanText": "format"
+      },
+      {
+        "Code": "Calor0274",
+        "Start": 2133,
+        "End": 2139,
+        "Line": 13,
+        "Column": 57,
+        "Message": "Instance receiver for \u0027string.Length.get\u0027 must be proven non-null, but the value may be null (source annotation: \u0027Annotated\u0027). Add an explicit non-null guard, a non-null fallback, or use conditional access.",
+        "SpanText": "format"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2170,
+        "End": 2176,
+        "Line": 14,
+        "Column": 16,
+        "Message": "Undefined variable \u0027Casing\u0027",
+        "SpanText": "Casing"
+      },
+      {
+        "Code": "Calor0274",
+        "Start": 2282,
+        "End": 2288,
+        "Line": 16,
+        "Column": 11,
+        "Message": "Instance receiver for \u0027string.Length.get\u0027 must be proven non-null, but the value may be null (source annotation: \u0027Annotated\u0027). Add an explicit non-null guard, a non-null fallback, or use conditional access.",
+        "SpanText": "format"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 2671,
+        "End": 2677,
+        "Line": 25,
+        "Column": 18,
+        "Message": "Undefined variable \u0027Casing\u0027",
+        "SpanText": "Casing"
+      }
+    ],
+    "PropagatedErrors": [
+      {
+        "Code": "Calor0274",
+        "Start": 2109,
+        "End": 2115,
+        "Line": 13,
+        "Column": 33,
+        "Message": "Instance receiver for \u0027string.Length.get\u0027 must be proven non-null, but the value may be null (source annotation: \u0027Annotated\u0027). Add an explicit non-null guard, a non-null fallback, or use conditional access.",
+        "SpanText": "format"
+      },
+      {
+        "Code": "Calor0274",
+        "Start": 2133,
+        "End": 2139,
+        "Line": 13,
+        "Column": 57,
+        "Message": "Instance receiver for \u0027string.Length.get\u0027 must be proven non-null, but the value may be null (source annotation: \u0027Annotated\u0027). Add an explicit non-null guard, a non-null fallback, or use conditional access.",
+        "SpanText": "format"
+      },
+      {
+        "Code": "Calor0274",
+        "Start": 2282,
+        "End": 2288,
+        "Line": 16,
+        "Column": 11,
+        "Message": "Instance receiver for \u0027string.Length.get\u0027 must be proven non-null, but the value may be null (source annotation: \u0027Annotated\u0027). Add an explicit non-null guard, a non-null fallback, or use conditional access.",
+        "SpanText": "format"
+      }
+    ]
+  },
+  "serilog/src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Formatting/Display/OutputProperties.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Formatting/ITextFormatter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Formatting/Json/JsonFormatter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/GlobalUsings.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/ILogger.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Log.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 1038,
+        "End": 1049,
+        "Line": 22,
+        "Column": 20,
+        "Message": "Undefined variable \u0027Interlocked\u0027",
+        "SpanText": "Interlocked"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1073,
+        "End": 1087,
+        "Line": 22,
+        "Column": 55,
+        "Message": "Undefined variable \u0027Serilog.Core\u0027",
+        "SpanText": "(Serilog.Core)"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 9451,
+        "End": 9472,
+        "Line": 168,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 9934,
+        "End": 9955,
+        "Line": 176,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 10547,
+        "End": 10568,
+        "Line": 185,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 11288,
+        "End": 11309,
+        "Line": 195,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 12334,
+        "End": 12355,
+        "Line": 211,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 12950,
+        "End": 12971,
+        "Line": 220,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 13696,
+        "End": 13717,
+        "Line": 230,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 14570,
+        "End": 14591,
+        "Line": 241,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Verbose\u0027",
+        "SpanText": "LogEventLevel.Verbose"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 15628,
+        "End": 15647,
+        "Line": 257,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 16099,
+        "End": 16118,
+        "Line": 265,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 16700,
+        "End": 16719,
+        "Line": 274,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 17429,
+        "End": 17448,
+        "Line": 284,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 18429,
+        "End": 18448,
+        "Line": 300,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 19011,
+        "End": 19030,
+        "Line": 309,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 19723,
+        "End": 19742,
+        "Line": 319,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 20563,
+        "End": 20582,
+        "Line": 330,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Debug\u0027",
+        "SpanText": "LogEventLevel.Debug"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 21646,
+        "End": 21671,
+        "Line": 346,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 22184,
+        "End": 22209,
+        "Line": 354,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 22852,
+        "End": 22877,
+        "Line": 363,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 23648,
+        "End": 23673,
+        "Line": 373,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 24792,
+        "End": 24817,
+        "Line": 389,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 25451,
+        "End": 25476,
+        "Line": 398,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 26240,
+        "End": 26265,
+        "Line": 408,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 27157,
+        "End": 27182,
+        "Line": 419,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Information\u0027",
+        "SpanText": "LogEventLevel.Information"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 28278,
+        "End": 28299,
+        "Line": 435,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 28767,
+        "End": 28788,
+        "Line": 443,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 29386,
+        "End": 29407,
+        "Line": 452,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 30133,
+        "End": 30154,
+        "Line": 462,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 31179,
+        "End": 31200,
+        "Line": 478,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 31789,
+        "End": 31810,
+        "Line": 487,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 32529,
+        "End": 32550,
+        "Line": 497,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 33397,
+        "End": 33418,
+        "Line": 508,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Warning\u0027",
+        "SpanText": "LogEventLevel.Warning"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 34458,
+        "End": 34477,
+        "Line": 524,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 34938,
+        "End": 34957,
+        "Line": 532,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 35548,
+        "End": 35567,
+        "Line": 541,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 36286,
+        "End": 36305,
+        "Line": 551,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 37314,
+        "End": 37333,
+        "Line": 567,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 37915,
+        "End": 37934,
+        "Line": 576,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 38646,
+        "End": 38665,
+        "Line": 586,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 39505,
+        "End": 39524,
+        "Line": 597,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Error\u0027",
+        "SpanText": "LogEventLevel.Error"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 40525,
+        "End": 40544,
+        "Line": 613,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 40975,
+        "End": 40994,
+        "Line": 621,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 41555,
+        "End": 41574,
+        "Line": 630,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 42263,
+        "End": 42282,
+        "Line": 640,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 43231,
+        "End": 43250,
+        "Line": 656,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 43802,
+        "End": 43821,
+        "Line": 665,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 44503,
+        "End": 44522,
+        "Line": 675,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 45332,
+        "End": 45351,
+        "Line": 686,
+        "Column": 13,
+        "Message": "Undefined variable \u0027LogEventLevel.Fatal\u0027",
+        "SpanText": "LogEventLevel.Fatal"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 876,
+        "End": 881,
+        "Line": 17,
+        "Column": 21,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/LoggerConfiguration.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 3234,
+        "End": 3245,
+        "Line": 60,
+        "Column": 62,
+        "Message": "Undefined variable \u0027_auditSinks\u0027",
+        "SpanText": "_auditSinks"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4231,
+        "End": 4239,
+        "Line": 82,
+        "Column": 59,
+        "Message": "Undefined variable \u0027_filters\u0027",
+        "SpanText": "_filters"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4464,
+        "End": 4490,
+        "Line": 87,
+        "Column": 59,
+        "Message": "Undefined variable \u0027_additionalScalarTypes.Add\u0027",
+        "SpanText": "_additionalScalarTypes.Add"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4502,
+        "End": 4528,
+        "Line": 87,
+        "Column": 97,
+        "Message": "Undefined variable \u0027_additionalDictionaryTypes\u0027",
+        "SpanText": "_additionalDictionaryTypes"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 4540,
+        "End": 4576,
+        "Line": 87,
+        "Column": 135,
+        "Message": "Undefined variable \u0027_additionalDestructuringPolicies.Add\u0027",
+        "SpanText": "_additionalDestructuringPolicies.Add"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/LoggerExtensions.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 983,
+        "End": 988,
+        "Line": 15,
+        "Column": 7,
+        "Message": "Undefined variable \u0027Guard\u0027",
+        "SpanText": "Guard"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Parsing/Alignment.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Parsing/AlignmentDirection.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Parsing/Destructuring.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Parsing/MessageTemplateParser.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Parsing/MessageTemplateToken.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Parsing/PropertyToken.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Parsing/TextToken.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/ByteMemoryScalarConversionPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/DelegateDestructuringPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/EnumScalarConversionPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/ProjectedDestructuringPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Policies/SimpleScalarConversionPolicy.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Properties/AssemblyInfo.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Rendering/Casing.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Rendering/MessageTemplateRenderer.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Rendering/Padding.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 596,
+        "End": 619,
+        "Line": 13,
+        "Column": 40,
+        "Message": "Undefined variable \u0027AlignmentDirection.Left\u0027",
+        "SpanText": "AlignmentDirection.Left"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 865,
+        "End": 889,
+        "Line": 20,
+        "Column": 40,
+        "Message": "Undefined variable \u0027AlignmentDirection.Right\u0027",
+        "SpanText": "AlignmentDirection.Right"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Rendering/ReusableStringWriter.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs": {
+    "RawErrors": [
+      {
+        "Code": "Calor0200",
+        "Start": 507,
+        "End": 526,
+        "Line": 5,
+        "Column": 176,
+        "Message": "Undefined variable \u0027BindingFlags.Static\u0027",
+        "SpanText": "BindingFlags.Static"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 529,
+        "End": 548,
+        "Line": 5,
+        "Column": 198,
+        "Message": "Undefined variable \u0027BindingFlags.Public\u0027",
+        "SpanText": "BindingFlags.Public"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 764,
+        "End": 801,
+        "Line": 7,
+        "Column": 26,
+        "Message": "Undefined variable \u0027SurrogateConfigurationMethods.WriteTo\u0027",
+        "SpanText": "SurrogateConfigurationMethods.WriteTo"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 890,
+        "End": 927,
+        "Line": 9,
+        "Column": 26,
+        "Message": "Undefined variable \u0027SurrogateConfigurationMethods.AuditTo\u0027",
+        "SpanText": "SurrogateConfigurationMethods.AuditTo"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1017,
+        "End": 1053,
+        "Line": 11,
+        "Column": 26,
+        "Message": "Undefined variable \u0027SurrogateConfigurationMethods.Enrich\u0027",
+        "SpanText": "SurrogateConfigurationMethods.Enrich"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1146,
+        "End": 1187,
+        "Line": 13,
+        "Column": 26,
+        "Message": "Undefined variable \u0027SurrogateConfigurationMethods.Destructure\u0027",
+        "SpanText": "SurrogateConfigurationMethods.Destructure"
+      },
+      {
+        "Code": "Calor0200",
+        "Start": 1273,
+        "End": 1309,
+        "Line": 15,
+        "Column": 26,
+        "Message": "Undefined variable \u0027SurrogateConfigurationMethods.Filter\u0027",
+        "SpanText": "SurrogateConfigurationMethods.Filter"
+      }
+    ],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  },
+  "serilog/src/Serilog/Util/TimeProvider.cs": {
+    "RawErrors": [],
+    "PropagatedErrors": []
+  }
+}

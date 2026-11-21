@@ -120,11 +120,13 @@ public sealed class DelegateDefinitionNode : TypeDefinitionNode
 /// </summary>
 public sealed class EventDefinitionNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public Visibility Visibility { get; }
     public string DelegateType { get; }
     public TextSpan DelegateTypeSpan { get; }
+    public bool IsStatic { get; }
     public AttributeCollection Attributes { get; }
 
     /// <summary>Optional body for the add accessor.</summary>
@@ -143,7 +145,8 @@ public sealed class EventDefinitionNode : AstNode
         Visibility visibility,
         string delegateType,
         AttributeCollection attributes,
-        TextSpan? delegateTypeSpan = null)
+        TextSpan? delegateTypeSpan = null,
+        bool isStatic = false)
         : this(
             span,
             id,
@@ -153,7 +156,8 @@ public sealed class EventDefinitionNode : AstNode
             attributes,
             null,
             null,
-            delegateTypeSpan)
+            delegateTypeSpan,
+            isStatic)
     {
     }
 
@@ -166,14 +170,16 @@ public sealed class EventDefinitionNode : AstNode
         AttributeCollection attributes,
         IReadOnlyList<StatementNode>? addBody,
         IReadOnlyList<StatementNode>? removeBody,
-        TextSpan? delegateTypeSpan = null)
+        TextSpan? delegateTypeSpan = null,
+        bool isStatic = false)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Visibility = visibility;
         DelegateType = delegateType ?? throw new ArgumentNullException(nameof(delegateType));
         DelegateTypeSpan = delegateTypeSpan ?? TextSpan.Empty;
+        IsStatic = isStatic;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         AddBody = addBody;
         RemoveBody = removeBody;

@@ -14,6 +14,9 @@ by `.github/workflows/publish-nuget.yml` before packages can be published.
   Migration-emitter brace escaping is labeled separately from native C# generation.
   Native mutants exercise distinct arithmetic operands, side-effect evaluation order,
   and parser conditional-arm selection through executable production-path regressions.
+  The migration identity probe injects a tooling ID into emitted source and requires
+  the conversion/re-emission regression to reject it. It replaces the retired
+  source-ID dropper probe; all ten mutants and the 100% kill floor remain required.
   These hand-selected probes are not an estimate of general mutation coverage.
   `scripts/run_mutation_gate.py` only credits an assertion
   failure as a kill; build and infrastructure failures fail the gate without improving

@@ -1,6 +1,6 @@
 §M{m001:DataService}
 
-§F{f001:WriteRecord:pri}
+§F{f001:WriteRecord:priv}
   §I{str:key}
   §I{str:value}
   §O{bool}

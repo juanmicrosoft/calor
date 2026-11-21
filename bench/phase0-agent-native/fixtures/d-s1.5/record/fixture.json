@@ -1,0 +1,10 @@
+{
+  "featureKey": "record",
+  "supportLevel": "Full",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 3107,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 3107,
+  "convertedExpectedDefinedInt": 3107
+}

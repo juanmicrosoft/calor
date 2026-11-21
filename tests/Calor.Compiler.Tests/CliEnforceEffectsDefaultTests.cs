@@ -31,10 +31,10 @@ public class CliEnforceEffectsDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "violation.calr");
         File.WriteAllText(path, """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                §O{void}
-                §P "undeclared console write"
+            module Test Test block
+              func Main () → void
+                !
+                Console.WriteLine("undeclared console write")
             """);
         return path;
     }
@@ -73,10 +73,10 @@ public class CliEnforceEffectsDefaultTests : IDisposable
 
         var result = Program.Compile(
             """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                §O{void}
-                §P "undeclared console write"
+            module Test Test block
+              func Main () → void
+                !
+                Console.WriteLine("undeclared console write")
             """,
             "sdk-default.calr",
             options);

@@ -1,0 +1,8 @@
+module Fixture Fixture overflow unchecked
+  module InterpolationHole
+    func Verify () → int
+      ! alloc
+      let int[]:items = new int[] { 3, 5, 8 }
+      let int:i = 1
+      let string:s = "[${items[i]}|${items[(i + 1)]}]"
+      return ((s == "[5|8]") ? 58 : (-1))

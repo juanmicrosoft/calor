@@ -23,99 +23,100 @@ public class ReturnShapeTests
     [Fact]
     public void ValueFunction_ClassifiesAsValue()
         => Assert.Equal(ReturnShape.Kind.Value, ClassifyFirst<FunctionNode>(@"
-§M{m1:T}
-  §F{f1:Get:pub}
-    §O{i32}
-    §R INT:0
+module T T block
+  func Get () → int
+    !
+    return 0
 "));
 
     [Fact]
     public void VoidFunction_ClassifiesAsVoid()
         => Assert.Equal(ReturnShape.Kind.Void, ClassifyFirst<FunctionNode>(@"
-§M{m1:T}
-  §F{f1:Do:pub}
-    §P ""x""
+module T T block
+  func Do ()
+    !
+    Console.WriteLine(""x"")
 "));
 
     [Fact]
     public void AsyncVoidFunction_ClassifiesAsAsyncVoid()
         => Assert.Equal(ReturnShape.Kind.AsyncVoid, ClassifyFirst<FunctionNode>(@"
-§M{m1:T}
-  §AF{f1:DoAsync:pub}
-    §P ""x""
+module T T block
+  func DoAsync async ()
+    !
+    Console.WriteLine(""x"")
 "));
 
     [Fact]
     public void IteratorFunction_ClassifiesAsIterator()
         => Assert.Equal(ReturnShape.Kind.Iterator, ClassifyFirst<FunctionNode>(@"
-§M{m1:T}
-  §F{f1:Nums:pub}
-    §O{i32}
-    §YIELD 42
+module T T block
+  func Nums () → int
+    !
+    yield 42
 "));
 
     [Fact]
     public void ValueMethod_ClassifiesAsValue()
         => Assert.Equal(ReturnShape.Kind.Value, ClassifyFirst<MethodNode>(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §MT{mt1:Get:pub} () -> i32
-      §R INT:0
+module T T block
+  class C
+    func Get () → int
+      !
+      return 0
 "));
 
     [Fact]
     public void VoidMethod_ClassifiesAsVoid()
         => Assert.Equal(ReturnShape.Kind.Void, ClassifyFirst<MethodNode>(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §MT{mt1:Do:pub} () -> void
-      §P ""x""
+module T T block
+  class C
+    func Do () → void
+      !
+      Console.WriteLine(""x"")
 "));
 
     [Fact]
     public void ValueOperator_ClassifiesAsValue()
         => Assert.Equal(ReturnShape.Kind.Value, ClassifyFirst<OperatorOverloadNode>(@"
-§M{m1:T}
-  §CL{c1:Vector:pub}
-    §OP{op1:+:pub} (Vector:a, Vector:b) -> Vector
-      §R a
+module T T block
+  class Vector
+    op + (Vector:a, Vector:b) → Vector
+      !
+      return a
 "));
 
     [Fact]
     public void Constructor_ClassifiesAsConstructor()
         => Assert.Equal(ReturnShape.Kind.Constructor, ClassifyFirst<ConstructorNode>(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §CTOR{ctor1:pub} ()
-      §P ""x""
+module T T block
+  class C
+    ctor ()
+      Console.WriteLine(""x"")
 "));
 
     [Fact]
     public void Event_ClassifiesAsEventAccessor()
         => Assert.Equal(ReturnShape.Kind.EventAccessor, ClassifyFirst<EventDefinitionNode>(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §EVT{e1:Click:pub:EventHandler}
-    §EADD
-    §P ""x""
-    §/EADD
-    §/EVT{e1}
+module T T block
+  class C
+    event EventHandler:Click
+      add
+        Console.WriteLine(""x"")
+      remove
 "));
 
     [Fact]
     public void PropertyGetter_ClassifiesAsValue_AndSetterAsSetter()
     {
         const string src = @"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §PROP{p1:Name:str:pub}
-      §GET
-        §R ""x""
-      §/GET
-      §SET
-        §P ""x""
-      §/SET
-    §/PROP{p1}
+module T T block
+  class C
+    property string:Name
+      get
+        return ""x""
+      set
+        Console.WriteLine(""x"")
 ";
         var accessors = FindAll<PropertyAccessorNode>(Parse(src));
         var getter = accessors.Single(a => a.Kind == PropertyAccessorNode.AccessorKind.Get);
@@ -128,9 +129,10 @@ public class ReturnShapeTests
     [Fact]
     public void NonOwnerNode_ClassifiesAsNone()
         => Assert.Equal(ReturnShape.Kind.None, ReturnShape.Classify(Parse(@"
-§M{m1:T}
-  §F{f1:Do:pub}
-    §P ""x""
+module T T block
+  func Do ()
+    !
+    Console.WriteLine(""x"")
 ")));
 
     // ------------------------------------------- Iterator divergence (the trap)
@@ -148,10 +150,10 @@ public class ReturnShapeTests
     public void Iterator_DeclaresValueOutput_ButClassifiesAsIterator()
     {
         var fn = FindAll<FunctionNode>(Parse(@"
-§M{m1:T}
-  §F{f1:Nums:pub}
-    §O{i32}
-    §YIELD 42
+module T T block
+  func Nums () → int
+    !
+    yield 42
 ")).Single();
 
         Assert.True(ReturnShape.DeclaresValueOutput(fn.Output));

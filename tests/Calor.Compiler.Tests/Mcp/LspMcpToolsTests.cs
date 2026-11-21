@@ -12,23 +12,18 @@ namespace Calor.Compiler.Tests.Mcp;
 public class LspMcpToolsTests
 {
     private static readonly string SampleSource = """
-        §M{m001:UserModule}
-          §F{f001:calculateTotal:pub}
-            §I{f64:total}
-            §O{f64}
-            §R total
+        module UserModule UserModule block
+          func calculateTotal (double:total) → double
+            !
+            return total
 
+          class Item
+            field double:Price
+            field string:Name
 
-          §CL{c001:Item:pub}
-            §FLD{f64:Price:pub}
-            §FLD{str:Name:pub}
-
-
-          §F{f002:greet:pub}
-            §I{str:name}
-            §O{str}
-            §R name
-
+          func greet (string:name) → string
+            !
+            return name
 
         """;
 
@@ -38,7 +33,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsFunction()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 13, column: 15, action: "definition"); // "greet" on function definition
+        var args = CreateArgs(SampleSource, line: 10, column: 9, action: "definition"); // "greet" on function definition
 
         var result = await tool.ExecuteAsync(args);
 
@@ -53,7 +48,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsParameter()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "definition"); // "total" parameter
+        var args = CreateArgs(SampleSource, line: 2, column: 32, action: "definition"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -68,7 +63,7 @@ public class LspMcpToolsTests
     public async Task GotoDefinition_FindsClass()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 15, action: "definition"); // "Item" class
+        var args = CreateArgs(SampleSource, line: 6, column: 10, action: "definition"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
@@ -120,16 +115,14 @@ public class LspMcpToolsTests
         Assert.True(output.GetProperty("found").GetBoolean());
         Assert.Equal("calculateTotal", output.GetProperty("name").GetString());
         Assert.Equal("function", output.GetProperty("kind").GetString());
-        // Type can be returned as "FLOAT" or "f64" depending on normalization
-        var typeVal = output.GetProperty("type").GetString();
-        Assert.True(typeVal == "f64" || typeVal == "FLOAT", $"Expected f64 or FLOAT, got {typeVal}");
+        Assert.Equal("double", output.GetProperty("type").GetString());
     }
 
     [Fact]
     public async Task SymbolInfo_ReturnsClassInfo()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 8, column: 15, action: "info"); // "Item" class
+        var args = CreateArgs(SampleSource, line: 6, column: 10, action: "info"); // "Item" class
 
         var result = await tool.ExecuteAsync(args);
 
@@ -145,7 +138,7 @@ public class LspMcpToolsTests
     public async Task SymbolInfo_ReturnsFieldInfo()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 9, column: 17, action: "info"); // "Price" field
+        var args = CreateArgs(SampleSource, line: 7, column: 19, action: "info"); // "Price" field
 
         var result = await tool.ExecuteAsync(args);
 
@@ -154,9 +147,7 @@ public class LspMcpToolsTests
         Assert.True(output.GetProperty("found").GetBoolean());
         Assert.Equal("Price", output.GetProperty("name").GetString());
         Assert.Equal("field", output.GetProperty("kind").GetString());
-        // Type can be returned as "FLOAT" or "f64" depending on normalization
-        var typeVal = output.GetProperty("type").GetString();
-        Assert.True(typeVal == "f64" || typeVal == "FLOAT", $"Expected f64 or FLOAT, got {typeVal}");
+        Assert.Equal("double", output.GetProperty("type").GetString());
     }
 
     #endregion
@@ -240,6 +231,43 @@ public class LspMcpToolsTests
 
     #region FindSymbolTool Tests
 
+    [Theory]
+    [InlineData("record", "PointRecord")]
+    [InlineData("class", "PointClass")]
+    public async Task NativeRecord_SearchKindDoesNotLaunderOrdinaryClasses(string kind, string expected)
+    {
+        const string source = """
+            module Records Records block
+              record PointRecord (int:X)
+
+              class PointClass
+            """;
+        var result = await new NavigateTool().ExecuteAsync(CreateFindSymbolArgsWithKind(source, "Point", kind));
+        Assert.False(result.IsError);
+        var match = Assert.Single(ParseOutput(result.Content).GetProperty("matches").EnumerateArray());
+        Assert.Equal(expected, match.GetProperty("name").GetString());
+        Assert.Equal(kind, match.GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task NativeRecord_InfoAndOutlineRetainRecordIdentity()
+    {
+        const string source = """
+            module Records Records block
+              record PointRecord (int:X)
+            """;
+        var info = await new NavigateTool().ExecuteAsync(CreateArgs(source, 2, 11, "info"));
+        Assert.False(info.IsError);
+        Assert.Equal("record", ParseOutput(info.Content).GetProperty("kind").GetString());
+        Assert.Contains("int X", ParseOutput(info.Content).GetProperty("signature").GetString());
+        var outline = await new StructureTool().ExecuteAsync(CreateOutlineArgs(source));
+        Assert.False(outline.IsError);
+        var record = Assert.Single(ParseOutput(outline.Content).GetProperty("symbols").EnumerateArray());
+        Assert.Equal("record", record.GetProperty("kind").GetString());
+        Assert.Single(record.GetProperty("children").EnumerateArray()
+            .Where(child => child.GetProperty("kind").GetString() == "constructor"));
+    }
+
     [Fact]
     public async Task FindSymbol_FindsByName()
     {
@@ -307,7 +335,7 @@ public class LspMcpToolsTests
     public async Task FindReferences_FindsAllUsages()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "references"); // "total" parameter
+        var args = CreateArgs(SampleSource, line: 2, column: 32, action: "references"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -325,7 +353,7 @@ public class LspMcpToolsTests
     public async Task FindReferences_MarksDefinition()
     {
         var tool = new NavigateTool();
-        var args = CreateArgs(SampleSource, line: 3, column: 17, action: "references"); // "total" parameter
+        var args = CreateArgs(SampleSource, line: 2, column: 32, action: "references"); // "total" parameter
 
         var result = await tool.ExecuteAsync(args);
 
@@ -350,7 +378,7 @@ public class LspMcpToolsTests
     public async Task FindReferences_ExcludesDefinition_WhenRequested()
     {
         var tool = new NavigateTool();
-        var args = CreateFindReferencesArgs(SampleSource, 3, 17, includeDefinition: false);
+        var args = CreateFindReferencesArgs(SampleSource, 2, 32, includeDefinition: false);
 
         var result = await tool.ExecuteAsync(args);
 

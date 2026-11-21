@@ -22,6 +22,15 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        // The root compile command (options first, with an input) binds every program that
+        // parses, and binding needs Roslyn: start JIT-compiling that path now, in parallel
+        // with the work before it. Output does not depend on it (see StartWarmUp).
+        if (args.Length > 0 && args[0].StartsWith('-')
+            && args.Any(arg => arg is "-i" or "--input" || arg.StartsWith("--input=", StringComparison.Ordinal)))
+        {
+            _ = Binding.Metadata.MetadataContext.StartWarmUp();
+        }
+
         var inputOption = new Option<FileInfo[]>(
             aliases: ["--input", "-i"],
             description: "The Calor source file(s) to compile. Pass multiple files to enable cross-module effect enforcement.")
@@ -33,7 +42,7 @@ public class Program
 
         var referenceOption = new Option<FileInfo[]>(
             aliases: ["--reference", "-r"],
-            description: "Assembly reference used to validate generated C# (repeatable)")
+            description: "Assembly reference: calls on its types bind to their metadata, and generated C# is validated against it (repeatable)")
         { Arity = ArgumentArity.ZeroOrMore };
 
         var verboseOption = new Option<bool>(
@@ -42,7 +51,7 @@ public class Program
 
         var strictApiOption = new Option<bool>(
             aliases: ["--strict-api"],
-            description: "Enable strict API mode: requires §BREAKING markers for public API changes");
+            description: "Enable strict API mode: requires /// breaking metadata for public API changes");
 
         var requireDocsOption = new Option<bool>(
             aliases: ["--require-docs"],
@@ -71,6 +80,10 @@ public class Program
             aliases: ["--transpile-only"],
             description: "UNSAFE: emit C# without type checking or Roslyn validation; no validated-success claim or incremental cache entry is produced",
             getDefaultValue: () => false);
+
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system",
+            "Validate standalone, without the default System-only project import");
 
         var strictEffectsOption = new Option<bool>(
             aliases: ["--strict-effects"],
@@ -176,6 +189,7 @@ public class Program
             noEnforceEffectsOption,
             noTypeCheckOption,
             transpileOnlyOption,
+            noImplicitSystemOption,
             strictEffectsOption,
             permissiveEffectsOption,
             contractModeOption,
@@ -269,7 +283,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards, elisionFlagGiven);
+                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards, elisionFlagGiven, !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
             }
             catch (Exception ex)
             {
@@ -320,6 +334,7 @@ public class Program
         rootCommand.AddCommand(EvaluationCommand.Create());
         rootCommand.AddCommand(RunCommand.Create());
         rootCommand.AddCommand(TestCommand.Create());
+        rootCommand.AddCommand(TestCommand.CreateLoop());
         rootCommand.AddCommand(WatchCommand.Create());
 
         // Parse telemetry options through System.CommandLine so every accepted
@@ -347,10 +362,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null)
-        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards, elisionFlagGiven));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null, bool includeImplicitSystemUsing = true)
+        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards, elisionFlagGiven, includeImplicitSystemUsing));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null)
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = true, string? elisionFlagGiven = null, bool includeImplicitSystemUsing = true)
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -469,7 +484,8 @@ public class Program
                             allFindings, strictBindInference, experimentalFlags,
                             elideProvenGuards,
                             references.Select(reference =>
-                                $"{reference.FullName}:{Incremental.BuildStateCache.ComputeFileHash(reference.FullName)}")),
+                                $"{reference.FullName}:{Incremental.BuildStateCache.ComputeFileHash(reference.FullName)}"),
+                            includeImplicitSystemUsing),
                         ClearFirst: clearCache,
                         OutputPathFor: file => Path.ChangeExtension(file.FullName, ".g.cs"));
                 }
@@ -479,6 +495,7 @@ public class Program
                 }
             }
 
+            Ids.DeclarationIdentityStore.SyncActiveInputs(input.Select(file => file.FullName));
             var driverResult = CompilationDriver.CompileAll(
                 input,
                 file =>
@@ -500,6 +517,7 @@ public class Program
                         EnforceEffects = enforceEffects,
                         EnableTypeChecking = enableTypeChecking,
                         UnsafeTranspileOnly = transpileOnly,
+                        IncludeImplicitSystemUsing = includeImplicitSystemUsing,
                         ReferencedAssemblyPaths = references
                             .Select(reference => reference.FullName)
                             .ToList(),
@@ -568,16 +586,18 @@ public class Program
                         statusOut.WriteLine($"Output written to: {outputPath}");
                     }
 
-                    statusOut.WriteLine(transpileOnly
-                        ? $"Unsafe transpilation output written: {outputPath}"
-                        : $"Compilation successful: {outputPath}");
+                    if (verbose)
+                        statusOut.WriteLine(transpileOnly
+                            ? $"Unsafe transpilation output written: {outputPath}"
+                            : $"Compilation successful: {outputPath}");
                 },
                 diagnosticSink: diagnosticSink,
                 cache: buildCache,
                 onSkipped: (file, outputPath) =>
                 {
                     var statusOut = structuredOutput ? Console.Error : Console.Out;
-                    statusOut.WriteLine($"Up-to-date (cached): {outputPath}");
+                    if (verbose)
+                        statusOut.WriteLine($"Up-to-date (cached): {outputPath}");
                 },
                 onAst: declarationIds != null
                     ? (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast)
@@ -590,7 +610,29 @@ public class Program
                         File.Delete(failedOutputPath);
                 });
 
+            if (!driverResult.AnyErrors && !verbose)
+            {
+                var statusOut = structuredOutput ? Console.Error : Console.Out;
+                statusOut.WriteLine(transpileOnly
+                    ? $"Unsafe transpilation output written: {input.Length} file(s)"
+                    : driverResult.Compiled.Count == 0
+                        ? $"Up-to-date (cached): {driverResult.Skipped.Count} file(s)"
+                        : $"Compilation successful: {driverResult.Compiled.Count} compiled, {driverResult.Skipped.Count} cached");
+            }
             return Finish(driverResult.AnyErrors ? 1 : 0);
+        }
+        catch (Ids.DeclarationIdentityParseException ex)
+        {
+            diagnosticSink?.AddRange(ex.Diagnostics);
+            if (!structuredOutput)
+                foreach (var diagnostic in ex.Diagnostics.Errors)
+                    Console.Error.WriteLine(diagnostic);
+            if (input != null && input.Any(file => file.FullName == ex.FilePath))
+            {
+                var failedOutput = output?.FullName ?? Path.ChangeExtension(ex.FilePath, ".g.cs");
+                if (File.Exists(failedOutput)) File.Delete(failedOutput);
+            }
+            return Finish(1);
         }
         catch (Exception ex)
         {
@@ -617,7 +659,8 @@ public class Program
         int verificationTimeout, bool analyze, bool allFindings, bool strictBindInference,
         string[]? experimentalFlags,
         bool elideProvenGuards = true,
-        IEnumerable<string>? referenceDescriptors = null)
+        IEnumerable<string>? referenceDescriptors = null,
+        bool includeImplicitSystemUsing = true)
     {
         var experimental = experimentalFlags == null
             ? ""
@@ -627,6 +670,7 @@ public class Program
             : string.Join(",", referenceDescriptors.Order(StringComparer.Ordinal));
         return $"strictApi:{strictApi}|requireDocs:{requireDocs}|enforceEffects:{enforceEffects}" +
                $"|enableTypeChecking:{enableTypeChecking}" +
+               $"|implicitSystem:{includeImplicitSystemUsing}" +
                $"|strictEffects:{strictEffects}|permissiveEffects:{permissiveEffects}" +
                $"|contractMode:{contractMode.ToLowerInvariant()}|verify:{verify}" +
                $"|elideProvenGuards:{elideProvenGuards}" +
@@ -656,7 +700,7 @@ public class Program
         writer.WriteLine("  calor coverage <file>                            Analyze C# file for conversion coverage");
         writer.WriteLine();
         writer.WriteLine("Strictness options:");
-        writer.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
+        writer.WriteLine("  --strict-api      Require /// breaking metadata for public API changes");
         writer.WriteLine("  --require-docs    Require documentation on public functions");
         writer.WriteLine("  --enforce-effects Enforce effect declarations (default: true as of v0.11)");
         writer.WriteLine("  --no-enforce-effects  Disable effect enforcement (opt-out)");
@@ -694,6 +738,10 @@ public class Program
     /// </summary>
     public static CompilationResult Compile(string source, string? filePath, CompilationOptions options)
     {
+        // Every binder this compilation creates loads the explicit references
+        // into its metadata view, next to the manifest's System.* set.
+        using var metadataReferences = Binding.Metadata.MetadataContext.UseReferences(
+            options.ReferencedAssemblyPaths);
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(filePath);
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
@@ -752,6 +800,25 @@ public class Program
         phaseSw.Restart();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
+        RawCSharpFrame.ValidateInteropReasons(tokens, diagnostics);
+        if (!diagnostics.HasErrors)
+        {
+            try
+            {
+                if (filePath != null && File.Exists(filePath) && File.ReadAllText(filePath) == source)
+                    Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(filePath));
+                Ids.DeclarationIdentityStore.AttachIfRegistered(
+                    filePath == null ? null : Path.GetFullPath(filePath), source, ast);
+            }
+            catch (Ids.DeclarationIdentityParseException ex)
+            {
+                diagnostics.AddRange(ex.Diagnostics);
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException)
+            {
+                diagnostics.Report(ast.Span, DiagnosticCode.DeclarationIdentityUnavailable, ex.Message);
+            }
+        }
         phaseSw.Stop();
         telemetry?.TrackPhase("Parser", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
@@ -766,6 +833,13 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        ContractVerifier.VerifyNamedRefinementPredicates(ast, diagnostics);
+        if (diagnostics.HasErrors)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
         CSharpEmitter.ValidateMatchExpressions(ast, diagnostics);
         if (diagnostics.HasErrors)
         {
@@ -773,11 +847,48 @@ public class Program
             return new CompilationResult(diagnostics, ast, "");
         }
 
+        // Bind once before type checking so identity-sensitive expression facts are available.
+        // Route binding diagnostics at the existing semantic-validation boundary below.
+        phaseSw.Restart();
+        var bindingDiagnostics = new DiagnosticBag();
+        bindingDiagnostics.SetFilePath(filePath);
+        var binder = new Binder(bindingDiagnostics, filePath)
+        {
+            CrossModuleFunctionModules = options.CrossModuleFunctionModules,
+            CrossModuleTypes = options.CrossModuleTypes,
+            ProjectionContractMode = options.ContractMode
+        };
+        binder.Bind(ast);
+        binder.ValidateCallableEffectRows(diagnostics);
+        if (diagnostics.HasErrors)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
+        phaseSw.Stop();
+        var semanticBindingMilliseconds = phaseSw.ElapsedMilliseconds;
+
+        bool CanVerifyRejectedRuntimeQuantifier() =>
+            (options.VerifyContracts || options.VerifyRefinements)
+            && diagnostics.HasErrors
+            && diagnostics.Errors.All(diagnostic =>
+                diagnostic.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
+
         // Type checking (optional)
         if (options.EnableTypeChecking && !options.UnsafeTranspileOnly)
         {
             phaseSw.Restart();
-            var typeChecker = new TypeChecking.TypeChecker(diagnostics);
+            var typeChecker = new TypeChecking.TypeChecker(
+                diagnostics, binder.BoundAwaits, binder.BoundSourceEnumConstants,
+                binder.BoundSourceStaticFieldReads, binder.BoundMetadataConstants,
+                bindingDiagnostics.Where(diagnostic =>
+                    diagnostic.BindingContext?.Shape == BindingReceivingShape.Generic
+                    && BindingDiagnosticPolicy.IsCompilationError(diagnostic))
+                    .Select(diagnostic => diagnostic.Span).ToHashSet(),
+                binder.BoundMetadataStaticFieldReads)
+            {
+                ProjectionContractMode = options.ContractMode
+            };
             typeChecker.Check(ast);
             phaseSw.Stop();
             telemetry?.TrackPhase("TypeChecker", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -787,8 +898,11 @@ public class Program
                 status.WriteLine("Type checking completed");
             }
 
-            if (diagnostics.HasErrors)
+            if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
             {
+                // Suggestions do not activate binder-only errors or make their edits safe.
+                diagnostics.ImportMatchingFixes(bindingDiagnostics.DiagnosticsWithFixes
+                    .Where(fix => !fix.Fix.IsSafeToApply));
                 TrackDiagnostics(telemetry, diagnostics);
                 return new CompilationResult(diagnostics, ast, "");
             }
@@ -817,7 +931,7 @@ public class Program
         phaseSw.Stop();
         telemetry?.TrackPhase("ReturnValidation", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
-        if (diagnostics.HasErrors)
+        if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
         {
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
@@ -828,21 +942,15 @@ public class Program
         // resolution, static-context instance access, and related diagnostics).
         // Optional verification may bind again for its bound tree, so propagate
         // only compilation errors and deduplicate them through the shared policy.
-        phaseSw.Restart();
-        var bindingDiagnostics = new DiagnosticBag();
-        bindingDiagnostics.SetFilePath(filePath);
-        var binder = new Binder(bindingDiagnostics, filePath);
-        binder.Bind(ast);
         BindingDiagnosticPolicy.PropagateCompilationErrors(bindingDiagnostics, diagnostics);
-        phaseSw.Stop();
-        telemetry?.TrackPhase("SemanticBinding", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+        telemetry?.TrackPhase("SemanticBinding", semanticBindingMilliseconds, !diagnostics.HasErrors);
 
         if (options.Verbose)
         {
             status.WriteLine("Semantic binding completed");
         }
 
-        if (diagnostics.HasErrors)
+        if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
         {
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
@@ -868,38 +976,6 @@ public class Program
             }
         }
 
-        // Effect enforcement checking
-        if (options.EnforceEffects)
-        {
-            phaseSw.Restart();
-            // Use shared resolver from CompilationContext if available (IL analysis enabled, task-level caching)
-            var sharedResolver = options.Context?.SharedEffectResolver;
-            var enforcementPass = new EffectEnforcementPass(
-                diagnostics,
-                options.UnknownCallPolicy,
-                resolver: sharedResolver,
-                strictEffects: options.StrictEffects,
-                projectDirectory: options.ProjectDirectory,
-                crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
-            {
-                CrossModuleTypes = options.CrossModuleTypes
-            };
-            enforcementPass.Enforce(ast);
-            phaseSw.Stop();
-            telemetry?.TrackPhase("EffectEnforcement", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
-
-            if (options.Verbose)
-            {
-                status.WriteLine(EffectEnforcementCompletedStatus);
-            }
-        }
-
-        if (diagnostics.HasErrors)
-        {
-            TrackDiagnostics(telemetry, diagnostics);
-            return new CompilationResult(diagnostics, ast, "");
-        }
-
         // Contract inheritance checking
         phaseSw.Restart();
         using var contractInheritanceChecker = new ContractInheritanceChecker(
@@ -915,15 +991,58 @@ public class Program
             status.WriteLine("Contract inheritance checking completed");
         }
 
-        if (diagnostics.HasErrors)
+        if (diagnostics.HasErrors && !CanVerifyRejectedRuntimeQuantifier())
         {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
+        if (inheritanceResult.RuntimeContracts.Count > 0)
+        {
+            binder.Bind(ast, inheritanceResult);
+            BindingDiagnosticPolicy.PropagateCompilationErrors(bindingDiagnostics, diagnostics);
+        }
+
+        // Charge the same effective contracts that runtime emission executes.
+        if (options.EnforceEffects)
+        {
+            phaseSw.Restart();
+            var sharedResolver = options.Context?.SharedEffectResolver;
+            var enforcementPass = new EffectEnforcementPass(
+                diagnostics,
+                options.UnknownCallPolicy,
+                resolver: sharedResolver,
+                strictEffects: options.StrictEffects,
+                projectDirectory: options.ProjectDirectory,
+                crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys)
+            {
+                CrossModuleTypes = options.CrossModuleTypes,
+                SourcePath = filePath,
+                CrossModuleFunctionModules = options.CrossModuleFunctionModules,
+                ProjectionContractMode = options.ContractMode
+            };
+            enforcementPass.Enforce(ast, inheritanceResult);
+            phaseSw.Stop();
+            telemetry?.TrackPhase("EffectEnforcement", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+            if (options.Verbose)
+                status.WriteLine(EffectEnforcementCompletedStatus);
+        }
+
+        // A runtime-lowering refusal must not hide an explicitly requested static refusal.
+        // It remains a compilation error, and this path never reaches code generation.
+        var verifyRejectedRuntimeQuantifier = CanVerifyRejectedRuntimeQuantifier();
+        if (diagnostics.HasErrors && !verifyRejectedRuntimeQuantifier)
+        {
+            // Every earlier error returned above, so these came from effect enforcement.
+            // They must not hide contract type errors (a non-boolean precondition).
+            new ContractVerifier(diagnostics, binder).Verify(ast);
             TrackDiagnostics(telemetry, diagnostics);
             return new CompilationResult(diagnostics, ast, "");
         }
 
         // Contract semantic verification (type checking, reference validation for quantifiers, etc.)
         phaseSw.Restart();
-        var contractVerifier = new ContractVerifier(diagnostics);
+        var contractVerifier = new ContractVerifier(diagnostics, binder);
         contractVerifier.Verify(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("ContractVerifier", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
@@ -943,6 +1062,12 @@ public class Program
         if (options.Verbose)
         {
             status.WriteLine("Contract simplification completed");
+        }
+
+        if (verifyRejectedRuntimeQuantifier && !CanVerifyRejectedRuntimeQuantifier())
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
         }
 
         // Refinement type obligation generation and verification (optional)
@@ -1028,13 +1153,15 @@ public class Program
             var verificationOptions = new VerificationOptions
             {
                 Verbose = options.Verbose,
-                ElideProvenGuards = options.ElideProvenGuards,
+                ElideProvenGuards = options.ElideProvenGuards && !verifyRejectedRuntimeQuantifier,
                 TimeoutMs = options.VerificationTimeoutMs,
-                CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default,
+                CacheOptions = verifyRejectedRuntimeQuantifier
+                    ? new VerificationCacheOptions { Enabled = false }
+                    : options.VerificationCacheOptions ?? VerificationCacheOptions.Default,
                 CancellationToken = options.CancellationToken
             };
             var verificationPass = new ContractVerificationPass(diagnostics, verificationOptions);
-            options.VerificationResults = verificationPass.Verify(ast);
+            options.VerificationResults = verificationPass.Verify(ast, binder.BoundVerificationCalls);
             phaseSw.Stop();
             telemetry?.TrackPhase("Z3Verification", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
@@ -1067,6 +1194,12 @@ public class Program
                     $"{options.VerificationAnalysisResult.BugPatternsFound} bug patterns, " +
                     $"{options.VerificationAnalysisResult.TaintVulnerabilities} taint issues");
             }
+        }
+
+        if (verifyRejectedRuntimeQuantifier)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
         }
 
         // Code generation
@@ -1107,6 +1240,7 @@ public class Program
                 new GeneratedCSharpCompilationContext
                 {
                     ReferencePaths = options.ReferencedAssemblyPaths,
+                    IncludeImplicitSystemUsing = options.IncludeImplicitSystemUsing,
                     AllowUnsafe = options.AllowUnsafeCode
                 });
             AddGeneratedOutputDiagnostics(validation, diagnostics, generatedPath);
@@ -1235,7 +1369,7 @@ public sealed class CompilationOptions
     public TextWriter? StatusWriter { get; init; }
 
     /// <summary>
-    /// Enable strict API mode: requires §BREAKING markers for public API changes.
+    /// Enable strict API mode: requires explicit breaking-change metadata for public API changes.
     /// </summary>
     public bool StrictApi { get; init; }
 
@@ -1287,6 +1421,12 @@ public sealed class CompilationOptions
     /// defaults to true; project surfaces override this with the project's setting.
     /// </summary>
     public bool AllowUnsafeCode { get; init; } = true;
+
+    /// <summary>
+    /// Import System during generated-C# validation. Low-level callers default to
+    /// standalone; project-facing commands explicitly enable this context.
+    /// </summary>
+    public bool IncludeImplicitSystemUsing { get; init; }
 
     /// <summary>
     /// Explicitly emit C# without Roslyn validation. This mode is unsafe and must

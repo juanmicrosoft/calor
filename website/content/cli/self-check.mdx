@@ -9,13 +9,13 @@ description: "Check agent-facing documentation against compiler keywords, diagno
 calor self-check docs [--root <repository>] [--format text|json] [--fix]
 ```
 
-The check verifies documented section keywords, diagnostic codes and bands,
+The check verifies documented keywords, diagnostic codes and bands,
 effect codes, fenced Calor programs, exemplar C# compilation, version-text
 rules, and generated instruction mirrors. It exits 1 on drift and emits
 `Calor1320`–`Calor1334` diagnostics.
 
 It also checks this website. Every complete Calor program on these pages
-(a `calor` code block whose first line starts with `§M`) is compiled the way
+(a `calor` code block whose first line starts with `module`) is compiled the way
 `calor --input` compiles it and must succeed. An example that is meant to fail
 is labelled with the codes it must report (for example `expect=Calor0272`), and
 the check fails if the compiler reports any other code. Compiler output shown
@@ -23,11 +23,10 @@ on a page is either checked against the real diagnostics or labelled
 illustrative. The changelog is excluded because it records past releases.
 
 Pages quote converted output, too. A converted example that is a complete
-program (it starts with `§M`) is compiled like any other; a fragment is not.
-The repository's test suite also compares each converted block that the
-[C# interoperability guide](/docs/guides/csharp-interoperability/) quotes with
-the converter's real output for the same C# input, so a converter change that
-alters the output fails CI until the page changes with it. Output of `calor
+program (it starts with `module`) is compiled like any other; a fragment is not.
+Successful compilation does not prove that the converter emitted those exact
+bytes or that the program has the claimed runtime behavior. Dedicated tests
+must establish those claims separately. Output of `calor
 convert`, `calor migrate` and the MCP tools on a page is labelled
 `illustrative` unless it is compiler diagnostics, which `self-check docs` checks
 against the program above it.

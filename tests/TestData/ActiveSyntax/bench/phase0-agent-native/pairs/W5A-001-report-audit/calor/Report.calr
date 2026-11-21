@@ -1,0 +1,23 @@
+module Report Report block
+  module ReportModule partial
+    func FormatHeader (string:title) → string
+      !
+      return ("== " + (title + " =="))
+
+    func FormatLine (string:name, int:value) → string
+      !
+      return (name + (": " + value.ToString()))
+
+    func FormatSummary (string:title, int:total) → string
+      !
+      let string:header = FormatHeader(title)
+      let string:body = FormatLine("total", total)
+      File.AppendAllText("report-audit.log", header)
+      return (header + (" | " + body))
+
+    func WriteReport (string:path, string:title, int:total) → void
+      ! fs:w
+      let string:content = FormatSummary(title, total)
+      File.WriteAllText(path, content)
+
+

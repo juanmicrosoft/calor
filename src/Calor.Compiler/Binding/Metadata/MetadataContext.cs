@@ -105,11 +105,48 @@ internal sealed class MetadataContext : IDisposable
     /// verifies against the current TPA, and constructs a context. Throws
     /// <see cref="InvalidOperationException"/> on manifest drift with a
     /// message naming the specific defect and the observed SDK version.
+    /// The context also admits the explicit references of the compilation in
+    /// progress (<see cref="UseReferences"/>); outside one, it holds the
+    /// manifest's <c>System.*</c> set alone.
     /// </summary>
     public static MetadataContext Create()
     {
+        // Every binder of a compilation creates a context, several per compilation. The
+        // embedded manifest, its verification against this process's TPA, and the host
+        // compilation over a given reference set are the same each time, so they are built
+        // once per process (per reference scope for explicit references) and shared; only
+        // the wrapper, which a caller may dispose, is new.
+        var (manifest, _, emptyHost) = EmbeddedFramework.Value;
+        var (references, host) = AmbientReferences.Value is { } scope ? scope.Host.Value : emptyHost;
+        return new MetadataContext(host, references, manifest);
+    }
+
+    private static readonly Lazy<(MetadataReferenceManifest Manifest, ImmutableArray<MetadataReference> Framework,
+        (ImmutableArray<MetadataReference> References, CSharpCompilation Host) EmptyHost)> EmbeddedFramework = new(() =>
+    {
         var manifest = MetadataReferenceManifest.Load();
-        return CreateWithManifest(manifest);
+        VerifyFrameworkVersionInRange(manifest);
+        var framework = FilterAndVerifyReferences(GeneratedCSharpCompiler.References, manifest);
+        return (manifest, framework, (framework, CreateHostCompilation(framework)));
+    });
+
+    private static CSharpCompilation CreateHostCompilation(ImmutableArray<MetadataReference> references)
+        => CSharpCompilation.Create(
+            assemblyName: "CalorMetadataContext",
+            syntaxTrees: null,
+            references: references,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithNullableContextOptions(NullableContextOptions.Enable));
+
+    /// <summary>
+    /// Entry point with an explicit reference list (CLI <c>-r</c>, the MSBuild
+    /// task's references, <see cref="CompilationOptions.ReferencedAssemblyPaths"/>).
+    /// See <see cref="AdmitExplicitReferences"/> for which of them are admitted.
+    /// </summary>
+    public static MetadataContext Create(IReadOnlyList<string>? referencePaths)
+    {
+        var manifest = MetadataReferenceManifest.Load();
+        return CreateWithManifest(manifest, referencePaths);
     }
 
     /// <summary>
@@ -117,7 +154,19 @@ internal sealed class MetadataContext : IDisposable
     /// <see cref="MetadataContextTests"/> to exercise the manifest-drift
     /// hard-failure path without touching the checked-in manifest file.
     /// </summary>
-    public static MetadataContext CreateWithManifest(MetadataReferenceManifest manifest)
+    public static MetadataContext CreateWithManifest(
+        MetadataReferenceManifest manifest,
+        IReadOnlyList<string>? referencePaths = null)
+        => CreateWithManifest(manifest, referencePaths, admitted: null);
+
+    private static MetadataContext CreateWithManifest(
+        MetadataReferenceManifest manifest, ImmutableArray<MetadataReference> admitted)
+        => CreateWithManifest(manifest, null, admitted);
+
+    private static MetadataContext CreateWithManifest(
+        MetadataReferenceManifest manifest,
+        IReadOnlyList<string>? referencePaths,
+        ImmutableArray<MetadataReference>? admitted)
     {
         // Round-2 C1 mitigation: SDK-version-range enforcement. If the running
         // framework is outside the manifest's declared range, hard-fail before
@@ -127,17 +176,232 @@ internal sealed class MetadataContext : IDisposable
         var filtered = FilterAndVerifyReferences(
             GeneratedCSharpCompiler.References,
             manifest);
+        var references = filtered.AddRange(admitted ?? AdmitExplicitReferences(referencePaths, filtered));
+        return new MetadataContext(CreateHostCompilation(references), references, manifest);
+    }
 
-        var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            .WithNullableContextOptions(NullableContextOptions.Enable);
+    // -------- explicit references --------
 
-        var compilation = CSharpCompilation.Create(
-            assemblyName: "CalorMetadataContext",
-            syntaxTrees: null,
-            references: filtered,
-            options: options);
+    // The explicit references of the compilation in progress. Every binder of one
+    // compilation (the semantic binder, the effect pass's call-graph binder, the
+    // verification and cross-module binders) creates its own context; an ambient
+    // value gives them all the same reference set without threading it through
+    // each construction site. AsyncLocal keeps concurrent compilations apart.
+    // The scope also admits its files once (lazily), so every context and image of
+    // one compilation sees the same assemblies even if a file changes meanwhile.
+    private static readonly AsyncLocal<ReferenceSet?> AmbientReferences = new();
 
-        return new MetadataContext(compilation, filtered, manifest);
+    internal sealed class ReferenceSet(IReadOnlyList<string> paths)
+    {
+        public IReadOnlyList<string> Paths { get; } = paths;
+        public Lazy<ExplicitReference[]> Admitted { get; } = new(() => AdmitExplicit(paths,
+            MetadataReferenceManifest.Load().Assemblies.Select(entry => entry.AssemblyName)).ToArray());
+
+        /// <summary>The verified framework set plus this scope's admitted references, and their host compilation.</summary>
+        internal Lazy<(ImmutableArray<MetadataReference> References, CSharpCompilation Host)> Host
+            => LazyInitializer.EnsureInitialized(ref _host, () => new(() =>
+            {
+                var references = EmbeddedFramework.Value.Framework.AddRange(
+                    Admitted.Value.Select(reference => (MetadataReference)reference.Reference));
+                return (references, CreateHostCompilation(references));
+            }));
+
+        private Lazy<(ImmutableArray<MetadataReference> References, CSharpCompilation Host)>? _host;
+    }
+
+    /// <summary>The explicit references in scope; empty outside a compilation.</summary>
+    internal static IReadOnlyList<string> CurrentReferencePaths => AmbientReferences.Value?.Paths ?? [];
+
+    /// <summary>
+    /// Makes <paramref name="referencePaths"/> the explicit references of every
+    /// context created on this flow until the returned scope is disposed, which
+    /// restores the previous set. A null list means no explicit references: an
+    /// inner compilation never inherits an outer one's.
+    /// </summary>
+    internal static ReferenceScope UseReferences(IEnumerable<string>? referencePaths)
+    {
+        var previous = AmbientReferences.Value;
+        var paths = referencePaths?.ToArray() ?? [];
+        AmbientReferences.Value = paths.Length == 0 ? null : new ReferenceSet(paths);
+        return new ReferenceScope(previous);
+    }
+
+    internal readonly struct ReferenceScope : IDisposable
+    {
+        private readonly ReferenceSet? _previous;
+        internal ReferenceScope(ReferenceSet? previous) => _previous = previous;
+        public void Dispose() => AmbientReferences.Value = _previous;
+    }
+
+    /// <summary>
+    /// The explicit references admitted next to the manifest set. The F-2
+    /// whitelist keeps the compiler's own process (TPA) from leaking into Calor's
+    /// metadata view: Roslyn, Z3 and Calor.Compiler are in the TPA but were never
+    /// asked for. An explicit reference is different: the user named it, and the
+    /// generated C# already compiles against it. So it is admitted, with three
+    /// rules that keep the result a function of the reference set alone:
+    /// <list type="bullet">
+    ///   <item><description>Only the listed files. Nothing is probed: no
+    ///   dependency resolution, no framework or package directories.</description></item>
+    ///   <item><description>An assembly whose simple name is already in the
+    ///   manifest set is skipped, so a project's <c>System.*</c> reference
+    ///   assemblies never replace or duplicate the reviewed surface.</description></item>
+    ///   <item><description>Paths are taken in ordinal order and the first file with
+    ///   a given simple name wins, so the list's order does not matter. A file that
+    ///   is missing, unreadable or not a managed assembly is not admitted (its
+    ///   calls stay unresolved, which is the conservative outcome).</description></item>
+    /// </list>
+    /// Callers that cache compiler output must key it on the reference set's
+    /// content; the CLI build cache and the MSBuild task already do.
+    /// </summary>
+    internal static ImmutableArray<MetadataReference> AdmitExplicitReferences(
+        IReadOnlyList<string>? referencePaths,
+        ImmutableArray<MetadataReference> manifestReferences)
+        => AdmitExplicit(referencePaths, manifestReferences
+                .OfType<PortableExecutableReference>()
+                .Select(reference => Path.GetFileNameWithoutExtension(reference.FilePath ?? string.Empty)))
+            .Select(admitted => (MetadataReference)admitted.Reference)
+            .ToImmutableArray();
+
+    private static List<ExplicitReference> AdmitExplicit(
+        IReadOnlyList<string>? referencePaths, IEnumerable<string> manifestNames)
+    {
+        var admitted = new List<ExplicitReference>();
+        if (referencePaths is null || referencePaths.Count == 0)
+            return admitted;
+
+        var names = manifestNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in referencePaths
+                     .Where(path => !string.IsNullOrWhiteSpace(path))
+                     .Select(Path.GetFullPath)
+                     .Distinct(StringComparer.Ordinal)
+                     .OrderBy(path => path, StringComparer.Ordinal))
+        {
+            if (LoadExplicitReference(path) is not { } loaded || !names.Add(loaded.AssemblyName))
+                continue;
+            admitted.Add(loaded);
+        }
+        return admitted;
+    }
+
+    private static readonly object ProjectionReferencesLock = new();
+    private static (ExplicitReference[] Admitted, IReadOnlyList<MetadataReference> References)? _projectionReferences;
+
+    /// <summary>
+    /// The reference set for the source projection images
+    /// (<c>CallGraphAnalysis</c>'s Roslyn compilation of the module's C# image):
+    /// the process set it has always used, with the explicit references this
+    /// compilation admits (<see cref="AdmitExplicitReferences"/>) added, each
+    /// replacing a same-named process assembly. Without explicit references it is
+    /// <see cref="GeneratedCSharpCompiler.References"/> itself. The image and the
+    /// binder therefore see the same framework assemblies; otherwise every call on
+    /// a framework type would be an error in the image, and one error there makes
+    /// every source call in the file unproved.
+    /// </summary>
+    internal static IReadOnlyList<MetadataReference> ProjectionReferences()
+    {
+        if (AmbientReferences.Value?.Admitted.Value is not { Length: > 0 } admitted)
+            return GeneratedCSharpCompiler.References;
+        lock (ProjectionReferencesLock)
+        {
+            // The cached references are reused objects, so one set of files maps to
+            // one list and the images' compilation caches keep hitting.
+            if (_projectionReferences is { } cached && cached.Admitted.SequenceEqual(admitted))
+                return cached.References;
+            var names = admitted.Select(reference => reference.AssemblyName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var references = GeneratedCSharpCompiler.References
+                .Where(reference => reference is not PortableExecutableReference { FilePath: { } path }
+                    || !names.Contains(Path.GetFileNameWithoutExtension(path)))
+                .Concat(admitted.Select(reference => (MetadataReference)reference.Reference))
+                .ToArray();
+            _projectionReferences = (admitted, references);
+            return references;
+        }
+    }
+
+    internal sealed record ExplicitReference(string AssemblyName, PortableExecutableReference Reference);
+
+    // One entry per path, replaced when the file's length or write time changes, so a
+    // long-lived host (an MSBuild node) holds at most one image per referenced path.
+    // Reusing the reference object also lets Roslyn reuse its assembly symbols across
+    // the many contexts one compilation creates.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        string, (long Length, DateTime LastWriteUtc, ExplicitReference? Reference)> ExplicitReferenceCache = new();
+
+    private static ExplicitReference? LoadExplicitReference(string path)
+    {
+        try
+        {
+            var before = new FileInfo(path);
+            if (!before.Exists)
+                return null;
+            if (ExplicitReferenceCache.TryGetValue(path, out var cached)
+                && cached.Length == before.Length && cached.LastWriteUtc == before.LastWriteTimeUtc)
+                return cached.Reference;
+
+            // One read: the name and the reference come from the same bytes.
+            var image = File.ReadAllBytes(path);
+            ExplicitReference? loaded = null;
+            using (var pe = new System.Reflection.PortableExecutable.PEReader(
+                       ImmutableArray.Create(image)))
+            {
+                if (pe.HasMetadata)
+                {
+                    var reader = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
+                    if (reader.IsAssembly)
+                    {
+                        var name = reader.GetString(reader.GetAssemblyDefinition().Name);
+                        loaded = new ExplicitReference(name,
+                            MetadataReference.CreateFromImage(image, filePath: path));
+                    }
+                }
+            }
+            var after = new FileInfo(path);
+            if (after.Exists && after.Length == before.Length && after.LastWriteTimeUtc == before.LastWriteTimeUtc)
+                ExplicitReferenceCache[path] = (before.Length, before.LastWriteTimeUtc, loaded);
+            return loaded;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                              or BadImageFormatException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static readonly Lazy<Task> WarmUp = new(() => Task.Run(RunWarmUp));
+
+    /// <summary>
+    /// Starts compiling Roslyn's metadata-lookup path on a thread-pool thread, once per
+    /// process. The binder resolves .NET names through a Roslyn semantic model (see
+    /// <c>Binder.ResolveScopedMetadataType</c>), and in a fresh CLI process the first
+    /// such lookup is dominated by JIT-compiling Roslyn itself: about half a second,
+    /// paid by every compile, accepted or rejected. Started at process entry, that work
+    /// overlaps command-line parsing, the declaration-identity sync, lexing and parsing.
+    /// The result is discarded and nothing is shared except what the process already
+    /// shares (the reference set, the reference-hash cache, compiled code), so no
+    /// diagnostic, output or cache key can depend on it. A failure here is ignored:
+    /// the binder repeats the same work and reports any real failure itself.
+    /// Returns the one warm-up task of the process; callers do not wait for it.
+    /// </summary>
+    internal static Task StartWarmUp() => WarmUp.Value;
+
+    private static void RunWarmUp()
+    {
+        try
+        {
+            using var context = Create();
+            var tree = CSharpSyntaxTree.ParseText(
+                "using System;\nusing System.Collections.Generic;\n"
+                + "class __CalorWarmUp { static global::System.Type Resolve() => typeof(List<>); }");
+            var model = context._hostCompilation.AddSyntaxTrees(tree).GetSemanticModel(tree);
+            _ = model.GetDiagnostics();
+            _ = model.GetTypeInfo(tree.GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>().Single().Type);
+        }
+        catch
+        {
+            // Best effort only; see the summary.
+        }
     }
 
     // -------- D3 typed lookup surface --------
@@ -413,10 +677,28 @@ internal sealed class MetadataContext : IDisposable
             // A future revision will emit a diagnostic here that the
             // auto-regen bot picks up; today we compute the SHA (verifying
             // the file is readable) and continue.
-            _ = ManifestAssemblyEntry.ComputeSha256(matched.FilePath);
+            _ = ReadReferenceSha256(matched.FilePath);
         }
 
         return filtered;
+    }
+
+    // Every binder creates a context, and hashing the whole reference set each time
+    // was about a quarter of effect-checking time. The hash is a function of the file's
+    // bytes, so it is computed once per process for a given path, length and
+    // last-write time. A changed file has a new key and is read (and hashed) again,
+    // and a missing file still throws when its length is read. Only a file that
+    // became unreadable without any change to its length or write time is no longer
+    // re-opened. The value is still discarded today (in-range drift is lenient); it is kept
+    // so the planned drift diagnostic can compare it without re-reading the file.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        (string Path, long Length, DateTime LastWriteUtc), string> ReferenceHashes = new();
+
+    private static string ReadReferenceSha256(string filePath)
+    {
+        var file = new FileInfo(filePath);
+        var key = (file.FullName, file.Length, file.LastWriteTimeUtc);
+        return ReferenceHashes.GetOrAdd(key, _ => ManifestAssemblyEntry.ComputeSha256(filePath));
     }
 
     private void ThrowIfDisposed()

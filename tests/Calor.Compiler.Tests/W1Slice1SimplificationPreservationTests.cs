@@ -19,13 +19,15 @@ public class W1Slice1SimplificationPreservationTests
     [Fact]
     public void ModuleInteropBlocks_SurviveContractSimplification()
     {
-        // §Q (> 2 1) constant-folds → the pass reconstructs the module. The
+        // requires (2 > 1) constant-folds → the pass reconstructs the module. The
         // interop block must survive the reconstruction.
-        var source = @"§M{m001:T}
-  §F{f001:F:pub} (i32:x) -> i32
-    §Q (> 2 1)
-    §R x
-  §CSHARP{public static class Keep { }}§/CSHARP
+        var source = @"module T T block
+  func F (int:x) → int
+    !
+    requires (2 > 1)
+    return x
+  raw member:class:Other:keep%20class 28
+public static class Keep { }
 ";
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("test.calr");

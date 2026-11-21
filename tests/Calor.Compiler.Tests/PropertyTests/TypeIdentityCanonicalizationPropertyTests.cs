@@ -106,7 +106,9 @@ public class TypeIdentityCanonicalizationPropertyTests
             new[] { "long", "i64", "Int64" },
             new[] { "byte", "u8" },
             new[] { "short", "i16" },
-            new[] { "float", "f64", "double" },
+            new[] { "double", "f64" },
+            // 0.30: the C# keyword `float` is single precision, like `f32`.
+            new[] { "float", "f32" },
             new[] { "bool", "boolean" },
             new[] { "string", "str" },
             new[] { "any", "object", "unknown" },

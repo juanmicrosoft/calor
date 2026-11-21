@@ -11,7 +11,9 @@ namespace Calor.Evaluation.Scorecard;
 
 public class ConversionScorecardRunner
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    // Measure what `calor convert` produces: the CLI applies the System-only project import
+    // to original and generated C# by default (e5aafb1d1); the library default is standalone.
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { IncludeImplicitSystemUsing = true });
 
     public ConversionScorecard Run(string testDataDir, string? commitHash = null)
     {
@@ -155,7 +157,8 @@ public class ConversionScorecardRunner
                 new CalorCompilationOptions
                 {
                     EnforceEffects = false,
-                    UnknownCallPolicy = UnknownCallPolicy.Permissive
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    IncludeImplicitSystemUsing = true
                 });
             compilationDuration = sw.Elapsed;
         }

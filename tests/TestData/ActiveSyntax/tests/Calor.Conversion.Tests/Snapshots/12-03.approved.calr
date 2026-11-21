@@ -1,0 +1,12 @@
+module Test_12_03 Test_12_03 overflow unchecked
+  class Vector2 public struct
+    field float:X public
+    field float:Y public
+
+    ctor public (float:x, float:y)
+      set X x
+      set Y y
+
+    op + (Vector2:a, Vector2:b) → Vector2
+      ! alloc, mut
+      return new Vector2(a.X + b.X, a.Y + b.Y)

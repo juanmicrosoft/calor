@@ -1,0 +1,121 @@
+module L2M04 L2M04 block
+  module L2M04Module public
+
+    func l2m04_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M22.L3M22Module.l3m22_fn05(x, 77)
+      let int:v2 = L3M29.L3M29Module.l3m29_fn01(x, 43)
+      return ((v1 + v2) + y)
+
+    func l2m04_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 3) + y)
+      if (acc > 22023)
+        return (acc + 22023)
+      else
+        return ((acc * 2) + 22023)
+
+    func l2m04_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22030)
+      let int:total = ((x * 5) + y)
+      if (total > 22030)
+        return 22030
+      return total
+
+    func l2m04_fn04 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M07.L3M07Module.l3m07_fn09(x, 60)
+      let int:v2 = L3M15.L3M15Module.l3m15_fn10(x, 28)
+      return ((v1 + v2) + y)
+
+    func l2m04_fn05 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22037)
+        return (acc + 22037)
+      else
+        return ((acc * 2) + 22037)
+
+    func l2m04_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 7)
+      requires (y >= 0)
+      => (result >= 22044)
+      let int:total = ((x * 5) + y)
+      if (total < 22044)
+        return 22044
+      else
+        return total
+
+    func l2m04_fn07 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22051)
+        return (acc + 22051)
+      else
+        return ((acc * 2) + 22051)
+
+    func l2m04_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M01.L3M01Module.l3m01_fn06(x, 82)
+      let int:v2 = L3M19.L3M19Module.l3m19_fn04(x, 53)
+      return ((v1 + v2) + y)
+
+    func l2m04_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22058)
+      if (x >= 22058)
+        return x
+      else
+        return 22058
+
+    func l2m04_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22065)
+      let int:total = ((x * 5) + y)
+      if (total > 22065)
+        return 22065
+      return total
+
+    func l2m04_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 22072)
+      let int:total = ((x * 3) + y)
+      if (total < 22072)
+        return 22072
+      else
+        return total
+
+    func l2m04_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 6)
+      => (x >= 7)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22079)
+        return (acc + 22079)
+      else
+        return ((acc * 2) + 22079)
+
+    func l2m04_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 22086)
+      let int:total = ((x * 2) + y)
+      if (total < 22086)
+        return 22086
+      else
+        return total

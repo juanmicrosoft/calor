@@ -1,0 +1,24 @@
+module Inventory Inventory block
+  module InventoryModule public
+    func AddItem (Dictionary<string, int>:items, string:name, int:qty) → void
+      ! mut
+      if items.ContainsKey(name)
+        set items[name] (items[name] + qty)
+      else
+        set items[name] qty
+
+    func RemoveItem (Dictionary<string, int>:items, string:name, int:qty) → void
+      ! mut
+      if items.ContainsKey(name)
+        let remaining = (items[name] - qty)
+        if (remaining <= 0)
+          items.Remove(name)
+        else
+          set items[name] remaining
+
+    func TotalCount (Dictionary<string, int>:items) → int
+      !
+      let total = 0
+      each k, v in items
+        set total (total + v)
+      return total

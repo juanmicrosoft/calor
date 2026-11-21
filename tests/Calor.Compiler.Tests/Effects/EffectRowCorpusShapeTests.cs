@@ -94,9 +94,6 @@ public sealed class EffectRowCorpusShapeTests
     /// a silent widening.
     ///
     /// <list type="bullet">
-    /// <item><c>tests/TestData/QueryCorpus/project/app.calr</c> — v0.15 E5 (review
-    /// round 1, #2): gate 7's polymorphic golden, <c>Map&lt;eff e&gt; (Func&lt;i32,i32&gt;:f §E{e}, …)</c>,
-    /// pins that the inferred row of a rank-1 body keeps its variable part.</item>
     /// <item><c>tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr</c>
     /// and <c>…/step-01-callee-row-widens/combinators.calr</c> — v0.16 kickoff sweep: the
     /// effect-row edit script (F-3′ §6), whose callee is the same rank-1 shape
@@ -107,7 +104,6 @@ public sealed class EffectRowCorpusShapeTests
     /// </summary>
     private static readonly HashSet<string> AuthoredUnderDecisionOne = new(StringComparer.Ordinal)
     {
-        "tests/TestData/QueryCorpus/project/app.calr",
         "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr",
         "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/combinators.calr",
     };
@@ -134,9 +130,13 @@ public sealed class EffectRowCorpusShapeTests
         // fixture, bringing it to 950.
         // #1541/#1524 (0.27) adds expected.calr and test.calr for the initializer-interop D-S1.5
         // fixture, bringing it to 952.
-        // The sweep below still covers every file. A drift from 952 means the sweep is no
+        // 0.30 adds expected.calr and test.calr for the record, checked-expression and
+        // unchecked-expression D-S1.5 fixtures, bringing it to 958.
+        // 0.30 also adds an unedited, independent bystander.calr to each of ES-04's three
+        // steps (so ES-04 keeps a CLI cache hit), bringing it to 961.
+        // The sweep below still covers every file. A drift from 961 means the sweep is no
         // longer measuring the corpus it claims to.
-        Assert.Equal(952, files.Count);
+        Assert.Equal(961, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.
@@ -233,6 +233,7 @@ public sealed class EffectRowCorpusShapeTests
             //     the other two options it listed are unavailable. Counts are unchanged either way.
             .Where(line => !line.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal))
             .Where(line => !PpwFixture.IsMatch(line))
+            .Where(line => !ActiveSyntaxInputs.IsActiveCopy(line))
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
     }

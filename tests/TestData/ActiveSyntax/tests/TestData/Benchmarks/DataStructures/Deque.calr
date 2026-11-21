@@ -1,0 +1,20 @@
+module Deque Deque
+  module DequeModule
+    func CanRemove public (int:size) → bool
+      !
+      return size > 0
+
+    func NewSizeAfterAdd public (int:size) → int
+      !
+      => result > size
+      return size + 1
+
+    func NewSizeAfterRemove public (int:size) → int
+      !
+      requires size > 0
+      => result < size
+      return size - 1
+
+    func IsEmpty public (int:size) → bool
+      !
+      return size == 0

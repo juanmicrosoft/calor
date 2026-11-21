@@ -1,0 +1,147 @@
+{
+  "cli-convert": {
+    "command": "calor convert Countdown.cs -o Countdown.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 1",
+      "    <dir>/Countdown.cs:7 [iterator-accessor]",
+      "    {",
+      "        get",
+      "        {",
+      "            for (in...",
+      "  ⓘ 1 member preserved as raw C# block(s) — the output parses, but this C# still needs migrating.",
+      "  Preservation paths: 1 by converter interop (unsupported construct)",
+      "Warnings (1):",
+      "  ⚠ Unsupported feature [iterator-accessor] escalated to raw C# preservation of the containing member: public IEnumerable<int> Steps",
+      "    {",
+      "        get",
+      "        {",
+      "            for (in...",
+      "Output: <dir>/Countdown.calr"
+    ],
+    "stderr": [],
+    "calor": "module Countdown overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      ! unknown\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Countdown.cs -o Countdown.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 6,
+    "interopPreservationCount": 1,
+    "lossCount": 1,
+    "losses": [
+      {
+        "feature": "iterator-accessor",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": [
+      "Calor1343 x2"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Countdown.calr --output Countdown.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 6,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "iterator-accessor",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "info:Calor1343:iterator-accessor",
+      "warning:Calor1343:iterator-accessor"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      ! unknown\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 6,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "iterator-accessor",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "info:Calor1343:iterator-accessor",
+      "warning:Calor1343:iterator-accessor"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  class Countdown\n    field int:Start = 3\n\n    func First () → int\n      ! unknown\n      each s in Steps\n        return s\n      return 0\n\n    raw member:iterator-accessor:Property:Unsupported%20Property%3A%20public%20IEnumerable%3Cint%3E%20Steps%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20get%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20%28in... 183\n\n    public IEnumerable<int> Steps\n    {\n        get\n        {\n            for (int i = Start; i > 0; i--)\n            {\n                yield return i;\n            }\n        }\n    }\n\n\n\n"
+  }
+}

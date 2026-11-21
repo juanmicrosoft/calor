@@ -155,12 +155,12 @@ Pair equivalence and interval calculations are tracked in
 
 **Measures:** How easily an agent can understand code structure.
 
-**Calor factors:**
-- Module declarations (`§M{`)
-- Function declarations (`§F{`)
-- Input/output annotations (`§I{`, `§O{`)
-- Effect declarations (`§E{`)
-- Contracts (`§Q`, `§S`)
+**Calor factors in the archived marker representation:**
+- Module declarations
+- Function declarations
+- Input/output annotations
+- Effect declarations
+- Contracts
 - Indented body lines (the structural-completeness signal)
 
 **C# factors:**
@@ -186,20 +186,22 @@ source-pattern heuristics; it does not execute an agent or apply the edits:
 - Change function signatures
 - Modify return types
 
-**Calor advantages:**
-- Explicit IDs can enable precise targeting (`§F{f001:`)
+**Archived Calor signals:**
+- Explicit source IDs can enable precise targeting in that representation
 - Indentation defines block boundaries
-- ID-based references don't break on rename
+- ID-based targeting is modeled separately from name matching
 
 **C# challenges:**
 - Name collisions reduce targeting accuracy
 - Brace nesting creates ambiguity
 - Cascading changes needed for renames
 
-**Scoring:** 40% structural analysis + 60% heuristic simulated-task score. {/* drift:ignore */}
-The current implementation still contains legacy `§V`/`§LOOP` detectors, so
-current `§B`/`§L` syntax does not receive those particular bonuses. Treat this
-as a static representation metric, not observed editing accuracy.
+**Scoring:** 40% structural analysis + 60% heuristic simulated-task score.
+The calculator reads module and function IDs from the `.calor/ids.json`
+sidecar, not from authored headers. Native bindings and loops have no IDs, so
+they earn no ID bonus. The published result predates this calculator. Treat this
+as a static representation metric, not observed editing accuracy or proof of
+current tool-driven identity preservation.
 
 ---
 
@@ -208,9 +210,9 @@ as a static representation metric, not observed editing accuracy.
 **Measures:** Bug detection capability through explicit contracts.
 
 **Calor factors:**
-- Preconditions (`§Q`) - +0.25
-- Postconditions (`§S`) - +0.20 {/* drift:ignore */}
-- Invariants - the current calculator still detects legacy `§INV`, not current `§IV`; this is a known measurement limitation
+- Recorded precondition markers - +0.25
+- Recorded postcondition markers - +0.20
+- Invariants - the calculator still detects an older invariant marker, not native `invariant`; this is a known measurement limitation
 - Effect declarations - +0.10
 
 **C# factors:**

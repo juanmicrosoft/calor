@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Verification.Obligations;
@@ -19,22 +20,119 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// #943 (0.25 F1): ref/out/in arguments per the D1 contract (#1427). Language rows compile Calor
 /// and check the refusal or acceptance (with a negative control for every refusal); conversion
 /// rows convert every R0 F1 fixture, the F1 interaction fixtures and every D1 C# witness on the
-/// library, CLI and MCP surfaces, compile, run, and compare with the original C#.
+/// library, CLI and MCP surfaces, run, and compare with the original C#. Native default output
+/// must compile strictly; marked preservation is not a certificate. Lowering-shape comparisons
+/// use an explicit noncertifying candidate, not a native certificate.
 /// </summary>
 public class RefOutImplementationTests
 {
+    public static TheoryData<string, string, string, Surface> GenericRefRows()
+    {
+        var data = new TheoryData<string, string, string, Surface>();
+        var witnesses = new (string Members, string Body, string Expected)[]
+        {
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "int a = 1, b = 2; Swap<int>(ref a, ref b); return a + \":\" + b;", "2:1"),
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "int a = 3; Swap(ref a, ref a); return a.ToString();", "3"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int a = 1; int seen = Write(ref a, ref a, 9); return seen + \":\" + a;", "9:9"),
+            ("static T Clear<T>(ref T a, ref T b) { a = default(T); return b; }",
+                "string a = \"first\"; string seen = Clear<string>(ref a, ref a); return (seen == null) + \":\" + (a == null);", "True:True"),
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "string a = \"first\", b = \"second\"; Swap(ref a, ref b); return a + \":\" + b;", "second:first"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int[] a = new[] { 1, 2 }; int seen = Write(ref a[0], ref a[0], 9); return seen + \":\" + a[0];", "9:9"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int[] a = new[] { 1, 2 }; int seen = Write(ref a[0], ref a[1], 9); return seen + \":\" + a[0];", "2:9"),
+            ("public struct Cell { public int N; } static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "Cell a = new Cell { N = 1 }; Cell value = new Cell { N = 7 }; Cell seen = Write(ref a, ref a, value); return seen.N + \":\" + a.N;", "7:7"),
+            ("static void Set<T>(ref T a, T value) { a = value; } static void Forward<T>(ref T a, T value) { Set(ref a, value); }",
+                "int a = 1; Forward(ref a, 7); return a.ToString();", "7"),
+            ("static void Swap<T>(ref T a, ref T b) { T temp = a; a = b; b = temp; }",
+                "int a = 1, b = 2; Swap<int>(b: ref a, a: ref b); return a + \":\" + b;", "2:1"),
+            ("static T Write<T>(ref T a, ref T b, T value) { a = value; return b; }",
+                "int a = 1, b = 2; int seen = Write<int>(value: 9, b: ref a, a: ref b); return seen + \":\" + a + \":\" + b;", "1:1:9"),
+        };
+        foreach (var witness in witnesses)
+            foreach (var surface in Enum.GetValues<Surface>())
+                data.Add(witness.Members, witness.Body, witness.Expected, surface);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(GenericRefRows))]
+    public async Task GenericRefMethods_PreserveActualCallerStorage(
+        string members, string body, string expected, Surface surface)
+    {
+        var source = "public static class Probe { " + members
+            + " public static string Run() { " + body + " } }";
+        var (calor, losses) = await ConvertAsync(source, surface);
+        Assert.Empty(losses);
+        Assert.DoesNotContain("§CS", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
+        Assert.Contains("ref T:a", calor);
+        var parseDiagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var module = new Compiler.Parsing.Parser(
+            new Compiler.Parsing.Lexer(calor, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics).Parse();
+        Assert.False(parseDiagnostics.HasErrors, string.Join("; ", parseDiagnostics.Errors));
+        var generated = new CSharpEmitter().Emit(module);
+        Assert.Contains("ref T a", generated);
+        Assert.Equal(expected, Run(source));
+        Assert.Equal(expected, Run(generated));
+    }
+
+    [Theory]
+    [InlineData("Keep<string?>(ref b)", false)]
+    [InlineData("let int:n = 1", true)]
+    public void GenericRefCall_InvalidatesPotentiallyAliasedNarrowing(string step, bool keepsNarrowing)
+    {
+        var errors = Errors($$"""
+              func Keep<T> public (ref T:value) → void
+                ! mut
+                set value value
+              func Check public (ref string?:a, ref string?:b) → int
+                ! mut
+                if a != null
+                  {{step}}
+                  let string:z = a
+                  return z.Length
+                return 0
+            """);
+        Assert.Equal(keepsNarrowing ? [] : ["Calor0272"], errors);
+    }
+
+    [Theory]
+    [InlineData("ref T?", "where T : class", "ref-parameter", "method")]
+    [InlineData("scoped ref T", "", "scoped-parameter", "scoped-parameter")]
+    [InlineData("ref readonly T", "", "ref-parameter", "method")]
+    public void GenericRefShapesOutsideTheNativeSlice_KeepTheirDeclaration(
+        string parameterType, string constraint, string feature, string loss)
+    {
+        var source = $"public static class Probe {{ static void Use<T>({parameterType} value) {constraint} {{ }} }}";
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        RawFrameAssertions.AssertFramed(conversion.CalorSource);
+        Assert.Contains(conversion.Issues, issue => issue.Feature == feature);
+        Assert.Contains(conversion.Losses, item => item.Feature == loss);
+    }
+
     private const string Prelude = """
-        §M{m1:P}
-          §F{f0:Bump:pub} (i32:x:ref) -> void
-            §ASSIGN x (+ x 1)
-          §F{f9:SetOut:pub} (i32:x:out) -> void
-            §ASSIGN x 7
-          §F{f6:SetNeg:pub} (i32:x:out) -> void
-            §ASSIGN x -5
-          §F{f8:Twice:pub} (i32:x:in) -> i32
-            §R (* x 2)
-          §F{f7:Id:pub} (i32:x) -> i32
-            §R x
+        module P
+          func Bump public (ref int:x) → void
+            ! mut
+            set x x + 1
+          func SetOut public (out int:x) → void
+            ! mut
+            set x 7
+          func SetNeg public (out int:x) → void
+            ! mut
+            set x -5
+          func Twice public (in int:x) → int
+            !
+            return x * 2
+          func Id public (int:x) → int
+            !
+            return x
 
         """;
 
@@ -52,52 +150,52 @@ public class RefOutImplementationTests
     // Each refusal (Calor0212) next to the closest accepted form: the operand rule, not the call, decides.
     [Theory]
     [InlineData("property",
-        "  §CL{c1:K:pub}\n    §PROP{p1:N:i32:pub}\n      §GET\n      §SET\n    §MT{m1:Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C",
-        "  §CL{c1:K:pub}\n    §FLD{i32:N:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{Bump} §A{ref} N §/C")]
+        "  class K public\n    property int:N public\n      get\n      set\n    func Run public () → void\n      ! mut\n      Bump(ref N)",
+        "  class K public\n    field int:N public\n    func Run public () → void\n      ! mut\n      Bump(ref N)")]
     [InlineData("static readonly field outside its static constructor",
-        "  §CL{c1:K:pub:stat}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> void\n      §C{Bump} §A{ref} n §/C",
-        "  §CL{c1:K:pub:stat}\n    §FLD{i32:n:pub:stat,readonly}\n    §MT{m1:Run:pub:stat} () -> i32\n      §R §C{Twice} §A{in} n §/C")]
+        "  module K public\n    field int:n public readonly\n    func Run public () → void\n      ! mut\n      Bump(ref n)",
+        "  module K public\n    field int:n public readonly\n    func Run public () → int\n      !\n      return Twice(in n)")]
     [InlineData("in parameter passed as ref",
-        "  §F{f1:Run:pub} (i32:p:in) -> void\n    §C{Bump} §A{ref} p §/C",
-        "  §F{f1:Run:pub} (i32:p:in) -> i32\n    §R §C{Twice} §A{in} p §/C")]
+        "  func Run public (in int:p) → void\n    ! mut\n    Bump(ref p)",
+        "  func Run public (in int:p) → int\n    !\n    return Twice(in p)")]
     [InlineData("call result",
-        "  §F{f1:Run:pub} () -> void\n    §C{Bump} §A{ref} §C{Twice} §A{in} 3 §/C §/C",
-        "  §F{f1:Run:pub} () -> void\n    §B{~v:i32} §C{Id} §A 3 §/C\n    §C{Bump} §A{ref} v §/C")]
+        "  func Run public () → void\n    ! mut\n    Bump(ref Twice(in 3))",
+        "  func Run public () → void\n    ! mut\n    var int:v = Id(3)\n    Bump(ref v)")]
     [InlineData("list indexer element",
-        "  §F{f1:Run:pub} (List<i32>:xs) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX{xs} 0 §/C",
-        "  §F{f1:Run:pub} (i32[]:xs) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX{xs} 0 §/C")]
+        "  func Run public (List<int>:xs) → void\n    ! mut\n    Bump(ref xs[0])",
+        "  func Run public (int[]:xs) → void\n    ! mut\n    Bump(ref xs[0])")]
     [InlineData("field of an in struct parameter",
-        "  §CL{s1:S:pub:struct}\n    §FLD{i32:X:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.X §/C",
-        "  §CL{s1:S:pub:struct}\n    §FLD{i32:X:pub}\n  §F{f1:Run:pub} (S:s:ref) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.X §/C")]
+        "  class S public struct\n    field int:X public\n  func Run public (in S:s) → void\n    ! mut\n    Bump(ref s.X)",
+        "  class S public struct\n    field int:X public\n  func Run public (ref S:s) → void\n    ! mut\n    Bump(ref s.X)")]
     [InlineData("non-generic indexer element",
-        "  §F{f1:Run:pub} (System.Collections.ArrayList:xs) -> void\n    §E{mut}\n    §C{SetOut} §A{out} §IDX{xs} 0 §/C",
-        "  §F{f1:Run:pub} (i32[]:xs) -> void\n    §E{mut}\n    §C{SetOut} §A{out} §IDX{xs} 0 §/C")]
+        "  func Run public (System.Collections.ArrayList:xs) → void\n    ! mut\n    SetOut(out xs[0])",
+        "  func Run public (int[]:xs) → void\n    ! mut\n    SetOut(out xs[0])")]
     [InlineData("scalar metadata property",
-        "  §F{f1:Run:pub} (str:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.Length §/C",
-        "  §F{f1:Run:pub} (str:s) -> void\n    §E{mut}\n    §B{~n:i32} s.Length\n    §C{Bump} §A{ref} n §/C")]
+        "  func Run public (string:s) → void\n    ! mut\n    Bump(ref s.Length)",
+        "  func Run public (string:s) → void\n    ! mut\n    var int:n = s.Length\n    Bump(ref n)")]
     [InlineData("readonly intermediate field of a struct path",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:Y:pub}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:X:pub:readonly}\n  §F{f1:Run:pub} (Outer[]:a) -> void\n    §E{mut}\n    §C{Bump} §A{ref} (§IDX{a} 0).X.Y §/C",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:Y:pub}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:X:pub}\n  §F{f1:Run:pub} (Outer[]:a) -> void\n    §E{mut}\n    §C{Bump} §A{ref} (§IDX{a} 0).X.Y §/C")]
+        "  class Inner public struct\n    field int:Y public\n  class Outer public struct\n    field Inner:X public readonly\n  func Run public (Outer[]:a) → void\n    ! mut\n    Bump(ref a[0].X.Y)",
+        "  class Inner public struct\n    field int:Y public\n  class Outer public struct\n    field Inner:X public\n  func Run public (Outer[]:a) → void\n    ! mut\n    Bump(ref a[0].X.Y)")]
     [InlineData("readonly field of another instance in a constructor",
-        "  §CL{c1:K:pub}\n    §FLD{i32:n:pub:readonly}\n    §CTOR{ct1:pub} (K:other)\n      §C{Bump} §A{ref} other.n §/C",
-        "  §CL{c1:K:pub}\n    §FLD{i32:n:pub:readonly}\n    §CTOR{ct1:pub} (K:other)\n      §C{Bump} §A{ref} n §/C")]
+        "  class K public\n    field int:n public readonly\n    ctor public (K:other)\n      Bump(ref other.n)",
+        "  class K public\n    field int:n public readonly\n    ctor public (K:other)\n      Bump(ref n)")]
     // Codex round 3: a readonly field reached through a struct path, a property at the end of
     // one, a metadata constant, and a two-index indexer.
     [InlineData("readonly field at the end of a dotted struct path",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:N:pub:readonly}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:F:pub}\n  §F{f1:Run:pub} (Outer:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.F.N §/C",
-        "  §CL{s1:Inner:pub:struct}\n    §FLD{i32:N:pub}\n  §CL{s2:Outer:pub:struct}\n    §FLD{Inner:F:pub}\n  §F{f1:Run:pub} (Outer:s) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.F.N §/C")]
+        "  class Inner public struct\n    field int:N public readonly\n  class Outer public struct\n    field Inner:F public\n  func Run public (Outer:s) → void\n    ! mut\n    Bump(ref s.F.N)",
+        "  class Inner public struct\n    field int:N public\n  class Outer public struct\n    field Inner:F public\n  func Run public (Outer:s) → void\n    ! mut\n    Bump(ref s.F.N)")]
     [InlineData("metadata constant",
-        "  §F{f1:Run:pub} () -> void\n    §C{Bump} §A{ref} Int32.MaxValue §/C",
-        "  §F{f1:Run:pub} () -> void\n    §B{~m:i32} Int32.MaxValue\n    §C{Bump} §A{ref} m §/C")]
+        "  func Run public () → void\n    ! mut\n    Bump(ref Int32.MaxValue)",
+        "  func Run public () → void\n    ! mut\n    var int:m = Int32.MaxValue\n    Bump(ref m)")]
     [InlineData("readonly reference-typed field in an in struct",
-        "  §CL{c1:Box:pub}\n    §FLD{i32:N:pub:readonly}\n  §CL{s1:S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C",
-        "  §CL{c1:Box:pub}\n    §FLD{i32:N:pub}\n  §CL{s1:S:pub:struct}\n    §FLD{Box:B:pub}\n  §F{f1:Run:pub} (S:s:in) -> void\n    §E{mut}\n    §C{Bump} §A{ref} s.B.N §/C")]
+        "  class Box public\n    field int:N public readonly\n  class S public struct\n    field Box:B public\n  func Run public (in S:s) → void\n    ! mut\n    Bump(ref s.B.N)",
+        "  class Box public\n    field int:N public\n  class S public struct\n    field Box:B public\n  func Run public (in S:s) → void\n    ! mut\n    Bump(ref s.B.N)")]
     [InlineData("two-index indexer element (Codex R3-5)",
-        "  §CL{c1:Grid:pub}\n    §IXER{ix1:i32:pub}\n      §I{i32:r}\n      §I{i32:c}\n      §GET\n        §R 1\n  §F{f1:Run:pub} (Grid:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C",
-        "  §F{f1:Run:pub} (i32[,]:g) -> void\n    §E{mut}\n    §C{Bump} §A{ref} §IDX2D g 0 0 §/C")]
+        "  class Grid public\n    this[int:r, int:c] → int\n      get\n        return 1\n  func Run public (Grid:g) → void\n    ! mut\n    Bump(ref g[0, 0])",
+        "  func Run public (int[,]:g) → void\n    ! mut\n    Bump(ref g[0, 0])")]
     [InlineData("discard bound to a field named _",
-        "  §CL{c1:K:pub}\n    §FLD{i32:_:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C",
-        "  §CL{c1:K:pub}\n    §MT{m1:Run:pub} () -> void\n      §C{SetOut} §A{out} _ §/C")]
+        "  class K public\n    field int:_ public\n    func Run public () → void\n      ! mut\n      SetOut(out _)",
+        "  class K public\n    func Run public () → void\n      ! mut\n      SetOut(out _)")]
     public void InvalidOperand_IsRefusedBeforeCodegen_AndItsControlCompiles(string shape, string refused, string accepted)
     {
         Assert.True(Errors(refused).SequenceEqual(["Calor0212"]), $"{shape}: [{string.Join(", ", Errors(refused))}]");
@@ -105,20 +203,23 @@ public class RefOutImplementationTests
         // a by-reference refusal or a generated-C# failure.
         Assert.True(!Errors(accepted).Any(code => code is "Calor0212" or "Calor1002" or "Calor0208"),
             $"{shape} control: [{string.Join(", ", Errors(accepted))}]");
+        Assert.DoesNotContain(Errors(accepted), code =>
+            code.StartsWith("Calor00", StringComparison.Ordinal)
+            || code.StartsWith("Calor01", StringComparison.Ordinal));
     }
 
     [Theory]
-    [InlineData("§C{Bump} §A{ref} k.n §/C", "§E{}", "Calor0410")]
-    [InlineData("§C{SetOut} §A{out} k.n §/C", "§E{}", "Calor0410")]
-    [InlineData("§C{Bump} §A{ref} k.n §/C", "§E{mut}", null)]
-    [InlineData("§C{Twice} §A{in} k.n §/C", "§E{}", null)]
-    [InlineData("§ASSIGN k.n 3", "§E{}", "Calor0410")]
+    [InlineData("Bump(ref k.n)", "!", "Calor0410")]
+    [InlineData("SetOut(out k.n)", "!", "Calor0410")]
+    [InlineData("Bump(ref k.n)", "! mut", null)]
+    [InlineData("Twice(in k.n)", "!", null)]
+    [InlineData("set k.n 3", "!", "Calor0410")]
     public void ReceiverFieldWrite_ChargesLikeAssign(string statement, string effects, string? error)
     {
         var errors = Errors($$"""
-              §CL{c1:K:pub}
-                §FLD{i32:n:pub}
-              §F{f1:Run:pub} (K:k) -> void
+              class K public
+                field int:n public
+              func Run public (K:k) → void
                 {{effects}}
                 {{statement}}
             """);
@@ -127,74 +228,109 @@ public class RefOutImplementationTests
 
     // RO-NULL-2 controls: invalidation is limited to by-reference parameters that may alias.
     [Theory]
-    [InlineData("(?str:a:ref)", "§B{i32:z} 1", true)]
-    [InlineData("(?str:a)", "§C{ClearSlot} §/C", true)]
-    [InlineData("(?str:a:ref, ?str:b)", "§ASSIGN b null", true)]
-    [InlineData("(?str:a:ref, ?str:b:ref)", "§B{i32:z} 1", true)]
-    [InlineData("(?str:a:ref)", "§C{ClearSlot} §/C", false)]
-    [InlineData("(?str:a:ref, ?str:b:ref)", "§ASSIGN b null", false)]
-    [InlineData("(?str:a:in, ?str:b:ref)", "§ASSIGN b null", false)]
-    [InlineData("(?str:a:ref, Func<i32>:f)", "§B{i32:z} §C f §/C", false)]   // expression-target call (Codex R2-1)
+    [InlineData("(ref string?:a)", "let int:z = 1", true)]
+    [InlineData("(string?:a)", "ClearSlot()", true)]
+    [InlineData("(ref string?:a, string?:b)", "set b null", true)]
+    [InlineData("(ref string?:a, ref string?:b)", "let int:z = 1", true)]
+    [InlineData("(ref string?:a)", "ClearSlot()", false)]
+    [InlineData("(ref string?:a, ref string?:b)", "set b null", false)]
+    [InlineData("(in string?:a, ref string?:b)", "set b null", false)]
+    [InlineData("(ref string?:a, Func<int>:f ! unknown)", "let int:z = f()", false)]   // expression-target call (Codex R2-1)
     public void AliasNarrowing_IsInvalidatedOnlyWhenStorageMayBeShared(string parameters, string step, bool keepsNarrowing)
     {
         var errors = Errors($$"""
-              §CL{c1:K:pub:stat}
-                §FLD{?str:slot:pub:stat}
-                §MT{m1:ClearSlot:pub:stat} ()
-                  §E{mut}
-                  §ASSIGN slot null
-                §MT{m2:Check:pub:stat} {{parameters}} -> i32
-                  §E{mut}
-                  §IF{i1} (!= a null)
+              module K public
+                field string?:slot public
+                func ClearSlot public () → void
+                  ! mut
+                  set slot null
+                func Check public {{parameters}} → int
+                  ! mut
+                  if a != null
                     {{step}}
-                    §B{str:u} a
-                    §R (len u)
-                  §R 0
+                    let string:u = a
+                    return u.Length
+                  return 0
             """);
         Assert.Equal(keepsNarrowing ? [] : ["Calor0272"], errors);
     }
 
     // Codex round 1: a write later in a loop body reaches the next iteration's reads (RO-NULL-2).
     [Theory]
-    [InlineData("(?str:a:ref, ?str:b:ref)", "a", "§ASSIGN b null", false)]
-    [InlineData("(?str:a:ref, ?str:b:ref)", "a", "§B{i32:z} 1", true)]
-    [InlineData("(?str:a)", "a", "§C{Clear} §A{ref} a §/C", false)]
-    [InlineData("(?str:a)", "a", "§C{Keep} §A a §/C", true)]
-    [InlineData("(?str:a:ref, ?str:b)", "a", "§B{i32:z} (len b)", true)]
-    public void LoopBackEdge_EndsNarrowingBeforeTheBody(string parameters, string name, string step, bool keepsNarrowing)
+    [InlineData("(ref string?:a, ref string?:b)", "a", "set b null", false)]
+    [InlineData("(ref string?:a, ref string?:b)", "a", "let int:z = 1", true)]
+    [InlineData("(string?:a)", "a", "Clear(ref a)", false)]
+    [InlineData("(string?:a)", "a", "Keep(a)", true)]
+    [InlineData("(ref string?:a, string?:b)", "a", "let int:z = (b ?? throw null).Length", true, "! mut, throw")]
+    [InlineData("(ref string?:a, string:b)", "a", "let int:z = b.Length", true)]
+    [InlineData("(ref string?:a, string?:b)", "a", "let int:z = (Read(b) ?? throw null).Length", false, "! mut, throw")]
+    public void LoopBackEdge_EndsNarrowingBeforeTheBody(string parameters, string name, string step, bool keepsNarrowing,
+        string effects = "! mut")
     {
         var errors = Errors($$"""
-              §F{f2:Clear:pub} (?str:s:ref) -> void
-                §ASSIGN s null
-              §F{f3:Keep:pub} (?str:s) -> void
-                §R
-              §F{f1:Check:pub} {{parameters}} -> i32
-                §IF{i1} (!= {{name}} null)
-                  §L{l1:i:0:1:1}
-                    §B{str:u} {{name}}
+              func Clear public (ref string?:s) → void
+                ! mut
+                set s null
+              func Keep public (string?:s) → void
+                !
+                return
+              func Read private (string?:s) → string?
+                return s
+              func Check public {{parameters}} → int
+                {{effects}}
+                if {{name}} != null
+                  for i from 0 to 1 step 1
+                    let string:u = {{name}}
                     {{step}}
-                §R 0
+                return 0
             """);
         Assert.Equal(keepsNarrowing ? [] : ["Calor0272"], errors);
     }
 
+    [Fact]
+    public void SourcePropertyNamedLength_StillEndsAliasedNarrowing()
+    {
+        var result = Program.Compile(Prelude + """
+              class Box public
+                field string?:Text public
+                property int:Length private
+                  get
+                    set Text null
+                    return 0
+                func Check public (ref string?:a) → int
+                  ! mut
+                  if a != null
+                    for i from 0 to 1 step 1
+                      let string:u = a
+                      let int:z = this.Length
+                  return 0
+            """, "source-length-alias.calr");
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code.StartsWith("Calor00", StringComparison.Ordinal)
+            || diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal));
+        var errors = result.Diagnostics.Errors.Select(diagnostic => diagnostic.Code).Distinct().ToArray();
+        Assert.Equal(new[] { "Calor0272" }, errors);
+    }
+
     // Codex round 3: an overloaded operator and a disposal can run code that writes aliased storage.
     [Theory]
-    [InlineData("§B{Box:y} (+ x x)", false)]
-    [InlineData("§B{i32:y} (+ 1 2)", true)]
+    [InlineData("let Box:y = x + x", false)]
+    [InlineData("let int:y = 1 + 2", true)]
     public void OverloadedOperator_EndsAliasedNarrowing(string step, bool keepsNarrowing)
     {
         var errors = Errors($$"""
-              §CL{c001:Box:pub}
-                §OP{op001:+:pub} (Box:x, Box:y) -> Box
-                  §R x
-              §CL{c002:K:pub:stat}
-                §MT{mt002:Check:pub:stat} (?str:a:ref, Box:x) -> i32
-                  §IF{if001} (!= a null)
+              class Box public
+                op + (Box:x, Box:y) → Box
+                  !
+                  return x
+              module K public
+                func Check public (ref string?:a, Box:x) → int
+                  ! mut
+                  if a != null
                     {{step}}
-                    §B{str:u} a
-                    §R (len u)
-                  §R 0
+                    let string:u = a
+                    return u.Length
+                  return 0
             """);
         Assert.Equal(keepsNarrowing ? [] : ["Calor0272"], errors);
     }
@@ -203,29 +339,31 @@ public class RefOutImplementationTests
     public void UsingInALoop_EndsAliasedNarrowingAtTheBackEdge()
     {
         var errors = Errors("""
-              §CL{c001:D:pub}
-                §IMPL{System.IDisposable}
-                §MT{mt001:Dispose:pub} () -> void
-                  §R
-              §CL{c002:K:pub:stat}
-                §MT{mt002:Check:pub:stat} (?str:a:ref, D:d) -> i32
-                  §IF{if001} (!= a null)
-                    §L{l001:i:0:1:1}
-                      §B{str:u} a
-                      §USE{use001:r} d
-                        §B{i32:z} 1
-                  §R 0
+              class D public
+                implements System.IDisposable
+                func Dispose public () → void
+                  !
+                  return
+              module K public
+                func Check public (ref string?:a, D:d) → int
+                  ! mut
+                  if a != null
+                    for i from 0 to 1 step 1
+                      let string:u = a
+                      using r = d
+                        let int:z = 1
+                  return 0
             """);
         Assert.Contains("Calor0272", errors);
     }
 
     // Soundness: no proof obligation is Discharged from a fact a by-reference write may have killed.
     [Theory]
-    [InlineData("§C{Bump} §A{ref} x §/C", "Unsupported")]
-    [InlineData("§C{SetNeg} §A{out} x §/C", "Unsupported")]
-    [InlineData("§IF{i9} (> x 0)\n    §C{SetNeg} §A{out} x §/C", "Unsupported")]
-    [InlineData("§B{d:i32} §C{Twice} §A{in} x §/C", "Discharged")]
-    [InlineData("§B{d:i32} §C{Id} §A x §/C", "Discharged")]
+    [InlineData("Bump(ref x)", "Unsupported")]
+    [InlineData("SetNeg(out x)", "Unsupported")]
+    [InlineData("if x > 0\n    SetNeg(out x)", "Unsupported")]
+    [InlineData("let int:d = Twice(in x)", "Discharged")]
+    [InlineData("let int:d = Id(x)", "Discharged")]
     public void ByReferenceWrite_NeverDischargesAStaleFact(string call, string expected)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "proof cases need Z3");
@@ -235,11 +373,12 @@ public class RefOutImplementationTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
         var errors = Errors($$"""
-              §F{f1:Run:pub} (i32:x) -> i32
-                §Q (> x 0)
+              func Run public (int:x) → int
+                ! mut
+                requires x > 0
                 {{call}}
-                §PROOF{pr1} (> x 0)
-                §R x
+                proof x > 0
+                return x
             """, options: options);
         Assert.Empty(errors);
         var proof = Assert.Single(options.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation);
@@ -249,24 +388,29 @@ public class RefOutImplementationTests
     // D1-ANA-06 (RO-ANA-5): the division checker must not keep a ref operand's pre-call value,
     // in either direction: d == 1 is no longer "safe" and d == 0 no longer "guaranteed" after Zero(ref d).
     [Theory]
-    [InlineData(1, "§B{z:i32} 1", null)]
-    [InlineData(1, "§C{Zero} §A{ref} d §/C", false)]
-    [InlineData(0, "§B{z:i32} 1", true)]
-    [InlineData(0, "§C{Zero} §A{ref} d §/C", false)]
+    [InlineData(1, "let int:z = 1", null)]
+    [InlineData(1, "Zero(ref d)", false)]
+    [InlineData(0, "let int:z = 1", true)]
+    [InlineData(0, "Zero(ref d)", false)]
     public void DivisionByZeroChecker_DoesNotUseThePreCallValueOfARefOperand(int initial, string step, bool? guaranteed)
     {
         var result = Program.Compile(Prelude + $$"""
-              §F{f5:Zero:pub} (i32:x:ref) -> void
-                §ASSIGN x 0
-              §F{f1:Run:pub} () -> i32
-                §B{~d:i32} {{initial}}
+              func Zero public (ref int:x) → void
+                ! mut
+                set x 0
+              func Run public () → int
+                ! mut
+                var int:d = {{initial}}
                 {{step}}
-                §R (/ 10 d)
+                return 10 / d
             """, "ana06.calr", new CompilationOptions
             {
                 EnableVerificationAnalyses = true,
                 VerificationAnalysisOptions = new Calor.Compiler.Analysis.VerificationAnalysisOptions(),
             });
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code.StartsWith("Calor00", StringComparison.Ordinal)
+            || diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal));
         var findings = result.Diagnostics.Where(d => d.Code == Calor.Compiler.Diagnostics.DiagnosticCode.DivisionByZero).ToList();
         if (guaranteed is null)
             Assert.Empty(findings);
@@ -274,14 +418,14 @@ public class RefOutImplementationTests
             Assert.Equal(guaranteed.Value, Assert.Single(findings).IsError);
     }
 
-    // X-INT-05 (F1 x F3) on the language side: a native local function's by-reference parameters
-    // follow the same operand, effect and stale-fact rules as any callee.
+    // A module-level private helper retains its inferred row while a direct call
+    // charges writes according to actual caller storage.
     [Theory]
-    [InlineData("§C{Inc} §A{ref} x §/C", "§E{alloc}", "", "Unsupported")]
-    [InlineData("§C{Inc} §A{ref} (+ x 1) §/C", "§E{alloc}", "Calor0212", null)]
-    [InlineData("§C{Inc} §A{ref} §IDX{arr} 0 §/C", "§E{alloc}", "Calor0410", null)]
-    [InlineData("§C{Inc} §A{ref} §IDX{arr} 0 §/C", "§E{alloc,mut}", "", "Discharged")]
-    public void LocalFunction_ByReferenceArguments_FollowTheContract(string call, string effects, string error, string? proof)
+    [InlineData("Inc(ref x)", "! alloc", "", "Unsupported")]
+    [InlineData("Inc(ref (x + 1))", "! alloc", "Calor0212", null)]
+    [InlineData("Inc(ref arr[0])", "! alloc", "Calor0410", null)]
+    [InlineData("Inc(ref arr[0])", "! alloc, mut", "", "Discharged")]
+    public void PrivateHelper_ByReferenceArguments_FollowTheContract(string call, string effects, string error, string? proof)
     {
         var options = new CompilationOptions
         {
@@ -289,17 +433,16 @@ public class RefOutImplementationTests
             VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
         };
         var result = Program.Compile($$"""
-            §M{m1:P}
-              §F{f1:Run:pub} (i32:x) -> i32
+            module P
+              func Run public (int:x) → int
                 {{effects}}
-                §Q (> x 0)
-                §ARR{arr:i32}
-                  1
+                requires x > 0
+                let int[]:arr = new int[] {1}
                 {{call}}
-                §PROOF{pr1} (> x 0)
-                §R x
-                §F{f2:Inc} (i32:v:ref) -> void
-                  §ASSIGN v (+ v 1)
+                proof x > 0
+                return x
+              func Inc private (ref int:v) → void
+                set v v + 1
             """, "local.calr", options);
         var errors = result.Diagnostics.Where(d => d.IsError).Select(d => d.Code).Distinct().ToArray();
         Assert.Equal(error.Length == 0 ? [] : [error], errors);
@@ -308,6 +451,75 @@ public class RefOutImplementationTests
             Assert.Contains("Inc(ref ", result.GeneratedCode);
             Assert.Equal(proof, Assert.Single(options.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation).Status.ToString());
         }
+    }
+
+    [Theory]
+    [InlineData("int:x", "Inc(ref x)", "private", "set v v + 1", false)]
+    [InlineData("int:x", "Inc(v: ref x)", "private", "set v v + 1", false)]
+    [InlineData("ref int:x", "Inc(ref x)", "private", "set v v + 1", true)]
+    [InlineData("int:x", "Inc(ref x)", "public", "! mut\nset v v + 1", true)]
+    [InlineData("int:x", "Inc(ref x)", "private", "set v v + 1\nset State.Value v", true)]
+    [InlineData("int:x", "Inc(ref x)", "private", "System.Threading.Interlocked.Increment(ref v)", true)]
+    public void DirectPrivateByRefCall_OnlyInstantiatesProvedLocalStorage(
+        string parameter, string call, string visibility, string body, bool hasForbiddenEffect)
+    {
+        var result = Program.Compile($$"""
+            module P
+              class State public
+                field int:Value public static
+              func Run public ({{parameter}}) → int
+                !
+                {{call}}
+                return x
+              func Inc {{visibility}} (ref int:v) → void
+                {{body.Replace("\n", "\n    ")}}
+            """, "owned-ref.calr", new CompilationOptions { StrictEffects = true });
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code.StartsWith("Calor00", StringComparison.Ordinal)
+            || diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal));
+        if (hasForbiddenEffect)
+            Assert.Contains(result.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0410");
+        else
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+    }
+
+    [Fact]
+    public void DirectPrivateByRefCall_DoesNotDowngradeTheCalleeRow()
+    {
+        const string source = """
+            module P
+              func Run public (int:x) → int
+                !
+                Inc(ref x)
+                return x
+              func Inc private (ref int:v) → void
+                set v v + 1
+            """;
+        var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var module = new Compiler.Parsing.Parser(
+            new Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var effects = new Compiler.Effects.EffectEnforcementPass(diagnostics, strictEffects: true);
+        effects.Enforce(module);
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics.Errors));
+        var callee = Assert.Single(effects.DeclarationFacts.Values, fact => fact.Name == "Inc");
+        Assert.Equal("mut", callee.InferredRow.ToCompactDisplayString());
+        Assert.Equal("mut", callee.DeclaredRow.ToCompactDisplayString());
+    }
+
+    [Fact]
+    public void DirectPrivateOutCall_InstantiatesOwnedReferenceStorage()
+    {
+        var result = Program.Compile("""
+            module P
+              func Run public () → string?
+                !
+                var string?:value = null
+                Clear(out value)
+                return value
+              func Clear private (out string?:target) → void
+                set target "done"
+            """, "owned-out.calr", new CompilationOptions { StrictEffects = true });
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
     }
 
     // ---- Conversion: convert, compile, run, compare (the R0/D1 oracle on every surface). ----
@@ -329,7 +541,8 @@ public class RefOutImplementationTests
     {
         var (_, source, allowed) = Rows().Single(row => row.Id == id);
         var original = Run(source);
-        var (calor, losses) = await ConvertAsync(source, surface);
+        var (calor, losses) = await ConvertForValueComparisonAsync(source, surface, original,
+            includeLoweringCandidate: allowed.Split("-or-").Contains("native"));
         var interop = calor.Contains("§CSHARP{", StringComparison.Ordinal) || calor.Contains("§CS{", StringComparison.Ordinal)
             || calor.Contains("§RAW", StringComparison.Ordinal) || losses.Count > 0;
         var strict = Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -354,8 +567,8 @@ public class RefOutImplementationTests
     public void OutVar_IsLoweredBeforeItsStatement()
     {
         var calor = new CSharpToCalorConverter().Convert(R0Fixture("F1-REFOUT-02")).CalorSource!;
-        Assert.Contains("§B{~n:i32} `default`\n        §R (? §C{int.TryParse} §A text §A{out} n §/C n (- 1))", calor.Replace("\r\n", "\n"));
-        Assert.Contains("§A{out} _ §/C", calor);
+        Assert.Contains("var int:n = default(int)\n      return (int.TryParse(text, out @n) ? n : (-1))", calor.Replace("\r\n", "\n"));
+        Assert.Contains("int.TryParse(text, out _)", calor);
     }
 
     [Theory]
@@ -389,8 +602,8 @@ public class RefOutImplementationTests
                 public static string Run() { int v = 4; return Twice(ref v).ToString(); }
             }
             """).CalorSource!;
-        Assert.Contains("§A{in} v", calor);
-        Assert.DoesNotContain("§A{ref}", calor);
+        Assert.Contains("Twice(in v)", calor);
+        Assert.DoesNotContain("ref v", calor);
     }
 
     private static IEnumerable<(string Id, string Source, string Allowed)> Rows()
@@ -459,30 +672,52 @@ public class RefOutImplementationTests
         ("P2-ref-return-property", "public static class Probe { static int slot = 3; static ref int Slot => ref slot; public static string Run() { Slot = 4; return slot.ToString(); } }", "preserved"),
     ];
 
-    // Codex PR 2 round 3: hand-written Calor keeps its meaning; a next-line expression is still the
-    // initializer of a bare binding, which is why the converter writes `default` instead.
+    // The retired bare, next-line initializer now uses the canonical explicit assignment.
     [Fact]
-    public void HandWrittenNextLineInitializer_KeepsItsMeaning()
+    public void HandWrittenInitializer_UsesCurrentSyntaxAndKeepsItsMeaning()
     {
-        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n    §R n\n",
+        var result = Program.Compile("""
+            module P P
+              module PModule
+                func Run public () → int
+                  !
+                  let int:n = System.Math.Abs(-7)
+                  return n
+            """,
             "next.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.Equal("7", Run(result.GeneratedCode + "\npublic static class Probe { public static string Run() => P.PModule.Run().ToString(); }"));
     }
 
-    // The lowered binding carries an explicit `default`, so the next statement is never its initializer.
+    // The lowered binding carries an explicit default, so the next statement is never its initializer.
     [Fact]
     public void OutDeclaration_IsLoweredWithAnExplicitDefault()
     {
         var calor = new CSharpToCalorConverter().Convert("public static class Probe { static bool Set(out string value) { value = \"ok\"; return true; } public static string Run() { Set(out string value); return value; } }").CalorSource!;
-        Assert.Contains("§B{~value:str} `default`\n        §C{Set} §A{out} value §/C", calor.Replace("\r\n", "\n"));
+        Assert.True(calor.Replace("\r\n", "\n").Contains(
+            "var string:value = default(string)\n      Set(out @value)", StringComparison.Ordinal), calor);
+    }
+
+    // 0.30: native default(T) takes only a built-in type, so `default(int[])` did not parse and
+    // the whole type was rescued as C# (P2-out-var-array-declaration); a reference type starts as null.
+    [Fact]
+    public void OutDeclaration_OfAnArrayType_StartsAsNullAndStaysNative()
+    {
+        const string source = "public static class Probe { static int Set(out int[] n) { n = new[] { 7 }; return 1; } public static string Run() { int[] a = new[] { Set(out var n) }; return n[0] + \":\" + a[0]; } }";
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+        Assert.Contains("var int[]:n = null\n", result.CalorSource!.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        var compiled = Program.Compile(result.CalorSource!, "out-array.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.Equal(Run(source), Run(compiled.GeneratedCode));
     }
 
     [Theory]
     [InlineData("static void Use(ref int x) { x++; } static void M(int[] a) { Use(ref a[Next()]); }", "ref-parameter")]
+    [InlineData("static void Use<T>(ref T x) { } static void M(int[] a) { Use<int>(ref a[Next()]); }", "ref-parameter")]
     [InlineData("static void Use(out int x) { x = 1; } static void M(int[] a) { Use(out a[Next()]); }", "out-parameter")]
     [InlineData("static void Use(ref readonly int x) { } static void M(int[] a) { Use(in a[Next()]); }", "ref-parameter")]
-    [InlineData("static void Use<T>(ref T x) { } static void M() { int x = 0; Use<int>(ref x); }", "ref-parameter")]
     [InlineData("static void Use<T>(in T x) { } static void M() { int x = 0; Use<int>(in x); }", "in-parameter")]
     [InlineData("static void Use(in int x) { } static void M(int[] a) { Use(in a[Next()]); }", "in-parameter")] // control
     [InlineData("static void Use(in int x) { } static void M(int v) { Use(v); }", "in-parameter")]                  // control
@@ -499,7 +734,7 @@ public class RefOutImplementationTests
     public void ExpressionBodiedRefReturn_IsPreserved_NotStripped()
     {
         var result = new CSharpToCalorConverter().Convert("public static class C { public static ref int First(int[] a) => ref a[0]; }");
-        Assert.Contains("§CSHARP{", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.DoesNotContain("-> ref", result.CalorSource);
         var block = new CSharpToCalorConverter().Convert("public static class C { public static ref int First(int[] a) { return ref a[0]; } }");
         Assert.Equal(block.Losses.Select(loss => loss.Feature), result.Losses.Select(loss => loss.Feature)); // the same report
@@ -524,6 +759,186 @@ public class RefOutImplementationTests
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
         CliTestHarness.FindRepoRoot(), "tests/TestData/InteropScope/R0/fixtures", id + ".cs.txt"));
 
+    public static TheoryData<Surface> DefaultSurfaceRows()
+    {
+        var data = new TheoryData<Surface>();
+        foreach (var surface in Enum.GetValues<Surface>())
+            data.Add(surface);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(DefaultSurfaceRows))]
+    public async Task DefaultSurfaces_KeepProvedPureCodeNative(Surface surface)
+    {
+        const string source = "public static class Probe { public static string Run() => \"safe\"; }";
+        var (calor, losses) = await ConvertAsync(source, surface);
+        Assert.Empty(losses);
+        RawFrameAssertions.AssertFramed(calor, Compiler.Parsing.TokenKind.CSharpInterop, present: false);
+        RawFrameAssertions.AssertFramed(calor, Compiler.Parsing.TokenKind.RawCSharp, present: false);
+        var compiled = Program.Compile(calor, "default-pure.calr",
+            new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.Equal("safe", Run(compiled.GeneratedCode));
+    }
+
+    [Theory]
+    [MemberData(nameof(DefaultSurfaceRows))]
+    public async Task DefaultSurfaces_DoNotCertifyOpenObjectDispatch(Surface surface)
+    {
+        // Object.Equals is pure again under the restored 0.29 contract, so this probes
+        // Object.ToString, which still has no contract. 0.30: instead of preserving the file,
+        // every surface converts natively and declares ! unknown (never a pure row); a pure
+        // row over the same body is still rejected with Calor0411.
+        const string source = "public static class Probe { public static string Text(object a) => a.ToString(); "
+            + "public static string Run() => Text(42); }";
+        var (calor, losses) = await ConvertAsync(source, surface);
+        Assert.Empty(losses);
+        RawFrameAssertions.AssertFramed(calor, Compiler.Parsing.TokenKind.CSharpInterop, present: false);
+        RawFrameAssertions.AssertFramed(calor, Compiler.Parsing.TokenKind.RawCSharp, present: false);
+        foreach (var native in new[] { calor, ConvertValueCandidate(source).CalorSource! })
+        {
+            Assert.Contains("! unknown", native);
+            var strict = Program.Compile(native, "uncertified-object.calr",
+                new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+            Assert.False(strict.HasErrors, string.Join("; ", strict.Diagnostics.Errors));
+            Assert.Equal("42", Run(strict.GeneratedCode));
+            var pure = Program.Compile(native.Replace("! unknown", "!", StringComparison.Ordinal),
+                "uncertified-object.calr", new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+            Assert.True(pure.HasErrors);
+            Assert.Contains(pure.Diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0411");
+        }
+    }
+
+    [Fact]
+    public void ValueCandidate_RetainsObliviousDeclarationsAndAssignedLocalTrace()
+    {
+        const string source = """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    bool flag = true;
+                    string result;
+                    if (flag) result = "safe";
+                    else result = "other";
+                    return result;
+                }
+            }
+            """;
+        var candidate = ConvertValueCandidate(source);
+        Assert.True(candidate.Success, string.Join("; ", candidate.Issues.Select(issue => issue.Message)));
+        Assert.Empty(candidate.Losses);
+        Assert.Contains("nullable oblivious", candidate.CalorSource);
+        var compiled = Program.Compile(candidate.CalorSource!, "oblivious-candidate.calr",
+            new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        Assert.Equal("safe", Run(compiled.GeneratedCode));
+
+        var originalTree = CSharpSyntaxTree.ParseText(source);
+        var original = CSharpCompilation.Create("ObliviousCandidateMetadata",
+            [originalTree], GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Disable));
+        var generated = original.ReplaceSyntaxTree(originalTree, CSharpSyntaxTree.ParseText(compiled.GeneratedCode));
+        var before = original.GetTypeByMetadataName("Probe")!.GetMembers("Run").OfType<IMethodSymbol>().Single();
+        var after = generated.GetTypeByMetadataName("Probe")!.GetMembers("Run").OfType<IMethodSymbol>().Single();
+        Assert.Equal(NullableAnnotation.None, before.ReturnNullableAnnotation);
+        Assert.Equal(before.ReturnNullableAnnotation, after.ReturnNullableAnnotation);
+        Assert.Equal(before.ReturnType.ToDisplayString(), after.ReturnType.ToDisplayString());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ObliviousValueCandidate_PreservesPropertyReceiverEvaluationAndNullFailure(bool nullReceiver)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                static int calls;
+                static string Next() { calls++; return {{(nullReceiver ? "null" : "\"abc\"")}}; }
+                public static string Run()
+                {
+                    try
+                    {
+                        int length = Next().Length;
+                        return calls == 1 && length == 3 ? "safe" : "wrong";
+                    }
+                    catch (System.NullReferenceException) { return calls == 1 ? "null" : "wrong"; }
+                }
+            }
+            """;
+        var candidate = ConvertValueCandidate(source);
+        Assert.True(candidate.Success, string.Join("; ", candidate.Issues.Select(issue => issue.Message)));
+        Assert.Empty(candidate.Losses);
+        var compiled = Program.Compile(candidate.CalorSource!, "oblivious-property-candidate.calr",
+            new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors) + "\n" + candidate.CalorSource);
+        var expected = nullReceiver ? "null" : "safe";
+        Assert.Equal(expected, Run(source));
+        Assert.Equal(expected, Run(compiled.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ValueCandidate_DoesNotDisableExplicitNullableChecking(bool projectOption)
+    {
+        var source = (projectOption ? "" : "#nullable enable\n") + """
+            public static class Probe
+            {
+                public static string Run(string? value) => value;
+            }
+            """;
+        var candidate = ConvertValueCandidate(source,
+            projectOption ? NullableContextOptions.Enable : null);
+        Assert.True(candidate.Success, string.Join("; ", candidate.Issues.Select(issue => issue.Message)));
+        Assert.Empty(candidate.Losses);
+        Assert.DoesNotContain("nullable oblivious", candidate.CalorSource);
+        var compiled = Program.Compile(candidate.CalorSource!, "annotated-candidate.calr",
+            new CompilationOptions { StrictEffects = true, StatusWriter = TextWriter.Null });
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == "Calor0273" && diagnostic.Message.Contains("Annotated", StringComparison.Ordinal));
+        Assert.DoesNotContain(compiled.Diagnostics.Errors, diagnostic => diagnostic.Code is "Calor0410" or "Calor0411");
+    }
+
+    // Candidate "native" means syntax-shaped lowering only. Actual default surfaces retain
+    // their lossless contract; neither preservation nor this opt-in is an effect certificate.
+    internal static async Task<(string Calor, List<string> Losses)> ConvertForValueComparisonAsync(
+        string source, Surface surface, string original, bool includeLoweringCandidate = true)
+    {
+        var (delivered, deliveredLosses) = await ConvertAsync(source, surface);
+        var strict = Program.Compile(delivered, "default-value-comparison.calr",
+            new CompilationOptions { StrictEffects = deliveredLosses.Count == 0, StatusWriter = TextWriter.Null });
+        Assert.False(strict.HasErrors, string.Join("; ", strict.Diagnostics.Errors));
+        var executed = Task.Run(() => Run(strict.GeneratedCode));
+        Assert.True(await Task.WhenAny(executed, Task.Delay(TimeSpan.FromSeconds(30))) == executed,
+            $"Default {surface} output did not finish\n{delivered}");
+        Assert.Equal(original, await executed);
+
+        // Preservation-only contract rows test delivery, not an optional native-shaped candidate.
+        if (deliveredLosses.Count == 0 || !includeLoweringCandidate)
+            return (delivered, deliveredLosses);
+
+        var candidate = ConvertValueCandidate(source);
+        Assert.True(candidate.Success, string.Join("; ", candidate.Issues.Select(issue => issue.Message)));
+        Assert.DoesNotContain(candidate.Losses, loss => loss.IsSemanticLoss);
+        Assert.NotNull(candidate.CalorSource);
+        return (candidate.CalorSource, candidate.Losses.Select(loss => loss.Feature).ToList());
+    }
+
+    private static ConversionResult ConvertValueCandidate(string source,
+        NullableContextOptions? nullableContextOptions = null) =>
+        new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            Mode = ConversionMode.Interop,
+            NullableContextOptions = nullableContextOptions,
+            UserManifestRoot = string.Empty
+        }).Convert(source);
+
     internal static async Task<(string Calor, List<string> Losses)> ConvertAsync(string source, Surface surface)
     {
         if (surface is Surface.McpDefault or Surface.McpPassthroughOnError)
@@ -541,12 +956,12 @@ public class RefOutImplementationTests
         }
         var options = surface == Surface.Library ? new ConversionOptions()
             : ConvertCommand.BuildCSharpToCalorOptions(benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: surface == Surface.CliPassthrough, explicitCallClosers: false);
+                passthrough: surface == Surface.CliPassthrough);
         var result = new CSharpToCalorConverter(options).Convert(source);
         return (result.CalorSource ?? "", result.Losses.Select(loss => loss.Feature).ToList());
     }
 
-    internal static string Run(string csharp)
+    internal static string Run(string csharp, string probeName = "Probe")
     {
         var compilation = CSharpCompilation.Create("F1_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(csharp, new CSharpParseOptions(LanguageVersion.Preview))],
@@ -559,7 +974,7 @@ public class RefOutImplementationTests
         var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
         try
         {
-            var run = context.LoadFromStream(stream).GetTypes().Single(t => t.Name == "Probe").GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
+            var run = context.LoadFromStream(stream).GetTypes().Single(t => t.Name == probeName).GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
             try { return run.Invoke(null, null)?.ToString() ?? "<null>"; }
             catch (TargetInvocationException e) { return "!" + e.InnerException!.GetType().Name; }
         }

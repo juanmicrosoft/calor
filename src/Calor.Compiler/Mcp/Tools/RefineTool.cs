@@ -25,6 +25,7 @@ public sealed class RefineTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
                     "enum": ["obligations", "bounds", "diagnose", "guards", "fixes", "types"],
@@ -33,6 +34,10 @@ public sealed class RefineTool : McpToolBase
                 "source": {
                     "type": "string",
                     "description": "Calor source code to analyze"
+                },
+                "filePath": {
+                    "type": "string",
+                    "description": "File path for resolving project sidecar declaration identity"
                 },
                 "timeout": {
                     "type": "integer",
@@ -95,13 +100,14 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 VerificationTimeoutMs = timeout,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp_obligations.calr", options);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_obligations.calr", options);
 
             var tracker = options.ObligationResults;
             if (tracker == null)
@@ -180,12 +186,13 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
-            Program.Compile(source, "mcp_bounds.calr", options);
+            Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_bounds.calr", options);
 
             var tracker = options.ObligationResults;
 
@@ -244,12 +251,13 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp_diagnose.calr", options);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_diagnose.calr", options);
 
             var tracker = options.ObligationResults;
 
@@ -352,12 +360,13 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
-            var result = Program.Compile(source, "mcp_guards.calr", options);
+            var result = Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_guards.calr", options);
 
             var tracker = options.ObligationResults;
             if (tracker == null)
@@ -421,12 +430,13 @@ public sealed class RefineTool : McpToolBase
         {
             var options = new CompilationOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 VerifyRefinements = true,
                 EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
-            Program.Compile(source, "mcp_suggest.calr", options);
+            Program.Compile(source, GetString(arguments, "filePath") ?? "mcp_suggest.calr", options);
 
             var tracker = options.ObligationResults;
             if (tracker == null)
@@ -490,6 +500,7 @@ public sealed class RefineTool : McpToolBase
                 }, isError: true));
             }
 
+            Ids.DeclarationIdentityStore.AttachIfRegistered(GetString(arguments, "filePath"), source, module);
             var suggester = new TypeSuggester();
             var suggestions = suggester.Suggest(module);
 
@@ -531,21 +542,21 @@ public sealed class RefineTool : McpToolBase
                 {
                     ObligationId = obligation.Id,
                     Strategy = "add_precondition",
-                    Description = $"Add a §Q precondition to require callers satisfy the refinement constraint",
+                    Description = $"Add a requires precondition so callers satisfy the constraint",
                     Confidence = "high",
                     Template = paramName != null
-                        ? $"§Q (>= {paramName} INT:0)"
-                        : "§Q (condition)"
+                        ? $"requires {paramName} >= 0"
+                        : "requires condition"
                 });
                 fixes.Add(new FixSuggestion
                 {
                     ObligationId = obligation.Id,
                     Strategy = "add_guard",
-                    Description = "Add a runtime guard at the start of the function body",
+                    Description = "Add a runtime guard at the start of the function body (the row needs throw, alloc)",
                     Confidence = "medium",
                     Template = paramName != null
-                        ? $"§IF{{g1}} (< {paramName} INT:0) → §R (err \"Invalid {paramName}\")"
-                        : "§IF{g1} (not condition) → §R (err \"constraint violated\")"
+                        ? $"if {paramName} < 0\n  throw new ArgumentOutOfRangeException(\"{paramName}\")"
+                        : "if !(condition)\n  throw new ArgumentException(\"constraint violated\")"
                 });
                 break;
 
@@ -556,15 +567,15 @@ public sealed class RefineTool : McpToolBase
                     Strategy = "strengthen_precondition",
                     Description = "Add or strengthen preconditions so the proof obligation can be discharged",
                     Confidence = "high",
-                    Template = "§Q (condition-that-implies-proof)"
+                    Template = "requires condition-that-implies-proof"
                 });
                 fixes.Add(new FixSuggestion
                 {
                     ObligationId = obligation.Id,
                     Strategy = "add_guard",
-                    Description = "Wrap the code path with a guard that ensures the condition",
+                    Description = "Wrap the code path with a guard that ensures the condition (the row needs throw, alloc)",
                     Confidence = "medium",
-                    Template = "§IF{g1} (not condition) → §R (err \"condition not met\")"
+                    Template = "if !(condition)\n  throw new InvalidOperationException(\"condition not met\")"
                 });
                 break;
 
@@ -572,10 +583,10 @@ public sealed class RefineTool : McpToolBase
                 fixes.Add(new FixSuggestion
                 {
                     ObligationId = obligation.Id,
-                    Strategy = "refine_parameter",
-                    Description = "Change the source parameter to use the refined type",
+                    Strategy = "add_proof",
+                    Description = "State the condition with a proof statement before the assignment; native Calor has no refined parameter types",
                     Confidence = "high",
-                    Template = "§I{RefinedType:param}"
+                    Template = "proof condition"
                 });
                 break;
 

@@ -9,118 +9,10 @@ namespace Calor.Compiler.Parsing;
 public static class AttributeHelper
 {
     /// <summary>
-    /// Heuristic shape check: returns true when <paramref name="value"/>
-    /// looks like a structural ID emitted by the compiler — i.e. a
-    /// lowercase prefix, an underscore, and an alphanumeric payload.
-    ///
-    /// Used by the structural-opener interpreters (Module, Func, Loop,
-    /// …) to distinguish the legacy form <c>§F{id:Name}</c> from the
-    /// new form <c>§F{Name}</c> introduced by RFC §1 Phase 1. Both
-    /// ULID-shaped IDs (<c>f_01J5X7K9M2NPQRSTABWXYZ12AB</c>) and the
-    /// compact form (<c>f_abc123def456</c>) match.
-    ///
-    /// User-supplied names like <c>Calculator</c>, <c>do_thing</c>,
-    /// or <c>Foo_bar</c> are deliberately rejected: real Calor names
-    /// follow PascalCase or contain uppercase letters, while IDs are
-    /// strictly lowercase digits-and-letters with one separating
-    /// underscore.
-    /// </summary>
-    public static bool LooksLikeId(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return false;
-        var underscoreIx = value.IndexOf('_');
-        if (underscoreIx <= 0 || underscoreIx >= value.Length - 1)
-        {
-            return false;
-        }
-        // Prefix must be all-lowercase letters.
-        for (int i = 0; i < underscoreIx; i++)
-        {
-            if (!char.IsLower(value[i])) return false;
-        }
-        // Payload must be all lowercase letters or digits (Crockford
-        // base32 lowercase or uppercase digits/letters as emitted by
-        // either generator). No underscores, no uppercase, no
-        // punctuation.
-        for (int i = underscoreIx + 1; i < value.Length; i++)
-        {
-            var c = value[i];
-            if (!(char.IsDigit(c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
-            {
-                return false;
-            }
-        }
-        // Plausible payload lengths: 12 (compact) or 26 (ULID). Any
-        // smaller would be a typo; any larger is too speculative.
-        var payloadLen = value.Length - underscoreIx - 1;
-        return payloadLen == 12 || payloadLen == 26;
-    }
-
-    /// <summary>
-    /// Interprets attributes for MODULE/§M: <c>{id:name}</c>.
-    ///
-    /// Returns raw positional values. Form-disambiguation (legacy
-    /// <c>{id:Name}</c> vs new <c>{Name}</c>) is performed by the
-    /// Parser at the call site so the auto-id assignment can share its
-    /// counter with other compact-syntax shifts.
-    /// </summary>
-    public static (string Id, string Name) InterpretModuleAttributes(AttributeCollection attrs)
-    {
-        return (attrs["_pos0"] ?? "", attrs["_pos1"] ?? "");
-    }
-
-    /// <summary>
-    /// Interprets attributes for END_MODULE/§/M: {id}
-    /// </summary>
-    public static string InterpretEndModuleAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for FUNC/§F: <c>{id:name:visibility}</c>.
-    ///
-    /// Returns raw positional values. Form-disambiguation (legacy 3-arg
-    /// vs new 2-arg) is performed by the Parser; see
-    /// <c>ParseFunction</c> in <c>Parser.cs</c>.
-    /// </summary>
-    public static (string Id, string Name, string Visibility) InterpretFuncAttributes(AttributeCollection attrs)
-    {
-        var visibility = attrs["_pos2"] ?? "";
-        if (string.IsNullOrEmpty(visibility))
-        {
-            visibility = "private";
-        }
-        else if (visibility == "pub")
-        {
-            visibility = "public";
-        }
-        else if (visibility == "pri")
-        {
-            visibility = "private";
-        }
-        else if (visibility == "int")
-        {
-            visibility = "internal";
-        }
-
-        return (attrs["_pos0"] ?? "", attrs["_pos1"] ?? "", visibility);
-    }
-
-    /// <summary>
-    /// Visibility tokens recognised by the Parser when disambiguating
-    /// the compact <c>§F{Name:vis}</c> form.
+    /// Visibility tokens recognised by the parser.
     /// </summary>
     public static bool IsVisibilityToken(string value) => value is
-        "pub" or "pri" or "int" or "public" or "private" or "internal";
-
-    /// <summary>
-    /// Interprets attributes for END_FUNC/§/F: {id}
-    /// </summary>
-    public static string InterpretEndFuncAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
+        "pub" or "int" or "prot" or "priv" or "prot-int" or "priv-prot";
 
     /// <summary>
     /// Interprets attributes for IN/§I: {type:name:semantic}
@@ -144,21 +36,6 @@ public static class AttributeHelper
     {
         var compactType = attrs["_pos0"] ?? "";
         return ExpandType(compactType);
-    }
-
-    /// <summary>
-    /// Interprets attributes for CALL/§C: {target} or {target!}
-    /// </summary>
-    public static (string Target, bool Fallible) InterpretCallAttributes(AttributeCollection attrs)
-    {
-        var target = attrs["_pos0"] ?? "";
-        var isFallible = target.EndsWith('!');
-        if (isFallible)
-        {
-            target = target[..^1]; // Remove the ! suffix
-        }
-
-        return (target, isFallible);
     }
 
     /// <summary>
@@ -243,14 +120,15 @@ public static class AttributeHelper
                 return IsLikelyType(value[..bracketStart]);
         }
 
-        var lower = value.ToLowerInvariant();
-        return lower switch
+        return value switch
         {
             "i8" or "i16" or "i32" or "i64" => true,
             "u8" or "u16" or "u32" or "u64" => true,
             "f32" or "f64" or "decimal" or "dec" => true,
-            "int" or "float" or "str" or "string" or "bool" or "void" or "char" or "var" or "any" or "object" or "dynamic" => true,
-            _ => value.StartsWith('?') || value.Contains('!') || value.Contains('<')
+            "int" or "long" or "short" or "sbyte" or "byte" or "ushort" or "uint" or "ulong"
+                or "float" or "double" or "nint" or "nuint" or "str" or "string" or "bool"
+                or "void" or "char" or "var" or "any" or "object" or "dynamic" => true,
+            _ => value.StartsWith('?') || value.EndsWith('?') || value.Contains('!') || value.Contains('<')
                  || IsLikelyPascalCaseType(value)
         };
     }
@@ -280,128 +158,6 @@ public static class AttributeHelper
         "never", "dec", "unit"
     };
 
-    private static bool IsTypeSpelling(string value) =>
-        IsLikelyType(value) || KeywordTypeSpellings.Contains(value)
-        || !string.Equals(ExpandType(value), value, StringComparison.Ordinal);
-
-    private static bool IsPlainIdentifier(string value) =>
-        value.Length > 0 && (char.IsLetter(value[0]) || value[0] == '_')
-        && value.All(c => char.IsLetterOrDigit(c) || c == '_');
-
-    /// <summary>
-    /// #1635: a spelling that reads as a type: an upper-case identifier (<c>W</c>, <c>URL</c>),
-    /// a keyword type (<c>long</c>, <c>nint</c>), or one of those wrapped as an array, pointer,
-    /// nullable or Calor array (<c>T[]</c>, <c>T?</c>, <c>[T]</c>, <c>long[,]</c>).
-    /// </summary>
-    private static bool IsTypeShaped(string value)
-    {
-        var core = value;
-        while (true)
-        {
-            if (core.Length > 2 && core[0] == '[' && core[^1] == ']') { core = core[1..^1]; continue; }
-            if (core.EndsWith('?') || core.EndsWith('*')) { core = core[..^1]; continue; }
-            if (core.StartsWith('?')) { core = core[1..]; continue; }
-            var bracket = core.LastIndexOf('[');
-            if (bracket > 0 && core[^1] == ']' && core[(bracket + 1)..^1].All(c => c == ',')) { core = core[..bracket]; continue; }
-            break;
-        }
-        return IsPlainIdentifier(core) && (char.IsUpper(core[0]) || IsTypeSpelling(core));
-    }
-
-    /// <summary>
-    /// #1635: true when a two-field immutable header <c>§B{pos0:pos1}</c> is spelled
-    /// type-first (<c>pos0</c> looks like a type name, <c>pos1</c> like a variable) but
-    /// <see cref="InterpretBindAttributes"/> reads it name-first, because <c>pos0</c> is not a
-    /// recognizable type spelling (a one-letter or all-caps type such as <c>W</c> or
-    /// <c>T</c>). The reading would silently swap the name and the type, so the parser
-    /// rejects the header with <c>Calor0123</c> instead.
-    /// </summary>
-    public static bool IsAmbiguousTypeFirstBindHeader(string pos0, string? pos1)
-    {
-        if (string.IsNullOrEmpty(pos0) || string.IsNullOrEmpty(pos1)
-            || pos0.StartsWith('~') || pos1 is "const" or "mut")
-            return false;
-        // Read type-first: no swap.
-        if (IsLikelyType(pos0) && !IsLikelyType(pos1))
-            return false;
-        // Read name-first: a swap when the first field is type-shaped and the second is a
-        // plain lower-case identifier that is not itself a type spelling.
-        var firstIsTypeShaped = IsTypeShaped(pos0);
-        var secondIsVariableShaped = IsPlainIdentifier(pos1)
-            && (char.IsLower(pos1[0]) || pos1[0] == '_')
-            && !IsTypeSpelling(pos1);
-        return firstIsTypeShaped && secondIsVariableShaped;
-    }
-
-    /// <summary>
-    /// #1635: formats the positional fields of an immutable <c>§B</c> header so that
-    /// <see cref="InterpretBindAttributes"/> reads them back as exactly (<paramref name="name"/>,
-    /// <paramref name="type"/>). Type-first (<c>i32:x</c>) when the parser recognizes the type;
-    /// otherwise name-first (<c>x:T</c>); and the explicit <c>type:name:const</c> form when
-    /// neither two-field spelling is read correctly (a PascalCase local of a one-letter type).
-    /// </summary>
-    public static string FormatImmutableBindHeader(string name, string type)
-    {
-        if (IsLikelyType(type) && !IsLikelyType(name)
-            && type != "const" && type != "mut" && name is not ("const" or "mut"))
-            return $"{type}:{name}";
-        if (!(IsLikelyType(name) && !IsLikelyType(type))
-            && !IsAmbiguousTypeFirstBindHeader(name, type)
-            && !name.StartsWith('~') && type is not ("const" or "mut"))
-            return $"{name}:{type}";
-        return $"{type}:{name}:const";
-    }
-
-    /// <summary>
-    /// Interprets attributes for FOR/§L (loop):
-    /// <c>{id:var:from:to:step}</c>.
-    ///
-    /// Returns raw positional values. Form-disambiguation (legacy 5-arg
-    /// vs new 4-arg) is performed by the Parser at <c>ParseFor</c>.
-    /// </summary>
-    public static (string Id, string Var, string From, string To, string Step) InterpretForAttributes(AttributeCollection attrs)
-    {
-        return (
-            attrs["_pos0"] ?? "",
-            attrs["_pos1"] ?? "",
-            attrs["_pos2"] ?? "",
-            attrs["_pos3"] ?? "",
-            attrs["_pos4"] ?? "");
-    }
-
-    /// <summary>
-    /// Interprets attributes for IF/§IF: {id}
-    /// </summary>
-    public static string InterpretIfAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for MATCH/§MATCH: {id}
-    /// </summary>
-    public static string InterpretMatchAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for END_MATCH/§/MATCH: {id}
-    /// </summary>
-    public static string InterpretEndMatchAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for REQUIRES/§Q: {message}
-    /// </summary>
-    public static string? InterpretRequiresAttributes(AttributeCollection attrs)
-    {
-        // No positional attributes for requires, just the expression
-        return null;
-    }
-
     /// <summary>
     /// Interprets attributes for EFFECTS/§E: effect codes
     /// Handles effect codes that may have been split by the colon-based attribute parser.
@@ -419,7 +175,8 @@ public static class AttributeHelper
         AttributeCollection attrs,
         Action<string>? reportUnknownCode = null,
         Func<string, bool>? isEffectVariable = null,
-        ICollection<string>? effectVariableSink = null)
+        ICollection<string>? effectVariableSink = null,
+        bool codesAreComplete = false)
     {
         var effects = new Dictionary<string, string>();
 
@@ -435,6 +192,12 @@ public static class AttributeHelper
         {
             var code = attrs[$"_pos{i}"];
             if (string.IsNullOrEmpty(code)) break;
+
+            if (codesAreComplete)
+            {
+                effectCodes.Add(code);
+                continue;
+            }
 
             // Check if this contains comma-separated effects (e.g., "cw,fs" from §E{cw,fs:w})
             if (code.Contains(','))
@@ -621,24 +384,15 @@ public static class AttributeHelper
             return $"ARRAY[element={inner}]";
         }
 
-        // Historical nullable-annotation encoding, not the runtime Option<T> type.
+        // Keep nullable annotations distinct from ordinary generic type references.
         if (compactType.StartsWith('?'))
         {
             var inner = ExpandType(compactType[1..]);
-            return $"OPTION[inner={inner}]";
+            return $"NULLABLE[inner={inner}]";
         }
 
-        // Handle Result type: T!E -> RESULT[ok=T][err=E]
-        // But be careful not to match ! inside generic brackets
-        var exclamationIndex = FindTopLevelChar(compactType, '!');
-        if (exclamationIndex >= 0)
-        {
-            var ok = ExpandType(compactType[..exclamationIndex]);
-            var err = exclamationIndex < compactType.Length - 1
-                ? ExpandType(compactType[(exclamationIndex + 1)..])
-                : "STRING";
-            return $"RESULT[ok={ok}][err={err}]";
-        }
+        if (compactType.EndsWith('?'))
+            return $"NULLABLE[inner={ExpandType(compactType[..^1])}]";
 
         // Handle generic types: List<T>, Dictionary<str, T>
         var genericIndex = compactType.IndexOf('<');
@@ -668,18 +422,18 @@ public static class AttributeHelper
         }
 
         // Primitive type mappings
-        return compactType.ToLowerInvariant() switch
+        return compactType switch
         {
-            "i8" => "INT[bits=8][signed=true]",
-            "i16" => "INT[bits=16][signed=true]",
+            "i8" or "sbyte" => "INT[bits=8][signed=true]",
+            "i16" or "short" => "INT[bits=16][signed=true]",
             "i32" or "int" => "INT",
-            "i64" => "INT[bits=64][signed=true]",
-            "u8" => "INT[bits=8][signed=false]",
-            "u16" => "INT[bits=16][signed=false]",
-            "u32" => "INT[bits=32][signed=false]",
-            "u64" => "INT[bits=64][signed=false]",
-            "f32" => "FLOAT[bits=32]",
-            "f64" or "float" => "FLOAT",
+            "i64" or "long" => "INT[bits=64][signed=true]",
+            "u8" or "byte" => "INT[bits=8][signed=false]",
+            "u16" or "ushort" => "INT[bits=16][signed=false]",
+            "u32" or "uint" => "INT[bits=32][signed=false]",
+            "u64" or "ulong" => "INT[bits=64][signed=false]",
+            "f32" or "float" => "FLOAT[bits=32]",
+            "f64" or "double" => "FLOAT",
             "str" or "string" => "STRING",
             "bool" => "BOOL",
             "void" => "VOID",
@@ -691,10 +445,12 @@ public static class AttributeHelper
 
     /// <summary>
     /// Inverse of <see cref="ExpandType"/>: maps an expanded/internal type name back to
-    /// the compact surface spelling agents actually write (<c>INT</c> → <c>i32</c>,
-    /// <c>STRING</c> → <c>str</c>, <c>ARRAY[element=STRING]</c> → <c>[str]</c>, …). Use in
+    /// the measured C# surface spelling (<c>INT</c> → <c>int</c>,
+    /// <c>STRING</c> → <c>string</c>, <c>ARRAY[element=STRING]</c> → <c>string[]</c>). Use in
     /// any diagnostic that echoes a type so the message never teaches an internal
-    /// spelling the user can't write. Idempotent on already-compact input.
+    /// spelling the user can't write. Idempotent on already-compact input. Also maps the
+    /// binder's canonical names (<c>LONG</c>, <c>UINT</c>, <c>ULONG</c>, <c>DECIMAL</c>,
+    /// <c>OBJECT</c>), which reach diagnostics through bound variable and type names.
     /// </summary>
     public static string ToSurfaceSpelling(string expandedType)
     {
@@ -705,36 +461,50 @@ public static class AttributeHelper
 
         var t = expandedType.Trim();
 
+        if (t.EndsWith(']'))
+        {
+            var start = t.LastIndexOf('[');
+            if (start > 0 && t[(start + 1)..^1].All(c => c == ','))
+                return ToSurfaceSpelling(t[..start]) + t[start..];
+        }
+
         // Composite forms, mirroring ExpandType (recurse into the payload).
         if (t.StartsWith("ARRAY[element=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
         {
-            return $"[{ToSurfaceSpelling(t["ARRAY[element=".Length..^1])}]";
+            return $"{ToSurfaceSpelling(t["ARRAY[element=".Length..^1])}[]";
         }
 
-        if (t.StartsWith("OPTION[inner=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
+        if (t.StartsWith("NULLABLE[inner=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
         {
-            return $"?{ToSurfaceSpelling(t["OPTION[inner=".Length..^1])}";
+            return $"{ToSurfaceSpelling(t["NULLABLE[inner=".Length..^1])}?";
         }
 
-        if (t.StartsWith("RESULT[ok=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
-        {
-            var body = t["RESULT[ok=".Length..^1];
-            var sep = body.IndexOf("][err=", StringComparison.Ordinal);
-            if (sep > 0)
-            {
-                var ok = ToSurfaceSpelling(body[..sep]);
-                var err = ToSurfaceSpelling(body[(sep + "][err=".Length)..]);
-                return $"{ok}!{err}";
-            }
-        }
+        if (t.StartsWith('[') && t.EndsWith(']'))
+            return ToSurfaceSpelling(t[1..^1]) + "[]";
+        if (t.StartsWith('?'))
+            return ToSurfaceSpelling(t[1..]) + "?";
+        if (t.EndsWith('?') || t.EndsWith('*'))
+            return ToSurfaceSpelling(t[..^1]) + t[^1];
+        if (t.StartsWith('(') && t.EndsWith(')'))
+            return Migration.TypeMapper.MapTupleType(t, ToSurfaceSpelling);
 
         // Generic: Base<A, B> — surface-spell each argument.
         var genericIndex = t.IndexOf('<');
-        if (genericIndex > 0 && t.EndsWith(">", StringComparison.Ordinal))
+        if (genericIndex > 0)
         {
-            var baseName = t[..genericIndex];
-            var args = SplitGenericArgs(t[(genericIndex + 1)..^1]);
-            return $"{baseName}<{string.Join(", ", args.Select(a => ToSurfaceSpelling(a.Trim())))}>";
+            var depth = 1;
+            var end = genericIndex + 1;
+            for (; end < t.Length; end++)
+            {
+                if (t[end] == '<') depth++;
+                if (t[end] == '>' && --depth == 0) break;
+            }
+            if (end < t.Length)
+            {
+                var args = SplitGenericArgs(t[(genericIndex + 1)..end]);
+                return $"{t[..genericIndex]}<{string.Join(", ", args.Select(a => ToSurfaceSpelling(a.Trim())))}>"
+                    + ToSurfaceSpelling(t[(end + 1)..]);
+            }
         }
 
         // C#-style array suffix: X[] / X[,] — surface-spell the element.
@@ -753,17 +523,24 @@ public static class AttributeHelper
 
         return t switch
         {
-            "INT" => "i32",
-            "INT[bits=8][signed=true]" => "i8",
-            "INT[bits=16][signed=true]" => "i16",
-            "INT[bits=64][signed=true]" => "i64",
-            "INT[bits=8][signed=false]" => "u8",
-            "INT[bits=16][signed=false]" => "u16",
-            "INT[bits=32][signed=false]" => "u32",
-            "INT[bits=64][signed=false]" => "u64",
-            "FLOAT" => "f64",
-            "FLOAT[bits=32]" => "f32",
-            "STRING" => "str",
+            "INT" or "i32" => "int",
+            "INT[bits=8][signed=true]" or "i8" => "sbyte",
+            "INT[bits=16][signed=true]" or "i16" => "short",
+            "INT[bits=64][signed=true]" or "i64" => "long",
+            "INT[bits=8][signed=false]" or "u8" => "byte",
+            "INT[bits=16][signed=false]" or "u16" => "ushort",
+            "INT[bits=32][signed=false]" or "u32" => "uint",
+            "INT[bits=64][signed=false]" or "u64" => "ulong",
+            "LONG" => "long",
+            "UINT" => "uint",
+            "ULONG" => "ulong",
+            "DECIMAL" => "decimal",
+            "OBJECT" => "object",
+            "FLOAT" or "f64" => "double",
+            "FLOAT[bits=32]" or "f32" => "float",
+            "STRING" or "str" => "string",
+            "dec" => "decimal",
+            "any" => "object",
             "BOOL" => "bool",
             "VOID" => "void",
             "NEVER" => "never",
@@ -773,29 +550,7 @@ public static class AttributeHelper
     }
 
     /// <summary>
-    /// Finds the index of a character at the top level (not inside angle brackets).
-    /// Returns -1 if not found.
-    /// </summary>
-    private static int FindTopLevelChar(string str, char target)
-    {
-        var depth = 0;
-        for (int i = 0; i < str.Length; i++)
-        {
-            var c = str[i];
-            if (c == '<') depth++;
-            else if (c == '>') depth--;
-            else if (c == target && depth == 0) return i;
-        }
-        return -1;
-    }
-
-    /// <summary>
-    /// Splits generic type arguments respecting nested angle brackets.
-    /// E.g., "str, List&lt;T&gt;" → ["str", "List&lt;T&gt;"]
-    /// </summary>
-    /// <summary>
-    /// Reads a nullable annotation, including the parser's historical expanded spelling.
-    /// Explicit Option&lt;T&gt; and Option[T] are runtime values, not nullable annotations.
+    /// Reads a nullable annotation, including the parser's expanded spelling.
     /// </summary>
     public static bool TryUnwrapNullableAnnotation(string typeName, out string innerType)
     {
@@ -805,7 +560,7 @@ public static class AttributeHelper
             return false;
         }
         var type = typeName.Trim();
-        const string expandedPrefix = "OPTION[inner=";
+        const string expandedPrefix = "NULLABLE[inner=";
         if (type.StartsWith(expandedPrefix, StringComparison.OrdinalIgnoreCase) && type.EndsWith(']'))
             innerType = type[expandedPrefix.Length..^1];
         else if (type.StartsWith('?') && type.Length > 1)
@@ -819,34 +574,6 @@ public static class AttributeHelper
         }
 
         return !string.IsNullOrWhiteSpace(innerType);
-    }
-
-    /// <summary>Reads explicit runtime Option types without accepting nullable annotations.</summary>
-    public static bool TryUnwrapRuntimeOption(string typeName, out string innerType)
-    {
-        if (string.IsNullOrWhiteSpace(typeName))
-        {
-            innerType = string.Empty;
-            return false;
-        }
-        var type = typeName.Trim();
-        var open = type.IndexOfAny(['<', '[']);
-        if (open > 0
-            && (type[..open].Equals("Option", StringComparison.OrdinalIgnoreCase)
-                || type[..open].Equals("Calor.Runtime.Option", StringComparison.Ordinal))
-            && type[^1] == (type[open] == '<' ? '>' : ']')
-            && !type[(open + 1)..].StartsWith("inner=", StringComparison.OrdinalIgnoreCase))
-        {
-            var arguments = SplitGenericArgs(type[(open + 1)..^1]);
-            if (arguments.Count == 1 && arguments[0].Length > 0)
-            {
-                innerType = arguments[0];
-                return true;
-            }
-        }
-
-        innerType = string.Empty;
-        return false;
     }
 
     /// <summary>
@@ -891,22 +618,62 @@ public static class AttributeHelper
     }
 
     /// <summary>
-    /// A known reference/Option representation mismatch, not a null-state predicate.
-    /// Object is deliberately excluded: the binder also uses it for unresolved expressions.
+    /// Resolves only the two built-in async carriers. Short names must not override source
+    /// declarations or aliases; synthesized carriers are always globally qualified.
     /// </summary>
-    public static bool IsReferenceOptionMismatch(
-        string targetType, string sourceType, IReadOnlySet<string> declaredReferences)
+    public static string ResolveAsyncCarrierName(string typeName, ModuleNode? module)
     {
-        var targetOption = TryUnwrapRuntimeOption(targetType, out _);
-        var sourceOption = TryUnwrapRuntimeOption(sourceType, out _);
-        if (targetOption == sourceOption)
-            return false;
+        var name = typeName.Trim();
+        if (name.StartsWith("global::", StringComparison.Ordinal))
+            return name[8..];
+        if (module is not null)
+        {
+            var headEnd = name.IndexOf('.');
+            var head = headEnd < 0 ? name : name[..headEnd];
+            var alias = module.Usings.FirstOrDefault(import => import.Alias == head);
+            if (alias is not null)
+                return alias.Namespace.Replace("global::", "", StringComparison.Ordinal)
+                    + (headEnd < 0 ? "" : name[headEnd..]);
+            if (GetDeclaredReferenceTypeNames(module).Contains(name)
+                || module.Enums.Any(declaration => declaration.Name == name)
+                || module.RefinementTypes.Any(declaration => declaration.Name == name)
+                || HasClass(module.Classes))
+                return name;
+        }
+        return name is "Task" or "ValueTask" ? $"System.Threading.Tasks.{name}" : name;
 
-        var reference = targetOption ? sourceType : targetType;
-        if (TryUnwrapNullableAnnotation(reference, out var referent))
-            reference = referent;
-        return reference is "str" or "string" or "STRING" or "System.String"
-            || declaredReferences.Contains(reference);
+        bool HasClass(IReadOnlyList<ClassDefinitionNode> classes)
+            => classes.Any(declaration => declaration.Name == name || HasClass(declaration.NestedClasses));
+    }
+
+    public static bool TryGetAsyncResultType(string typeName, ModuleNode? module, out string resultType)
+    {
+        var surface = ToSurfaceSpelling(typeName);
+        if (TryUnwrapNullableAnnotation(surface, out var nonNullable))
+            surface = ToSurfaceSpelling(nonNullable);
+        var open = surface.IndexOf('<');
+        var carrier = ResolveAsyncCarrierName(open < 0 ? surface : surface[..open], module);
+        if (open < 0 && carrier != surface && carrier.Contains('<'))
+            return TryGetAsyncResultType(carrier, null, out resultType);
+        if (carrier is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
+        {
+            if (open < 0)
+            {
+                resultType = "void";
+                return true;
+            }
+            if (surface.EndsWith('>'))
+            {
+                var arguments = SplitGenericArgs(surface[(open + 1)..^1]);
+                if (arguments.Count == 1 && arguments[0].Length > 0)
+                {
+                    resultType = arguments[0];
+                    return true;
+                }
+            }
+        }
+        resultType = "";
+        return false;
     }
 
     private static List<string> SplitGenericArgs(string argsStr)
@@ -917,8 +684,8 @@ public static class AttributeHelper
 
         foreach (var c in argsStr)
         {
-            if (c == '<') depth++;
-            else if (c == '>') depth--;
+            if (c is '<' or '(' or '[') depth++;
+            else if (c is '>' or ')' or ']') depth--;
             else if (c == ',' && depth == 0)
             {
                 args.Add(current.ToString().Trim());
@@ -928,8 +695,8 @@ public static class AttributeHelper
             current.Append(c);
         }
 
-        if (current.Length > 0)
-            args.Add(current.ToString().Trim());
+        // Empty arguments carry the arity of an open generic type.
+        args.Add(current.ToString().Trim());
 
         return args;
     }
@@ -979,72 +746,8 @@ public static class AttributeHelper
 
     #region Extended Features - Quick Wins
 
-    /// <summary>
-    /// Interprets attributes for EXAMPLE/§EX: {id:msg:"message"}
-    /// </summary>
-    public static (string? Id, string? Message) InterpretExampleAttributes(AttributeCollection attrs)
-    {
-        var id = attrs["_pos0"];
-        var msg = attrs["_pos1"];
-
-        // Handle msg: prefix
-        if (!string.IsNullOrEmpty(msg) && msg.StartsWith("msg:"))
-        {
-            msg = msg[4..];
-        }
-
-        return (id, msg);
-    }
-
-    /// <summary>
-    /// Interprets attributes for TODO/FIXME/HACK: {id:category:priority}
-    /// </summary>
-    public static (string? Id, string? Category, IssuePriority Priority) InterpretIssueAttributes(AttributeCollection attrs)
-    {
-        var id = attrs["_pos0"];
-        var category = attrs["_pos1"];
-        var priority = ParseIssuePriority(attrs["_pos2"]);
-
-        return (id, category, priority);
-    }
-
-    /// <summary>
-    /// Parses issue priority from string.
-    /// </summary>
-    public static IssuePriority ParseIssuePriority(string? priorityStr)
-    {
-        return priorityStr?.ToLowerInvariant() switch
-        {
-            "low" => IssuePriority.Low,
-            "medium" or "med" => IssuePriority.Medium,
-            "high" => IssuePriority.High,
-            "critical" or "crit" => IssuePriority.Critical,
-            _ => IssuePriority.Medium
-        };
-    }
-
     #endregion
-
     #region Extended Features - Core Features
-
-    /// <summary>
-    /// Interprets attributes for USES/USEDBY: {dep1, dep2, dep3}
-    /// Returns list of dependency targets.
-    /// </summary>
-    public static IReadOnlyList<string> InterpretDependencyListAttributes(AttributeCollection attrs)
-    {
-        var dependencies = new List<string>();
-
-        // Collect all positional attributes
-        for (int i = 0; ; i++)
-        {
-            var dep = attrs[$"_pos{i}"];
-            if (string.IsNullOrEmpty(dep)) break;
-            dependencies.Add(dep);
-        }
-
-        return dependencies;
-    }
 
     /// <summary>
     /// Interprets attributes for ASSUME: {category}
@@ -1072,184 +775,9 @@ public static class AttributeHelper
     }
 
     #endregion
-
     #region Extended Features - Enhanced Contracts
-
-    /// <summary>
-    /// Interprets attributes for COMPLEXITY: {timeComplexity} or {timeComplexity:spaceComplexity}
-    /// Pure positional format in v2 syntax.
-    /// </summary>
-    public static (ComplexityClass? Time, ComplexityClass? Space, bool IsWorstCase, string? Custom) InterpretComplexityAttributes(AttributeCollection attrs)
-    {
-        // Pure positional: {time} or {time:space}
-        var timeVal = attrs["_pos0"];
-        var spaceVal = attrs["_pos1"];
-
-        ComplexityClass? timeComplexity = timeVal != null ? ParseComplexityClass(timeVal) : null;
-        ComplexityClass? spaceComplexity = spaceVal != null ? ParseComplexityClass(spaceVal) : null;
-
-        return (timeComplexity, spaceComplexity, false, null);
-    }
-
-    /// <summary>
-    /// Parses complexity class from string like "O(n)", "O(1)", "O(n log n)".
-    /// </summary>
-    public static ComplexityClass? ParseComplexityClass(string? complexityStr)
-    {
-        if (string.IsNullOrEmpty(complexityStr))
-            return null;
-
-        var normalized = complexityStr.Replace(" ", "").ToLowerInvariant();
-        return normalized switch
-        {
-            "o(1)" => ComplexityClass.O1,
-            "o(logn)" or "o(log(n))" => ComplexityClass.OLogN,
-            "o(n)" => ComplexityClass.ON,
-            "o(nlogn)" or "o(n*logn)" or "o(nlog(n))" => ComplexityClass.ONLogN,
-            "o(n^2)" or "o(n2)" => ComplexityClass.ON2,
-            "o(n^3)" or "o(n3)" => ComplexityClass.ON3,
-            "o(2^n)" or "o(2n)" => ComplexityClass.O2N,
-            "o(n!)" => ComplexityClass.ONFact,
-            _ => null
-        };
-    }
-
-    /// <summary>
-    /// Interprets attributes for SINCE: {version}
-    /// </summary>
-    public static string InterpretSinceAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for DEPRECATED: {version:replacement} or {version}
-    /// Pure positional format - no prefixes needed in v2 syntax.
-    /// </summary>
-    public static (string Since, string? Replacement, string? Reason, string? RemovedIn) InterpretDeprecatedAttributes(AttributeCollection attrs)
-    {
-        // Pure positional: {version} or {version:replacement}
-        var since = attrs["_pos0"] ?? "";
-        var replacement = attrs["_pos1"];
-
-        // If replacement is empty string, treat as null
-        if (string.IsNullOrEmpty(replacement))
-            replacement = null;
-
-        return (since, replacement, null, null);
-    }
-
-    /// <summary>
-    /// Interprets attributes for BREAKING: {version}
-    /// </summary>
-    public static string InterpretBreakingAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
     #endregion
-
     #region Extended Features - Future Extensions
-
-    /// <summary>
-    /// Interprets attributes for DECISION: {id}
-    /// </summary>
-    public static string InterpretDecisionAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for CONTEXT: {partial} or empty
-    /// </summary>
-    public static bool InterpretContextAttributes(AttributeCollection attrs)
-    {
-        var pos0 = attrs["_pos0"];
-        return pos0?.Equals("partial", StringComparison.OrdinalIgnoreCase) ?? false;
-    }
-
-    /// <summary>
-    /// Interprets attributes for FILE: {path}
-    /// </summary>
-    public static string InterpretFileRefAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for FOCUS: {target}
-    /// </summary>
-    public static string InterpretFocusAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for LOCK: {agentId}
-    /// Pure positional format in v2 syntax.
-    /// </summary>
-    public static (string AgentId, DateTime? Acquired, DateTime? Expires) InterpretLockAttributes(AttributeCollection attrs)
-    {
-        // Pure positional: {agentId}
-        var agentId = attrs["_pos0"] ?? "";
-        return (agentId, null, null);
-    }
-
-    /// <summary>
-    /// Interprets attributes for AUTHOR: {agentId:taskId}
-    /// Pure positional format in v2 syntax.
-    /// </summary>
-    public static (string AgentId, DateOnly Date, string? TaskId) InterpretAuthorAttributes(AttributeCollection attrs)
-    {
-        // Pure positional: {agentId} or {agentId:taskId}
-        var agentId = attrs["_pos0"] ?? "";
-        var taskId = attrs["_pos1"];
-        var date = DateOnly.FromDateTime(DateTime.Now);
-
-        // If taskId is empty string, treat as null
-        if (string.IsNullOrEmpty(taskId))
-            taskId = null;
-
-        return (agentId, date, taskId);
-    }
-
-    /// <summary>
-    /// Interprets attributes for TASK: {taskId}
-    /// </summary>
-    public static string InterpretTaskRefAttributes(AttributeCollection attrs)
-    {
-        return attrs["_pos0"] ?? "";
-    }
-
-    /// <summary>
-    /// Interprets attributes for DATE: {date}
-    /// </summary>
-    public static DateOnly? InterpretDateAttributes(AttributeCollection attrs)
-    {
-        return TryParseDateOnly(attrs["_pos0"]);
-    }
-
-    private static DateTime? TryParseDateTime(string? dateTimeStr)
-    {
-        if (string.IsNullOrEmpty(dateTimeStr))
-            return null;
-
-        if (DateTime.TryParse(dateTimeStr, out var result))
-            return result;
-
-        return null;
-    }
-
-    private static DateOnly? TryParseDateOnly(string? dateStr)
-    {
-        if (string.IsNullOrEmpty(dateStr))
-            return null;
-
-        if (DateOnly.TryParse(dateStr, out var result))
-            return result;
-
-        return null;
-    }
 
     #endregion
 }

@@ -1,5 +1,7 @@
+using Calor.Compiler.Ast;
 using Calor.Compiler.Migration;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -55,19 +57,17 @@ public class RegistryConformanceTests
     }
 
     // ------------------------------------------------------------------
-    // Records (#773): registry says NotSupported → the converter must
-    // preserve records verbatim as §CSHARP, never emit the broken
-    // class-without-constructor shape.
+    // Record classes retain native identity; unsupported variants remain exact C#.
     // ------------------------------------------------------------------
 
     [Fact]
-    public void Registry_Record_IsNotClaimedFull()
+    public void Registry_RecordClasses_AreNative()
     {
-        Assert.NotEqual(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
+        Assert.Equal(SupportLevel.Full, FeatureSupport.GetSupportLevel("record"));
     }
 
     [Fact]
-    public void Record_IsPreservedAsInterop_NotBrokenClass()
+    public void Record_IsNative_NotBrokenOrdinaryClass()
     {
         var csharp = """
             public record Person(string Name, int Age);
@@ -79,16 +79,13 @@ public class RegistryConformanceTests
         Assert.NotNull(result.CalorSource);
         _output.WriteLine(result.CalorSource);
 
-        // Preserved verbatim as interop — original record text survives.
-        Assert.Contains("§CSHARP", result.CalorSource);
-        Assert.Contains("record Person(string Name, int Age)", result.CalorSource);
-        // The broken shape (a Calor class definition for the record) must be gone.
-        Assert.DoesNotContain("§CL{", result.CalorSource);
-
-        // Counted as a structured loss with a location (#770).
-        var loss = Assert.Single(result.Context.Losses.Where(l => l.Feature == "record"));
-        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
-        Assert.NotNull(loss.Line);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        Assert.Contains("record Person (string:Name, int:Age)", result.CalorSource);
+        Assert.DoesNotContain("class Person", result.CalorSource);
+        var record = Assert.Single(result.Ast!.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Equal(Visibility.Public, record.Visibility);
+        Assert.Empty(result.Losses);
     }
 
     [Fact]
@@ -112,7 +109,7 @@ public class RegistryConformanceTests
     [InlineData(
         "[System.Obsolete] public record Base(int X); public record Derived(int X, int Y) : Base(X);",
         "record Derived(int X, int Y) : Base(X)",
-        2)]
+        0)]
     [InlineData(
         "public partial record Person(string Name); public partial record Person { public void Deconstruct(out string name) => name = Name; }",
         "partial record Person",
@@ -120,8 +117,8 @@ public class RegistryConformanceTests
     [InlineData(
         "public record Nominal { public int Value { get; init; } protected Nominal(Nominal other) { Value = other.Value; } }",
         "protected Nominal(Nominal other)",
-        1)]
-    public void RecordVariants_ArePreservedVerbatimAndCompile(
+        0)]
+    public void RecordVariants_PreserveKindAndCompile(
         string csharp,
         string expectedText,
         int expectedLossCount)
@@ -135,7 +132,7 @@ public class RegistryConformanceTests
             "Round-tripped record variant does not compile: "
             + string.Join("; ", result.RoslynErrors));
         var recordLosses = conversion.Losses
-            .Where(loss => loss.Feature == "record")
+            .Where(loss => loss.Feature.StartsWith("record", StringComparison.Ordinal))
             .ToList();
         Assert.Equal(expectedLossCount, recordLosses.Count);
         Assert.All(
@@ -160,7 +157,7 @@ public class RegistryConformanceTests
         var result = RoundTrip(csharp);
 
         var loss = Assert.Single(conversion.Losses.Where(item =>
-            item.Feature == "record"));
+            item.Feature == "record-nested-declaration"));
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
         Assert.DoesNotContain(
             conversion.Losses,
@@ -194,7 +191,7 @@ public class RegistryConformanceTests
         var result = RoundTrip(csharp);
 
         var recordLoss = Assert.Single(conversion.Losses.Where(item =>
-            item.Feature == "record"));
+            item.Feature == "record-nested-declaration"));
         Assert.Equal(
             ConversionLossKind.InteropPreserved,
             recordLoss.Kind);
@@ -220,10 +217,11 @@ public class RegistryConformanceTests
         var result = Convert(csharp);
 
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("record Inner(int Value)", result.CalorSource);
         // The rest of the class still converts natively.
-        Assert.Contains("§MT{", result.CalorSource);
+        Assert.Contains("func Count ()", result.CalorSource);
+        Assert.Equal("Count", Assert.Single(Assert.Single(result.Ast!.Classes).Methods).Name);
     }
 
     // ------------------------------------------------------------------
@@ -380,13 +378,14 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // The member with >>> is preserved verbatim — original operator intact.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(">>> 2", result.CalorSource);
         // The unsupported operator must NOT be silently converted to addition.
-        Assert.DoesNotContain("(+ x 2)", result.CalorSource);
+        Assert.DoesNotContain("(x + 2)", result.CalorSource);
         // Sibling members still convert natively.
         Assert.Contains("Untouched", result.CalorSource);
-        Assert.Contains("§MT{", result.CalorSource);
+        Assert.Contains("func Untouched ()", result.CalorSource);
+        Assert.Equal("Untouched", Assert.Single(Assert.Single(result.Ast!.Classes).Methods).Name);
 
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
@@ -411,7 +410,7 @@ public class RegistryConformanceTests
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
         _output.WriteLine(result.CalorSource!);
 
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(">>>= 1", result.CalorSource);
         // Must not degrade to a plain assignment x = 1.
         Assert.DoesNotContain("§ASSIGN x 1", result.CalorSource);
@@ -470,7 +469,7 @@ public class RegistryConformanceTests
     // ------------------------------------------------------------------
     // Prefix unary operators (#774): exhaustive SyntaxKind mapping — an
     // unknown prefix operator must never silently become negation, and unary
-    // plus (no Calor node) escalates instead of being dropped.
+    // plus uses a native cast only for proven built-in numeric promotion.
     // ------------------------------------------------------------------
 
     [Theory]
@@ -492,21 +491,22 @@ public class RegistryConformanceTests
             """);
 
         _output.WriteLine(result.CalorSource!);
-        Assert.Contains(expectedCalor, result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        Assert.Empty(result.SemanticLosses);
+        Assert.True(result.CalorSource!.Contains($"({expr})", StringComparison.Ordinal),
+            $"Expected the native equivalent of {expectedCalor}:\n{result.CalorSource}");
         Assert.True(result.RoslynSuccess,
             "Prefix-unary round trip does not compile: " + string.Join("; ", result.RoslynErrors));
     }
 
     [Fact]
-    public void PrefixUnary_UnaryPlus_EscalatesToInterop()
+    public void PrefixUnary_UserDefinedUnaryPlus_EscalatesToInterop()
     {
-        // +x has no Calor node and could change user-defined operator+ overload
-        // resolution. The old code silently mapped ANY unknown prefix operator
-        // (including +) to negation, turning `+x` into `-x`. It must escalate.
         var csharp = """
             public class U
             {
-                public int Pos(int x)
+                public static U operator +(U x) { return new U(); }
+                public U Pos(U x)
                 {
                     return +x;
                 }
@@ -520,7 +520,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // Preserved verbatim — the unary + survives, never becomes negation.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("+x", result.CalorSource);
         Assert.DoesNotContain("(- x)", result.CalorSource);
         // Sibling member still converts natively.
@@ -572,11 +572,14 @@ public class RegistryConformanceTests
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
         _output.WriteLine(result.CalorSource!);
 
-        Assert.Contains(expectedCalor, result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        Assert.Empty(result.Losses);
+        Assert.True(result.CalorSource!.Contains($"(a {op} b)", StringComparison.Ordinal),
+            $"Expected the native equivalent of {expectedCalor}:\n{result.CalorSource}");
         // The old silent default turned unknown operators into addition — prove
-        // no non-additive operator ever produced a `(+ a b)` form.
+        // no non-additive operator ever produced an `(a + b)` form.
         if (op != "+")
-            Assert.DoesNotContain("(+ a b)", result.CalorSource);
+            Assert.DoesNotContain("(a + b)", result.CalorSource);
     }
 
     // ------------------------------------------------------------------
@@ -635,7 +638,8 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
         _output.WriteLine(result.EmittedCSharp!);
 
-        Assert.Contains("SINGLE:3.14", result.CalorSource);
+        Assert.Contains("3.14f", result.CalorSource);
+        Assert.DoesNotContain("SINGLE:", result.CalorSource);
         Assert.Contains("3.14f", result.EmittedCSharp);
         Assert.DoesNotContain("3.140000", result.EmittedCSharp);  // no widened double expansion
         Assert.True(result.RoslynSuccess,
@@ -668,7 +672,7 @@ public class RegistryConformanceTests
     {
         // 4000000000u fits in a long, so the old bare-digit Calor emission
         // re-parsed it as `4000000000L` (long) — a silent signedness+width
-        // change. The UINT: typed literal keeps it uint.
+        // change. The explicit U suffix keeps it uint.
         var result = RoundTrip("""
             public class U
             {
@@ -678,7 +682,8 @@ public class RegistryConformanceTests
 
         _output.WriteLine(result.CalorSource!);
         _output.WriteLine(result.EmittedCSharp!);
-        Assert.Contains("UINT:4000000000", result.CalorSource);
+        Assert.Contains("4000000000U", result.CalorSource);
+        Assert.DoesNotContain("UINT:", result.CalorSource);
         Assert.Contains("4000000000U", result.EmittedCSharp);
         Assert.DoesNotContain("4000000000L", result.EmittedCSharp);
         Assert.True(result.RoslynSuccess,
@@ -722,8 +727,10 @@ public class RegistryConformanceTests
         _output.WriteLine(result.EmittedCSharp!);
 
         // Calor keeps the type test natively.
-        Assert.Contains("§PTYPE{string:s}", result.CalorSource);
-        Assert.Contains("§PTYPE{int}", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        Assert.Empty(result.SemanticLosses);
+        Assert.Contains("case string s →", result.CalorSource);
+        Assert.Contains("case int _ →", result.CalorSource);
 
         // Emitted C# restores the real declaration/type patterns — the type
         // test survives and the arm is NOT broadened to `var s`.
@@ -736,7 +743,7 @@ public class RegistryConformanceTests
     [Fact]
     public void DeclarationPattern_GenericType_RoundTripsThroughBothEmitters()
     {
-        // The §PTYPE{Type<T>:x} form must survive the Calor parser too, so a
+        // The native generic pattern must survive the Calor parser too, so a
         // generic-typed declaration pattern keeps its type test end-to-end.
         var result = RoundTrip("""
             public class Box<T> { public T Value; }
@@ -756,7 +763,9 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
         _output.WriteLine(result.EmittedCSharp!);
 
-        Assert.Contains("§PTYPE{Box<int>:b}", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        Assert.Empty(result.SemanticLosses);
+        Assert.Contains("case Box<int> b →", result.CalorSource);
         // The generic type test is restored, not broadened to `var b`.
         Assert.Contains("Box<int> b", result.EmittedCSharp);
         Assert.True(result.RoslynSuccess,
@@ -784,10 +793,17 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
         _output.WriteLine(result.EmittedCSharp!);
 
-        Assert.Contains("§PTYPE{int}", result.CalorSource);
-        Assert.Contains("§PTYPE{string}", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        Assert.Empty(result.SemanticLosses);
+        Assert.Contains("case int _ →", result.CalorSource);
+        Assert.Contains("case string _ →", result.CalorSource);
         // Type-only arms carry no binding.
-        Assert.DoesNotContain("§PTYPE{int:", result.CalorSource);
+        var arms = CSharpSyntaxTree.ParseText(result.EmittedCSharp!).GetRoot()
+            .DescendantNodes().OfType<SwitchExpressionArmSyntax>().ToList();
+        Assert.Collection(arms,
+            arm => Assert.Equal("int", Assert.IsType<TypePatternSyntax>(arm.Pattern).Type.ToString()),
+            arm => Assert.Equal("string", Assert.IsType<TypePatternSyntax>(arm.Pattern).Type.ToString()),
+            arm => Assert.IsType<DiscardPatternSyntax>(arm.Pattern));
         Assert.True(result.RoslynSuccess,
             "Type-only-pattern round trip does not compile: " + string.Join("; ", result.RoslynErrors));
     }
@@ -819,7 +835,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // Preserved verbatim — `case > 100:` semantics intact, never broadened.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("case > 100:", result.CalorSource);
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
@@ -832,11 +848,8 @@ public class RegistryConformanceTests
     [Fact]
     public void C1_PassthroughStatementPreservation_RawStatementSurvivesRoundTrip()
     {
-        // #836 C1: in C#-preserving modes an escalated statement is contained
-        // as a §RAW statement — previously Visit(RawCSharpNode) RETURNED the
-        // §RAW text while body loops discard Accept() results, so the
-        // statement VANISHED and the failed statement's partial conversions
-        // (hoisted `§ASSIGN total (+ total x)`) leaked into the body.
+        // #836 C1: the failed statement must survive without partial hoists.
+        // Conditional expression hoisting now preserves the complete member.
         var csharp = """
             public class Acc
             {
@@ -862,14 +875,21 @@ public class RegistryConformanceTests
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
         _output.WriteLine(result.CalorSource!);
 
-        // The raw statement is actually IN the output…
-        Assert.Contains("§RAW", result.CalorSource);
+        // The statement survives inside the exact preserved member.
+        TestHelpers.AssertRawFraming(result.CalorSource);
+        var containingClass = Assert.Single(result.Ast!.Classes);
+        Assert.Empty(containingClass.Methods);
+        var block = Assert.Single(containingClass.InteropBlocks);
+        var originalMethod = CSharpSyntaxTree.ParseText(csharp).GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        Assert.Equal(originalMethod.ToFullString(), block.CSharpCode);
         Assert.Contains(">>> 2", result.CalorSource);
-        // …and the half-converted compound assignment did not leak next to it.
-        Assert.DoesNotContain("(+ total x)", result.CalorSource);
+        Assert.DoesNotContain("(total + x)", result.CalorSource);
 
         // Ledger matches reality.
-        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        var loss = Assert.Single(result.Context.Losses);
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.Equal("conditional-expression-hoisting", loss.Feature);
 
         // Round trip: the raw statement text survives and the emitted C# compiles.
         var emitted = TestHelpers.CompileCalorToCSharp(result.CalorSource!);
@@ -904,7 +924,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.EmittedCSharp!);
 
         // The escalated member is preserved without directive trivia.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(">>> 1", result.CalorSource);
 
         // And the round-tripped C# compiles (a dangling #if would be CS1027).
@@ -947,9 +967,7 @@ public class RegistryConformanceTests
     [Fact]
     public void M2_EmitterSideRawFallback_IsCountedAsLoss()
     {
-        // #836 M2: raw C# reaching the output through emitter/visitor paths
-        // that bypass the ledger (§CS{…} from RawCSharpExpressionNode here)
-        // must still be counted, so "zero losses" always means fully native.
+        // #836 M2: an unledgered emitter fallback must not claim zero losses.
         var csharp = """
             public class Test
             {
@@ -967,9 +985,22 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
         Assert.Contains("__makeref", result.CalorSource);
 
-        // The §CS{…} fallback has no visitor-side ledger entry — the
-        // post-emission reconciliation must count it.
-        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.EmitterFallback);
+        var preservation = Assert.Single(result.Context.Losses);
+        Assert.Equal(ConversionLossKind.InteropPreserved, preservation.Kind);
+        Assert.Equal("typed-reference", preservation.Feature);
+        TestHelpers.AssertRawFraming(result.CalorSource);
+
+        // Re-emit the actual preserved AST with no visitor ledger to exercise
+        // emitter-side recovery independently of the visitor's correct accounting.
+        var emitted = new CalorEmitter().Emit(result.Ast!);
+        var unledgered = new ConversionContext();
+        CSharpToCalorConverter.ReconcileEmitterFallbacks(emitted, unledgered);
+        var recovered = Assert.Single(unledgered.Losses);
+        Assert.Equal(ConversionLossKind.EmitterFallback, recovered.Kind);
+        CSharpToCalorConverter.ReconcileEmitterFallbacks(emitted, unledgered);
+        Assert.Single(unledgered.Losses);
+        CSharpToCalorConverter.ReconcileEmitterFallbacks(emitted, result.Context);
+        Assert.Equal(preservation, Assert.Single(result.Context.Losses));
     }
 
     [Fact]
@@ -984,6 +1015,92 @@ public class RegistryConformanceTests
 
         Assert.True(result.Success);
         Assert.Empty(result.Context.Losses);
+    }
+
+    [Theory]
+    [InlineData("public static object Probe() { int value = 7; var reference = __makeref(value); return System.TypedReference.ToObject(reference); }", "typed-reference")]
+    [InlineData("public static int Probe() { int value = 7; return __refvalue(__makeref(value), int); }", "typed-reference")]
+    [InlineData("public static System.Type Probe() { int value = 7; return __reftype(__makeref(value)); }", "typed-reference")]
+    [InlineData("public static int Probe(__arglist) { return new System.ArgIterator(__arglist).GetRemainingCount(); }", "varargs")]
+    [InlineData("public static void Probe(__arglist) { }", "varargs")]
+    public void UnsupportedRuntimeReferences_PreserveTheCompleteMember(string member, string feature)
+    {
+        var csharp = $"public class RuntimeReferences {{ {member} }}";
+        var original = CSharpSyntaxTree.ParseText(csharp).GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        foreach (var fidelity in new[] { ConversionFidelity.Lossy, ConversionFidelity.Lossless })
+        {
+            var result = new CSharpToCalorConverter(new ConversionOptions
+            {
+                Fidelity = fidelity,
+                ModuleName = "ConformanceTest",
+            }).Convert(csharp);
+            Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
+            var block = Assert.Single(Assert.Single(result.Ast!.Classes).InteropBlocks);
+            Assert.Equal(original.ToFullString(), block.CSharpCode);
+            Assert.Equal(feature, block.FeatureName);
+            var loss = Assert.Single(result.Losses);
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+            Assert.Equal(feature, loss.Feature);
+            Assert.Equal(1, result.Context.Stats.InteropBlocksEmitted);
+            TestHelpers.AssertRawFraming(result.CalorSource);
+            var emitted = TestHelpers.CompileCalorToCSharpWithDiagnostics(result.CalorSource!);
+            Assert.NotNull(emitted.GeneratedCode);
+            Assert.Empty(emitted.Diagnostics);
+            foreach (var source in new[] { csharp, emitted.GeneratedCode })
+            {
+                var validation = TestHelpers.RoslynCompile(source);
+                Assert.True(validation.CompilationSuccess,
+                    string.Join("; ", validation.FormattedCompilationErrors));
+            }
+        }
+    }
+
+    [Fact]
+    public void EscapedRuntimeIntrinsicName_RemainsANativeOrdinaryCall()
+    {
+        const string csharp = """
+            public static class RuntimeIdentifiers
+            {
+                private static int @__makeref(int value) => value;
+                public static int Probe() => @__makeref(7);
+            }
+            """;
+        var result = Convert(csharp);
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
+        Assert.Empty(result.Losses);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        var emitted = TestHelpers.CompileCalorToCSharpWithDiagnostics(result.CalorSource!);
+        Assert.NotNull(emitted.GeneratedCode);
+        Assert.Empty(emitted.Diagnostics);
+        var validation = TestHelpers.RoslynCompile(emitted.GeneratedCode);
+        Assert.True(validation.CompilationSuccess,
+            string.Join("; ", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void TypedReferencePreservation_DoesNotConferPureCallableAuthority()
+    {
+        const string csharp = """
+            public static class RuntimeReferences
+            {
+                private static int Probe()
+                {
+                    int value = 7;
+                    return __refvalue(__makeref(value), int);
+                }
+                public static int Caller() => Probe();
+            }
+            """;
+        var result = Convert(csharp);
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(issue => issue.Message)));
+        Assert.Single(Assert.Single(result.Ast!.Classes).InteropBlocks);
+        // 0.30: the converter declares ! unknown rather than claiming pure; the
+        // output compiles and the public caller's row stays unknown, never pure.
+        var compiled = Calor.Compiler.Program.Compile(result.CalorSource!, "runtime-references.calr");
+        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors.Select(e => e.Message)));
+        var caller = Assert.Single(Assert.Single(result.Ast!.Classes).Methods, method => method.Name == "Caller");
+        Assert.True(caller.Effects!.IsUnknown, result.CalorSource);
     }
 
     [Fact]
@@ -1002,7 +1119,7 @@ public class RegistryConformanceTests
         var result = RoundTrip(csharp);
         _output.WriteLine(result.CalorSource!);
 
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Contains("'\\ud83d'", result.CalorSource, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("�", result.CalorSource);
         Assert.True(result.RoslynSuccess, string.Join("; ", result.RoslynErrors));
@@ -1035,7 +1152,7 @@ public class RegistryConformanceTests
         _output.WriteLine(result.CalorSource!);
 
         // The member is preserved verbatim — `case > 100:` semantics intact.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("case > 100:", result.CalorSource);
         Assert.Contains(result.Context.Losses,
             l => l.Kind == ConversionLossKind.InteropPreserved);
@@ -1078,12 +1195,26 @@ public class RegistryConformanceTests
         var conversion = Convert(csharp);
         var roundTrip = RoundTrip(csharp);
 
-        Assert.Contains("§CSHARP", conversion.CalorSource);
-        Assert.Contains(originalSyntax, conversion.CalorSource);
-        Assert.DoesNotContain("§IFACE{", conversion.CalorSource);
-        var loss = Assert.Single(conversion.Losses.Where(item =>
-            item.Feature == feature));
-        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        if (csharp.StartsWith("internal interface ", StringComparison.Ordinal))
+        {
+            // Internal visibility is now representable without interop.
+            TestHelpers.AssertRawFraming(conversion.CalorSource, present: false);
+            var contract = Assert.Single(conversion.Ast!.Interfaces);
+            Assert.Equal(Visibility.Internal, contract.Visibility);
+            Assert.Equal("IHidden", contract.Name);
+            Assert.Equal("M", Assert.Single(contract.Methods).Name);
+            Assert.Contains("interface IHidden internal", conversion.CalorSource);
+            Assert.Empty(conversion.Losses);
+        }
+        else
+        {
+            TestHelpers.AssertRawFraming(conversion.CalorSource);
+            Assert.Contains(originalSyntax, conversion.CalorSource);
+            Assert.Empty(conversion.Ast!.Interfaces);
+            var loss = Assert.Single(conversion.Losses.Where(item =>
+                item.Feature == feature));
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        }
         Assert.DoesNotContain(conversion.Losses, item =>
             item.Kind == ConversionLossKind.Dropped);
         Assert.Contains(originalSyntax, roundTrip.EmittedCSharp);
@@ -1103,8 +1234,9 @@ public class RegistryConformanceTests
             }
             """);
 
-        Assert.Contains("§IFACE{", result.CalorSource);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.Contains("interface IContract", result.CalorSource);
+        Assert.Equal("IContract", Assert.Single(result.Ast!.Interfaces).Name);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.Empty(result.Losses);
     }
 
@@ -1138,10 +1270,15 @@ public class RegistryConformanceTests
         var conversion = Convert(csharp);
         var roundTrip = RoundTrip(csharp);
 
-        Assert.Contains("§CL{", conversion.CalorSource);
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        Assert.Contains("class Container", conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource);
         Assert.Contains(originalSyntax, conversion.CalorSource);
-        Assert.DoesNotContain("§MT{", conversion.CalorSource);
+        var containingClass = Assert.Single(conversion.Ast!.Classes);
+        Assert.Empty(containingClass.Methods);
+        var block = Assert.Single(containingClass.InteropBlocks);
+        var originalMethod = CSharpSyntaxTree.ParseText(csharp).GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        Assert.Equal(originalMethod.ToFullString(), block.CSharpCode);
         var loss = Assert.Single(conversion.Losses.Where(item =>
             item.Feature == feature));
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
@@ -1166,7 +1303,7 @@ public class RegistryConformanceTests
         var conversion = Convert(csharp);
         var roundTrip = RoundTrip(csharp);
 
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource);
         Assert.Contains(csharp, conversion.CalorSource);
         Assert.DoesNotContain(nativeMarker, conversion.CalorSource);
         var loss = Assert.Single(conversion.Losses.Where(item =>
@@ -1205,7 +1342,7 @@ public class RegistryConformanceTests
             ? "file-scoped-type"
             : "delegate-semantics";
 
-        Assert.Contains("§CSHARP", conversion.CalorSource);
+        TestHelpers.AssertRawFraming(conversion.CalorSource);
         Assert.Contains(originalSyntax, conversion.CalorSource);
         Assert.DoesNotContain("§DEL{", conversion.CalorSource);
         var loss = Assert.Single(conversion.Losses.Where(item =>
@@ -1289,7 +1426,10 @@ public class RegistryConformanceTests
             preserveDocumentationComments: preserve);
 
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
+        Assert.Equal(Visibility.Internal, Assert.Single(result.Ast!.Interfaces).Visibility);
+        Assert.Contains("interface IInterop internal", result.CalorSource);
+        Assert.Empty(result.Losses);
         Assert.Equal(
             preserve,
             result.CalorSource!.Contains(
@@ -1310,10 +1450,11 @@ public class RegistryConformanceTests
 
         var result = Convert(csharp);
 
-        Assert.Contains("§CL{", result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("class Outer", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains("ref struct Buffer", result.CalorSource);
-        Assert.Contains("§MT{", result.CalorSource);
+        Assert.Contains("func Value ()", result.CalorSource);
+        Assert.Equal("Value", Assert.Single(Assert.Single(result.Ast!.Classes).Methods).Name);
         var loss = Assert.Single(result.Losses.Where(item =>
             item.Feature == "ref-struct"));
         Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
@@ -1330,8 +1471,9 @@ public class RegistryConformanceTests
 
         var result = Convert(csharp);
 
-        Assert.Contains("§CL{", result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("class Outer", result.CalorSource);
+        Assert.Empty(Assert.Single(result.Ast!.Classes).NestedClasses);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Contains(nestedDeclaration, result.CalorSource);
         var loss = Assert.Single(result.Losses.Where(item =>
             item.Feature == "file-scoped-type"));
@@ -1359,7 +1501,7 @@ public class RegistryConformanceTests
             symbols: ["FEATURE"],
             preserveDocumentationComments: preserve);
 
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
         Assert.Equal(
             preserve,
             result.CalorSource!.Contains(

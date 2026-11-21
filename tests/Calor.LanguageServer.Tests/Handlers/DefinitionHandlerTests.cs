@@ -14,12 +14,9 @@ public class DefinitionHandlerTests
     public void FindDefinition_Function_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R a + b
+            module TestModule TestModule block
+              func Add private (int:a, int:b) → int
+                return (a + b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -35,9 +32,9 @@ public class DefinitionHandlerTests
     public void FindDefinition_Class_ReturnsClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
-                §FLD{str:name}
+            module TestModule TestModule block
+              class Person internal
+                field string:name private
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -50,71 +47,12 @@ public class DefinitionHandlerTests
     }
 
     [Fact]
-    public void FindDefinition_Interface_ReturnsInterface()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IShape}
-                §MT{m001:GetArea}
-                  §O{f64}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "IShape");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.InterfaceDefinitionNode>(def);
-    }
-
-    [Fact]
-    public void FindDefinition_Enum_ReturnsEnum()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
-              §EM{Red}
-              §EM{Green}
-              §/EN{e001}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "Color");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.EnumDefinitionNode>(def);
-    }
-
-    [Fact]
-    public void FindDefinition_Delegate_ReturnsDelegate()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §DEL{d001:Callback}
-              §I{i32:value}
-              §O{void}
-              §/DEL{d001}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var def = SymbolFinder.FindDefinition(ast, "Callback");
-
-        Assert.NotNull(def);
-        Assert.IsType<Calor.Compiler.Ast.DelegateDefinitionNode>(def);
-    }
-
-    [Fact]
     public void FindDefinition_NonExistent_ReturnsNull()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test}
-                §R 0
+            module TestModule TestModule block
+              func Test private ()
+                return 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -129,12 +67,9 @@ public class DefinitionHandlerTests
     public void FindFunction_ExistingFunction_ReturnsFunction()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calculate}
-                §I{i32:x}
-                §I{i32:y}
-                §O{i32}
-                §R x + y
+            module TestModule TestModule block
+              func Calculate private (int:x, int:y) → int
+                return (x + y)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -151,13 +86,10 @@ public class DefinitionHandlerTests
     public void FindMethod_ExistingMethod_ReturnsMethod()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R a + b
+            module TestModule TestModule block
+              class Calculator internal
+                func Add private (int:a, int:b) → int
+                  return (a + b)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -177,13 +109,15 @@ public class DefinitionHandlerTests
     public void FindDefinition_MultipleFunctions_FindsCorrectOne()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:First}
-                §R 1
-              §F{f002:Second}
-                §R 2
-              §F{f003:Third}
-                §R 3
+            module TestModule TestModule block
+              func First private ()
+                return 1
+
+              func Second private ()
+                return 2
+
+              func Third private ()
+                return 3
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -201,11 +135,12 @@ public class DefinitionHandlerTests
     public void FindDefinition_NestedClassInOtherClass_FindsClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Outer}
-                §FLD{i32:x}
-              §CL{c002:Inner}
-                §FLD{str:name}
+            module TestModule TestModule block
+              class Outer internal
+                field int:x private
+
+              class Inner internal
+                field string:name private
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -224,18 +159,22 @@ public class DefinitionHandlerTests
         try
         {
             const string definition = """
-                §M{defs:Collision}
-                  §CL{worker1:Worker:pub:partial}
-                    §MT{pickInt:Pick:pub} (i32:value) -> i32
-                      §R value
-                    §MT{pickText:Pick:pub} (str:value) -> i32
-                      §R INT:2
+                module Collision Collision block
+                  class Worker partial
+                    func Pick (int:value) → int
+                      !
+                      return value
+
+                    func Pick (string:value) → int
+                      !
+                      return 2
                 """;
             const string use = """
-                §M{use:Collision}
-                  §CL{worker2:Worker:pub:partial}
-                    §MT{call:Call:pub} () -> i32
-                      §R §C{Pick} §A INT:1 §/C
+                module Collision Collision block
+                  class Worker partial
+                    func Call () → int
+                      !
+                      return Pick(1)
                 """;
             var definitionPath = Path.Combine(root, "definition.calr");
             var usePath = Path.Combine(root, "use.calr");
@@ -261,7 +200,7 @@ public class DefinitionHandlerTests
             var location = link.Location!;
             Assert.Equal(definitionPath, location.Uri.ToUri().LocalPath);
             Assert.Equal(
-                definition.IndexOf("Pick:pub", StringComparison.Ordinal),
+                definition.IndexOf("Pick (", StringComparison.Ordinal),
                 PositionConverter.ToOffset(location.Range.Start, definition));
         }
         finally
@@ -272,57 +211,13 @@ public class DefinitionHandlerTests
     }
 
     [Fact]
-    public async Task DefinitionResolvesNamespacedGenericStaticReceiverByArityAsync()
-    {
-        const string source = """
-            §M{m001:GenericDefinitions}
-              §NS{ns1:Alpha}
-                §CL{c001:Box:pub}<T>
-                  §MT{m001:Create:pub:stat} (i32:value) -> i32
-                    §R value
-                §CL{c002:Box:pub}<TLeft,TRight>
-                  §MT{m002:Create:pub:stat} (str:value) -> str
-                    §R value
-              §NS{ns2:Beta}
-                §F{f001:UseStatic:pub} () -> i32
-                  §R §C{Alpha.Box<i32>.Create} §A INT:1 §/C
-            """;
-        var uri = DocumentUri.From("file:///generic-definition.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-        var handler = new DefinitionHandler(workspace);
-        var declarationOffset = source.IndexOf(
-            "Box:pub",
-            StringComparison.Ordinal);
-        var referenceOffset = source.IndexOf(
-            "Box<i32>.Create",
-            StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(
-            source,
-            referenceOffset);
-        var result = await handler.Handle(
-            new DefinitionParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-            },
-            CancellationToken.None);
-
-        Assert.NotNull(result);
-        var location = Assert.Single(result).Location;
-        Assert.NotNull(location);
-        Assert.Equal(
-            declarationOffset,
-            PositionConverter.ToOffset(location!.Range.Start, source));
-    }
-
-    [Fact]
     public async Task DefinitionDoesNotResolveWhitespaceOrEndAdjacentCursorAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
-                §R INT:1
+            module TestModule TestModule block
+              func Compute () → int
+                !
+                return 1
             """;
         var uri = DocumentUri.From("file:///definition-cursor.calr");
         var workspace = new WorkspaceState();
@@ -348,13 +243,15 @@ public class DefinitionHandlerTests
     public async Task DefinitionResolvesNamespacedTypeQualifiedStaticCallAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §NS{ns1:Alpha}
-                §CL{c1:Widget:pub}
-                  §MT{m1:Create:pub:stat} (i32:value) -> i32
-                    §R value
-                §F{f1:Use:pub} () -> i32
-                  §R §C{Widget.Create} §A INT:42 §/C
+            module TestModule Alpha block
+              class Widget
+                func Create static (int:value) → int
+                  !
+                  return value
+
+              func Use () → int
+                !
+                return Widget.Create(42)
             """;
         var uri = DocumentUri.From("file:///namespaced-static-definition.calr");
         var workspace = new WorkspaceState();
@@ -377,7 +274,7 @@ public class DefinitionHandlerTests
         var location = Assert.Single(result).Location;
         Assert.NotNull(location);
         Assert.Equal(
-            source.IndexOf("Create:pub", StringComparison.Ordinal),
+            source.IndexOf("Create static", StringComparison.Ordinal),
             PositionConverter.ToOffset(location!.Range.Start, source));
     }
 

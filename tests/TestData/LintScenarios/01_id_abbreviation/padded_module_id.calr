@@ -1,4 +1,4 @@
-§M{m001:TestModule}
-  §F{f001:Main:pub} () -> void
-    §R
-
+module TestModule TestModule block
+  func Main () → void
+    !
+    return

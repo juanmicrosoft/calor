@@ -11,6 +11,8 @@ public abstract class BoundNode
 {
     public TextSpan Span { get; }
     public virtual IEnumerable<BoundNode> ChildNodes => Array.Empty<BoundNode>();
+    // Only this node's direct write; writes inside children are found by traversal.
+    internal virtual BoundExpression? DirectWriteTarget => null;
 
     protected BoundNode(TextSpan span)
     {
@@ -39,14 +41,28 @@ public abstract class BoundExpression : BoundNode
     /// </summary>
     public abstract BoundType Type { get; }
 
+    // The display type can be OBJECT for recovery without establishing System.Object.
+    internal bool HasUnknownInferredType { get; init; }
     internal ArrayBoundType? MethodInputArrayType { get; init; }
     internal GenericInstantiationBoundType? GenericNullabilityType { get; init; }
+    internal IReadOnlyList<BoundNamedValue>? AnonymousObjectMembers { get; init; }
+    // Effects-only producer identity, independent of nullability and verifier eligibility.
+    internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; init; }
 
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
     public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
     public override IEnumerable<BoundNode> ChildNodes => Children;
 
     protected BoundExpression(TextSpan span) : base(span) { }
+}
+
+// Computed values never borrow storage identity from their children. Flow retyping
+// preserves the direct reference, its selected symbols, and all side-band metadata.
+internal interface IBoundStorageExpression
+{
+    VariableSymbol? ReferencedStorage { get; }
+    IReadOnlyList<VariableSymbol> ResolvedStorageCandidates { get; }
+    BoundExpression WithFlowType(NominalBoundType type);
 }
 
 /// <summary>
@@ -126,7 +142,8 @@ public sealed class BoundFunction : BoundNode
     /// declares it. Analyses keyed by callable charge its body to that callable.
     /// </summary>
     public SymbolId? EnclosingSymbolId { get; init; }
-    public override IEnumerable<BoundNode> ChildNodes => Body;
+    public IReadOnlyList<BoundExpression> ContractConditions { get; init; } = [];
+    public override IEnumerable<BoundNode> ChildNodes => ContractConditions.Cast<BoundNode>().Concat(Body);
 
     public BoundFunction(TextSpan span, FunctionSymbol symbol, IReadOnlyList<BoundStatement> body, Scope scope)
         : this(span, symbol, body, scope, Array.Empty<string>(), BoundMemberKind.TopLevelFunction, null)
@@ -173,14 +190,24 @@ public sealed class BoundBindStatement : BoundStatement
 /// <summary>
 /// Bound variable reference.
 /// </summary>
-public sealed class BoundVariableExpression : BoundExpression
+public sealed class BoundVariableExpression : BoundExpression, IBoundStorageExpression
 {
+    private BoundType _type;
     public VariableSymbol Variable { get; }
     public SymbolId SymbolId => Variable.Id;
     public IReadOnlyList<VariableSymbol> ResolvedSymbols { get; }
     public IReadOnlyList<SymbolId> ResolvedSymbolIds =>
         ResolvedSymbols.Select(symbol => symbol.Id).ToArray();
-    public override BoundType Type { get; }
+    public override BoundType Type => _type;
+    VariableSymbol IBoundStorageExpression.ReferencedStorage => Variable.StorageIdentity;
+    IReadOnlyList<VariableSymbol> IBoundStorageExpression.ResolvedStorageCandidates => ResolvedSymbols;
+
+    BoundExpression IBoundStorageExpression.WithFlowType(NominalBoundType type)
+    {
+        var copy = (BoundVariableExpression)MemberwiseClone();
+        copy._type = type;
+        return copy;
+    }
 
     /// <param name="typeOverride">v0.15 E1 slice 2a. When the binder knows the
     /// symbol's type string is not a type it can vouch for — today only the
@@ -209,10 +236,13 @@ public sealed class BoundVariableExpression : BoundExpression
         Variable = variable;
         ResolvedSymbols = resolvedSymbols
             ?? [variable];
+        HasUnknownInferredType = ResolvedSymbols.Any(symbol => symbol.StorageIdentity.HasUnknownInferredType);
         if (ResolvedSymbols.Count == 1 && typeOverride is not UnresolvedBoundType)
         {
             MethodInputArrayType = variable.MethodInputArrayType;
             GenericNullabilityType = variable.GenericNullabilityType;
+            AnonymousObjectMembers = variable.AnonymousObjectMembers;
+            MetadataArrayResultType = variable.StorageIdentity.MetadataArrayResultType;
         }
         if (typeOverride != null)
         {
@@ -221,23 +251,28 @@ public sealed class BoundVariableExpression : BoundExpression
             // TypeIdentity.Canonicalize throws on an empty/whitespace type
             // string, and a symbol with no recorded type is precisely a case a
             // caller passes an UnresolvedBoundType for.
-            Type = typeOverride;
+            _type = typeOverride;
             return;
         }
 
-        var resolvedTypes = ResolvedSymbols
-            .Select(symbol => TypeIdentity.Canonicalize(symbol.TypeName))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        var resolvedTypeName = resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT";
+        string? firstResolvedType = null;
+        var singleResolvedType = ResolvedSymbols.Count != 0;
+        for (var index = 0; index < ResolvedSymbols.Count; index++)
+        {
+            var resolvedType = TypeIdentity.Canonicalize(ResolvedSymbols[index].TypeName);
+            if (index == 0) firstResolvedType = resolvedType;
+            else if (!string.Equals(firstResolvedType, resolvedType, StringComparison.Ordinal))
+                singleResolvedType = false;
+        }
+        var resolvedTypeName = singleResolvedType ? variable.TypeName : "OBJECT";
         // Keep the legacy display projection. Resolved reference identity and
         // annotation are carried separately; ambiguous names do not supply one.
-        Type = resolvedTypes.Length == 1
+        _type = singleResolvedType
             ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
             : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
         referenceIdentity ??= ResolvedSymbols.Count == 1 ? variable.InferredReferenceType : null;
-        if (resolvedTypes.Length == 1 && referenceIdentity is not null && Type is NominalBoundType nominal)
-            Type = new NominalBoundType(
+        if (singleResolvedType && referenceIdentity is not null && Type is NominalBoundType nominal)
+            _type = new NominalBoundType(
                 nominal.QualifiedName,
                 referenceIdentity.IsKnownReferenceType ? variable.NullableAnnotation : nominal.NullableAnnotation,
                 referenceIdentity.Declaration, referenceIdentity.RoslynSymbol);
@@ -298,7 +333,7 @@ public sealed class BoundVariableExpression : BoundExpression
         "VOID" or "void" => false,
         "OBJECT" or "object" => false,  // OBJECT is the multi-resolve sentinel — not a real user type
         "" => false,
-        var n when n.Contains('[', StringComparison.Ordinal) => false, // ARRAY[…] / OPTION[…]
+        var n when n.Contains('[', StringComparison.Ordinal) => false, // ARRAY[…] / NULLABLE[…]
         _ => true,
     };
 
@@ -340,6 +375,9 @@ public sealed class BoundCallStatement : BoundStatement
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
+    // Preserved overloads veto native-name and metadata fallback, not emission.
+    internal bool HasOpaqueOverloads { get; init; }
+    internal bool HasUnresolvedArguments { get; init; }
     public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
     public IReadOnlyList<string>? TypeArguments { get; }
@@ -353,7 +391,9 @@ public sealed class BoundCallStatement : BoundStatement
     public IReadOnlyList<int>? ArgumentParameterIndices { get; init; }
     /// <summary>Actual native selections, including each conditional alternative's own argument map.</summary>
     public IReadOnlyList<ResolvedOverloadMatch> SelectedOverloadMatches { get; init; } = [];
-    public override IEnumerable<BoundNode> ChildNodes => Arguments;
+    public override IEnumerable<BoundNode> ChildNodes =>
+        CallableStorageIdentity?.EventDeclaration is not null && Receiver is not null
+            ? [Receiver, .. Arguments] : Arguments;
 
     public BoundCallStatement(
         TextSpan span,
@@ -420,15 +460,26 @@ public sealed class BoundForStatement : BoundStatement
     public BoundExpression From { get; }
     public BoundExpression To { get; }
     public BoundExpression? Step { get; }
+    public BoundExpression? Condition { get; }
+    public BoundStatement? Update { get; }
     public IReadOnlyList<BoundStatement> Body { get; }
     public override IEnumerable<BoundNode> ChildNodes
     {
         get
         {
             yield return From;
-            yield return To;
-            if (Step != null)
-                yield return Step;
+            if (Condition != null)
+            {
+                yield return Condition;
+                if (Update != null)
+                    yield return Update;
+            }
+            else
+            {
+                yield return To;
+                if (Step != null)
+                    yield return Step;
+            }
             foreach (var statement in Body)
                 yield return statement;
         }
@@ -440,7 +491,9 @@ public sealed class BoundForStatement : BoundStatement
         BoundExpression from,
         BoundExpression to,
         BoundExpression? step,
-        IReadOnlyList<BoundStatement> body)
+        IReadOnlyList<BoundStatement> body,
+        BoundExpression? condition = null,
+        BoundStatement? update = null)
         : base(span)
     {
         LoopVariable = loopVariable;
@@ -448,6 +501,8 @@ public sealed class BoundForStatement : BoundStatement
         To = to;
         Step = step;
         Body = body;
+        Condition = condition;
+        Update = update;
     }
 }
 
@@ -617,7 +672,8 @@ public sealed class BoundStringLiteral : BoundExpression
         TextSpan span,
         string value,
         bool isMultiline,
-        bool isUtf8)
+        bool isUtf8,
+        Microsoft.CodeAnalysis.INamedTypeSymbol? stringType = null)
         : base(span)
     {
         Value = value ?? throw new ArgumentNullException(nameof(value));
@@ -635,7 +691,8 @@ public sealed class BoundStringLiteral : BoundExpression
         // equally non-null.
         Type = new NominalBoundType(
             isUtf8 ? "ReadOnlySpan<BYTE>" : "STRING",
-            NullableAnnotation.NotAnnotated);
+            NullableAnnotation.NotAnnotated,
+            roslynSymbol: isUtf8 ? null : stringType);
     }
 }
 
@@ -692,19 +749,6 @@ public sealed class BoundDecimalLiteral : BoundExpression
 }
 
 /// <summary>
-/// Bound None literal (Option.None / null).
-/// </summary>
-public sealed class BoundNoneLiteral : BoundExpression
-{
-    public override BoundType Type { get; }
-
-    public BoundNoneLiteral(TextSpan span, string? optionType = null) : base(span)
-    {
-        Type = new NominalBoundType(optionType ?? "NONE");
-    }
-}
-
-/// <summary>
 /// Bound C# null literal. Its nominal type is intentionally not STRING; receiving
 /// boundaries decide whether null is applicable to their declared reference type.
 /// </summary>
@@ -727,6 +771,9 @@ public sealed class BoundUnaryExpression : BoundExpression
     public BoundExpression Operand { get; }
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
+    internal override BoundExpression? DirectWriteTarget =>
+        Operator is UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
+            or UnaryOperator.PreDecrement or UnaryOperator.PostDecrement ? Operand : null;
 
     public BoundUnaryExpression(TextSpan span, Ast.UnaryOperator op, BoundExpression operand, string resultType)
         : base(span)
@@ -743,6 +790,11 @@ public sealed class BoundUnaryExpression : BoundExpression
 /// </summary>
 public class BoundCallExpression : BoundExpression
 {
+    internal Microsoft.CodeAnalysis.IMethodSymbol? ResolvedMetadataMethod { get; init; }
+    // The actual receiver used for metadata overload selection, before any boxing.
+    internal Microsoft.CodeAnalysis.ITypeSymbol? ResolvedMetadataReceiverType { get; init; }
+    internal Microsoft.CodeAnalysis.IMethodSymbol? CollectionMethodDefinition { get; init; }
+    internal bool MutatesOnlyFreshCollectionReceiver { get; init; }
     internal VariableSymbol? CallableStorageIdentity { get; init; }
     internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public string Target { get; }
@@ -786,8 +838,17 @@ public class BoundCallExpression : BoundExpression
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
+    internal bool HasOpaqueOverloads { get; init; }
+    internal bool HasUnresolvedArguments { get; init; }
     public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => Arguments;
+    public BoundExpression? EvaluatedReceiver { get; init; }
+    internal Microsoft.CodeAnalysis.IMethodSymbol? SelectedSourceMethod { get; init; }
+    internal ClassDefinitionNode? SourceStaticMethodOwner { get; init; }
+    // A reduced source extension is represented as its selected static call:
+    // Arguments[0] is the receiver, already included in the child enumeration.
+    internal bool IsSourceExtensionCall { get; init; }
+    public override IReadOnlyList<BoundExpression> Children =>
+        !IsSourceExtensionCall && EvaluatedReceiver is { } receiver ? [receiver, .. Arguments] : Arguments;
 
     /// <summary>
     /// Named argument labels, argument modifiers, and explicit generic arguments
@@ -945,64 +1006,29 @@ public static class BoundChildren
         expression.DeferredChildren;
 }
 
-/// <summary>#762 B2: Option construction. Type composes from the payload (string types, D3).</summary>
-public sealed class BoundSomeExpression : BoundExpression
-{
-    public BoundExpression Value { get; }
-    public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => [Value];
-
-    public BoundSomeExpression(TextSpan span, BoundExpression value) : base(span)
-    {
-        Value = value;
-        Type = new NominalBoundType($"Option<{value.Type.DisplayString}>");
-    }
-}
-
-/// <summary>#762 B2: Result success construction. The error type parameter is unknowable
-/// from the value alone under 0.13's string types — "OBJECT" is the explicit placeholder
-/// (never null, per D3); 0.14's typed representation replaces it.</summary>
-public sealed class BoundOkExpression : BoundExpression
-{
-    public BoundExpression Value { get; }
-    public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => [Value];
-
-    public BoundOkExpression(TextSpan span, BoundExpression value) : base(span)
-    {
-        Value = value;
-        Type = new NominalBoundType($"Result<{value.Type.DisplayString}, OBJECT>");
-    }
-}
-
-/// <summary>#762 B2: Result error construction (see BoundOkExpression on the placeholder).</summary>
-public sealed class BoundErrExpression : BoundExpression
-{
-    public BoundExpression Error { get; }
-    public override BoundType Type { get; }
-    public override IReadOnlyList<BoundExpression> Children => [Error];
-
-    public BoundErrExpression(TextSpan span, BoundExpression error) : base(span)
-    {
-        Error = error;
-        Type = new NominalBoundType($"Result<OBJECT, {error.Type.DisplayString}>");
-    }
-}
-
 /// <summary>#762 B2: invocation of a function VALUE (computed target). Return type is
 /// unknowable without function types (0.14); "OBJECT" is the explicit placeholder.</summary>
 public sealed class BoundExpressionCall : BoundExpression
 {
     public BoundExpression Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
+    public IReadOnlyList<string?>? ArgumentModifiers { get; }
+    public IReadOnlyList<string>? TypeArguments { get; }
+    internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Target, .. Arguments];
 
     public BoundExpressionCall(TextSpan span, BoundExpression target,
-        IReadOnlyList<BoundExpression> arguments, BoundType? resultType = null) : base(span)
+        IReadOnlyList<BoundExpression> arguments, BoundType? resultType = null,
+        IReadOnlyList<string?>? argumentNames = null, IReadOnlyList<string?>? argumentModifiers = null,
+        IReadOnlyList<string>? typeArguments = null) : base(span)
     {
         Target = target;
         Arguments = arguments;
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
+        TypeArguments = typeArguments;
         Type = resultType ?? new NominalBoundType("OBJECT");
     }
 }
@@ -1016,7 +1042,11 @@ public sealed class BoundAnonymousObjectCreation : BoundExpression
         Initializers.Select(initializer => initializer.Value).ToArray();
 
     public BoundAnonymousObjectCreation(TextSpan span, IReadOnlyList<BoundNamedValue> initializers)
-        : base(span) => Initializers = initializers;
+        : base(span)
+    {
+        Initializers = initializers;
+        AnonymousObjectMembers = initializers;
+    }
 }
 
 /// <summary>#762 B2: record creation — typed by the record name; field values bound.</summary>
@@ -1091,34 +1121,42 @@ public sealed class BoundArrayCreation : BoundExpression
     }
 }
 
-/// <summary>#762 B3: array element access. Element type derives from the array's
-/// composed type string when it has the "T[]" shape; "OBJECT" otherwise (0.13 string
-/// types — 0.14's typed representation replaces the derivation).</summary>
+/// <summary>#762 B3: indexed element access. Unavailable element inference
+/// retains OBJECT only as a non-authoritative recovery type.</summary>
 public sealed class BoundArrayAccess : BoundExpression
 {
     public BoundExpression Array { get; }
     public BoundExpression Index { get; }
+
+    /// <summary>
+    /// 0.30: the metadata indexer Roslyn selects for this access when the receiver is a
+    /// metadata type other than an array (<c>config["k"]</c> → <c>IConfiguration.this[string]</c>).
+    /// Null for arrays, source types and receivers that do not resolve. The effect pass
+    /// charges the selected accessor's contract, or <c>unknown</c> without one.
+    /// </summary>
+    internal Microsoft.CodeAnalysis.IPropertySymbol? ResolvedIndexer { get; init; }
+
+    /// <summary>The receiver type the indexer was selected on (see <see cref="ResolvedIndexer"/>).</summary>
+    internal Microsoft.CodeAnalysis.ITypeSymbol? ResolvedIndexerReceiver { get; init; }
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Array, Index];
 
-    public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index) : base(span)
+    public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index,
+        string? elementTypeName = null, BoundType? resolvedType = null) : base(span)
     {
         Array = array; Index = index;
-        if (array.MethodInputArrayType is
-            {
-                ElementType: NominalBoundType
-                {
-                    QualifiedName: "STRING" or "string" or "str" or "System.String"
-                }
-            } typedArray)
-        {
-            Type = typedArray.ElementType;
-            return;
-        }
+        resolvedType ??= index is not BoundRangeExpression && !array.HasUnknownInferredType
+            && NullabilityChecker.GetMethodInputArrayType(array) is { Rank: 1 } typedArray
+                ? typedArray.ElementType : null;
         var arrayTypeName = array.Type.DisplayString;
-        Type = new NominalBoundType(arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
+        elementTypeName ??= arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
             ? arrayTypeName[..^2]
-            : "OBJECT");
+            : null;
+        Type = resolvedType is not null and not UnresolvedBoundType
+            ? resolvedType : new NominalBoundType(elementTypeName ?? "OBJECT");
+        MethodInputArrayType = Type as ArrayBoundType;
+        GenericNullabilityType = Type as GenericInstantiationBoundType;
+        HasUnknownInferredType = array.HasUnknownInferredType || resolvedType is null or UnresolvedBoundType;
     }
 }
 
@@ -1172,11 +1210,17 @@ public sealed class BoundMultiDimArrayAccess : BoundExpression
         IReadOnlyList<BoundExpression> indices) : base(span)
     {
         Array = array; Indices = indices;
-        // LastIndexOf: on jagged shapes like "i32[][,]" the element type is
-        // everything before the TRAILING bracket group ("i32[]"), not "i32" (B3 review m5).
+        var resolvedType = !array.HasUnknownInferredType
+            && NullabilityChecker.GetMethodInputArrayType(array) is { } typedArray
+            && typedArray.Rank == indices.Count ? typedArray.ElementType : null;
+        // Display-only recovery must not establish an element identity.
         var t = array.Type.DisplayString;
         var open = t.LastIndexOf('[');
-        Type = new NominalBoundType(open > 0 ? t[..open] : "OBJECT");
+        Type = resolvedType is not null and not UnresolvedBoundType
+            ? resolvedType : new NominalBoundType(open > 0 ? t[..open] : "OBJECT");
+        MethodInputArrayType = Type as ArrayBoundType;
+        GenericNullabilityType = Type as GenericInstantiationBoundType;
+        HasUnknownInferredType = array.HasUnknownInferredType || resolvedType is null or UnresolvedBoundType;
     }
 }
 
@@ -1602,6 +1646,7 @@ public sealed class BoundAssignmentStatement : BoundStatement
     public BoundExpression Target { get; }
     public BoundExpression Value { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Target, Value];
+    internal override BoundExpression DirectWriteTarget => Target;
 
     public BoundAssignmentStatement(TextSpan span, BoundExpression target, BoundExpression value)
         : base(span)
@@ -1620,6 +1665,7 @@ public sealed class BoundCompoundAssignment : BoundStatement
     public Ast.CompoundAssignmentOperator Operator { get; }
     public BoundExpression Value { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Target, Value];
+    internal override BoundExpression DirectWriteTarget => Target;
 
     public BoundCompoundAssignment(TextSpan span, BoundExpression target, Ast.CompoundAssignmentOperator op, BoundExpression value)
         : base(span)
@@ -1636,14 +1682,17 @@ public sealed class BoundCompoundAssignment : BoundStatement
 public sealed class BoundForeachStatement : BoundStatement
 {
     public VariableSymbol LoopVariable { get; }
+    public VariableSymbol? DeconstructionVariable { get; }
     public BoundExpression Collection { get; }
     public IReadOnlyList<BoundStatement> Body { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Collection, .. Body];
 
-    public BoundForeachStatement(TextSpan span, VariableSymbol loopVariable, BoundExpression collection, IReadOnlyList<BoundStatement> body)
+    public BoundForeachStatement(TextSpan span, VariableSymbol loopVariable, BoundExpression collection,
+        IReadOnlyList<BoundStatement> body, VariableSymbol? deconstructionVariable = null)
         : base(span)
     {
         LoopVariable = loopVariable ?? throw new ArgumentNullException(nameof(loopVariable));
+        DeconstructionVariable = deconstructionVariable;
         Collection = collection ?? throw new ArgumentNullException(nameof(collection));
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
@@ -1723,9 +1772,9 @@ public sealed class BoundThisExpression : BoundExpression
 {
     public override BoundType Type { get; }
 
-    public BoundThisExpression(TextSpan span, string className) : base(span)
+    public BoundThisExpression(TextSpan span, string className, BoundType? typeOverride = null) : base(span)
     {
-        Type = new NominalBoundType(
+        Type = typeOverride ?? new NominalBoundType(
             className ?? "UNKNOWN",
             BoundTypes.NullableAnnotation.NotAnnotated);
     }
@@ -1749,8 +1798,12 @@ public sealed class BoundBaseExpression : BoundExpression
 /// <summary>
 /// Bound field access expression: target.fieldName.
 /// </summary>
-public sealed class BoundFieldAccessExpression : BoundExpression
+public sealed class BoundFieldAccessExpression : BoundExpression, IBoundStorageExpression
 {
+    private BoundType _type;
+    internal bool IsTupleElementRead { get; init; }
+    internal bool IsAnonymousPropertyRead { get; init; }
+    internal ClassDefinitionNode? SourceStaticFieldOwner { get; init; }
     internal Microsoft.CodeAnalysis.ISymbol? ResolvedMetadataMember { get; init; }
     /// <summary>#943: a metadata member whose read is unsupported here (the result stays unresolved).</summary>
     internal Microsoft.CodeAnalysis.ISymbol? UnsupportedMetadataMember { get; init; }
@@ -1760,8 +1813,18 @@ public sealed class BoundFieldAccessExpression : BoundExpression
     public VariableSymbol? ResolvedField { get; }
     public IReadOnlyList<VariableSymbol> ResolvedFields { get; }
     public SymbolId? ResolvedSymbolId => ResolvedField?.Id;
-    public override BoundType Type { get; }
+    public override BoundType Type => _type;
     public override IReadOnlyList<BoundExpression> Children { get; }
+    VariableSymbol? IBoundStorageExpression.ReferencedStorage =>
+        ResolvedFields is [var member] ? member : null;
+    IReadOnlyList<VariableSymbol> IBoundStorageExpression.ResolvedStorageCandidates => ResolvedFields;
+
+    BoundExpression IBoundStorageExpression.WithFlowType(NominalBoundType type)
+    {
+        var copy = (BoundFieldAccessExpression)MemberwiseClone();
+        copy._type = type;
+        return copy;
+    }
 
     public BoundFieldAccessExpression(
         TextSpan span,
@@ -1780,7 +1843,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         // v0.15 E1 slice 2a: resolvedType lets the binder say "I cannot type this
         // member" with an UnresolvedBoundType instead of the OBJECT guess. Null
         // (the default) keeps every pre-existing construction byte-identical.
-        Type = resolvedType ?? new NominalBoundType(typeName ?? "OBJECT");
+        _type = resolvedType ?? new NominalBoundType(typeName ?? "OBJECT");
         ResolvedField = resolvedField;
         ResolvedFields = resolvedFields
             ?? (resolvedField == null ? Array.Empty<VariableSymbol>() : [resolvedField]);
@@ -1863,10 +1926,12 @@ public sealed class BoundTypeReference
 /// </summary>
 public sealed class BoundNewExpression : BoundExpression
 {
+    public IReadOnlyList<BoundCallExpression> CollectionInitializers { get; }
     public override BoundType Type { get; }
     public TextSpan TypeNameSpan { get; }
     public BoundTypeReference TypeReference { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<BoundObjectInitializer> Initializers { get; }
     public FunctionSymbol? ResolvedConstructor { get; }
@@ -1876,7 +1941,7 @@ public sealed class BoundNewExpression : BoundExpression
     public SymbolId? ResolvedTypeSymbolId => ResolvedType?.Id;
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IEnumerable<BoundNode> ChildNodes =>
-        Arguments.Cast<BoundNode>().Concat(Initializers);
+        Arguments.Cast<BoundNode>().Concat(Initializers).Concat(CollectionInitializers);
 
     public BoundNewExpression(TextSpan span, string typeName, IReadOnlyList<BoundExpression> arguments)
         : this(
@@ -1899,7 +1964,10 @@ public sealed class BoundNewExpression : BoundExpression
         TypeSymbol? resolvedType = null,
         TextSpan? typeNameSpan = null,
         IReadOnlyList<FunctionSymbol>? resolvedConstructors = null,
-        BoundTypeReference? typeReference = null)
+        BoundTypeReference? typeReference = null,
+        IReadOnlyList<string?>? argumentNames = null,
+        Microsoft.CodeAnalysis.INamedTypeSymbol? resolvedMetadataType = null,
+        IReadOnlyList<BoundCallExpression>? collectionInitializers = null)
         : base(span)
     {
         // v0.14 nullability §NEW annotation flow — a `§NEW{Foo}` expression
@@ -1910,11 +1978,16 @@ public sealed class BoundNewExpression : BoundExpression
         // preserved (F-3B discipline): the raw `typeName` string flows
         // through unchanged. This does NOT affect constructor dispatch or
         // overload resolution — it is a type-annotation-channel-only change.
-        Type = new NominalBoundType(typeName ?? "OBJECT", NullableAnnotation.NotAnnotated);
+        Type = new NominalBoundType(typeName ?? "OBJECT", NullableAnnotation.NotAnnotated,
+            roslynSymbol: resolvedMetadataType);
         TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? Array.Empty<string>();
         Arguments = arguments ?? Array.Empty<BoundExpression>();
+        if (argumentNames != null && argumentNames.Count != Arguments.Count)
+            throw new ArgumentException("Argument names must align with constructor arguments.", nameof(argumentNames));
+        ArgumentNames = argumentNames;
         Initializers = initializers ?? Array.Empty<BoundObjectInitializer>();
+        CollectionInitializers = collectionInitializers ?? Array.Empty<BoundCallExpression>();
         ResolvedConstructor = resolvedConstructor;
         ResolvedConstructors = resolvedConstructors
             ?? (resolvedConstructor == null ? Array.Empty<FunctionSymbol>() : [resolvedConstructor]);
@@ -1929,7 +2002,7 @@ public sealed class BoundNewExpression : BoundExpression
                     resolvedType: null))
                 .ToArray());
         ResolvedType = resolvedType ?? TypeReference.ResolvedType;
-        Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value)];
+        Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value), .. CollectionInitializers];
     }
 }
 
@@ -1939,22 +2012,32 @@ internal static class ExpressionResultTypes
     internal static bool IsNever(BoundType type) =>
         type is NominalBoundType { QualifiedName: "NEVER" };
 
-    internal static BoundType Join(string resultName, IEnumerable<BoundType> alternatives)
+    internal static BoundType Join(string resultName, IEnumerable<BoundExpression> alternatives)
     {
-        var returning = alternatives.Where(type => !IsNever(type)).ToArray();
+        var returning = alternatives.Where(expression => !IsNever(expression.Type)).ToArray();
         if (returning.Length == 0)
             return new NominalBoundType("NEVER", NullableAnnotation.NotAnnotated);
 
-        var annotations = returning.Select(NullabilityChecker.GetAnnotation).ToArray();
+        var annotations = returning.Select(expression => NullabilityChecker.GetAnnotation(expression.Type)).ToArray();
         var annotation = annotations.Contains(NullableAnnotation.Annotated)
             ? NullableAnnotation.Annotated
             : annotations.All(value => value == NullableAnnotation.NotAnnotated)
                 ? NullableAnnotation.NotAnnotated
                 : NullableAnnotation.Oblivious;
-        return PreserveIdentity(resultName, annotation, returning);
+        return PreserveIdentity(resultName, annotation,
+            returning.Where(expression => expression is not BoundNullLiteral).Select(expression => expression.Type).ToArray());
     }
 
-    internal static BoundType Coalesce(string resultName, BoundType left, BoundType right)
+    internal static BoundType Coalesce(string resultName, BoundExpression left, BoundExpression right) =>
+        Coalesce(resultName, left.Type, right.Type,
+            new[] { left, right }.Where(expression => expression is not BoundNullLiteral)
+                .Select(expression => expression.Type).ToArray());
+
+    internal static BoundType Coalesce(string resultName, BoundType left, BoundType right) =>
+        Coalesce(resultName, left, right, [left, right]);
+
+    private static BoundType Coalesce(
+        string resultName, BoundType left, BoundType right, IReadOnlyList<BoundType> alternatives)
     {
         if (IsNever(left))
             return left;
@@ -1962,18 +2045,23 @@ internal static class ExpressionResultTypes
             || NullabilityChecker.GetAnnotation(left) == NullableAnnotation.NotAnnotated
                 ? NullableAnnotation.NotAnnotated
                 : NullabilityChecker.GetAnnotation(right) ?? NullableAnnotation.Oblivious;
-        return PreserveIdentity(resultName, annotation, [left, right]);
+        return PreserveIdentity(resultName, annotation, alternatives);
     }
 
     private static BoundType PreserveIdentity(
         string resultName, NullableAnnotation annotation, IReadOnlyList<BoundType> alternatives)
     {
-        var identity = alternatives.OfType<NominalBoundType>()
-            .Where(type => type.QualifiedName == resultName)
-            .OrderByDescending(type => type.IsKnownReferenceType)
-            .FirstOrDefault();
+        var candidates = alternatives.Where(type => !IsNever(type)).OfType<NominalBoundType>().ToArray();
+        var identity = candidates.FirstOrDefault(type => type.IsKnownReferenceType);
+        if (identity is not null && (candidates.Length != alternatives.Count(type => !IsNever(type))
+            || candidates.Any(type => !identity.HasSameUnderlyingReferenceType(type))
+            || ReferenceName(identity.QualifiedName) != ReferenceName(resultName)))
+            identity = null;
         return new NominalBoundType(resultName, annotation, identity?.Declaration, identity?.RoslynSymbol);
     }
+
+    private static string ReferenceName(string name) =>
+        TypeIdentity.Canonicalize(Parsing.AttributeHelper.TryUnwrapNullableAnnotation(name, out var inner) ? inner : name);
 }
 
 /// <summary>
@@ -2020,7 +2108,8 @@ public sealed class BoundConditionalExpression : BoundExpression
         WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
         if (resultType is null) throw new ArgumentNullException(nameof(resultType));
         var shape = NullabilityResultTypes.Join([whenTrue, whenFalse]);
-        Type = shape ?? ExpressionResultTypes.Join(resultType, [whenTrue.Type, whenFalse.Type]);
+        Type = shape ?? ExpressionResultTypes.Join(resultType, [whenTrue, whenFalse]);
+        HasUnknownInferredType = whenTrue.HasUnknownInferredType || whenFalse.HasUnknownInferredType;
         MethodInputArrayType = shape as ArrayBoundType;
         GenericNullabilityType = shape as GenericInstantiationBoundType;
         Children = [condition, whenTrue, whenFalse];
@@ -2068,6 +2157,26 @@ public class BoundStructuralExpression : BoundExpression
         Children = children ?? Array.Empty<BoundExpression>();
         Metadata = metadata ?? new Dictionary<string, object?>();
         DeferredChildren = deferredChildren ?? Array.Empty<BoundExpression>();
+    }
+}
+
+/// <summary>A lifted result with a separately typed, conditionally evaluated continuation.</summary>
+public sealed class BoundConditionalAccessExpression : BoundStructuralExpression
+{
+    public BoundExpression Receiver { get; }
+    public BoundExpression WhenNotNull { get; }
+
+    internal BoundConditionalAccessExpression(
+        TextSpan span, BoundExpression receiver, BoundExpression whenNotNull, BoundType resultType)
+        : base(span, nameof(NullConditionalNode), resultType.DisplayString,
+            [receiver, whenNotNull], metadata: null, deferredChildren: [whenNotNull],
+            NullableAnnotation.Oblivious, resultType)
+    {
+        Receiver = receiver;
+        WhenNotNull = whenNotNull;
+        HasUnknownInferredType = receiver.HasUnknownInferredType || whenNotNull.HasUnknownInferredType;
+        MethodInputArrayType = resultType as ArrayBoundType;
+        GenericNullabilityType = resultType as GenericInstantiationBoundType;
     }
 }
 
@@ -2129,13 +2238,14 @@ public sealed class BoundTypeOperationExpression : BoundExpression
         TypeOp operation,
         BoundExpression operand,
         string targetType,
-        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious)
+        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious,
+        BoundType? resolvedType = null)
         : base(span)
     {
         Operation = operation;
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
         TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
-        Type = new NominalBoundType(
+        Type = resolvedType ?? new NominalBoundType(
             operation == TypeOp.Is ? "BOOL" : targetType,
             operation == TypeOp.Is ? NullableAnnotation.NotAnnotated : nullableAnnotation);
         Children = [operand];
@@ -2410,7 +2520,8 @@ public sealed class BoundMatchExpression : BoundExpression
         var shape = NullabilityResultTypes.Join(
             cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!));
         Type = shape ?? ExpressionResultTypes.Join(resultType,
-            cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!.Type));
+            cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!));
+        HasUnknownInferredType = cases.Any(matchCase => matchCase.Result?.HasUnknownInferredType == true);
         MethodInputArrayType = shape as ArrayBoundType;
         GenericNullabilityType = shape as GenericInstantiationBoundType;
         Children =

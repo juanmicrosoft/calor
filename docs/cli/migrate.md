@@ -62,8 +62,92 @@ Passing a directory instead selects loose-directory mode: files are discovered
 recursively without adopting a nearby project, and nested project directories
 are excluded. Output-path collisions (for
 example, `Foo.cs` and `Foo.csx` both mapping to `Foo.calr`) fail before writes.
-For project mode, generated C# is validated once with its converted siblings
-and the effective project references/options before any output is written.
+For project mode, generated C# is validated with its converted siblings and
+effective project references/options. Failures escalate native conversion through
+member, type, and exact whole-file C# preservation, then validation runs again.
+Buildable discovered inputs are written without needing a passthrough flag.
+One malformed or unwritable input does not discard unrelated valid outputs.
+Loose directories can lack references: exact preserved sources are still written,
+with failed compilation reported as `unverified`, not a passed build.
+Writing, native fraction, project compilation, and test execution are distinct results.
+
+### Opt-in native namespace splitting
+
+`calor migrate ./src --split-namespaces` can split a C# file containing distinct
+top-level namespace blocks into `File.namespace1.calr`, `File.namespace2.calr`,
+and so on, in source order. Each file uses the existing `module M N block`
+header: `M` remains a file label, and `N` is the original CLR namespace.
+There are no namespace blocks in the converted Calor.
+
+For a single named namespace, the same opt-in can convert resolved local imports
+without splitting the file. The output remains `File.calr`, `IsSplit` is false in
+the API, and no `namespaceIndex` is assigned. `namespace using` retains local
+ordinary, alias and static imports; compilation-unit and global imports stay
+outside the C# namespace. Since 0.30 this single-namespace case no longer needs
+the opt-in: `calor convert` and default `calor migrate` use it too, and fall back
+to whole-file C# preservation when it cannot be certified.
+Normal effect and nullability checks still apply; resolving an import does not
+prove that a call is pure. A scoped projection that changes declared types or
+nullable annotations stays as whole-file C#, with an explicit refusal reason.
+
+The bounded multi-namespace subset excludes repeated or nested namespaces, nested types,
+scoped imports, alias/global imports, directives, compilation-unit attributes,
+extern aliases, inheritance, and nonliteral field/property initializers.
+Ordinary compilation-unit imports keep their original scope in each output.
+The complete original Roslyn tree and evaluated sibling/reference context remain
+the authority during conversion; missing or invalid source context is refused.
+Every output must remain native and compile, and the complete generated C# set
+is validated with the original project context. This does not add general
+constructed-generic member substitution.
+
+Unsupported topologies retain the ordinary single-file preservation boundary.
+If an otherwise split-safe input cannot produce the complete native set, the
+project migration fails without committing partial outputs. Any conversion,
+collision, cancellation or validation failure before commit prevents the entire
+opt-in batch from being written. Output, receipt and lock paths participate in
+collision checks. Existing single-output files are not deleted or replaced by
+split outputs; choose a fresh destination instead.
+Refresh also refuses obsolete split files outside the new output set, rather
+than leaving their declarations active. Constructor bodies and initialization
+must pass the existing effect checks; an unproved constructor is not native
+split success.
+
+The report contains one result row per output, with the original `sourcePath`
+and zero-based `namespaceIndex`. `summary.sourceFiles` counts distinct inputs;
+`summary.totalFiles` counts result rows. Native split rows still carry the
+existing Partial namespace-topology registry warning; no registry support level
+is promoted.
+
+Library callers opt in with `CSharpToCalorConverter.ConvertProject(source,
+sourceFile, cancellationToken)`. Its ordered `Outputs` contain `FileName` and
+`Conversion` (the ordinary `ConversionResult`). Check `IsSplit` and each output's
+losses before claiming native splitting. Existing `Convert` and `ConvertFileAsync`
+remain single-result APIs with unchanged preservation/refusal behavior.
+
+### Safe refresh of generated Calor
+
+Lossless C# migration saves `<output>.conversion.json` beside each generated
+file. This receipt retains the original source, supplied sibling trees, parse
+options, reference aliases and observed input hashes. Whole-file preservation
+keeps the actual conversion context.
+
+Migration can refresh an unchanged generated file when its original C# changes.
+It refuses edited output and missing, corrupt or unassociated receipts; keep
+those files and choose a new destination. It also checks for changed inputs and
+generation bases before committing. Cooperating writers hold generation locks.
+Dry runs and cancellation or validation refusal before commit write neither
+output nor receipt.
+
+Calor outputs and declaration identities commit together, but receipts are
+separate writes. If a final receipt cannot be saved, migration reports an error
+and `outputWritten: true` for the committed file. Its output path and loss
+disposition remain available. Automatic refresh stays blocked for a mismatched
+pair; the error does not mean the output was unchanged.
+
+Receipts detect generation changes, not converter authenticity or native
+support. They do not capture the complete evaluated-project, generator or
+effect-manifest closure. Lossy partial-class merging and build/LSP/cache
+validation do not use these receipts yet.
 
 ---
 
@@ -75,17 +159,15 @@ and the effective project references/options before any output is written.
 | `--benchmark` | `-b` | `false` | Include before/after metrics comparison |
 | `--direction` | `-d` | `cs-to-calor` | Migration direction |
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
+| `--split-namespaces` | — | `false` | Opt in to one native file per split-safe top-level namespace; requires lossless, all-branches migration. |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
-| `--lossy` | — | `false` | Allow explicitly reported semantic loss. |
-| `--select-active-preprocessor-branch-lossy` | — | `false` | Select Roslyn's active conditional branch. Implies lossy fidelity and requires an unambiguous project configuration/target framework. |
 | `--define` | — | — | Add a conditional-compilation symbol. |
 | `--configuration` | — | `Debug` | MSBuild configuration used to resolve parse options and symbols. |
-| `--framework` | — | — | Select one target framework. Required whenever a file belongs to multiple target frameworks with different language versions or symbol sets; symbols are never unioned. |
+| `--framework` | — | — | Select one target framework. Without selection, configuration-sensitive files are preserved exactly and checked under each target; symbols are never unioned. |
 | `--language-version` | — | Project value | Override the C# language version. |
 | `--documentation-mode` | — | `parse` | Roslyn documentation mode: `none`, `parse`, or `diagnose`. |
 | `--feature` | — | — | Roslyn parse feature in `key=value` form. |
-| `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
 
 ### Direction Values
 
@@ -188,6 +270,26 @@ Token Savings: 17,090 tokens (37.8% reduction)
 ## Migration Reports
 
 Generate detailed reports for documentation:
+
+### Default-path CI measurement
+
+The `roundtrip-verification (default)` CI job also runs default `calor migrate`
+on isolated copies of the pinned MediatR, Serilog and FluentValidation source
+directories. The `default-migrate-reports` artifact contains the CLI JSON
+envelopes, logs, and a combined JSON/Markdown summary:
+
+- Genuinely failed files, converted-but-blocked files, and files actually written.
+- Fully native written files divided by all discovered input files. Passthrough
+  and unwritten conversions do not count as native output.
+- Written passthrough units grouped by reason, plus discovery exclusions.
+- Explicit build/test status. These source-only copies are not buildable
+  projects, so both statuses are `not-run`, never `passed`.
+
+This report complements the existing project-context round-trip harness; it
+does not replace or relax its build, test, native-conversion or coverage gates.
+The source-directory measurement does not establish that a migration builds.
+Until the preservation fallback ladder is implemented, a failed file can still
+block other converted files from being written.
 
 ### Markdown Report
 

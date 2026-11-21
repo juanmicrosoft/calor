@@ -2,6 +2,7 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Calor.Compiler.Verification.Z3;
+using System.Text.Json;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -24,6 +25,410 @@ public class MigrateWorkflowTests : IDisposable
     private void WriteTestCSharpFile(string fileName, string content)
     {
         File.WriteAllText(Path.Combine(_tempDir, fileName), content);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectReceipt_DirectoryInitialUnchangedAndChangedOriginalRefresh(bool parallel)
+    {
+        WriteTestCSharpFile("A.cs", "public class A { public int Get() => 1; }");
+        const string preservedSource = "public class B { ~B() { /* \u03c0 */ } }\r\n";
+        WriteTestCSharpFile("B.cs", preservedSource);
+        var migrator = ReceiptMigrator(parallel);
+        var plan = await migrator.CreatePlanAsync(_tempDir, MigrationDirection.CSharpToCalor);
+        var report = await migrator.ExecuteAsync(plan);
+        Assert.Equal(0, report.Summary.FailedFiles);
+        Assert.Equal(1, report.Summary.SuccessfulFiles);
+        Assert.Equal(1, report.Summary.PartialFiles);
+        foreach (var file in report.FileResults)
+        {
+            Assert.True(file.OutputWritten);
+            var receipt = ReadReceipt(file.OutputPath!);
+            Assert.Equal(File.ReadAllText(file.SourcePath), receipt.Original.Text);
+            Assert.Equal(File.ReadAllText(file.OutputPath!), receipt.GeneratedCalor);
+            ConversionReceipt.VerifyInputs(receipt.Inputs);
+            var originalPolicy = new CSharpToCalorConverter(new()
+            {
+                ValidateRoundTripCSharp = false,
+                ProjectDirectory = _tempDir,
+                Configuration = "Debug"
+            }).Convert(receipt.Original.Text, file.SourcePath);
+            Assert.Equal(originalPolicy.CalorSource, receipt.GeneratedCalor);
+            Assert.Equal(JsonSerializer.Serialize(originalPolicy.Losses), JsonSerializer.Serialize(file.Losses));
+        }
+        var before = ReceiptArtifacts(plan);
+        for (var refreshIndex = 0; refreshIndex < 3; refreshIndex++)
+        {
+            var refresh = await migrator.ExecuteAsync(plan);
+            Assert.Equal(0, refresh.Summary.FailedFiles);
+            AssertReceiptArtifacts(before, refresh);
+        }
+        WriteTestCSharpFile("A.cs", "public class A { public int Get() => 2; }");
+        var changed = await migrator.ExecuteAsync(plan);
+        Assert.Equal(0, changed.Summary.FailedFiles);
+        var changedReceipt = ReadReceipt(Path.Combine(_tempDir, "A.calr"));
+        Assert.Contains("=> 2", changedReceipt.Original.Text);
+        Assert.Contains("return 2", changedReceipt.GeneratedCalor);
+        Assert.Equal(preservedSource, ReadReceipt(Path.Combine(_tempDir, "B.calr")).Original.Text);
+    }
+
+    [Theory]
+    [InlineData("edited")]
+    [InlineData("missing-receipt")]
+    [InlineData("missing-output")]
+    [InlineData("corrupt-receipt")]
+    [InlineData("unassociated")]
+    [InlineData("different-source")]
+    public async Task ProjectReceipt_RefusesUnsafeBasesAndReleasesLocks(string state)
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        var migrator = ReceiptMigrator();
+        var plan = await migrator.CreatePlanAsync(_tempDir, MigrationDirection.CSharpToCalor);
+        var output = Assert.Single(plan.Entries).OutputPath;
+        if (state == "unassociated")
+            File.WriteAllText(output, "unassociated\r\n");
+        else
+            Assert.Equal(0, (await migrator.ExecuteAsync(plan)).Summary.FailedFiles);
+        switch (state)
+        {
+            case "edited": File.AppendAllText(output, "// user edit\r\n"); break;
+            case "missing-receipt": File.Delete(output + ".conversion.json"); break;
+            case "missing-output": File.Delete(output); break;
+            case "corrupt-receipt": File.WriteAllText(output + ".conversion.json", "{"); break;
+            case "different-source":
+                WriteTestCSharpFile("Other.cs", "public class Other { }");
+                plan = ReceiptPlan("Other.cs");
+                plan.Entries[0].OutputPath = output;
+                break;
+        }
+        var before = ReceiptArtifacts(plan);
+        var report = await migrator.ExecuteAsync(plan);
+        var failed = Assert.Single(report.FileResults);
+        Assert.Equal(FileMigrationStatus.Failed, failed.Status);
+        Assert.Null(failed.OutputPath);
+        Assert.False(failed.OutputWritten);
+        Assert.NotEmpty(failed.Issues);
+        AssertReceiptArtifacts(before);
+        using var released = new FileStream(output + ".conversion.lock",
+            FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+    }
+
+    [Theory]
+    [InlineData("source")]
+    [InlineData("output")]
+    [InlineData("receipt")]
+    public async Task ProjectReceipt_StalePreparationRefusesTheEntireOutputBatch(string changed)
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        WriteTestCSharpFile("B.cs", "public class B { }");
+        var plan = ReceiptPlan("A.cs", "B.cs");
+        var migrator = ReceiptMigrator();
+        Assert.Equal(0, (await migrator.ExecuteAsync(plan)).Summary.FailedFiles);
+        Dictionary<string, byte[]?>? expected = null;
+        var report = await migrator.ExecuteAsync(plan, progress: new ReceiptProgress(progress =>
+        {
+            if (progress.ProcessedFiles != progress.TotalFiles) return;
+            File.AppendAllText(changed switch
+            {
+                "source" => plan.Entries[0].SourcePath,
+                "output" => plan.Entries[0].OutputPath,
+                _ => plan.Entries[0].OutputPath + ".conversion.json"
+            }, "// external edit\r\n");
+            expected = ReceiptArtifacts(plan);
+        }));
+        Assert.Equal(2, report.Summary.FailedFiles);
+        Assert.All(report.FileResults, file =>
+        {
+            Assert.False(file.OutputWritten);
+            Assert.Equal("refused", file.ConversionPaths!.Outcome);
+        });
+        Assert.NotNull(expected);
+        AssertReceiptArtifacts(expected);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectReceipt_DryRunDoesNotCreateOrRefreshArtifacts(bool existing)
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        var plan = ReceiptPlan("A.cs");
+        plan.Entries[0].OutputPath = Path.Combine(_tempDir, "out", "A.calr");
+        var migrator = ReceiptMigrator();
+        if (existing) Assert.Equal(0, (await migrator.ExecuteAsync(plan)).Summary.FailedFiles);
+        var before = ReceiptArtifacts(plan);
+        var report = await migrator.DryRunAsync(plan);
+        Assert.Equal(0, report.Summary.FailedFiles);
+        Assert.False(Assert.Single(report.FileResults).OutputWritten);
+        AssertReceiptArtifacts(before);
+        if (!existing) Assert.False(Directory.Exists(Path.Combine(_tempDir, "out")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectReceipt_CancellationAfterConversionDoesNotCommit(bool existing)
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        WriteTestCSharpFile("B.cs", "public class B { }");
+        var plan = ReceiptPlan("A.cs", "B.cs");
+        var migrator = ReceiptMigrator();
+        if (existing) Assert.Equal(0, (await migrator.ExecuteAsync(plan)).Summary.FailedFiles);
+        var before = ReceiptArtifacts(plan);
+        using var cancellation = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            migrator.ExecuteAsync(plan, cancellationToken: cancellation.Token,
+                progress: new ReceiptProgress(progress =>
+                {
+                    if (progress.ProcessedFiles == progress.TotalFiles) cancellation.Cancel();
+                })));
+        AssertReceiptArtifacts(before);
+        Assert.Equal(0, (await migrator.ExecuteAsync(plan)).Summary.FailedFiles);
+    }
+
+    [Fact]
+    public async Task ProjectReceipt_PerFileTimeoutDoesNotWrite()
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        var plan = ReceiptPlan("A.cs");
+        var before = ReceiptArtifacts(plan);
+        var report = await new ProjectMigrator(new()
+        {
+            Parallel = false, PerFileTimeoutSeconds = 0
+        }).ExecuteAsync(plan);
+        Assert.Equal(FileMigrationStatus.TimedOut, Assert.Single(report.FileResults).Status);
+        AssertReceiptArtifacts(before);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectReceipt_ValidationRefusalDoesNotWrite(bool existing)
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        var plan = ReceiptPlan("A.cs");
+        var migrator = ReceiptMigrator();
+        if (existing) Assert.Equal(0, (await migrator.ExecuteAsync(plan)).Summary.FailedFiles);
+        var before = ReceiptArtifacts(plan);
+        WriteTestCSharpFile("A.cs", "#error reject\npublic class A { }");
+        var report = await migrator.ExecuteAsync(plan);
+        Assert.Equal(FileMigrationStatus.Failed, Assert.Single(report.FileResults).Status);
+        AssertReceiptArtifacts(before);
+    }
+
+    [Fact]
+    public async Task ProjectReceipt_ProjectValidationRefusalDoesNotWrite()
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        var project = await CreateReceiptProjectAsync();
+        var migrator = ReceiptMigrator();
+        var plan = await migrator.CreatePlanAsync(project, MigrationDirection.CSharpToCalor);
+        var before = ReceiptArtifacts(plan);
+        var report = await migrator.ExecuteAsync(plan, progress: new ReceiptProgress(_ =>
+            File.WriteAllText(project, "<Project invalid")));
+        Assert.Equal(FileMigrationStatus.Failed, Assert.Single(report.FileResults).Status);
+        Assert.Contains(report.FileResults[0].Issues, issue => issue.Feature == "project-csharp-validation");
+        AssertReceiptArtifacts(before);
+    }
+
+    [Fact]
+    public async Task ProjectReceipt_ProjectLeaseExcludesCooperatingCliWriter()
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        WriteTestCSharpFile("B.cs", "public class B { }");
+        var plan = ReceiptPlan("A.cs", "B.cs");
+        var report = await ReceiptMigrator().ExecuteAsync(plan, progress: new ReceiptProgress(progress =>
+        {
+            if (progress.ProcessedFiles != progress.TotalFiles) return;
+            var competing = CliTestHarness.RunCli(_tempDir, "convert", plan.Entries[0].SourcePath, "--format", "json");
+            Assert.Equal(1, competing.ExitCode);
+            Assert.All(plan.Entries, entry =>
+            {
+                Assert.False(File.Exists(entry.OutputPath));
+                Assert.False(File.Exists(entry.OutputPath + ".conversion.json"));
+            });
+        }));
+        Assert.Equal(0, report.Summary.FailedFiles);
+        Assert.All(report.FileResults, file => Assert.True(file.OutputWritten));
+    }
+
+    [Fact]
+    public async Task ProjectReceipt_PartialReceiptFailureRetainsBothCommittedOutputs()
+    {
+        WriteTestCSharpFile("A.cs", "public class A { }");
+        WriteTestCSharpFile("B.cs", "public class B { ~B() { } }");
+        var plan = ReceiptPlan("A.cs", "B.cs");
+        var failedReceipt = plan.Entries[1].OutputPath + ".conversion.json";
+        var report = await ReceiptMigrator().ExecuteAsync(plan, progress: new ReceiptProgress(progress =>
+        {
+            if (progress.ProcessedFiles == progress.TotalFiles) Directory.CreateDirectory(failedReceipt);
+        }));
+        Assert.Equal(1, report.Summary.FailedFiles);
+        Assert.All(report.FileResults, file =>
+        {
+            Assert.True(file.OutputWritten);
+            Assert.NotNull(file.OutputPath);
+            Assert.Equal(file.ConvertedSource, File.ReadAllText(file.OutputPath));
+        });
+        Assert.True(File.Exists(plan.Entries[0].OutputPath + ".conversion.json"));
+        Assert.False(File.Exists(failedReceipt));
+        var failed = Assert.Single(report.FileResults, file => file.Status == FileMigrationStatus.Failed);
+        Assert.Equal("preserved", failed.ConversionPaths!.Outcome);
+        Assert.NotEmpty(failed.Losses);
+        Assert.Contains(failed.Issues, issue => issue.Feature == "migration-receipt-failure"
+            && issue.Message.Contains("Output was written", StringComparison.Ordinal));
+        var json = JsonSerializer.Serialize(failed, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        Assert.True(JsonDocument.Parse(json).RootElement.GetProperty("outputWritten").GetBoolean());
+        var written = File.ReadAllBytes(plan.Entries[1].OutputPath);
+        var retry = await ReceiptMigrator().ExecuteAsync(plan);
+        Assert.Equal(1, retry.Summary.FailedFiles);
+        Assert.Equal(written, File.ReadAllBytes(plan.Entries[1].OutputPath));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ProjectReceipt_ProjectRetainsSiblingOptionsAliasesAndActualRescueContext(bool rescue, bool staleReference)
+    {
+        var referencePath = Path.Combine(_tempDir, "External.dll");
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("External",
+            [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("namespace ExternalLib; public class Value { }")],
+            CodeGen.GeneratedCSharpCompiler.References,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        using (var stream = File.Create(referencePath))
+            Assert.True(compilation.Emit(stream).Success);
+        WriteTestCSharpFile("A.cs", "extern alias External; public class A { public External::ExternalLib.Value Get() => new(); }");
+        WriteTestCSharpFile("B.cs", rescue
+            ? "public class B { public Missing Get() => new Missing(); }"
+            : "public class B { public A Get() => new A(); }");
+        WriteTestCSharpFile("C.cs", "public class C { }");
+        var project = await CreateReceiptProjectAsync();
+        var options = new MigrationPlanOptions
+        {
+            Parallel = false, Configuration = "Release",
+            DefinedSymbols = ["EXTRA"],
+            DocumentationMode = Microsoft.CodeAnalysis.DocumentationMode.Diagnose,
+            ParseFeatures = new Dictionary<string, string> { ["receipt-control"] = "true" }
+        };
+        var migrator = new ProjectMigrator(options);
+        var plan = await migrator.CreatePlanAsync(project, MigrationDirection.CSharpToCalor);
+        var before = ReceiptArtifacts(plan);
+        var report = await migrator.ExecuteAsync(plan, progress: new ReceiptProgress(progress =>
+        {
+            if (staleReference && progress.ProcessedFiles == progress.TotalFiles)
+                File.AppendAllText(referencePath, "observed reference changed");
+        }));
+        if (staleReference)
+        {
+            Assert.Equal(3, report.Summary.FailedFiles);
+            AssertReceiptArtifacts(before);
+            return;
+        }
+        Assert.Equal(0, report.Summary.FailedFiles);
+        foreach (var file in report.FileResults)
+        {
+            var receipt = ReadReceipt(file.OutputPath!);
+            Assert.Equal(File.ReadAllText(file.SourcePath), receipt.Original.Text);
+            Assert.Equal(_tempDir, receipt.Settings.GetProperty("ProjectDirectory").GetString());
+            Assert.Equal("Release", receipt.Metadata.Configuration);
+            Assert.Contains("PROJECT_FLAG", receipt.Original.Symbols);
+            Assert.Contains("EXTRA", receipt.Original.Symbols);
+            Assert.Equal("Diagnose", receipt.Original.DocumentationMode);
+            Assert.Equal("true", receipt.Original.Features["receipt-control"]);
+            Assert.False(receipt.Settings.TryGetProperty("UseImplicitCallCloser", out _));
+            Assert.True(receipt.Metadata.ReferencesAreComplete);
+            Assert.Contains(receipt.Metadata.References, reference =>
+                CanonicalPath.Resolve(reference.Path) == CanonicalPath.Resolve(referencePath)
+                && reference.Aliases.SequenceEqual(["External"]));
+            Assert.All(plan.Entries, entry => Assert.Contains(receipt.Siblings,
+                sibling => CanonicalPath.Resolve(sibling.Path) == CanonicalPath.Resolve(entry.SourcePath)
+                    && sibling.Text == File.ReadAllText(entry.SourcePath)
+                    && sibling.Features["receipt-control"] == "true"));
+            Assert.NotEmpty(receipt.ReplayLimitations);
+            if (rescue && file.Losses.Any(loss => loss.Feature == "whole-file-preservation"))
+            {
+                var frame = Assert.Single(receipt.Frames);
+                var boundary = receipt.ResolveBoundary(0, receipt.GeneratedCalor);
+                Assert.Equal(receipt.Original.Text, frame.Payload);
+                Assert.Equal(receipt.Original.Text, boundary.SyntaxTree.GetText().ToString());
+            }
+        }
+        if (rescue)
+            Assert.Contains(report.FileResults, file => file.Issues.Any(issue =>
+                issue.Message.Contains("Project C# validation failed", StringComparison.Ordinal)));
+    }
+
+    private static ProjectMigrator ReceiptMigrator(bool parallel = false)
+        => new(new MigrationPlanOptions { Parallel = parallel, MergePartialClasses = false });
+
+    private MigrationPlan ReceiptPlan(params string[] files) => new()
+    {
+        ProjectPath = _tempDir,
+        Direction = MigrationDirection.CSharpToCalor,
+        Entries = files.Select(file => new MigrationPlanEntry
+        {
+            SourcePath = Path.Combine(_tempDir, file),
+            OutputPath = Path.ChangeExtension(Path.Combine(_tempDir, file), ".calr"),
+            Convertibility = FileConvertibility.Full
+        }).ToList()
+    };
+
+    private static ConversionReceipt ReadReceipt(string output)
+        => ConversionReceipt.Deserialize(File.ReadAllText(output + ".conversion.json"));
+
+    private static Dictionary<string, byte[]?> ReceiptArtifacts(MigrationPlan plan)
+        => plan.Entries.SelectMany(entry => new[] { entry.OutputPath, entry.OutputPath + ".conversion.json" })
+            .Append(Path.Combine(plan.ProjectPath, ".calor", "ids.json")).Distinct()
+            .ToDictionary(path => path, path => File.Exists(path) ? File.ReadAllBytes(path) : null);
+
+    private static void AssertReceiptArtifacts(Dictionary<string, byte[]?> expected, MigrationReport? report = null)
+    {
+        foreach (var pair in expected)
+        {
+            var actual = File.Exists(pair.Key) ? File.ReadAllBytes(pair.Key) : null;
+            Assert.True(pair.Value == null ? actual == null : actual != null && pair.Value.SequenceEqual(actual),
+                $"Artifact changed: {pair.Key}\nBefore: {System.Text.Encoding.UTF8.GetString(pair.Value ?? [])}\n"
+                + $"After: {System.Text.Encoding.UTF8.GetString(actual ?? [])}\n"
+                + JsonSerializer.Serialize(report?.FileResults.Select(file => new { file.SourcePath, file.Status, file.Issues })));
+        }
+    }
+
+    private async Task<string> CreateReceiptProjectAsync()
+    {
+        var project = Path.Combine(_tempDir, "Receipt.csproj");
+        File.WriteAllText(project, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <DefineConstants>PROJECT_FLAG</DefineConstants>
+              </PropertyGroup>
+              <ItemGroup Condition="Exists('External.dll')">
+                <Reference Include="External"><HintPath>External.dll</HintPath><Aliases>External</Aliases></Reference>
+              </ItemGroup>
+            </Project>
+            """);
+        var start = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
+            WorkingDirectory = _tempDir
+        };
+        foreach (var arg in new[] { "restore", project, "--source", _tempDir, "--disable-parallel",
+                     "-p:NuGetAudit=false", "-p:UseSharedCompilation=false", "-nodeReuse:false" })
+            start.ArgumentList.Add(arg);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.True(process.ExitCode == 0, await output + await error);
+        return project;
+    }
+
+    private sealed class ReceiptProgress(Action<MigrationProgress> callback) : IProgress<MigrationProgress>
+    {
+        public void Report(MigrationProgress value) => callback(value);
     }
 
     private static readonly string SimpleCSharpSource = """
@@ -486,14 +891,12 @@ public class MigrateWorkflowTests : IDisposable
 
         // Write a .calr file directly with known contracts
         var calrSource = """
-            §M{m001:VerifyTest}
-
-              §F{f001:Square:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q (>= x 0)
-                  §S (>= result 0)
-                  §R (* x x)
+            module VerifyTest VerifyTest block
+              func Square (int:x) → int
+                !
+                requires (x >= 0)
+                => (result >= 0)
+                return (x * x)
 
             """;
 

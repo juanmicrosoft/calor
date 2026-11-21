@@ -45,6 +45,15 @@ public class EvaluationContext
     /// </summary>
     public Dictionary<string, object> Metadata { get; init; } = new();
 
+    /// <summary>
+    /// The project identity sidecar (<c>.calor/ids.json</c>) that registers this Calor input,
+    /// or null when the input has none. ID-based metrics read declaration IDs from it.
+    /// </summary>
+    public string? CalorIdentitySidecar { get; init; }
+
+    /// <summary>The input's path relative to the sidecar's project root, when a sidecar is set.</summary>
+    public string? CalorIdentityFile { get; init; }
+
     private CalorCompilationResult? _calorCompilation;
     private CSharpCompilationResult? _csharpCompilation;
 

@@ -1,0 +1,85 @@
+module L1M01 L1M01 block
+  module L1M01Module public
+
+    func l1m01_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M25.L2M25Module.l2m25_fn05(x, 71)
+      return (v1 + y)
+
+    func l1m01_fn02 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 20000)
+      let int:total = ((x * 3) + y)
+      if (total < 20000)
+        return 20000
+      else
+        return total
+
+    func l1m01_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M24.L2M24Module.l2m24_fn04(x, 6)
+      return (v1 + y)
+
+    func l1m01_fn04 public (int:x, int:y) → int
+      !
+      requires (x > 5)
+      => (x >= 6)
+      let int:acc = ((x * 3) + y)
+      if (acc > 20007)
+        return (acc + 20007)
+      else
+        return ((acc * 2) + 20007)
+
+    func l1m01_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M09.L2M09Module.l2m09_fn11(x, 32)
+      return (v1 + y)
+
+    func l1m01_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M10.L2M10Module.l2m10_fn03(x, 27)
+      let int:v2 = L2M20.L2M20Module.l2m20_fn06(x, 51)
+      return ((v1 + v2) + y)
+
+    func l1m01_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20014)
+      let int:total = ((x * 3) + y)
+      if (total > 20014)
+        return 20014
+      return total
+
+    func l1m01_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M03.L2M03Module.l2m03_fn08(x, 15)
+      let int:v2 = L2M23.L2M23Module.l2m23_fn01(x, 81)
+      return ((v1 + v2) + y)
+
+    func l1m01_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M33.L2M33Module.l2m33_fn04(x, 83)
+      return (v1 + y)
+
+    func l1m01_fn10 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M08.L2M08Module.l2m08_fn08(x, 64)
+      return (v1 + y)
+
+    func l1m01_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M21.L2M21Module.l2m21_fn04(x, 51)
+      return (v1 + y)
+
+    func l1m01_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M34.L2M34Module.l2m34_fn02(x, 2)
+      return (v1 + y)
+
+    func l1m01_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M32.L2M32Module.l2m32_fn06(x, 28)
+      let int:v2 = L2M26.L2M26Module.l2m26_fn04(x, 25)
+      return ((v1 + v2) + y)

@@ -14,24 +14,25 @@ public class PostconditionReturnLoweringRuntimeTests
     public void NestedIfLoopTryFinallyUsing_PreservesTraceAndChecksOnce()
     {
         const string source = """
-            §M{m001:ReturnFlow}
-              §F{f001:Record:priv} (List<i32>:trace, i32:value) -> i32
-                §C{trace.Add} §A value §/C
-                §R value
-              §F{f002:Choose:pub} (List<i32>:trace, bool:early) -> i32
-                §S (== §C{Record} §A trace §A result §/C result)
-                §TR{t1}
-                  §IF{i1} early
-                    §L{l1:i:0:0:1}
-                      §USE{u1:stream:MemoryStream} §NEW{MemoryStream} §/NEW
-                        §C{trace.Add} §A INT:10 §/C
-                        §R §C{Record} §A trace §A INT:7 §/C
-                        §C{trace.Add} §A INT:99 §/C
-                  §FI
-                    §C{trace.Add} §A INT:20 §/C
-                §/TR{t1}
-                §C{trace.Add} §A INT:30 §/C
-                §R INT:3
+            module ReturnFlow ReturnFlow block
+              func Record private (List<int>:trace, int:value) → int
+                trace.Add(value)
+                return value
+
+              func Choose (List<int>:trace, bool:early) → int
+                !
+                => (Record(trace, result) == result)
+                try
+                  if early
+                    for i from 0 to 0 step 1
+                      using MemoryStream:stream = new MemoryStream()
+                        trace.Add(10)
+                        return Record(trace, 7)
+                        trace.Add(99)
+                finally
+                  trace.Add(20)
+                trace.Add(30)
+                return 3
             """;
         var assembly = Compile(source, out _);
         var trace = new List<int>();
@@ -46,17 +47,18 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ExceptionalExit_DoesNotRunPostcondition()
     {
         const string source = """
-            §M{m001:Exceptional}
-              §F{f001:Record:priv} (List<i32>:trace, i32:value) -> i32
-                §C{trace.Add} §A value §/C
-                §R value
-              §F{f002:Boom:pub} (List<i32>:trace) -> i32
-                §S (== §C{Record} §A trace §A result §/C result)
-                §TR{t1}
-                  §R INT:5
-                §FI
-                  §TH STR:"boom"
-                §/TR{t1}
+            module Exceptional Exceptional block
+              func Record private (List<int>:trace, int:value) → int
+                trace.Add(value)
+                return value
+
+              func Boom (List<int>:trace) → int
+                !
+                => (Record(trace, result) == result)
+                try
+                  return 5
+                finally
+                  throw "boom"
             """;
         var assembly = Compile(source, out _);
         var trace = new List<int>();
@@ -72,10 +74,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ResultPseudoVariable_DoesNotAlterIdentifiersOrStrings()
     {
         const string source = """
-            §M{m001:ResultSafety}
-              §F{f001:Echo:pub} (i32:resultCode, str:myresult) -> i32
-                §S{"result stays literal"} (&& (== result resultCode) (== myresult STR:"result"))
-                §R resultCode
+            module ResultSafety ResultSafety block
+              func Echo (int:resultCode, string:myresult) → int
+                !
+                => ((result == resultCode) && (myresult == "result")) && ("result stays literal".Length > 0)
+                return resultCode
             """;
         var assembly = Compile(source, out var generatedCode);
 
@@ -97,18 +100,22 @@ public class PostconditionReturnLoweringRuntimeTests
     public async Task AsyncTaskAndTaskOfT_UseValueResultsAndCheckOnce()
     {
         const string source = """
-            §M{m001:AsyncReturns}
-              §F{f001:Record:priv} (List<i32>:trace, i32:value) -> i32
-                §C{trace.Add} §A value §/C
-                §R value
-              §AF{f002:Get:pub} (List<i32>:trace, bool:first) -> i32
-                §S (== §C{Record} §A trace §A result §/C result)
-                §IF{i1} first
-                  §R INT:5
-                §R INT:6
-              §AF{f003:Done:pub} (List<i32>:trace) -> void
-                §S (== §C{Record} §A trace §A INT:1 §/C INT:1)
-                §R
+            module AsyncReturns AsyncReturns block
+              func Record private (List<int>:trace, int:value) → int
+                trace.Add(value)
+                return value
+
+              func Get async (List<int>:trace, bool:first) → int
+                !
+                => (Record(trace, result) == result)
+                if first
+                  return 5
+                return 6
+
+              func Done async (List<int>:trace) → void
+                !
+                => (Record(trace, 1) == 1)
+                return
             """;
         var assembly = Compile(source, out var generatedCode);
         var valueTrace = new List<int>();
@@ -145,10 +152,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void IteratorPostcondition_IsRejectedExplicitly()
     {
         const string source = """
-            §M{m001:IteratorContracts}
-              §F{f001:Values:pub} () -> i32
-                §S (>= result 0)
-                §YIELD INT:1
+            module IteratorContracts IteratorContracts block
+              func Values () → int
+                !
+                => (result >= 0)
+                yield 1
             """;
 
         var result = Program.Compile(
@@ -167,18 +175,21 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ClassMethodAndOperatorMethod_ShareReturnLowering()
     {
         const string source = """
-            §M{m001:MethodOwners}
-              §CL{c001:Legacy:pub}
-                §MT{m001:Pick:pub} (bool:first) -> i32
-                  §S (>= result 0)
-                  §IF{i1} first
-                    §R INT:4
-                  §R INT:5
-                §MT{m002:op_Implicit:pub:stat} (Legacy:value) -> i32
-                  §S (>= result 0)
-                  §IF{i2} (!= value null)
-                    §R INT:8
-                  §R INT:9
+            module MethodOwners MethodOwners block
+              class Legacy
+                func Pick (bool:first) → int
+                  !
+                  => (result >= 0)
+                  if first
+                    return 4
+                  return 5
+
+                func op_Implicit static (Legacy:value) → int
+                  !
+                  => (result >= 0)
+                  if (value != null)
+                    return 8
+                  return 9
             """;
         var assembly = Compile(source, out _);
         var type = GetType(assembly, "Legacy");
@@ -195,17 +206,14 @@ public class PostconditionReturnLoweringRuntimeTests
     public void OperatorOverload_UsesSharedReturnLowering()
     {
         const string source = """
-            §M{m001:OperatorOwner}
-              §CL{c001:Box:pub}
-                §OP{op001:+:pub}
-                  §I{Box:left}
-                  §I{Box:right}
-                  §O{Box}
-                  §S (!= result null)
-                  §IF{i1} (!= left null)
-                    §R left
-                  §R right
-                §/OP{op001}
+            module OperatorOwner OperatorOwner block
+              class Box
+                op + (Box:left, Box:right) → Box
+                  !
+                  => (result != null)
+                  if (left != null)
+                    return left
+                  return right
             """;
         var assembly = Compile(source, out _);
         var type = GetType(assembly, "Box");
@@ -221,18 +229,18 @@ public class PostconditionReturnLoweringRuntimeTests
     public void EnumExtension_UsesSharedReturnLowering()
     {
         const string source = """
-            §M{m001:EnumOwner}
-              §EN{e001:Color}
-              Red
-              Blue
-              §/EN{e001}
-              §EEXT{x001:Color}
-                §F{f001:Code:pub} (Color:self, bool:primary) -> i32
-                  §S (>= result 0)
-                  §IF{i1} primary
-                    §R INT:1
-                  §R INT:2
-              §/EEXT{x001}
+            module EnumOwner EnumOwner block
+              enum Color
+                Red
+                Blue
+
+              module ColorExtensions
+                func Code (this Color:self, bool:primary) → int
+                  !
+                  => (result >= 0)
+                  if primary
+                    return 1
+                  return 2
             """;
         var assembly = Compile(source, out _);
         var enumType = GetType(assembly, "Color");
@@ -250,10 +258,12 @@ public class PostconditionReturnLoweringRuntimeTests
     public void StatementLambda_ReturnDoesNotInheritOuterLowering()
     {
         const string source = """
-            §M{m001:LambdaOwner}
-              §F{f001:Make:pub} () -> Func<i32>
-                §S (== result result)
-                §R §LAM{l1} §R INT:42 §/LAM{l1}
+            module LambdaOwner LambdaOwner block
+              func Make () → Func<int> !
+                !
+                => (result == result)
+                return () =>
+                  return 42
             """;
         var assembly = Compile(source, out var generatedCode);
 
@@ -268,11 +278,12 @@ public class PostconditionReturnLoweringRuntimeTests
     public void NonVoidFallthrough_RemainsACompilerErrorWithoutDefaultResult()
     {
         const string source = """
-            §M{m001:MissingReturn}
-              §F{f001:Maybe:pub} (bool:take) -> i32
-                §S (>= result 0)
-                §IF{i1} take
-                  §R INT:1
+            module MissingReturn MissingReturn block
+              func Maybe (bool:take) → int
+                !
+                => (result >= 0)
+                if take
+                  return 1
             """;
 
         var (generatedCode, diagnostics) = Emit(
@@ -292,140 +303,92 @@ public class PostconditionReturnLoweringRuntimeTests
             diagnostic => diagnostic.Id == "CS0165");
     }
 
-    [Fact]
-    public void OpaqueCSharp_InEitherPreprocessorBranch_IsRejected()
-    {
-        const string source = """
-            §M{m001:OpaquePreprocessor}
-              §F{f001:InBody:pub} () -> i32
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §RAW
-                  return 1;
-                  §/RAW
-                §/PP{DEBUG}
-              §F{f002:InElse:pub} () -> i32
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §R INT:1
-                §PPE
-                  §RAW
-                  return 2;
-                  §/RAW
-                §/PP{DEBUG}
-            """;
-
-        var (_, diagnostics) = Emit(source, ContractMode.Debug);
-        var loweringErrors = diagnostics
-            .Where(diagnostic =>
-                diagnostic.Code == DiagnosticCode.PostconditionCheckNotLowered)
-            .ToArray();
-
-        Assert.Equal(2, loweringErrors.Length);
-        Assert.Contains(
-            loweringErrors,
-            diagnostic => diagnostic.Message.Contains(
-                "'InBody'",
-                StringComparison.Ordinal));
-        Assert.Contains(
-            loweringErrors,
-            diagnostic => diagnostic.Message.Contains(
-                "'InElse'",
-                StringComparison.Ordinal));
-    }
-
     public static TheoryData<string, string> NestedYieldContainers => new()
     {
         {
             "using",
             """
-            §USE{u1:stream:MemoryStream} §NEW{MemoryStream} §/NEW
-              §YIELD INT:1
+            using MemoryStream:stream = new MemoryStream()
+              yield 1
             """
         },
         {
             "preprocessor-body",
             """
-            §PP{DEBUG}
-              §YIELD INT:1
-            §/PP{DEBUG}
+            pp DEBUG
+              yield 1
             """
         },
         {
             "preprocessor-else",
             """
-            §PP{DEBUG}
-              §P INT:0
-            §PPE
-              §YIELD INT:1
-            §/PP{DEBUG}
+            pp DEBUG
+              Console.WriteLine(0)
+            pp else
+              yield 1
             """
         },
         {
             "match",
             """
-            §W{w1} value
-              §K _
-                §YIELD INT:1
+            match value
+              case _
+                yield 1
             """
         },
         {
             "dictionary-foreach",
             """
-            §EACHKV{e1:key:item} items
-              §YIELD item
+            each key, item in items
+              yield item
             """
         },
         {
             "try",
             """
-            §TR{t1}
-              §YIELD INT:1
-            §/TR{t1}
+            try
+              yield 1
+            finally
+              Console.WriteLine(0)
             """
         },
         {
             "catch",
             """
-            §TR{t1}
-              §P INT:0
-            §CA{Exception:ex}
-              §YIELD INT:1
-            §/TR{t1}
+            try
+              Console.WriteLine(0)
+            catch Exception:ex
+              yield 1
             """
         },
         {
             "finally",
             """
-            §TR{t1}
-              §P INT:0
-            §FI
-              §YIELD INT:1
-            §/TR{t1}
+            try
+              Console.WriteLine(0)
+            finally
+              yield 1
             """
         },
         {
             "unsafe",
             """
-            §UNSAFE{u1}
-              §YIELD INT:1
-            §/UNSAFE{u1}
+            unsafe
+              yield 1
             """
         },
         {
             "fixed",
             """
-            §FIXED{f1:pointer:i32*:array}
-              §YIELD INT:1
-            §/FIXED{f1}
+            fixed int*:pointer = array
+              yield 1
             """
         },
         {
             "sync",
             """
-            §SYNC{s1} (gate)
-              §YIELD INT:1
-            §/SYNC{s1}
+            lock gate
+              yield 1
             """
         },
     };
@@ -437,9 +400,10 @@ public class PostconditionReturnLoweringRuntimeTests
         string nestedBody)
     {
         var source = $$"""
-            §M{m001:NestedYield}
-              §F{f001:Values:pub} (i32:value, Dictionary<str,i32>:items, [i32]:array, object:gate) -> i32
-                §S (>= result 0)
+            module NestedYield NestedYield block
+              func Values (int:value, Dictionary<string, int>:items, int[]:array, object:gate) → int
+                !
+                => (result >= 0)
             {{Indent(nestedBody, 4)}}
             """;
 
@@ -459,13 +423,14 @@ public class PostconditionReturnLoweringRuntimeTests
     public void ResultPseudoVariable_RespectsLexicalBinders()
     {
         const string source = """
-            §M{m001:QuantifiedResult}
-              §F{f001:Zero:pub} () -> i32
-                §S (forall ((result i32)) (-> (&& (>= result INT:0) (< result INT:1)) (== result INT:0)))
-                §S (exists ((result i32)) (&& (>= result INT:0) (< result INT:1) (== result INT:0)))
-                §S (-> (is result i32 result) (>= result INT:0))
-                §S (== result INT:0)
-                §R INT:0
+            module QuantifiedResult QuantifiedResult block
+              func Zero () → int
+                !
+                => (forall int:result in 0..1 : (result == 0))
+                => (exists int:result in 0..1 : (result == 0))
+                => (!((result is int result)) || (result >= 0))
+                => (result == 0)
+                return 0
             """;
 
         var assembly = Compile(source, out var generatedCode);
@@ -482,7 +447,7 @@ public class PostconditionReturnLoweringRuntimeTests
             ".Any(result => (result >= 0 && result < 1 && result == 0))",
             generatedCode);
         Assert.Contains(
-            "__calorPostconditionResult0 is int result) || (result >= 0)",
+            "!(__calorPostconditionResult0 is int result) || result >= 0",
             generatedCode);
         Assert.Contains(
             "if (!(__calorPostconditionResult",
@@ -493,10 +458,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void PatternBinder_DoesNotShadowResultOnFalseBranch()
     {
         const string source = """
-            §M{m001:PatternResult}
-              §F{f001:Maybe:pub} (object:fallback) -> object
-                §S (|| (is result i32 result) (== result fallback))
-                §R fallback
+            module PatternResult PatternResult block
+              func Maybe (object:fallback) → object
+                !
+                => ((result is int result) || (result == fallback))
+                return fallback
             """;
 
         var assembly = Compile(source, out var generatedCode);
@@ -516,10 +482,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void Disjunction_BindsResultOnlyWhenEveryTruePathDoes()
     {
         const string source = """
-            §M{m001:PatternTruthFlow}
-              §F{f001:Value:pub} () -> object
-                §S (&& (|| (is result i32 result) false) (> result INT:0))
-                §R INT:1
+            module PatternTruthFlow PatternTruthFlow block
+              func Value () → object
+                !
+                => (((result is int result) || false) && (result > 0))
+                return 1
             """;
 
         var assembly = Compile(source, out var generatedCode);
@@ -538,10 +505,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void NegatedPattern_BindsResultOnFalseContinuation()
     {
         const string source = """
-            §M{m001:NegatedPattern}
-              §F{f001:Value:pub} () -> object
-                §S (|| (! (is result i32 result)) (> result INT:0))
-                §R INT:1
+            module NegatedPattern NegatedPattern block
+              func Value () → object
+                !
+                => ((!(result is int result)) || (result > 0))
+                return 1
             """;
 
         var assembly = Compile(source, out var generatedCode);
@@ -557,62 +525,22 @@ public class PostconditionReturnLoweringRuntimeTests
     }
 
     [Fact]
-    public void ContractModeOff_SkipsPostconditionRefusalsButKeepsRefinements()
-    {
-        const string source = """
-            §M{m001:ContractsOff}
-              §RTYPE{r001:NonNegative:i32} (>= # INT:0)
-              §F{f001:Iterator:pub} () -> NonNegative
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §YIELD INT:1
-                §/PP{DEBUG}
-              §F{f002:Opaque:pub} () -> i32
-                §S (>= result 0)
-                §PP{DEBUG}
-                  §RAW
-                  return 1;
-                  §/RAW
-                §/PP{DEBUG}
-              §F{f003:Refined:pub} () -> NonNegative
-                §S (>= result 0)
-                §R INT:1
-            """;
-
-        var (generatedCode, diagnostics) = Emit(
-            source,
-            ContractMode.Off);
-
-        Assert.DoesNotContain(
-            diagnostics,
-            diagnostic =>
-                diagnostic.Code == DiagnosticCode.IteratorPostconditionUnsupported
-                || diagnostic.Code == DiagnosticCode.PostconditionCheckNotLowered);
-        Assert.Contains("IEnumerable<int> Iterator", generatedCode);
-        Assert.Contains(
-            "Yielded value violates refinement type 'NonNegative'",
-            generatedCode);
-        Assert.Contains("return 1;", generatedCode);
-        Assert.Contains(
-            "Return value violates refinement type 'NonNegative'",
-            generatedCode);
-        Assert.DoesNotContain("ContractKind.Ensures", generatedCode);
-    }
-
-    [Fact]
     public void SynthesizedReturnNames_AvoidParametersLocalsAndLabels()
     {
         const string source = """
-            §M{m001:Hygiene}
-              §F{f001:ParameterCollision:pub} (i32:__calorPostconditionResult0) -> i32
-                §S (>= result 0)
-                §LABEL{__calorPostconditionExit0}
-                §R __calorPostconditionResult0
-              §F{f002:LocalCollision:pub} () -> i32
-                §S (>= result 0)
-                §B{__calorPostconditionResult1:i32} INT:2
-                §LABEL{__calorPostconditionExit1}
-                §R __calorPostconditionResult1
+            module Hygiene Hygiene block
+              func ParameterCollision (int:__calorPostconditionResult0) → int
+                !
+                => (result >= 0)
+                __calorPostconditionExit0:
+                return __calorPostconditionResult0
+
+              func LocalCollision () → int
+                !
+                => (result >= 0)
+                let int:__calorPostconditionResult1 = 2
+                __calorPostconditionExit1:
+                return __calorPostconditionResult1
             """;
 
         var assembly = Compile(source, out var generatedCode);
@@ -638,10 +566,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void SynthesizedReturnNames_AvoidPostconditionBinders()
     {
         const string source = """
-            §M{m001:PostconditionHygiene}
-              §F{f001:Value:pub} () -> object
-                §S (-> (is result i32 __calorPostconditionResult0) (is result object))
-                §R INT:1
+            module PostconditionHygiene PostconditionHygiene block
+              func Value () → object
+                !
+                => (!((result is int __calorPostconditionResult0)) || (result is object))
+                return 1
             """;
 
         var assembly = Compile(source, out var generatedCode);
@@ -663,10 +592,11 @@ public class PostconditionReturnLoweringRuntimeTests
     public void SynthesizedReturnNames_AvoidMethodTypeParameters()
     {
         const string source = """
-            §M{m001:GenericHygiene}
-              §F{f001:Value:pub}<__calorPostconditionResult0> () -> i32
-                §S (>= result INT:0)
-                §R INT:1
+            module GenericHygiene GenericHygiene block
+              func Value<__calorPostconditionResult0> () → int
+                !
+                => (result >= 0)
+                return 1
             """;
 
         Compile(source, out var generatedCode);

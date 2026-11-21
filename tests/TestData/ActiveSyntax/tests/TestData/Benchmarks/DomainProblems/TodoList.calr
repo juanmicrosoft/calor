@@ -1,0 +1,19 @@
+module TodoList TodoList
+  module TodoListModule
+    func AddTask public (int:count) → int
+      !
+      return count + 1
+
+    func CompleteTask public (int:completedCount) → int
+      !
+      return completedCount + 1
+
+    func PendingCount public (int:total, int:completed) → int
+      !
+      requires total >= completed
+      => result >= 0
+      return total - completed
+
+    func AllDone public (int:total, int:completed) → bool
+      !
+      return total == completed

@@ -88,8 +88,9 @@ CLAUDE.md.bak
 tests/TestData/Verification/**/.calor/
 tests/TestData/Verification/**/*.g.cs
 
-# Verification cache directories from ad-hoc verify runs anywhere in the tree
-.calor/
+# Tooling identity is versioned; caches, locks and recovery journals stay local.
+**/.calor/*
+!**/.calor/ids.json
 
 # Harness run-internal state must not be committed with epoch results
 bench/phase0-agent-native/epochs/**/.envelope-src/

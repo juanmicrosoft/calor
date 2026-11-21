@@ -1,0 +1,17 @@
+module DictOps DictOps
+  module DictOpsModule
+    func ContainsKey public (bool:found) → bool
+      !
+      return found
+
+    func EntryCount public (int:count) → int
+      !
+      => result >= 0
+      return count
+
+    func GetOrDefault public (int:value, int:defaultVal, bool:exists) → int
+      !
+      if exists
+        return value
+      else
+        return defaultVal

@@ -66,12 +66,14 @@ public static class VerifyCommand
         var clearCacheOption = new Option<bool>(
             aliases: ["--clear-cache"],
             description: "Clear verification cache before verifying");
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system", "Validate without the implicit System project import");
 
         var weakeningOption = new Option<string?>(
             aliases: ["--weakening-check"],
             description: "M-G4 mode (gates doc Annex A-1.3): with exactly two input files "
                 + "(frozen, final), mechanically decide whether the named declaration's "
-                + "§Q/§S conjunction was weakened — prints a JSON verdict, exit 0");
+                + "requires/=> conjunction was weakened — prints a JSON verdict, exit 0");
 
         var command = new Command("verify", "Verify contracts in Calor files using Z3 SMT solver")
         {
@@ -82,6 +84,7 @@ public static class VerifyCommand
             timeoutOption,
             noCacheOption,
             clearCacheOption,
+            noImplicitSystemOption,
             weakeningOption
         };
 
@@ -106,7 +109,8 @@ public static class VerifyCommand
                 ctx.ParseResult.GetValueForOption(verboseOption),
                 ctx.ParseResult.GetValueForOption(timeoutOption),
                 ctx.ParseResult.GetValueForOption(noCacheOption),
-                ctx.ParseResult.GetValueForOption(clearCacheOption));
+                ctx.ParseResult.GetValueForOption(clearCacheOption),
+                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
         });
 
         return command;
@@ -119,7 +123,8 @@ public static class VerifyCommand
         bool verbose,
         int timeout,
         bool noCache,
-        bool clearCache)
+        bool clearCache,
+        bool includeImplicitSystemUsing)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("verify");
@@ -141,7 +146,24 @@ public static class VerifyCommand
         // every contract is proven or merely unknown/timeout/unsupported —
         // inconclusive is not failure (runtime checks are kept). Applies to
         // both text and JSON modes.
-        var hasErrors = false;
+        var identityDiagnostics = new DiagnosticBag();
+        try
+        {
+            Ids.DeclarationIdentityStore.SyncActiveInputs(files
+                .Where(file => file.Exists && file.Extension.Equals(".calr", StringComparison.OrdinalIgnoreCase))
+                .Select(file => file.FullName));
+        }
+        catch (Ids.DeclarationIdentityParseException ex)
+        {
+            identityDiagnostics.AddRange(ex.Diagnostics);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+            or System.Text.Json.JsonException or UnauthorizedAccessException)
+        {
+            identityDiagnostics.Report(TextSpan.Empty, DiagnosticCode.DeclarationIdentityUnavailable, ex.Message);
+        }
+        aggregatedDiagnostics.AddRange(identityDiagnostics);
+        var hasErrors = identityDiagnostics.HasErrors;
 
         // JSON (the only machine-readable format; FormatOutput renders every
         // other value as text): --verbose compiler phase lines go to stderr so
@@ -170,9 +192,16 @@ public static class VerifyCommand
                 continue;
             }
 
+            if (identityDiagnostics.HasErrors)
+            {
+                results.Add(new FileVerificationResult(file.Name, file.FullName,
+                    new VerificationSummary(0, 0, 0, 0, 0), [], identityDiagnostics));
+                continue;
+            }
+
             try
             {
-                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache, declarationIds, statusWriter);
+                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache, declarationIds, statusWriter, includeImplicitSystemUsing);
                 results.Add(result);
                 aggregatedDiagnostics.AddRange(result.Diagnostics);
 
@@ -237,12 +266,10 @@ public static class VerifyCommand
         bool noCache,
         bool clearCache,
         DeclarationIdResolver declarationIds,
-        TextWriter? statusWriter)
+        TextWriter? statusWriter,
+        bool includeImplicitSystemUsing)
     {
         var source = await File.ReadAllTextAsync(file.FullName);
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath(file.FullName);
-
         var cacheOptions = new VerificationCacheOptions
         {
             Enabled = !noCache,
@@ -252,6 +279,7 @@ public static class VerifyCommand
 
         var options = new CompilationOptions
         {
+            IncludeImplicitSystemUsing = includeImplicitSystemUsing,
             Verbose = verbose,
             StatusWriter = statusWriter,
             VerifyContracts = true,
@@ -696,24 +724,46 @@ public static class VerifyCommand
             return 2;
         }
 
-        static Ast.ModuleNode? ParseFile(FileInfo file, out bool hadErrors)
+        static Ast.ModuleNode? ParseFile(FileInfo file, out bool hadErrors, out string? identityError)
         {
             hadErrors = false;
+            identityError = null;
             if (!file.Exists)
             {
                 hadErrors = true;
                 return null;
             }
             var diagnostics = new Diagnostics.DiagnosticBag();
-            var lexer = new Parsing.Lexer(File.ReadAllText(file.FullName), diagnostics);
-            var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
+            var source = File.ReadAllText(file.FullName);
+            var lexer = new Parsing.Lexer(source, diagnostics);
+            var tokens = lexer.TokenizeAllForParser();
+            if (diagnostics.HasErrors)
+            {
+                hadErrors = true;
+                return null;
+            }
+            var parser = new Parsing.Parser(tokens, diagnostics);
             var module = parser.Parse();
             hadErrors = diagnostics.HasErrors;
+            if (!hadErrors)
+            {
+                try
+                {
+                    Ids.DeclarationIdentityStore.SyncActiveInputs([file.FullName]);
+                    Ids.DeclarationIdentityStore.AttachIfRegistered(file.FullName, source, module);
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+                    or System.Text.Json.JsonException or UnauthorizedAccessException)
+                {
+                    identityError = $"--weakening-check: declaration identity unavailable for '{file.FullName}': {ex.Message}";
+                    return null;
+                }
+            }
             return module;
         }
 
         static Ast.FunctionNode? FindDeclaration(Ast.ModuleNode? module, string id)
-            => module?.Functions.FirstOrDefault(f => f.Id == id);
+            => module?.Functions.SingleOrDefault(f => f.ToolingId == id);
 
         static List<Ast.ExpressionNode> Preconditions(Ast.FunctionNode fn)
             => fn.Preconditions.Select(p => p.Condition).ToList();
@@ -759,7 +809,12 @@ public static class VerifyCommand
             return 0;
         }
 
-        var frozenModule = ParseFile(files[0], out var frozenErrors);
+        var frozenModule = ParseFile(files[0], out var frozenErrors, out var frozenIdentityError);
+        if (frozenIdentityError != null)
+        {
+            Console.Error.WriteLine(frozenIdentityError);
+            return 2;
+        }
         var frozenFn = FindDeclaration(frozenModule, declarationId);
         if (frozenErrors || frozenFn == null)
         {
@@ -767,7 +822,12 @@ public static class VerifyCommand
             return 2;
         }
 
-        var finalModule = ParseFile(files[1], out var finalErrors);
+        var finalModule = ParseFile(files[1], out var finalErrors, out var finalIdentityError);
+        if (finalIdentityError != null)
+        {
+            Console.Error.WriteLine(finalIdentityError);
+            return 2;
+        }
         if (finalErrors || finalModule == null)
         {
             return Emit(declarationId, weakened: true, indeterminate: false,
@@ -913,8 +973,8 @@ public static class VerifyCommand
                 sWeakened && qStrengthened
                     ? "postcondition relaxed and precondition strengthened — weakened"
                     : sWeakened
-                        ? "frozen §S implies final §S but not conversely — postcondition weakened"
-                        : "final §Q implies frozen §Q but not conversely — precondition strengthened (prover appeasement)",
+                        ? "frozen postcondition implies final postcondition but not conversely — postcondition weakened"
+                        : "final precondition implies frozen precondition but not conversely — precondition strengthened (prover appeasement)",
                 false, sF, sB, qF, qB);
         }
 

@@ -4,6 +4,7 @@ section: "benchmarking"
 order: 3
 ---
 
+> **Syntax and measurement:** Code illustrations use current native syntax. The tag-based calculator rules and published numbers below describe archived source, not a remeasurement of these illustrations.
 
 **Category:** Comprehension
 **Historical dashboard result:** Calor wins (1.84x across 217 programs)
@@ -27,28 +28,34 @@ When an AI agent reads code, it needs to answer:
 - What side effects are possible?
 - What constraints must hold?
 
-Traditional languages require parsing and inference. Calor makes these explicit.
+Both languages require parsing and name resolution. Calor gives effects and
+contracts declaration syntax; this metric counts surface signals rather than
+testing whether an agent understands them.
 
 ---
 
 ## How It's Measured
 
-### Calor Clarity Factors
+### Archived Calor Clarity Factors
+
+These are named descriptions of the historical marker checks against the
+recorded corpus, not current authoring instructions. Exact detector spellings
+belong to the recorded calculator source, not native examples.
 
 | Factor | Points | Check |
 |:-------|:-------|:------|
-| Module declaration | 0.15 | Contains `§M{` |
-| Function declaration | 0.15 | Contains `§F{` |
-| Input parameters | 0.10 | Contains `§I{` |
-| Output type | 0.10 | Contains `§O{` |
-| Return statement | 0.10 | Contains `§R` |
-| Effect declaration | 0.15 | Contains `§E{` |
-| Requires contract | 0.15 | Contains `§Q` |
-| Ensures contract | 0.10 | Contains `§S` |
+| Module declaration | 0.15 | Recorded module marker |
+| Function declaration | 0.15 | Recorded function marker |
+| Input parameters | 0.10 | Recorded input marker |
+| Output type | 0.10 | Recorded output marker |
+| Return statement | 0.10 | Recorded return marker |
+| Effect declaration | 0.15 | Recorded effect marker |
+| Requires contract | 0.15 | Recorded precondition marker |
+| Ensures contract | 0.10 | Recorded postcondition marker |
 | Indented body line (proportional) | up to 0.10 | Matches `^[ \t]+\S` |
-| Indent-form completeness | 0.05 | At least one indented body line per `§F{` opener |
+| Indent-form completeness | 0.05 | At least one indented body line per recorded function opener |
 
-### C# Clarity Factors
+### Archived C# Clarity Factors
 
 | Factor | Points | Check |
 |:-------|:-------|:------|
@@ -66,33 +73,35 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 ## Example Comparison
 
-### Calor (High Clarity)
+### Current Calor Illustration
 
 ```calor
-§M{m001:Calculator}
-  §F{f001:Divide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §S (>= result 0)
-    §R (/ a b)
+module Calculator
+  func Divide (int:a, int:b) → int
+    !
+    requires b != 0
+    => result >= 0
+    return a / b
 ```
 
-**Score calculation:**
-- `§M{`: +0.15
-- `§F{`: +0.15
-- `§I{`: +0.10
-- `§O{`: +0.10
-- `§R`: +0.10
-- `§Q`: +0.15
-- `§S`: +0.10
+**Archived score calculation, not a score for the native illustration above:**
+- Module marker: +0.15
+- Function marker: +0.15
+- Input marker: +0.10
+- Output marker: +0.10
+- Return marker: +0.10
+- Precondition marker: +0.15
+- Postcondition marker: +0.10
 - Indented body lines: +0.10 (proportional)
-- Indent-form completeness (every `§F{` has an indented body): +0.05
+- Indent-form completeness (every recorded function has an indented body): +0.05
 
 **Total: 1.00**
 
-### C# (Lower Clarity)
+Current preconditions use `requires`; postconditions use `=>`. This preserves
+the original Divide contracts, including `result >= 0`. The precondition alone
+does not prove that postcondition: a negative quotient violates it.
+
+### Unchanged C# Comparison
 
 ```csharp
 namespace Calculator
@@ -123,6 +132,12 @@ namespace Calculator
 **Illustrative ratio: 0.95 / 0.65 = 1.46x.** This single example is not the
 aggregate historical result.
 
+The archived narrative reports a Calor total of 1.00 but uses 0.95 in this ratio.
+Those historical numbers are retained, not recalculated for current syntax.
+The implementations agree on valid integer quotients. Their failure behavior is
+not interchangeable: Calor's runtime contracts and C#'s conditional `Debug.Assert`
+do not establish the same postcondition-enforcement behavior.
+
 ---
 
 ## What Agents Can Extract
@@ -131,14 +146,14 @@ aggregate historical result.
 
 | Information | Extraction Method |
 |:------------|:------------------|
-| Function name | Parse `§F{id:name:vis}` |
-| Function ID | Parse `§F{id:name:vis}` |
-| Inputs | Find all `§I{type:name}` |
-| Output type | Parse `§O{type}` |
-| Side effects | Parse `§E{codes}` |
-| Preconditions | Find all `§Q condition` |
-| Postconditions | Find all `§S condition` |
-| Scope boundaries | `§F{id}` opener followed by indented body lines (terminated by dedent in indent form) |
+| Function name | Read `func Divide` |
+| Function ID | Query the project tools' `.calor/ids.json` sidecar; no ID is written in the declaration |
+| Inputs | Read the typed parameter list, such as `(int:a, int:b)` |
+| Output type | Read the signature after `→` |
+| Side effects | Read the `!` effect row, when declared |
+| Preconditions | Read `requires condition` |
+| Postconditions | Read `=> condition` |
+| Scope boundaries | An indented function body ends at dedent; no structural closer is written |
 
 ### From C# (Requires Inference)
 
@@ -163,7 +178,8 @@ aggregate historical result.
 Preconditions: b != 0
 Postconditions: result >= 0
 ```
-Direct extraction from `§Q` and `§S`.
+Direct extraction from `requires` and `=>`. These compatibility contracts do not
+choose a refinement-type or custom-message policy.
 
 **From C#:**
 ```
@@ -182,7 +198,9 @@ The historical aggregate is 1.84x. Under this calculator, Calor source exposes m
 of the structural signals being counted. That measures the calculator's
 defined signals; it is not a direct measurement of human comprehension.
 
-This doesn't mean C# is hard to understand—it means Calor makes structure *more explicit*, which benefits automated analysis.
+This does not show that C# is hard to understand or that an agent benefits by
+the reported ratio. The literal-marker heuristic is not a native-syntax parser;
+its archived scores must not be presented as scores for the current examples.
 
 ---
 

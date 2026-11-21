@@ -6,7 +6,7 @@
 
 
     §CSHARP{public record ConditionalRecord(int Value);
-    }§/CSHARP
+}§/CSHARP
     §DEL{del003:ConditionalDelegate}
       §I{i32:value}
       §O{i32}

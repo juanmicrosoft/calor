@@ -1,0 +1,121 @@
+module L2M32 L2M32 block
+  module L2M32Module public
+
+    func l2m32_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 23395)
+      let int:total = ((x * 2) + y)
+      if (total < 23395)
+        return 23395
+      else
+        return total
+
+    func l2m32_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 3) + y)
+      if (acc > 23402)
+        return (acc + 23402)
+      else
+        return ((acc * 2) + 23402)
+
+    func l2m32_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M15.L3M15Module.l3m15_fn04(x, 26)
+      return (v1 + y)
+
+    func l2m32_fn04 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 23409)
+        return (acc + 23409)
+      else
+        return ((acc * 2) + 23409)
+
+    func l2m32_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23416)
+      let int:total = ((x * 5) + y)
+      if (total > 23416)
+        return 23416
+      return total
+
+    func l2m32_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M26.L3M26Module.l3m26_fn04(x, 42)
+      return (v1 + y)
+
+    func l2m32_fn07 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 23423)
+        return (acc + 23423)
+      else
+        return ((acc * 2) + 23423)
+
+    func l2m32_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 5)
+      => (x >= 6)
+      let int:acc = ((x * 3) + y)
+      if (acc > 23430)
+        return (acc + 23430)
+      else
+        return ((acc * 2) + 23430)
+
+    func l2m32_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23437)
+      let int:total = ((x * 5) + y)
+      if (total > 23437)
+        return 23437
+      return total
+
+    func l2m32_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 23444)
+      let int:total = ((x * 2) + y)
+      if (total < 23444)
+        return 23444
+      else
+        return total
+
+    func l2m32_fn11 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 3) + y)
+      if (acc > 23451)
+        return (acc + 23451)
+      else
+        return ((acc * 2) + 23451)
+
+    func l2m32_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23458)
+      let int:total = ((x * 5) + y)
+      if (total > 23458)
+        return 23458
+      return total
+
+    func l2m32_fn13 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23465)
+      if (x >= 23465)
+        return x
+      else
+        return 23465

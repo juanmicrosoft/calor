@@ -7,6 +7,53 @@ This document specifies how the .NET backend must implement Calor semantics. The
 The production path calls `CSharpEmitter.Emit(ast)` after AST analyses. It does
 not consume CNF; `normal-form.md` describes separate, unintegrated lowering work.
 
+## Compilation-context imports
+
+User-facing compilation, conversion, execution, migration, MCP compilation and
+LSP/editor diagnostics default to an implicit **`System` only** import. This is
+a compilation input, not a rewrite of emitted or preserved source. It does not
+import `System.Threading.Tasks`, LINQ, IO, or every SDK namespace. Existing
+explicit imports and namespace-local scopes remain unchanged.
+
+Low-level `CompilationOptions`, `ConversionOptions` and
+`GeneratedCSharpCompilationContext` default to **standalone**, with neither
+implicit-import switch enabled. The original conversion scorecard keeps this
+profile. Its results cannot be relabeled using project-context success.
+`IncludeImplicitSystemUsing` selects the System-only profile;
+`IncludeImplicitGlobalUsings` remains the separate opt-in full-SDK compatibility
+profile.
+
+CLI compile, convert, watch, run, test, check, verify, migrate,
+analyze-convertibility and `fix --apply`
+accept `--no-implicit-system`. SDK projects use
+`<CalorImplicitSystemUsing>false</CalorImplicitSystemUsing>`. SDK/init-generated
+projects add a real MSBuild `Using` item so downstream C# compilation receives
+the same import as validation. To test a genuine no-import project, also disable
+the SDK's independent `<ImplicitUsings>` and remove any explicit global System
+import. An emitted `.g.cs` validated with System still needs that context when
+compiled outside the Calor project; the CLI does not prepend an import to it.
+
+Original C# and emitted C# must use the same selected references, global imports,
+nullable settings, conditional symbols and project inputs. Evaluated projects
+use their actual generated global-usings source, including aliases and static
+imports, rather than a guessed SDK preamble. Project resolution requires restored
+references and an explicit framework when selecting among multiple targets.
+
+LSP initialization accepts `implicitSystem` (default `true`) and, optionally,
+`projectPath`, `configuration` and `targetFramework`. Supply `projectPath` to use
+evaluated project references and settings; without it the editor uses the shared
+platform-reference context. Both published generated-C# diagnostics and rename
+preflight use this selected context. MCP compile uses `options.implicitSystem`;
+conversion, checking, verification, analysis, repair, batch and migration use
+top-level `implicitSystem`. Set it to `false` for standalone validation.
+
+The import can introduce short-name ambiguity, reported by authoritative C#
+binding as `CS0104`. Resolve it with a source alias or a fully qualified name,
+such as `global::System.Action`. Imports do not prove unknown calls pure, relax
+effect checks, or make raw C# native. Original case081 and its exact preserved
+output both fail standalone with `CS0103` and both compile in the System-project
+profile; their preserved/native classification is unchanged.
+
 ---
 
 ## Why This Document Exists
@@ -67,7 +114,9 @@ a() + b();  // C# guarantees left-to-right
 
 ### 2.3 Complex Expressions with Side Effects
 
-When lowering CNF to C#, preserve temporary assignments if the CNF introduced them:
+The following is a design obligation for a future CNF backend, not the
+production compilation path. A backend consuming CNF must preserve temporary
+assignments if lowering introduced them:
 
 **CNF:**
 ```
@@ -109,7 +158,8 @@ A || B;  // C# short-circuits
 
 ### 3.3 From CNF
 
-When emitting from CNF (which has control flow), generate structured code:
+For the separate CNF design (not the production emitter input), a backend
+would generate structured code:
 
 **CNF:**
 ```
@@ -155,7 +205,7 @@ checked
 }
 ```
 
-**Compiler Flag `--overflow=wrap`:**
+**Preserved unchecked C# semantics:**
 ```csharp
 // Use unchecked arithmetic
 unchecked
@@ -166,7 +216,8 @@ unchecked
 
 ### 4.2 Project-Level Configuration
 
-The emitter should generate project files with appropriate settings:
+The native emitter uses explicit checked expressions and statements. It does
+not require consumers to enable this C# project setting:
 
 ```xml
 <PropertyGroup>
@@ -174,40 +225,52 @@ The emitter should generate project files with appropriate settings:
 </PropertyGroup>
 ```
 
-Or wrap arithmetic in `checked` blocks when `--overflow=trap`.
+There is no Calor `--overflow=wrap` or `--overflow=trap` CLI option. Migration
+can retain imported unchecked semantics; do not make all preserved C# checked
+by changing its project context. See the [core numeric rules](core.md#4-numeric-semantics).
+
+```calor
+module BackendOverflow
+  func Increment (int:value) → int
+    !
+    return value + 1
+```
+
+`Increment(41)` returns `42`; `Increment(int.MaxValue)` throws
+`OverflowException`, including with contract mode off.
 
 ### 4.3 Type Mapping
 
 | Calor Type | C# Type | Notes |
 |------------|---------|-------|
-| `INT` / `i32` | `int` | 32-bit signed |
-| `i64` | `long` | 64-bit signed |
-| `i16` | `short` | 16-bit signed |
-| `i8` | `sbyte` | 8-bit signed |
-| `u32` | `uint` | 32-bit unsigned |
-| `u64` | `ulong` | 64-bit unsigned |
-| `u16` | `ushort` | 16-bit unsigned |
-| `u8` | `byte` | 8-bit unsigned |
-| `FLOAT` / `f64` | `double` | 64-bit IEEE 754 |
-| `f32` | `float` | 32-bit IEEE 754 |
-| `BOOL` | `bool` | - |
-| `STRING` | `string` | - |
-| `VOID` | `void` | - |
+| `int` | `int` | 32-bit signed |
+| `long` | `long` | 64-bit signed |
+| `short` | `short` | 16-bit signed |
+| `sbyte` | `sbyte` | 8-bit signed |
+| `uint` | `uint` | 32-bit unsigned |
+| `ulong` | `ulong` | 64-bit unsigned |
+| `ushort` | `ushort` | 16-bit unsigned |
+| `byte` | `byte` | 8-bit unsigned |
+| `double` | `double` | 64-bit IEEE 754 |
+| `float` | `float` | 32-bit IEEE 754 |
+| `bool` | `bool` | Boolean |
+| `string` | `string` | Reference type |
+| `void` | `void` | No return value |
 
 ### 4.4 Conversions
 
 **Implicit Widening:**
 ```csharp
-// Calor: INT → FLOAT (implicit)
+// Native int to double (implicit)
 int i = 42;
 double f = i;  // C# allows implicit widening
 ```
 
 **Explicit Narrowing:**
 ```csharp
-// Calor: FLOAT → INT (explicit required)
+// Native double to int (explicit required)
 double f = 3.14;
-int i = (int)f;  // Explicit cast required
+int i = checked((int)f);  // Explicit cast required
 ```
 
 ---
@@ -216,7 +279,7 @@ int i = (int)f;  // Explicit cast required
 
 ### 5.1 Preconditions
 
-**C# Implementation:**
+**Schematic C# implementation** (the emitter supplies actual IDs and spans):
 ```csharp
 public int MyFunction(int x)
 {
@@ -224,14 +287,12 @@ public int MyFunction(int x)
     if (!(x > 0))
     {
         throw new Calor.Runtime.ContractViolationException(
-            functionId: "f001",
-            message: "x must be positive",
-            expression: "x > 0",
-            kind: ContractKind.Requires);
+            "Precondition failed", "f001", Calor.Runtime.ContractKind.Requires,
+            startOffset: 0, length: 0, condition: "x > 0");
     }
 
     // Body
-    return x * 2;
+    return checked(x * 2);
 }
 ```
 
@@ -242,16 +303,14 @@ public int MyFunction(int x)
 public int MyFunction(int x)
 {
     // Body
-    var __result = x * 2;
+    var __result = checked(x * 2);
 
     // ENSURES: result > x
     if (!(__result > x))
     {
         throw new Calor.Runtime.ContractViolationException(
-            functionId: "f001",
-            message: "result must be greater than input",
-            expression: "result > x",
-            kind: ContractKind.Ensures);
+            "Postcondition failed", "f001", Calor.Runtime.ContractKind.Ensures,
+            startOffset: 0, length: 0, condition: "__result > x");
     }
 
     return __result;
@@ -262,57 +321,39 @@ public int MyFunction(int x)
 
 | Mode | Behavior |
 |------|----------|
-| `Debug` | All contracts checked |
-| `Release` | Only preconditions checked |
-| `None` | No contract checking |
+| `debug` | Detailed supported precondition and postcondition checks |
+| `release` | The same supported checks, with leaner exceptions |
+| `off` | No precondition or postcondition guards |
 
-**C# Implementation with Conditional:**
-```csharp
-#if DEBUG
-if (!(condition))
-{
-    throw new ContractViolationException(...);
-}
-#endif
+This is a compiler option, not a C# `DEBUG` conditional. Optional verification
+can remove only eligible clean proven postcondition guards;
+`--keep-proven-guards` retains them. Unsupported requested runtime lowering
+fails rather than silently dropping a check. Explicit `proof` statements have
+their own guards and remain active with contract mode off.
+
+```calor
+module BackendContracts
+  func Positive (int:value) → int
+    !
+    requires value > 0
+    => result > 0
+    return value
 ```
+
+`Positive(1)` returns `1`. `Positive(0)` throws `ContractViolationException`
+with enabled contracts and returns `0` with contract mode off.
 
 ---
 
-## 6. Option<T> and Result<T,E>
+## 6. Nullable Values and Exceptions
 
-### 6.1 Option<T>
+The backend emits .NET's native representations: `string?` remains `string?`,
+`int?` remains `int?`, and `null` remains `null`. The native expression
+`value ?? fallback` emits C# null coalescing.
 
-**C# Implementation using records:**
-```csharp
-namespace Calor.Runtime
-{
-    public abstract record Option<T>
-    {
-        public sealed record Some(T Value) : Option<T>;
-        public sealed record None : Option<T>;
-
-        public static Option<T> Some(T value) => new Some(value);
-        public static Option<T> None() => new None();
-    }
-}
-```
-
-### 6.2 Result<T,E>
-
-**C# Implementation:**
-```csharp
-namespace Calor.Runtime
-{
-    public abstract record Result<T, E>
-    {
-        public sealed record Ok(T Value) : Result<T, E>;
-        public sealed record Err(E Error) : Result<T, E>;
-
-        public static Result<T, E> Ok(T value) => new Ok(value);
-        public static Result<T, E> Err(E error) => new Err(error);
-    }
-}
-```
+Native `throw`, `try`, `catch`, `finally`, and bare `throw` emit the corresponding
+C# statements, including rethrow. Success values use their ordinary return
+type; no Calor-specific absence/error runtime types are required.
 
 ---
 
@@ -322,10 +363,13 @@ namespace Calor.Runtime
 
 **Calor:**
 ```calor
-§W{sw1:expr} code
-  §K 200 → "OK"
-  §K 404 → "Not Found"
-  §K _ → "Unknown"
+module BackendMatch
+  func Describe (int:code) → string
+    !
+    return match code
+      case 200 → "OK"
+      case 404 → "Not Found"
+      case _ → "Unknown"
 ```
 
 **C#:**
@@ -341,8 +385,8 @@ code switch
 ### 7.2 Property Patterns
 
 **Calor:**
-```calor
-§PPROP{Person} §PMATCH{Age} §PREL{gte} 18
+```calor-fragment
+Person { Age: >= 18 }
 ```
 
 **C#:**
@@ -376,12 +420,21 @@ finally
 
 **Calor catch with filter:**
 ```calor
-§CA{IOException:ex} §WHEN (== ex.Message "Not found")
+module BackendCatch
+  using System
+  func Read (bool:fail) → int
+    ! alloc, throw
+    try
+      if fail
+        throw new InvalidOperationException("Not found")
+      return 42
+    catch InvalidOperationException:ex when ex.Message == "Not found"
+      return -1
 ```
 
 **C#:**
 ```csharp
-catch (IOException ex) when (ex.Message == "Not found")
+catch (InvalidOperationException ex) when (ex.Message == "Not found")
 {
     // handler
 }
@@ -395,24 +448,26 @@ catch (IOException ex) when (ex.Message == "Not found")
 
 **Calor async function:**
 ```calor
-§F{f1:fetchData:pub:async}
-  §O{Task{string}}
-  ...
+module BackendAsync
+  using System.Threading.Tasks
+  func Read async () → int
+    !
+    return await Task.FromResult(42)
 ```
 
 **C#:**
 ```csharp
-public async Task<string> FetchData()
+public static async Task<int> Read()
 {
-    // body
+    return await Task.FromResult(42);
 }
 ```
 
 ### 9.2 Await Expression
 
 **Calor:**
-```calor
-§AWAIT §C{client.GetStringAsync} §A url §/C
+```calor-fragment
+await client.GetStringAsync(url)
 ```
 
 **C#:**
@@ -424,12 +479,16 @@ await client.GetStringAsync(url)
 
 **Calor:**
 ```calor
-§AWAIT{false} expr
+module BackendConfiguredAwait
+  using System.Threading.Tasks
+  func Read async () → int
+    !
+    return await Task.FromResult(42).ConfigureAwait(false)
 ```
 
 **C#:**
 ```csharp
-await expr.ConfigureAwait(false)
+await Task.FromResult(42).ConfigureAwait(false)
 ```
 
 ---
@@ -440,23 +499,32 @@ await expr.ConfigureAwait(false)
 
 **Calor:**
 ```calor
-§CL{c1:Circle:pub:seal}
-  §EXT{Shape}
-  §IMPL{IDrawable}
-  §FLD{f64:Radius:priv}
-  §MT{mt1:Area:pub:over} () -> f64
-    §R (* 3.14159 (* this.Radius this.Radius))
+module BackendClasses
+  interface IDrawable
+    func Area () → double
+      !
+  class Shape abstract
+    func Area abstract () → double
+      !
+  class Circle sealed
+    extends Shape
+    implements IDrawable
+    func Area override () → double
+      !
+      return 3.14159 * 5.0 * 5.0
+  func Main () → double
+    ! alloc
+    let Shape:value = new Circle()
+    return value.Area()
 ```
 
 **C#:**
 ```csharp
 public sealed class Circle : Shape, IDrawable
 {
-    private double Radius;
-
     public override double Area()
     {
-        return 3.14159 * Radius * Radius;
+        return 3.14159 * 5.0 * 5.0;
     }
 }
 ```
@@ -465,34 +533,56 @@ public sealed class Circle : Shape, IDrawable
 
 | Calor | C# |
 |-------|-----|
-| `virt` | `virtual` |
-| `over` | `override` |
-| `abs` | `abstract` |
-| `seal` | `sealed` |
-| `stat` | `static` |
+| `virtual` | `virtual` |
+| `override` | `override` |
+| `abstract` | `abstract` |
+| `sealed` | `sealed` |
+| `static` | `static` |
 
 ---
 
 ## 11. Records
 
-### 11.1 Record Definition
+### 11.1 Record Declaration and Construction
+
+The bare `record` declaration represents a C# record class, not an ordinary
+class or a record struct. C# synthesizes positional properties, value equality,
+hashing, `ToString`, deconstruction and copy behavior. Constructor defaults and
+record visibility survive emission. Properties, methods and static members use
+the existing indented member syntax. Derived positional records pass their base
+arguments in the header: `record D (int:X, int:Y) : B(X)`.
+
+Record structs, partial or nested declarations, positional parameter attributes/modifiers, conditional members
+and unrepresented member kinds preserve unchanged C# with a specific converter
+fallback reason. They do not count as native record support.
 
 **Calor:**
 ```calor
-§D{Person} (str:Name, i32:Age)
+module BackendRecords
+  record Person (string:Name, int:Age)
+  func Create () → Person
+    ! alloc, mut
+    return new Person(Age: 30, Name: "Alice")
 ```
 
 **C#:**
 ```csharp
 public record Person(string Name, int Age);
+public static class GlobalModule
+{
+    public static Person Create() => new Person(Age: 30, Name: "Alice");
+}
 ```
 
 ### 11.2 With Expressions
 
 **Calor:**
 ```calor
-§WITH person
-  §SET{Age} 30
+module BackendRecordCopy
+  record Person (string:Name, int:Age)
+  func WithAge (Person:person) → Person
+    ! alloc, mut
+    return person with { Age = 30 }
 ```
 
 **C#:**
@@ -500,22 +590,27 @@ public record Person(string Name, int Age);
 person with { Age = 30 }
 ```
 
+Constructors and custom init accessors retain the existing effect rules.
+Construction and copying charge their actual constructor and accessor bodies;
+record names do not bypass `Calor0410` or unknown-call diagnostic `Calor0411`.
+
 ---
 
-## 12. Effects (Advisory)
+## 12. Effects (Compile-Time Enforcement)
 
-Effects in Calor are primarily compile-time checked. The C# backend:
+Ordinary compilation enforces declared effect rows using selected source and
+metadata calls and reviewed external contracts. Unknown calls are not assumed
+pure. This is bounded compile-time enforcement, not a proof of arbitrary
+library implementations or converter-preserved C#. The C# backend:
 
 1. **Does not emit runtime effect tracking** (by default)
-2. **Generates XML documentation** for effect declarations
-3. **May emit attributes** for tooling integration
+2. Emits ordinary CLR calls after the compile-time checks
+3. Does not require a runtime effect attribute to enforce a source row
 
-```csharp
-/// <summary>
-/// Effects: [io=file_read, io=console_write]
-/// </summary>
-[CalorEffects("io:file_read", "io:console_write")]
-public void ProcessFile(string path) { ... }
+```calor-fragment
+func Print (string:text) → void
+  ! cw
+  System.Console.WriteLine(text)
 ```
 
 ---
@@ -526,11 +621,17 @@ public void ProcessFile(string path) { ... }
 
 | Calor | C# |
 |-------|-----|
-| Function `myFunc` | Method `MyFunc` (PascalCase) |
+| Function `myFunc` | Method `myFunc` (spelling preserved) |
 | Parameter `myParam` | Parameter `myParam` (camelCase) |
 | Local `myVar` | Local `myVar` (camelCase) |
 | Type `MyType` | Type `MyType` (PascalCase) |
-| Module `myModule` | Namespace/Class `MyModule` |
+| File label `myModule` | File identity, not a CLR namespace or class |
+| `module Label Demo` | CLR namespace `Demo` |
+| Nested `module Tools` | Named static container `Tools` |
+
+Root functions use the generated `GlobalModule` container. Reserved C#
+identifiers are escaped as needed; emission does not rename declarations to
+PascalCase.
 
 ### 13.2 Generated Code Markers
 
@@ -538,15 +639,15 @@ The emitter should include markers in generated code:
 
 ```csharp
 // <auto-generated>
-// This file was generated by the Calor compiler.
-// Semantics version: 1.0.0
-// Do not modify directly.
+// This code was generated by the Calor compiler.
+// Do not modify this file directly.
 // </auto-generated>
 ```
 
 ### 13.3 Source Mapping
 
-Generate `#line` directives for debugging:
+Source mapping can emit `#line` directives when a source path is supplied;
+this is not a claim that every standalone emitter call enables them:
 
 ```csharp
 #line 42 "MyModule.calr"
@@ -566,17 +667,14 @@ The .NET backend depends on `Calor.Runtime.dll`:
 ```
 Calor.Runtime
 ├── ContractViolationException.cs
-├── Option.cs
-├── Result.cs
-└── Effects/
-    └── EffectAttributes.cs
+└── Attributes.cs
 ```
 
 ---
 
 ## 15. Validation Checklist
 
-The backend must ensure:
+These are validation obligations, not a claim of exhaustive enforcement:
 
 - [ ] Left-to-right evaluation preserved
 - [ ] Short-circuit semantics correct
@@ -584,8 +682,9 @@ The backend must ensure:
 - [ ] Type conversions explicit where required
 - [ ] Contracts generate correct exception type
 - [ ] Contract exception includes function ID
-- [ ] Option/Result types from runtime library
-- [ ] Pattern matching exhaustive (compiler enforced)
+- [ ] Native nullable types and exception handling
+- [ ] Pattern matching follows admitted native forms; general exhaustiveness
+      is not proved for arbitrary guarded patterns
 - [ ] Async/await preserves semantics
 
 ---

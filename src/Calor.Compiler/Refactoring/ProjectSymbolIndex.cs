@@ -1,6 +1,8 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Incremental;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Refactoring;
@@ -90,6 +92,7 @@ public sealed class ProjectSymbolIndex
     private readonly SortedSet<string> _ambiguousCallees = new(StringComparer.Ordinal);
 
     public IReadOnlyList<IndexedDocument> Documents { get; }
+    internal CrossModuleTypeRegistry SourceTypes { get; }
 
     /// <summary>Calls resolved to a declaration, attributed to their containing function.</summary>
     public IReadOnlyList<ProjectCallEdge> CallEdges => _callEdges;
@@ -98,9 +101,10 @@ public sealed class ProjectSymbolIndex
     public ProjectResolutionResidual Residual =>
         new(_unresolvedCalls, [.. _ambiguousCallees]);
 
-    private ProjectSymbolIndex(IReadOnlyList<IndexedDocument> documents)
+    private ProjectSymbolIndex(IReadOnlyList<IndexedDocument> documents, CrossModuleTypeRegistry sourceTypes)
     {
         Documents = documents;
+        SourceTypes = sourceTypes;
         _byFile = documents.ToDictionary(
             document => document.FilePath,
             _ => new List<SymbolOccurrence>(),
@@ -116,16 +120,22 @@ public sealed class ProjectSymbolIndex
     /// </summary>
     public static ProjectSymbolIndex Build(
         IEnumerable<string> filePaths,
-        out IReadOnlyList<string> skipped)
+        out IReadOnlyList<string> skipped,
+        bool synchronizeIdentities = true,
+        string? initializeIdentityRoot = null)
     {
         ArgumentNullException.ThrowIfNull(filePaths);
 
         var documents = new List<IndexedDocument>();
         var failed = new List<string>();
+        var parsed = new List<(string Path, string Source, ModuleNode Ast)>();
+        var sourceHashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
 
         foreach (var path in filePaths.OrderBy(path => path, StringComparer.Ordinal))
         {
-            var source = File.ReadAllText(path);
+            var bytes = File.ReadAllBytes(path);
+            sourceHashes[Path.GetFullPath(path)] = BuildStateCache.ComputeContentHash(bytes);
+            var source = CompilationDriver.DecodeSource(bytes);
             var parseDiagnostics = new DiagnosticBag();
             var parser = new Parser(new Lexer(source, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics);
             ModuleNode? ast;
@@ -145,11 +155,41 @@ public sealed class ProjectSymbolIndex
                 continue;
             }
 
+            parsed.Add((path, source, ast));
+        }
+        if (initializeIdentityRoot != null)
+            Ids.DeclarationIdentityStore.SyncActiveInputs(parsed.Select(document => document.Path), initializeIdentityRoot);
+        // Explicit project enrollment above already reconciled every selected input.
+        // Each sync reconciles its whole store, so syncing before attaching changes nothing
+        // an attachment sees; attaching as one batch reconciles each store once, not per file.
+        if (synchronizeIdentities && initializeIdentityRoot == null)
+        {
+            foreach (var (path, _, _) in parsed)
+                Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(path));
+        }
+        Ids.DeclarationIdentityStore.AttachAllIfRegistered(
+            parsed.Select(document => (Path.GetFullPath(document.Path), document.Source, document.Ast)));
+        var sourceTypes = CrossModuleTypeRegistry.Build(
+            parsed.Select(document => (document.Ast, document.Path)).ToArray(),
+            sourceHashes);
+        // The driver binds every file of a multi-file build over its cross-module
+        // function map; without it a native qualified call into another module
+        // (`OrderService.SaveOrder()`) is an undefined name, and the whole file
+        // would be skipped as a bind error that `calor build` never reports.
+        var crossModuleFunctions = parsed.Count > 1
+            ? CompilationDriver.BuildCrossModuleFunctionMap(parsed.Select(document => document.Ast).ToList())
+            : null;
+        foreach (var (path, source, ast) in parsed)
+        {
             var bindDiagnostics = new DiagnosticBag();
             BoundModule bound;
             try
             {
-                bound = new Binder(bindDiagnostics, path).Bind(ast);
+                bound = new Binder(bindDiagnostics, path)
+                {
+                    CrossModuleTypes = sourceTypes,
+                    CrossModuleFunctionModules = crossModuleFunctions
+                }.Bind(ast);
             }
             catch (Exception)
             {
@@ -161,7 +201,8 @@ public sealed class ProjectSymbolIndex
         }
 
         skipped = failed;
-        var index = new ProjectSymbolIndex(documents);
+        sourceTypes.EnsureSourceSnapshots();
+        var index = new ProjectSymbolIndex(documents, sourceTypes);
         index.Populate();
         return index;
     }
@@ -204,24 +245,16 @@ public sealed class ProjectSymbolIndex
 
     private void Populate()
     {
-        // A module, and a type declared across several files, is one declaration
-        // in the language but one symbol per file here. Renaming from such a
-        // declaration would edit a single part and split it, with no Calor
-        // diagnostic to show for it (the break surfaces only in generated C#).
-        // They are marked so the engine can refuse. See #922.
-        var moduleDocumentCounts = Documents
-            .GroupBy(document => document.Ast.Name, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
-        var importedNamespaces = Documents
-            .SelectMany(document => document.Ast.Usings)
-            .Select(directive => directive.Namespace)
-            .ToHashSet(StringComparer.Ordinal);
+        // Type parts share CLR identity, not compilation-unit labels. A per-file
+        // occurrence set cannot safely rename one part of that declaration.
         var typeDocumentCounts = Documents
             .SelectMany(document => document.BoundModule.SymbolsById.Values
                 .OfType<TypeSymbol>()
-                .Select(symbol => (Module: document.Ast.Name, Type: symbol.Name)))
-            .GroupBy(pair => pair)
-            .ToDictionary(group => group.Key, group => group.Count());
+                .Select(symbol => (symbol.QualifiedName, document.FilePath)))
+            .GroupBy(part => part.QualifiedName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key,
+                group => group.Select(part => part.FilePath).Distinct(StringComparer.Ordinal).Count(),
+                StringComparer.Ordinal);
 
         var seen = new HashSet<(string File, SymbolId Id, int Start, SymbolOccurrenceKind Kind)>();
 
@@ -232,9 +265,9 @@ public sealed class ProjectSymbolIndex
                 if (symbol.Id.IsNone || !IsExactDeclaration(document.Source, symbol))
                     continue;
 
-                var split = symbol is TypeSymbol
+                var split = symbol is TypeSymbol typeSymbol
                     && typeDocumentCounts.TryGetValue(
-                        (document.Ast.Name, symbol.Name),
+                        typeSymbol.QualifiedName,
                         out var declaringDocuments)
                     && declaringDocuments > 1;
                 Add(document, symbol.Id, symbol.DeclarationSpan,
@@ -328,17 +361,31 @@ public sealed class ProjectSymbolIndex
                             (target, resolved, calleeSpan) =
                                 (statement.Target, statement.ResolvedSymbols, statement.CalleeSpan);
                             break;
+                        case BoundExpressionCall valueCall:
+                            // 0.30: invoking a computed value (`pick()(x)`, an event) calls
+                            // whatever it holds, so the site is unknown, never absent.
+                            (target, resolved, calleeSpan) =
+                                ("<expression-call>", Array.Empty<FunctionSymbol>(), valueCall.Span);
+                            break;
                         default:
                             continue;
                     }
 
                     var callee = resolved.Count > 0
                         ? resolved[0]
-                        : ResolveAcrossDocuments(target);
+                        : node is BoundExpressionCall ? null : ResolveAcrossDocuments(target);
                     if (callee is { Id.IsNone: false })
                     {
                         _callEdges.Add(new ProjectCallEdge(
                             function.Symbol.Id, callee.Id, document.FilePath, calleeSpan));
+                    }
+                    else if (node is BoundCallExpression metadataCall
+                        && Calor.Compiler.Analysis.CallGraphAnalysis.IsProvablyMetadataCall(metadataCall))
+                    {
+                        // 0.30: `Console.WriteLine(s)` binds to a metadata member. It is
+                        // attributed — to the BCL, not to a declaration of this project —
+                        // so it neither adds an edge nor makes the caller's answers partial.
+                        continue;
                     }
                     else
                     {
@@ -354,19 +401,16 @@ public sealed class ProjectSymbolIndex
                 }
             }
 
-            // Module names are indexed so a rename can be refused explicitly
-            // rather than silently doing nothing.
-            var moduleId = SymbolId.Create(
+            // Root module names are independent per-file labels, not namespaces.
+            var moduleId = document.Ast.ToolingId != null
+                ? SymbolId.Create("declaration", document.Ast.ToolingId)
+                : SymbolId.Create(
                 "source",
                 SymbolSourceIdentity.Canonicalize(document.FilePath),
                 "module",
-                document.Ast.Id);
-            var moduleSplit =
-                (moduleDocumentCounts.TryGetValue(document.Ast.Name, out var declaringModules)
-                    && declaringModules > 1)
-                || importedNamespaces.Contains(document.Ast.Name);
+                document.Ast.Name);
             Add(document, moduleId, document.Ast.IdentifierSpan,
-                SymbolOccurrenceKind.Definition, moduleSplit);
+                SymbolOccurrenceKind.Definition, isSplitDeclaration: false);
         }
 
         // Each file is bound on its own, so a call into another module resolves

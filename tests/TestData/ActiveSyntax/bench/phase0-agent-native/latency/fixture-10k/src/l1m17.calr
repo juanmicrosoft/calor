@@ -1,0 +1,91 @@
+module L1M17 L1M17 block
+  module L1M17Module public
+
+    func l1m17_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M13.L2M13Module.l2m13_fn02(x, 9)
+      return (v1 + y)
+
+    func l1m17_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M09.L2M09Module.l2m09_fn06(x, 75)
+      return (v1 + y)
+
+    func l1m17_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M20.L2M20Module.l2m20_fn11(x, 49)
+      return (v1 + y)
+
+    func l1m17_fn04 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M31.L2M31Module.l2m31_fn03(x, 11)
+      let int:v2 = L2M17.L2M17Module.l2m17_fn12(x, 13)
+      return ((v1 + v2) + y)
+
+    func l1m17_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M09.L2M09Module.l2m09_fn03(x, 17)
+      return (v1 + y)
+
+    func l1m17_fn06 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 20889)
+      if (x >= 20889)
+        return x
+      else
+        return 20889
+
+    func l1m17_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M07.L2M07Module.l2m07_fn07(x, 50)
+      return (v1 + y)
+
+    func l1m17_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 20896)
+      let int:total = ((x * 3) + y)
+      if (total < 20896)
+        return 20896
+      else
+        return total
+
+    func l1m17_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M15.L2M15Module.l2m15_fn05(x, 17)
+      let int:v2 = L2M24.L2M24Module.l2m24_fn03(x, 2)
+      return ((v1 + v2) + y)
+
+    func l1m17_fn10 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 5) + y)
+      if (acc > 20903)
+        return (acc + 20903)
+      else
+        return ((acc * 2) + 20903)
+
+    func l1m17_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M33.L2M33Module.l2m33_fn06(x, 56)
+      return (v1 + y)
+
+    func l1m17_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 3) + y)
+      if (acc > 20910)
+        return (acc + 20910)
+      else
+        return ((acc * 2) + 20910)
+
+    func l1m17_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M33.L2M33Module.l2m33_fn04(x, 4)
+      let int:v2 = L2M27.L2M27Module.l2m27_fn11(x, 75)
+      return ((v1 + v2) + y)

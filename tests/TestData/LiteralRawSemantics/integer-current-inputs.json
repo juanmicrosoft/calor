@@ -1,0 +1,14 @@
+[
+  { "original": "0", "current": "0", "runtimeType": "System.Int32" },
+  { "original": "-1", "current": "-1", "runtimeType": "System.Int32" },
+  { "original": "1_000", "current": "1_000", "runtimeType": "System.Int32" },
+  { "original": "-0x2A", "current": "-0x2A", "runtimeType": "System.Int32" },
+  { "original": "0x7FFF_FFFF", "current": "0x7FFF_FFFF", "runtimeType": "System.Int32" },
+  { "original": "INT:-0x8000_0000", "current": "-2147483648", "runtimeType": "System.Int32" },
+  { "original": "LONG:9_223_372_036_854_775_807", "current": "9_223_372_036_854_775_807L", "runtimeType": "System.Int64" },
+  { "original": "LONG:-9_223_372_036_854_775_808", "current": "-9_223_372_036_854_775_808L", "runtimeType": "System.Int64" },
+  { "original": "UINT:4_294_967_295", "current": "4_294_967_295U", "runtimeType": "System.UInt32" },
+  { "original": "ULONG:18_446_744_073_709_551_615", "current": "18_446_744_073_709_551_615UL", "runtimeType": "System.UInt64" },
+  { "original": "0xFFFF_FFFFU", "current": "0xFFFF_FFFFU", "runtimeType": "System.UInt32" },
+  { "original": "0xFFFF_FFFF_FFFF_FFFFUL", "current": "0xFFFF_FFFF_FFFF_FFFFUL", "runtimeType": "System.UInt64" }
+]

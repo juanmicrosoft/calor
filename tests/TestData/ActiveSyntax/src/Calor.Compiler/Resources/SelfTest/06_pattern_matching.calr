@@ -1,0 +1,26 @@
+module PatternDemo PatternDemo block
+  module PatternDemoModule
+    func GetGrade (int:score) → string
+      !
+      return match score
+        case >= 90 → "A"
+        case >= 80 → "B"
+        case >= 70 → "C"
+        case >= 60 → "D"
+        case _ → "F"
+
+    func GetHttpStatus (int:code) → string
+      !
+      return match code
+        case 200 → "OK"
+        case 404 → "Not Found"
+        case 500 → "Server Error"
+        case _ → "Unknown"
+
+    func Describe (int:x) → string
+      !
+      return match x
+        case var n when n > 100 → "large"
+        case var n when n < 0 → "negative"
+        case 0 → "zero"
+        case _ → "normal"

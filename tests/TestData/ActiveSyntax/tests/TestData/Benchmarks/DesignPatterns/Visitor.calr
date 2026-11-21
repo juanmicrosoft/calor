@@ -1,0 +1,91 @@
+module DesignPatterns
+  interface IExpressionVisitor
+    func VisitNumber (NumberExpression:expr) → float
+      !
+    func VisitAdd (AddExpression:expr) → float
+      !
+    func VisitMultiply (MultiplyExpression:expr) → float
+      !
+
+  class Expression internal abstract
+    func Accept private (IExpressionVisitor:visitor) → float
+      return
+
+
+  class NumberExpression public
+    extends Expression
+
+    field double:Value public
+
+    ctor (float:value)
+      set this.Value value
+
+    func Accept public override (IExpressionVisitor:visitor) → float
+      !
+      return visitor.VisitNumber(this)
+
+
+  class AddExpression public
+    extends Expression
+
+    field Expression:Left public
+    field Expression:Right public
+
+    ctor (Expression:left, Expression:right)
+      set this.Left left
+      set this.Right right
+
+    func Accept public override (IExpressionVisitor:visitor) → float
+      !
+      return visitor.VisitAdd(this)
+
+
+  class MultiplyExpression public
+    extends Expression
+
+    field Expression:Left public
+    field Expression:Right public
+
+    ctor (Expression:left, Expression:right)
+      set this.Left left
+      set this.Right right
+
+    func Accept public override (IExpressionVisitor:visitor) → float
+      !
+      return visitor.VisitMultiply(this)
+
+
+  class EvaluatorVisitor public
+    implements IExpressionVisitor
+
+    func VisitNumber public (NumberExpression:expr) → float
+      !
+      return expr.Value
+
+    func VisitAdd public (AddExpression:expr) → float
+      !
+      var _hoist000 = expr.Left.Accept(this)
+      var _hoist001 = expr.Right.Accept(this)
+      return _hoist000 + _hoist001
+
+    func VisitMultiply public (MultiplyExpression:expr) → float
+      !
+      var _hoist002 = expr.Left.Accept(this)
+      var _hoist003 = expr.Right.Accept(this)
+      return _hoist002 * _hoist003
+
+
+  module VisitorDemo internal
+    func Evaluate public (Expression:expr) → float
+      !
+      let EvaluatorVisitor:visitor = new EvaluatorVisitor()
+      return expr.Accept(visitor)
+
+    func BuildSampleExpression public () → Expression
+      !
+      let NumberExpression:two = new NumberExpression(2)
+      let NumberExpression:three = new NumberExpression(3)
+      let NumberExpression:four = new NumberExpression(4)
+      let AddExpression:sum = new AddExpression(two, three)
+      return new MultiplyExpression(sum, four)
+

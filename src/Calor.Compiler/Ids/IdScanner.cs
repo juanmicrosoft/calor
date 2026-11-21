@@ -48,28 +48,8 @@ public sealed class IdScanner : IAstVisitor
         return allEntries;
     }
 
-    public void Visit(ModuleNode node)
-    {
-        AddEntry(node.Id, IdKind.Module, node.Name, node.Span);
-
-        foreach (var function in node.Functions)
-            function.Accept(this);
-
-        foreach (var iface in node.Interfaces)
-            iface.Accept(this);
-
-        foreach (var cls in node.Classes)
-            cls.Accept(this);
-
-        foreach (var enumDef in node.Enums)
-            enumDef.Accept(this);
-
-        foreach (var rtype in node.RefinementTypes)
-            rtype.Accept(this);
-
-        foreach (var itype in node.IndexedTypes)
-            itype.Accept(this);
-    }
+    public void Visit(ModuleNode node) =>
+        _entries.AddRange(DeclarationIdentityStore.ScanDeclarations(node, _currentFilePath));
 
     public void Visit(FunctionNode node)
     {
@@ -92,6 +72,8 @@ public sealed class IdScanner : IAstVisitor
 
         foreach (var method in node.Methods)
             method.Accept(this);
+        foreach (var block in node.PreprocessorBlocks)
+            block.Accept(this);
     }
 
     public void Visit(MethodSignatureNode node)
@@ -101,7 +83,7 @@ public sealed class IdScanner : IAstVisitor
 
     public void Visit(ClassDefinitionNode node)
     {
-        AddEntry(node.Id, IdKind.Class, node.Name, node.Span);
+        AddEntry(node.Id, node.IsModule ? IdKind.Module : node.IsRecord ? IdKind.Record : IdKind.Class, node.Name, node.Span);
 
         foreach (var property in node.Properties)
             property.Accept(this);
@@ -110,13 +92,23 @@ public sealed class IdScanner : IAstVisitor
             indexer.Accept(this);
 
         foreach (var constructor in node.Constructors)
-            constructor.Accept(this);
+            if (!ReferenceEquals(constructor, node.RecordCopyConstructor))
+                constructor.Accept(this);
 
         foreach (var method in node.Methods)
             method.Accept(this);
 
         foreach (var op in node.OperatorOverloads)
             op.Accept(this);
+
+        foreach (var nested in node.NestedClasses)
+            nested.Accept(this);
+        foreach (var nested in node.NestedInterfaces)
+            nested.Accept(this);
+        foreach (var nested in node.NestedEnums)
+            nested.Accept(this);
+        foreach (var block in node.PreprocessorBlocks)
+            block.Accept(this);
     }
 
     public void Visit(PropertyNode node)
@@ -201,20 +193,12 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(RecordCreationNode node) { }
     public void Visit(FieldAssignmentNode node) { }
     public void Visit(FieldAccessNode node) { }
-    public void Visit(SomeExpressionNode node) { }
-    public void Visit(NoneExpressionNode node) { }
-    public void Visit(OkExpressionNode node) { }
-    public void Visit(ErrExpressionNode node) { }
     public void Visit(MatchExpressionNode node) { }
     public void Visit(MatchStatementNode node) { }
     public void Visit(MatchCaseNode node) { }
     public void Visit(WildcardPatternNode node) { }
     public void Visit(VariablePatternNode node) { }
     public void Visit(LiteralPatternNode node) { }
-    public void Visit(SomePatternNode node) { }
-    public void Visit(NonePatternNode node) { }
-    public void Visit(OkPatternNode node) { }
-    public void Visit(ErrPatternNode node) { }
     public void Visit(RequiresNode node) { }
     public void Visit(EnsuresNode node) { }
     public void Visit(InvariantNode node) { }
@@ -315,6 +299,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(FallbackExpressionNode node) { }
     public void Visit(FallbackCommentNode node) { }
     public void Visit(TypeOfExpressionNode node) { }
+    public void Visit(OverflowContextExpressionNode node) { }
     public void Visit(NameOfExpressionNode node) { }
     public void Visit(ExpressionCallNode node) { }
     public void Visit(ExpressionStatementNode node) { }
@@ -324,8 +309,16 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(CompilerDirectiveNode node) { }
     public void Visit(RawCSharpExpressionNode node) { }
     public void Visit(PreprocessorDirectiveNode node) { }
-    public void Visit(MemberPreprocessorBlockNode node) { }
-    public void Visit(TypePreprocessorBlockNode node) { }
+    public void Visit(MemberPreprocessorBlockNode node)
+    {
+        foreach (var item in node.Items) item.Accept(this);
+        node.ElseBranch?.Accept(this);
+    }
+    public void Visit(TypePreprocessorBlockNode node)
+    {
+        foreach (var item in node.Items) item.Accept(this);
+        node.ElseBranch?.Accept(this);
+    }
     public void Visit(CSharpInteropBlockNode node) { }
     public void Visit(StackAllocNode node) { }
     public void Visit(UnsafeBlockNode node) { }

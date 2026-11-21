@@ -1,0 +1,21 @@
+{
+  "featureKey": "conditional-expression-hoisting",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": null,
+  "expectedLossKinds": ["InteropPreserved"],
+  "allowedLossKinds": ["InteropPreserved"],
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 329,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 329,
+  "convertedExpectedDefinedInt": 329,
+  "definedSymbols": [],
+  "currentObservation": {
+    "inputContract": "current-compiler-active-syntax",
+    "reason": "The complete original Run member preserves all seven lazy prefix/postfix update sites as one exact C# member. No partial native method or eager assignment prelude is credited as native.",
+    "fullyNative": false,
+    "nativeConversionCount": 4,
+    "interopFeatureCounts": { "conditional-expression-hoisting": 1 },
+    "requiredIssueFeatures": ["conditional-expression-hoisting"]
+  }
+}

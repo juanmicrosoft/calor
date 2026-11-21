@@ -42,7 +42,8 @@ internal sealed record CompileCalorCacheInputs(
     IReadOnlyList<string> ResolvedImplementationAssemblies,
     string RuntimeDirectory,
     string NuGetPackageRoot,
-    string DepsFile)
+    string DepsFile,
+    bool IncludeImplicitSystemUsing = true)
 {
     internal string Serialize()
     {
@@ -60,6 +61,7 @@ internal sealed record CompileCalorCacheInputs(
         Append(builder, "defineConstants", DefineConstants);
         Append(builder, "languageVersion", LanguageVersion);
         Append(builder, "implicitUsings", ImplicitUsings);
+        Append(builder, "implicitSystem", IncludeImplicitSystemUsing ? "true" : "false");
         Append(builder, "nullable", Nullable);
         Append(builder, "treatWarningsAsErrors", TreatWarningsAsErrors ? "true" : "false");
         Append(builder, "verifyContracts", VerifyContracts ? "true" : "false");
@@ -193,8 +195,12 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     /// <summary>The consuming project's C# language version.</summary>
     public string LanguageVersion { get; set; } = string.Empty;
 
-    /// <summary>The consuming project's MSBuild ImplicitUsings setting.</summary>
+    /// <summary>Explicit full-SDK compatibility imports for direct task callers.
+    /// SDK projects pass their actual global-usings source in ProjectSourceFiles.</summary>
     public string ImplicitUsings { get; set; } = string.Empty;
+
+    /// <summary>System-only project import, independent of the SDK namespace set.</summary>
+    public bool ImplicitSystem { get; set; } = true;
 
     /// <summary>The consuming project's nullable context setting.</summary>
     public string Nullable { get; set; } = string.Empty;
@@ -292,7 +298,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 : "unused",
             EnableILAnalysis
                 ? DescribePath(DepsFilePath, includeContent: true)
-                : "unused");
+                : "unused",
+            ImplicitSystem);
     }
 
     private Compiler.Effects.IL.ILAnalysisOptions CreateILAnalysisOptions()
@@ -586,7 +593,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             string OutputPath,
             string RelativePath,
             byte[] GeneratedBytes,
-            BuildFileEntry CacheEntry)>();
+            BuildFileEntry CacheEntry,
+            Calor.Compiler.Incremental.ValidatedOutputEntry? Evidence)>();
         var generatedValidationFailed = false;
         // Modules of files that failed this build; null for one that did not
         // parse. Feeds GeneratedValidationScope so `dotnet build` and
@@ -605,27 +613,31 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
 
         // Cross-module call qualification map (G3/#809, #823 review M2): MSBuild is
         // the surface where csc actually consumes the outputs, so it needs the same
-        // map the CLI driver builds. Warm-skip validity: a changed map invalidates
-        // every skip (a cached .g.cs may carry stale qualification).
+        // map the CLI driver builds. Warm-skip validity (#1732): the same
+        // CrossModuleCacheReuse decision the CLI driver uses. A changed function
+        // map invalidates every skip (a cached .g.cs may carry stale
+        // qualification); a source-only change spares just the outputs the
+        // independence proof clears.
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap = null;
         CrossModuleTypeRegistry? crossModuleTypes = null;
-        string? crossModuleMapHash = null;
+        var sourceFileInfos = SourceFiles
+            .Select(sf =>
+            {
+                var path = sf.GetMetadata("FullPath");
+                return new FileInfo(string.IsNullOrEmpty(path) ? sf.ItemSpec : path);
+            })
+            .ToList();
         if (SourceFiles.Length > 1)
         {
-            var sourceFileInfos = SourceFiles
-                .Select(sf =>
-                {
-                    var path = sf.GetMetadata("FullPath");
-                    return new FileInfo(string.IsNullOrEmpty(path) ? sf.ItemSpec : path);
-                })
-                .ToList();
             crossModuleMap = Calor.Compiler.CompilationDriver.BuildCrossModuleFunctionMap(
                 sourceFileInfos, out crossModuleTypes);
-            crossModuleMapHash = Calor.Compiler.CompilationDriver.ComputeCrossModuleMapHash(
-                crossModuleMap, crossModuleTypes);
         }
-        newState.CrossModuleMapHash = crossModuleMapHash;
-        if (priorCache != null && priorCache.CrossModuleMapHash != crossModuleMapHash)
+        var crossModuleReuse = Calor.Compiler.CrossModuleCacheReuse.Evaluate(
+            sourceFileInfos, crossModuleMap, crossModuleTypes, priorCache,
+            globalReasons.Count == 0 ? priorCache?.Files : null,
+            path => LocateOutput(path, fullProjectDir));
+        crossModuleReuse.Record(newState);
+        if (crossModuleReuse.Mode == Calor.Compiler.CrossModuleReuseMode.Invalidated)
         {
             globalReasons.Add(GlobalCacheInvalidationReason.CrossModuleMapChanged);
         }
@@ -639,6 +651,14 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     MessageImportance.High,
                     "Calor: global invalidation [{0}] — recompiling all files.",
                     BuildStateCache.GetReasonCode(reason));
+            }
+            if (!globalInvalidation
+                && crossModuleReuse.Mode == Calor.Compiler.CrossModuleReuseMode.RequiresIndependenceProof)
+            {
+                Log.LogMessage(
+                    MessageImportance.High,
+                    "Calor: cross-module sources changed [cross-module-sources-changed] — "
+                    + "reusing only outputs proven independent of the changed modules.");
             }
         }
 
@@ -664,7 +684,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             currentRelativePaths.Add(relativePath);
 
             // Compute output path preserving directory structure
-            var outputRelative = Path.ChangeExtension(relativePath.Replace('/', Path.DirectorySeparatorChar), ".g.cs");
+            var outputRelative = OutputRelativePath(relativePath);
             var outputPath = Path.Combine(OutputDirectory, outputRelative);
 
             // Detect output path collisions (from out-of-project file sanitization)
@@ -688,11 +708,31 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 if (missReason == null
                     && crossModuleTypes?.MatchesSourceHash(inputPath, cachedEntry!.ContentHash) == false)
                     missReason = Calor.Compiler.Incremental.FileCacheMissReason.SourceContentChanged;
+                if (missReason == null
+                    && crossModuleReuse.Mode != Calor.Compiler.CrossModuleReuseMode.Unchanged)
+                {
+                    // Re-read and re-hash the exact bytes the proof inspects.
+                    missReason = Calor.Compiler.Incremental.FileCacheMissReason.CrossModuleDependencyChanged;
+                    try
+                    {
+                        var outputBytes = File.ReadAllBytes(outputPath);
+                        if (BuildStateCache.ComputeContentHash(outputBytes) != cachedEntry!.OutputContentHash)
+                            missReason = Calor.Compiler.Incremental.FileCacheMissReason.OutputContentChanged;
+                        else if (crossModuleReuse.CanReuse(inputPath, DecodeSource(outputBytes), CompileContractMode))
+                            missReason = null;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        missReason = Calor.Compiler.Incremental.FileCacheMissReason.CacheValidationFailed;
+                    }
+                }
                 if (missReason == null)
                 {
                     var trustedEntry = cachedEntry!;
                     // Skip — carry entry forward
                     newState.Files[relativePath] = trustedEntry;
+                    if (priorCache?.ValidatedOutputs?.TryGetValue(relativePath, out var evidence) == true)
+                        newState.ValidatedOutputs[relativePath] = evidence;
                     var outputItem = new TaskItem(outputPath);
                     outputItem.SetMetadata("SourceFile", inputPath);
                     generatedFiles.Add(outputItem);
@@ -778,7 +818,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     EnableILAnalysis = EnableILAnalysis,
                     ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags),
                     VerifyContracts = Verify,
-                    ElideProvenGuards = ElideProvenGuards
+                    ElideProvenGuards = ElideProvenGuards,
+                    ContractMode = CompileContractMode
                 };
                 compileOptions.DeferGeneratedOutputValidation = true;
                 compileOptions.CrossModuleFunctionModules = crossModuleMap;
@@ -821,7 +862,10 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 EffectSummary? summary = null;
                 if (result.Ast != null)
                 {
-                    summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast);
+                    // Same map as CompilationDriver: without it a call written with the
+                    // callee's namespace is not recognized as cross-module, and the
+                    // cached summary would hide its Calor0410 on warm builds.
+                    summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast, crossModuleMap);
                     moduleSummaries.Add((summary, inputPath));
                 }
 
@@ -838,7 +882,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     Column = diagnostic.Span.Column
                 }).ToList();
                 pendingOutputs.Add((
-                    inputPath, outputPath, relativePath, generatedBytes, fileEntry));
+                    inputPath, outputPath, relativePath, generatedBytes, fileEntry,
+                    Calor.Compiler.CrossModuleCacheReuse.Evidence(result.Ast, result.GeneratedCode)));
             }
             catch (Exception ex)
             {
@@ -913,6 +958,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     OutputKind = ParseOutputKind(ProjectOutputType),
                     LanguageVersion = ParseLanguageVersion(LanguageVersion),
                     IncludeImplicitGlobalUsings = IsImplicitUsingsEnabled(ImplicitUsings),
+                    IncludeImplicitSystemUsing = ImplicitSystem,
                     AnalyzerPaths = AnalyzerAssemblies
                         .Select(item => item.GetMetadata("FullPath") is { Length: > 0 } fullPath
                             ? fullPath
@@ -983,6 +1029,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     if (!TranspileOnly)
                     {
                         newState.Files[pending.RelativePath] = pending.CacheEntry;
+                        if (pending.Evidence is { } evidence)
+                            newState.ValidatedOutputs[pending.RelativePath] = evidence;
                     }
 
                     var item = new TaskItem(pending.OutputPath);
@@ -1186,7 +1234,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         {
             tasksAssemblyPath,
             compilerPath,
-            typeof(Calor.Runtime.Option<int>).Assembly.Location,
+            typeof(Calor.Runtime.CalorModuleAttribute).Assembly.Location,
             Path.Combine(compilerDirectory, "Microsoft.Z3.dll"),
             Path.Combine(compilerDirectory, nativeZ3Name)
         }
@@ -1195,6 +1243,21 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal)
         .ToList();
+    }
+
+    // The task always compiles in the default contract mode; the independence
+    // proof projects companions in the same mode.
+    private const ContractMode CompileContractMode = ContractMode.Debug;
+
+    private static string OutputRelativePath(string relativePath)
+        => Path.ChangeExtension(relativePath.Replace('/', Path.DirectorySeparatorChar), ".g.cs");
+
+    // Cache key and output path for a source, exactly as the per-file loop
+    // computes them (CrossModuleCacheReuse reads the evidence through this).
+    private (string Key, string OutputPath) LocateOutput(string inputPath, string fullProjectDir)
+    {
+        var (relativePath, _) = BuildStateCache.ComputeRelativePathFromFullProjectDir(inputPath, fullProjectDir);
+        return (relativePath, Path.Combine(OutputDirectory, OutputRelativePath(relativePath)));
     }
 
     private static string DecodeSource(byte[] bytes)

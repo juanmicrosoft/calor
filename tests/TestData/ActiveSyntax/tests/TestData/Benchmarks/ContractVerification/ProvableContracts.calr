@@ -1,0 +1,39 @@
+module VerifiableMath VerifiableMath
+  module VerifiableMathModule
+    func Abs public (int:x) → int
+      !
+      => result >= 0
+      if x >= 0
+        return x
+      else
+        return 0 - x
+
+    func Max public (int:a, int:b) → int
+      !
+      => result >= a
+      => result >= b
+      if a > b
+        return a
+      else
+        return b
+
+    func Min public (int:a, int:b) → int
+      !
+      => result <= a
+      => result <= b
+      if a < b
+        return a
+      else
+        return b
+
+    func Clamp public (int:value, int:min, int:max) → int
+      !
+      requires min <= max
+      => result >= min
+      => result <= max
+      if value < min
+        return min
+      else if value > max
+        return max
+      else
+        return value

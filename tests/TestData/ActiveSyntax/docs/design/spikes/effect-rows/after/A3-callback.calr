@@ -1,0 +1,8 @@
+module CallbackAfter CallbackAfter block
+  class Counter
+    field Action<int>:onChange private ! cw
+    func Bump (int:n) → void
+      ! cw
+      onChange(n)
+
+

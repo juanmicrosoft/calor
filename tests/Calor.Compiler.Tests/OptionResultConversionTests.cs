@@ -7,12 +7,41 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Tests for converting Option&lt;T&gt; and Result&lt;T,E&gt; structs from C# to Calor,
+/// Tests for converting user-defined Option&lt;T&gt; and Result&lt;T,E&gt; structs as ordinary generics,
 /// verifying per-member fallback, target-typed new inference, and round-trip fidelity.
 /// </summary>
 public class OptionResultConversionTests
 {
     private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
+
+    [Fact]
+    public void ThirdPartyOptionResult_AreOrdinaryGenericsAcrossConversionAndEmission()
+    {
+        const string source = """
+            public struct Option<T> { public T Value; }
+            public struct Result<T, E> { public T Value; public E Error; }
+            public static class Consumer
+            {
+                public static Option<int> EchoOption(Option<int> input) => input;
+                public static Result<int, string> EchoResult(Result<int, string> input) => input;
+                public static Option<Result<int, int>> EchoNested(Option<Result<int, int>> input) => input;
+            }
+            """;
+        var converted = _converter.Convert(source);
+        Assert.True(converted.Success, GetErrorMessage(converted));
+        Assert.DoesNotContain("§SM", converted.CalorSource);
+        Assert.DoesNotContain("§NN", converted.CalorSource);
+        Assert.DoesNotContain("§OK", converted.CalorSource);
+        Assert.DoesNotContain("§ERR", converted.CalorSource);
+        var compiled = Program.Compile(converted.CalorSource!);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("Option<int>", compiled.GeneratedCode);
+        Assert.Contains("Result<int, string>", compiled.GeneratedCode);
+        Assert.Contains("Option<Result<int, int>>", compiled.GeneratedCode);
+        Assert.DoesNotContain("Calor.Runtime.Option", compiled.GeneratedCode);
+        Assert.DoesNotContain("Calor.Runtime.Result", compiled.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(compiled.GeneratedCode).CompilationSuccess);
+    }
 
     private const string OptionCSharp = """
         using System;
@@ -31,7 +60,7 @@ public class OptionResultConversionTests
 
             public static Option<T> Some(T value) => new(value);
 
-            public static Option<T> None => default;
+            public static Option<T> None => new Option<T>();
 
             public bool HasValue => _hasValue;
 
@@ -131,17 +160,29 @@ public class OptionResultConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
 
         var calor = result.CalorSource!;
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
     }
 
     [Fact]
-    public void ResultTE_NoInteropBlocks()
+    public void ResultTE_PreservesOnlyItsNullForgivingMembers()
     {
+        // 0.30: Calor has no null-forgiving assertion, so a member using `!` (`default!`,
+        // `_error!`) is kept as C# instead of dropping the flow-state override. Those three
+        // members are the only interop; everything else converts natively.
         var result = _converter.Convert(ResultCSharp);
         Assert.True(result.Success, GetErrorMessage(result));
 
-        var calor = result.CalorSource!;
-        Assert.DoesNotContain("§CSHARP", calor);
+        Assert.Equal(3, result.Losses.Count);
+        Assert.All(result.Losses, loss =>
+        {
+            Assert.Equal("null-forgiving-expression", loss.Feature);
+            Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        });
+        var cls = Assert.Single(result.Ast!.Classes);
+        Assert.Equal(
+            [InteropMemberKind.Constructor, InteropMemberKind.Property, InteropMemberKind.Method],
+            cls.InteropBlocks.Select(block => block.MemberKind));
+        Assert.All(cls.InteropBlocks, block => Assert.Contains("!", block.CSharpCode));
     }
 
     #endregion
@@ -188,17 +229,21 @@ public class OptionResultConversionTests
         Assert.True(cls.IsStruct, "Should be struct");
         Assert.True(cls.IsReadOnly, "Should be readonly");
 
-        // Private constructors (two of them)
-        Assert.True(cls.Constructors.Count(c => c.Visibility == Visibility.Private) >= 2,
-            "Should have at least 2 private constructors");
+        // Private constructors: Result(T) is native; Result(E) assigns `default!`, which is kept
+        // as C# (0.30: no null-forgiving syntax), so it is the preserved constructor.
+        Assert.Contains(cls.Constructors, c => c.Visibility == Visibility.Private);
+        Assert.Contains(cls.InteropBlocks, block => block.MemberKind == InteropMemberKind.Constructor
+            && block.CSharpCode.Contains("private Result(E error)", StringComparison.Ordinal));
 
-        // Generic method (Map<TNew>)
-        Assert.Contains(cls.Methods, m => m.Name == "Map" && m.TypeParameters.Count > 0);
+        // Generic method (Map<TNew>) and Error both read `_error!`, so they are preserved too.
+        Assert.Contains(cls.InteropBlocks, block => block.MemberKind == InteropMemberKind.Method
+            && block.CSharpCode.Contains("Map<TNew>", StringComparison.Ordinal));
+        Assert.Contains(cls.InteropBlocks, block => block.MemberKind == InteropMemberKind.Property
+            && block.CSharpCode.Contains("public E Error", StringComparison.Ordinal));
 
         // Properties
         Assert.Contains(cls.Properties, p => p.Name == "IsOk");
         Assert.Contains(cls.Properties, p => p.Name == "Value");
-        Assert.Contains(cls.Properties, p => p.Name == "Error");
     }
 
     #endregion
@@ -218,7 +263,7 @@ public class OptionResultConversionTests
         Assert.Contains("readonly", calor);
 
         // Operators emitted
-        Assert.Contains("§OP", calor); // operator declarations present
+        Assert.Contains("op ==", calor); // operator declarations present
     }
 
     [Fact]

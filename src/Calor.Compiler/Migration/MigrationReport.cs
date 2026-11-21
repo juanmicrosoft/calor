@@ -34,6 +34,8 @@ public enum MigrationDirection
 /// </summary>
 public sealed class MigrationSummary
 {
+    /// <summary>Number of distinct original inputs; TotalFiles counts output/result rows.</summary>
+    public int SourceFiles { get; set; }
     public int TotalFiles { get; set; }
     public int SuccessfulFiles { get; set; }
     public int PartialFiles { get; set; }
@@ -55,12 +57,17 @@ public sealed class MigrationSummary
 /// </summary>
 public sealed class FileMigrationResult
 {
+    /// <summary>Zero-based source namespace ordinal for an explicitly split output.</summary>
+    public int? NamespaceIndex { get; init; }
     public required string SourcePath { get; init; }
     public required string? OutputPath { get; set; }
     public required FileMigrationStatus Status { get; set; }
+    /// <summary>Confirmed lossless batch output commit, including a later receipt failure.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool OutputWritten { get; internal set; }
     public TimeSpan Duration { get; init; }
-    public List<ConversionIssue> Issues { get; init; } = new();
-    public IReadOnlyList<ConversionLoss> Losses { get; init; } = Array.Empty<ConversionLoss>();
+    public List<ConversionIssue> Issues { get; set; } = new();
+    public IReadOnlyList<ConversionLoss> Losses { get; set; } = Array.Empty<ConversionLoss>();
 
     /// <summary>
     /// #1144: the paths this file's conversion took; null when the file was not
@@ -69,6 +76,7 @@ public sealed class FileMigrationResult
     public ConversionPathSummary? ConversionPaths
     {
         get => _conversionPaths is { Outcome: not "refused" } paths
+               && !OutputWritten
                && Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut
             ? paths.WithSuccess(false)
             : _conversionPaths;
@@ -76,11 +84,11 @@ public sealed class FileMigrationResult
     }
     private ConversionPathSummary? _conversionPaths;
     public ConversionMetadata? Metadata { get; init; }
-    public FileMetrics? Metrics { get; init; }
+    public FileMetrics? Metrics { get; set; }
     public FileAnalysisResult? Analysis { get; init; }
     public FileVerificationSummary? Verification { get; set; }
-    internal string? ConvertedSource { get; init; }
-    internal string? GeneratedCSharp { get; init; }
+    internal string? ConvertedSource { get; set; }
+    internal string? GeneratedCSharp { get; set; }
 }
 
 /// <summary>

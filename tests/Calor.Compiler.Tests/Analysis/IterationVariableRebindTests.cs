@@ -17,6 +17,7 @@ public class IterationVariableRebindTests
 
     private static bool HasCode(string source, string code)
     {
+        source = NativeSource(source);
         var lex = new DiagnosticBag();
         var tokens = new Lexer(source, lex).TokenizeAllForParser();
         Assert.False(lex.HasErrors, "lexer: " + string.Join("; ", lex.Select(d => d.Message)));
@@ -29,31 +30,167 @@ public class IterationVariableRebindTests
         return bag.ToList().Any(d => d.Code == code);
     }
 
+    // Only these exact historical fixtures have native counterparts. The explicit
+    // namespace retains S.SModule; indexed each uses its explicit counter lowering.
+    private static string NativeSource(string original) => original switch
+    {
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §B{~x:str} \"y\"\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  var string:x = "y"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{~k:str} \"z\"\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                !
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  var string:k = "z"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{~v:i32} 9\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                !
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  var int:v = 9
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §ASSIGN x \"y\"\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  set x "y"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~s} 0\n" +
+        "    §L{i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n" => """
+            module S S
+              func Do public () → int
+                !
+                var s = 0
+                for i from 0 to 3 step 1
+                  var int:i = 9
+                  set s s + i
+                return s
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x:str:i} arr\n      §B{~i:i32} 5\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                var i = -1
+                each string:x in arr
+                  set i i + 1
+                  var int:i = 5
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x:str:i} arr\n      §ASSIGN i 0\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                var i = -1
+                each string:x in arr
+                  set i i + 1
+                  set i 0
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §P x\n    §B{~x:str} \"y\"\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  Console.WriteLine(x)
+                var string:x = "y"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r,cw}\n" +
+        "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §EACH{x} arr\n      §P x\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r, cw
+                let string[]:arr = File.ReadAllLines(path)
+                each x in arr
+                  Console.WriteLine(x)
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{x:i32} 9\n      §R x\n    §R x\n" => """
+            module S S
+              func Do public (int:x) → int
+                !
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  let int:x = 9
+                  return x
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+        "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
+        "    §EACHKV{k:v} d\n      §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
+        "      §R (len lines)\n    §R 0\n" => """
+            module S S
+              func Do public (string:path) → int
+                ! fs:r
+                let Dictionary<string,int>:d = new Dictionary<string,int>()
+                each k, v in d
+                  let List<string>:lines = File.ReadAllLines(path)
+                  return lines.Length
+                return 0
+            """,
+        _ => throw new ArgumentException("No native counterpart is registered for this iteration rebind fixture.", nameof(original))
+    };
+
     [Fact]
     public void RebindOfForeachVariable_IsRejected()
     {
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n"));
+            "    §EACH{x} arr\n      §B{~x:str} \"y\"\n    §R 0\n"));
     }
 
     [Fact]
     public void RebindOfEachKvKey_IsRejected()
     {
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n" +
+            "§M{S}\n  §F{Do:pub} () -> i32\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{~k:str} \"z\"\n    §R 0\n"));
+            "    §EACHKV{k:v} d\n      §B{~k:str} \"z\"\n    §R 0\n"));
     }
 
     [Fact]
     public void RebindOfEachKvValue_IsRejected()
     {
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n" +
+            "§M{S}\n  §F{Do:pub} () -> i32\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{~v:i32} 9\n    §R 0\n"));
+            "    §EACHKV{k:v} d\n      §B{~v:i32} 9\n    §R 0\n"));
     }
 
     [Fact]
@@ -62,9 +199,9 @@ public class IterationVariableRebindTests
         // The same defect via §ASSIGN rather than §B: `x = "y"` inside the foreach is
         // CS1656 too. (#743 review finding 2.)
         Assert.True(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §ASSIGN x \"y\"\n    §R 0\n"));
+            "    §EACH{x} arr\n      §ASSIGN x \"y\"\n    §R 0\n"));
     }
 
     [Fact]
@@ -73,8 +210,8 @@ public class IterationVariableRebindTests
         // A §L for-loop variable is a plain local that IS reassignable in C#, so
         // rebinding it is a legal reassignment — Calor0257 must NOT fire.
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~s} 0\n" +
-            "    §L{l1:i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~s} 0\n" +
+            "    §L{i:0:3:1}\n      §B{~i:i32} 9\n      §ASSIGN s (+ s i)\n    §R s\n"));
     }
 
     [Fact]
@@ -84,18 +221,18 @@ public class IterationVariableRebindTests
         // local — it IS reassignable, unlike the item variable, so Calor0257 must NOT
         // fire on rebinding it. (#743 review finding 1.)
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x:str:i} arr\n      §B{~i:i32} 5\n    §R 0\n"));
+            "    §EACH{x:str:i} arr\n      §B{~i:i32} 5\n    §R 0\n"));
     }
 
     [Fact]
     public void AssignToForeachIndexVariable_IsAccepted()
     {
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x:str:i} arr\n      §ASSIGN i 0\n    §R 0\n"));
+            "    §EACH{x:str:i} arr\n      §ASSIGN i 0\n    §R 0\n"));
     }
 
     [Fact]
@@ -104,9 +241,9 @@ public class IterationVariableRebindTests
         // Once the §EACH block closes, the iteration variable is out of scope, so a
         // fresh §B of the same name is a new declaration, not a rebind of the iter var.
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §P x\n    §B{~x:str} \"y\"\n    §R 0\n"));
+            "    §EACH{x} arr\n      §P x\n    §B{~x:str} \"y\"\n    §R 0\n"));
     }
 
     [Fact]
@@ -114,9 +251,9 @@ public class IterationVariableRebindTests
     {
         // Merely using (not rebinding) the iteration variable is always fine.
         Assert.False(RebindsIterationVar(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r,cw}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r,cw}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §P x\n    §R 0\n"));
+            "    §EACH{x} arr\n      §P x\n    §R 0\n"));
     }
 
     // §EACHKV-body traversal (#743 review finding 3): adding the DictionaryForeachNode
@@ -129,9 +266,9 @@ public class IterationVariableRebindTests
     {
         // Calor0255: an inner §B reusing the enclosing parameter name 'x' — CS0136.
         Assert.True(HasCode(
-            "§M{m:S}\n  §F{f:Do:pub} (i32:x) -> i32\n" +
+            "§M{S}\n  §F{Do:pub} (i32:x) -> i32\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{x:i32} 9\n      §R x\n    §R x\n",
+            "    §EACHKV{k:v} d\n      §B{x:i32} 9\n      §R x\n    §R x\n",
             DiagnosticCode.BindShadowsEnclosingScope));
     }
 
@@ -140,9 +277,9 @@ public class IterationVariableRebindTests
     {
         // Calor0254: an array bound to a concrete List<T> inside the §EACHKV body.
         Assert.True(HasCode(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{d:Dictionary<str:i32>} §NEW{Dictionary<str:i32>} §/NEW\n" +
-            "    §EACHKV{e2:k:v} d\n      §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACHKV{k:v} d\n      §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
             "      §R (len lines)\n    §R 0\n",
             DiagnosticCode.BindArrayToConcreteCollection));
     }

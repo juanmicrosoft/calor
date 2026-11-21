@@ -1,0 +1,68 @@
+// Security Benchmark: Command Injection Detection
+// Tests taint analysis for command injection vulnerabilities
+
+module CommandInjectionBenchmark CommandInjectionBenchmark
+  func VulnerableShellExec public (string:user_input) → int
+    // BUG: Direct shell execution with user input
+    // EXPECTED: Calor0982 Command Injection
+    ! proc
+    let string:cmd = "ls -la " + user_input
+    let string:slashes = cmd.Replace("\\", "\\\\")
+    let string:argument = slashes.Replace("\"", "\\\"")
+    System.Diagnostics.Process.Start("/bin/sh", "-c \"" + (argument + "\""))
+    return 0
+
+  func SafeWhitelistedCommand public (int:option) → int
+    // SAFE: Only whitelisted commands executed
+    // EXPECTED: No warnings
+    ! proc
+    if option == 1
+      System.Diagnostics.Process.Start("ls")
+    else if option == 2
+      System.Diagnostics.Process.Start("pwd")
+    else
+      System.Diagnostics.Process.Start("whoami")
+    return 0
+
+  func VulnerablePopen public (string:user_input) → string
+    // BUG: User input passed to popen
+    // EXPECTED: Calor0982 Command Injection
+    ! proc
+    let string:cmd = "cat " + user_input
+    let string:slashes = cmd.Replace("\\", "\\\\")
+    let string:argument = slashes.Replace("\"", "\\\"")
+    let result = System.Diagnostics.Process.Start("/bin/sh", "-c \"" + (argument + "\""))
+    return ""
+
+  func SafeEscapedCommand public (string:user_input) → int
+    // SAFE: Shell arguments properly escaped
+    // EXPECTED: No warnings
+    ! proc
+    let string:quoted = user_input.Replace("'", "'\\''")
+    let string:safe = "'" + (quoted + "'")
+    let string:cmd = "echo " + safe
+    let string:slashes = cmd.Replace("\\", "\\\\")
+    let string:argument = slashes.Replace("\"", "\\\"")
+    System.Diagnostics.Process.Start("/bin/sh", "-c \"" + (argument + "\""))
+    return 0
+
+  func VulnerableSystemCall public (string:user_input) → int
+    // BUG: User input in system call
+    // EXPECTED: Calor0982 Command Injection
+    ! proc
+    let string:script = "python script.py --arg=" + user_input
+    let string:slashes = script.Replace("\\", "\\\\")
+    let string:argument = slashes.Replace("\"", "\\\"")
+    System.Diagnostics.Process.Start("/bin/sh", "-c \"" + (argument + "\""))
+    return 0
+
+  func SafeArrayExec public (string:user_input) → int
+    // SAFE: Command executed as array (no shell)
+    // EXPECTED: No warnings
+    ! proc
+    let startInfo = new System.Diagnostics.ProcessStartInfo("ls")
+    set startInfo.UseShellExecute false
+    startInfo.ArgumentList.Add("-la")
+    startInfo.ArgumentList.Add(user_input)
+    System.Diagnostics.Process.Start(startInfo)
+    return 0

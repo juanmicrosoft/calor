@@ -1,0 +1,15 @@
+module LogService LogService
+  module LogServiceModule
+    func LogMessage public (string:message) → void
+      ! cw
+      System.Console.WriteLine(message)
+
+    func ComputeSum public (int:a, int:b) → int
+      !
+      return a + b
+
+    func LogAndCompute public (string:label, int:x, int:y) → int
+      ! cw
+      System.Console.WriteLine(label)
+      let result = x + y
+      return result

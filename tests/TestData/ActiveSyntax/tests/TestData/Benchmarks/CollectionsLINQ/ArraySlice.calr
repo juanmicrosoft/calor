@@ -1,0 +1,12 @@
+module ArraySlice ArraySlice
+  module ArraySliceModule
+    func SliceLength public (int:start, int:end) → int
+      !
+      requires start >= 0
+      requires end > start
+      => result > 0
+      return end - start
+
+    func IsValidSlice public (int:start, int:end, int:length) → bool
+      !
+      return (start >= 0 && end <= length) && end >= start

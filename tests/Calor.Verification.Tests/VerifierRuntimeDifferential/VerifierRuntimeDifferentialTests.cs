@@ -369,7 +369,7 @@ public sealed class VerifierRuntimeDifferentialTests
         translator.SetUserTypeRegistry(
             new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal)
             {
-                ["probe"] = new Dictionary<string, string>(StringComparer.Ordinal)
+                ["Probe"] = new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["Value"] = fieldType
                 }

@@ -60,9 +60,11 @@ public class BinderControlValueFamilyTests
     {
         var (expr, diags) = BindReturn(new NullConditionalNode(S,
             new ReferenceNode(S, "obj"), "Length"));
-        var ncond = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("Length", ncond.Metadata["MemberName"]);
-        Assert.Empty(BoundChildren.DeferredOf(ncond)); // target itself always evaluates
+        var ncond = Assert.IsType<BoundConditionalAccessExpression>(expr);
+        Assert.Equal("Length", Assert.IsType<BoundFieldAccessExpression>(ncond.WhenNotNull).FieldName);
+        Assert.IsType<BoundVariableExpression>(ncond.Receiver);
+        Assert.Equal([ncond.WhenNotNull], BoundChildren.DeferredOf(ncond));
+        Assert.True(ncond.HasUnknownInferredType);
         AssertComplete(diags);
     }
 
@@ -122,19 +124,21 @@ public class BinderControlValueFamilyTests
     }
 
     [Fact]
-    public void Await_UnwrapsTaskTypeString_ConfigureAwaitRetained()
+    public void Await_ResolvesNativeTaskResult_ConfigureAwaitRetained()
     {
         var (expr, diags) = BindReturn(new AwaitExpressionNode(S,
             new ReferenceNode(S, "t"), configureAwait: false), ("t", "Task<i32>"));
         var aw = Assert.IsType<BoundStructuralExpression>(expr);
-        Assert.Equal("i32", aw.Type.DisplayString);
+        Assert.Equal(Compiler.Parsing.AttributeHelper.ExpandType("i32"),
+            Compiler.Parsing.AttributeHelper.ExpandType(aw.Type.DisplayString));
         Assert.Equal(false, aw.Metadata["ConfigureAwait"]);
         AssertComplete(diags);
 
         var (voidAwait, _) = BindReturn(
             new AwaitExpressionNode(S, new ReferenceNode(S, "t")),
             ("t", "Task"));
-        Assert.Equal("VOID", voidAwait.Type.DisplayString);
+        Assert.Equal(Compiler.Parsing.AttributeHelper.ExpandType("void"),
+            Compiler.Parsing.AttributeHelper.ExpandType(voidAwait.Type.DisplayString));
     }
 
     [Fact]
@@ -186,9 +190,10 @@ public class BinderControlValueFamilyTests
         // fallback is a real latent bug (it is about WHEN it executes, not WHETHER the
         // expression is wrong) — Of() includes it, and the finding fires.
         const string source = @"
-§M{m001:Test}
-  §F{f001:Trap:pub} (?i32:x) -> i32
-    §R (?? x (/ 10 0))";
+module Test Test block
+  func Trap (int?:x) → int
+    !
+    return (x ?? (10 / 0))";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -203,7 +208,7 @@ public class BinderControlValueFamilyTests
         });
 
         Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.DivisionByZero && d.Span.Line == 4);
+            d => d.Code == DiagnosticCode.DivisionByZero && d.Span.Line == 5);
     }
 
     // ---- #908 adversarial-review pins (F1, F2, F4, F5, F3) ----
@@ -302,9 +307,9 @@ public class BinderControlValueFamilyTests
         // The fix skips IsParameter symbols in use detection (function parameters are
         // seeded Initialized at entry, so this drops no true finding).
         const string source = """
-            §M{m001:Test}
-              §F{f001:Probe:pub} (List<i32>:items) -> i32
-                §B{n:i32} §C{items.Count} §A §LAM{lam001:y:i32} (> y 0) §/LAM{lam001} §/C
+            §M{Test}
+              §F{Probe:pub} (List<i32>:items) -> i32
+                §B{n:i32} §C{items.Count} §A §LAM{y:i32} (> y 0) §/LAM §/C
                 §R n
             """;
 

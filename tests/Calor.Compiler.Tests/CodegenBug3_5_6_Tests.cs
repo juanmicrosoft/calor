@@ -17,11 +17,11 @@ public class CodegenBug3_5_6_Tests
     #region Bug 6: static class not emitted
 
     [Fact]
-    public void Bug6_Parser_StaticModifier_SetsIsStatic()
+    public void Bug6_Parser_NamedModule_SetsIsStatic()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:static}
+module Test Test block
+  module Helper internal
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -34,8 +34,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_ParseAndEmit_StaticClass_EmitsStaticKeyword()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:pub:static}
+module Test Test block
+  module Helper
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -66,8 +66,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_PartialClass_EmitsPartialKeyword()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:DataService:pub:partial}
+module Test Test block
+  class DataService partial
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public partial class DataService", result);
@@ -98,8 +98,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_StaticPartialClass_EmitsCombinedModifiers()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:pub:static,partial}
+module Test Test block
+  module Helper partial
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static partial class Helper", result);
@@ -109,8 +109,8 @@ public class CodegenBug3_5_6_Tests
     public void Bug6_Parser_PartialModifier_SetsIsPartial()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass:partial}
+module Test Test block
+  class MyClass internal partial
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -118,41 +118,40 @@ public class CodegenBug3_5_6_Tests
     }
 
     [Fact]
-    public void Bug6_Parser_StShortFormModifier_SetsIsStatic()
+    public void Bug6_Parser_NamedModule_KeepsModuleIdentity()
     {
-        // R1: "st" short form should be recognized as "static"
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:st}
+module Test Test block
+  module Helper internal
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
-        Assert.True(cls.IsStatic, "IsStatic should be true for 'st' short-form modifier");
+        Assert.True(cls.IsStatic);
+        Assert.True(cls.IsModule);
     }
 
     [Fact]
-    public void Bug6_ParseAndEmit_StShortForm_EmitsStaticKeyword()
+    public void Bug6_ParseAndEmit_PublicModule_EmitsStaticKeyword()
     {
-        // R1: "st" short form should emit as "static" in C#
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:pub:st}
+module Test Test block
+  module Helper
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
     }
 
     [Fact]
-    public void Bug6_Parser_StWithOtherModifiers_WorksCorrectly()
+    public void Bug6_Parser_PartialModule_KeepsBothFlags()
     {
-        // R1: "st" combined with other modifiers
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:st,partial}
+module Test Test block
+  module Helper internal partial
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
-        Assert.True(cls.IsStatic, "IsStatic should be true for 'st' in comma-separated modifiers");
+        Assert.True(cls.IsStatic);
+        Assert.True(cls.IsModule);
         Assert.True(cls.IsPartial, "IsPartial should also be true");
     }
 
@@ -161,8 +160,9 @@ public class CodegenBug3_5_6_Tests
     {
         // An unrecognized modifier like "foo" should not set any known flags
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:foo}
+module Test Test block
+  class Helper internal
+    extends foo
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -179,10 +179,11 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_Parser_FourPositionals_ParsesBaseClassAndModifiers()
     {
-        // §CL{id:name:BaseClass:modifiers}
+        // §CL{name:BaseClass:modifiers}
         var source = @"
-§M{m1:Test}
-  §CL{c1:Child:Parent:sealed}
+module Test Test block
+  class Child internal sealed
+    extends Parent
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -193,10 +194,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_Parser_ThreePositionals_ModifiersOnly_BackwardCompat()
     {
-        // §CL{id:name:abs} — original 3-positional format
+        // §CL{name:abs} — original 3-positional format
         var source = @"
-§M{m1:Test}
-  §CL{c1:Shape:abs}
+module Test Test block
+  class Shape internal abstract
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -209,9 +210,9 @@ public class CodegenBug3_5_6_Tests
     {
         // §EXT{Parent} as child tag
         var source = @"
-§M{m1:Test}
-  §CL{c1:Child}
-    §EXT{Parent}
+module Test Test block
+  class Child internal
+    extends Parent
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -221,8 +222,14 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_CalorEmitter_EmitsExtTag_NotPositional()
     {
+        // Parent is declared so the base resolves: an unresolved base could be a class or an
+        // interface, and the converter keeps such a class as C# (class-unresolved-base-kind).
         var csharp = """
             public class Child : Parent
+            {
+            }
+
+            public class Parent
             {
             }
             """;
@@ -230,12 +237,11 @@ public class CodegenBug3_5_6_Tests
         Assert.True(convResult.Success, GetErrorMessage(convResult));
 
         var calor = convResult.CalorSource!;
-        // Should contain §EXT{Parent} as a child tag
-        Assert.Contains("§EXT{Parent}", calor);
-        // The §CL line should NOT have Parent as a positional
-        // (it should be §CL{...:Child} or §CL{...:Child:modifiers}, not §CL{...:Child:Parent:...})
-        var clLine = calor.Split('\n').First(l => l.Contains("§CL{"));
-        Assert.DoesNotContain(":Parent", clLine);
+        // Should contain `extends Parent` as a child clause
+        Assert.Contains("extends Parent", calor);
+        // The class header line should NOT carry Parent
+        var clLine = calor.Split('\n').First(l => l.TrimStart().StartsWith("class ", StringComparison.Ordinal));
+        Assert.DoesNotContain("Parent", clLine);
     }
 
     [Fact]
@@ -282,10 +288,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_FourPositionals_VisibilityInPos2_IgnoredCorrectly()
     {
-        // §CL{c0:Foo:pub:abs} — pos2 is visibility keyword, should be ignored; pos3 is modifiers
+        // §CL{Foo:pub:abs} — pos2 is visibility keyword, should be ignored; pos3 is modifiers
         var source = @"
-§M{m1:Test}
-  §CL{c0:Foo:pub:abs}
+module Test Test block
+  class Foo abstract
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -296,10 +302,11 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_FourPositionals_BaseClassInPos2_ParsedCorrectly()
     {
-        // §CL{c0:Foo:MyBase:sealed} — pos2 is base class, pos3 is modifiers
+        // §CL{Foo:MyBase:sealed} — pos2 is base class, pos3 is modifiers
         var source = @"
-§M{m1:Test}
-  §CL{c0:Foo:MyBase:sealed}
+module Test Test block
+  class Foo internal sealed
+    extends MyBase
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -310,10 +317,10 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_ThreePositionals_SpaceSeparatedModifiers()
     {
-        // §CL{c1:Base:abs seal} — space-separated modifiers in 3-positional format
+        // §CL{Base:abs seal} — space-separated modifiers in 3-positional format
         var source = @"
-§M{m1:Test}
-  §CL{c1:Base:abs seal}
+module Test Test block
+  class Base internal abstract sealed
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -330,8 +337,8 @@ public class CodegenBug3_5_6_Tests
         // This only affects legacy Calor files; the new CalorEmitter uses §EXT tags,
         // and old files with base classes always used 4 positionals.
         var source = @"
-§M{m1:Test}
-  §CL{c1:Foo:partial}
+module Test Test block
+  class Foo partial
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -343,10 +350,11 @@ public class CodegenBug3_5_6_Tests
     [Fact]
     public void Bug3_ThreePositionals_NonKeywordPos2_TreatedAsBaseClass()
     {
-        // §CL{c1:Child:ParentWidget} — "ParentWidget" is not a known modifier → treated as base class
+        // §CL{Child:ParentWidget} — "ParentWidget" is not a known modifier → treated as base class
         var source = @"
-§M{m1:Test}
-  §CL{c1:Child:ParentWidget}
+module Test Test block
+  class Child internal
+    extends ParentWidget
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -363,10 +371,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_DottedAccess_InterpolatedCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Greet:pub}
-                  §O{str}
-                  §B{~result:str} STR:"Hello ${p.Name}"
+            module Test Test block
+              func Greet () → string
+                !
+                var string:result = "Hello ${p.Name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -377,10 +385,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MultiLevelDottedAccess()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${a.B.C}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${a.B.C}"
             """;
 
         var result = ParseAndEmit(source);
@@ -391,10 +399,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_NullConditionalAccess()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${x?.Y}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${x?.Y}"
             """;
 
         var result = ParseAndEmit(source);
@@ -405,10 +413,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_SimpleInterpolation_BackwardCompat()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"Hello ${name}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "Hello ${name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -419,10 +427,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_IndexerAccess()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${arr[0]}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${arr[0]}"
             """;
 
         var result = ParseAndEmit(source);
@@ -433,10 +441,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MethodCall()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${obj.Method()}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${obj.Method()}"
             """;
 
         var result = ParseAndEmit(source);
@@ -447,10 +455,10 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_ChainedIndexerProperty()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${list[i].Name}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${list[i] . Name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -461,54 +469,58 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_MethodWithArgument()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${obj.GetValue(x)}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${obj.GetValue(x)}"
             """;
 
         var result = ParseAndEmit(source);
         Assert.Contains("$\"{obj.GetValue(x)}\"", result);
     }
 
-    [Fact]
-    public void Bug5_ArithmeticExpression()
+    [Theory]
+    [InlineData(19, 23, "42")]
+    [InlineData(int.MaxValue, 1, "overflow")]
+    public void Bug5_ArithmeticExpression(int left, int right, string expected)
     {
-        var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${a + b}"
+        var source = $$"""
+            module Test Test block
+              func Get () → string
+                !
+                let a = {{left}}
+                let b = {{right}}
+                return "${(a + b)}"
             """;
 
         var result = ParseAndEmit(source);
-        Assert.Contains("$\"{a + b}\"", result);
+        Assert.Contains("$\"{checked(a + b)}\"", result);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(result
+            + "\npublic static class Probe { public static string Run() { try { return Test.TestModule.Get(); } catch (OverflowException) { return \"overflow\"; } } }"));
     }
 
     [Fact]
-    public void Bug5_FormatPlaceholder_BackwardCompat()
+    public void Bug5_DigitHole_IsRuntimeInterpolation()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${0}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${0}"
             """;
 
         var result = ParseAndEmit(source);
-        // Format placeholders should NOT be converted to interpolation
-        Assert.DoesNotContain("$\"", result);
-        Assert.Contains("\"${0}\"", result);
+        Assert.Contains("$\"{0}\"", result);
     }
 
     [Fact]
     public void Bug5_MultipleInterpolations()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${a} and ${b[0]}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${a} and ${b[0]}"
             """;
 
         var result = ParseAndEmit(source);
@@ -519,30 +531,51 @@ public class CodegenBug3_5_6_Tests
     public void Bug5_NestedBraces()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${dict.GetOrAdd(key, () => new V { P = 1 })}"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${dict.GetOrAdd(key, () => new V { P = 1 })}"
             """;
 
         var result = ParseAndEmit(source);
-        Assert.Contains("$\"{dict.GetOrAdd(key, () => new V { P = 1 })}\"", result);
+        // The hole is parsed as a native expression, so the creation prints in canonical form.
+        Assert.Contains("$\"{dict.GetOrAdd(key, () => new V() { P = 1 })}\"", result);
     }
 
     [Fact]
     public void Bug5_UnmatchedDollarBrace()
     {
         var source = """
-            §M{m1:Test}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §B{~result:str} STR:"${incomplete"
+            module Test Test block
+              func Get () → string
+                !
+                var string:result = "${incomplete"
             """;
 
-        var result = ParseAndEmit(source);
-        // Unmatched ${ should be treated as literal text, not interpolation
-        Assert.DoesNotContain("$\"", result);
-        Assert.Contains("\"${incomplete\"", result);
+        var result = Program.Compile(source, "unterminated-hole.calr");
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.UnterminatedString
+            && d.Message.Contains("interpolation hole", StringComparison.Ordinal));
+        Assert.True(string.IsNullOrEmpty(result.GeneratedCode));
+    }
+
+    [Theory]
+    [InlineData("\"${0}\"", "$\"{0}\"", "0")]
+    [InlineData("\"\\${0}\"", "\"${0}\"", "${0}")]
+    [InlineData("\"\\${incomplete\"", "\"${incomplete\"", "${incomplete")]
+    public void Bug5_RuntimeAndEscapedLiteralHoles_CompileAndRun(string literal, string expected, string value)
+    {
+        var source = $$"""
+            module Test Test block
+              func Get () → string
+                !
+                return {{literal}}
+            """;
+        var result = Program.Compile(source, "holes.calr");
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Contains(expected, result.GeneratedCode);
+        Assert.Equal(value, InteropScope.RefOutImplementationTests.Run(result.GeneratedCode
+            + "\npublic static class Probe { public static string Run() => Test.TestModule.Get(); }"));
     }
 
     [Fact]

@@ -1,0 +1,32 @@
+module Fixture Fixture overflow unchecked
+  module ConditionalAccessFixture
+    field int:ArgumentCalls private static
+
+    func Argument private () → int
+      set ArgumentCalls (ArgumentCalls + 1)
+      return 7
+
+    func Run () → int
+      ! alloc, mut
+      set ArgumentCalls 0
+      var Holder:target = null
+      let int?:skipped = target?.M(Argument())
+      if ((skipped != null) || (ArgumentCalls != 0))
+        return (-1)
+      set target new Holder()
+      let int?:selected = target?.M(Argument())
+      if (((selected != 7) || (ArgumentCalls != 1)) || (target.Calls != 1))
+        return (-2)
+      return (((ArgumentCalls * 100) + (target.Calls * 10)) + (selected ?? 0))
+
+    class Holder sealed
+      field int:Calls
+
+      property int:M7
+        get public
+          return 0
+
+      func M (int:value) → int
+        ! mut
+        set Calls (Calls + 1)
+        return value

@@ -73,6 +73,7 @@ public sealed class Z3Verifier : IDisposable
     private readonly uint _timeoutMs;
     private readonly bool _checkIntegerOverflow;
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
+    internal IReadOnlyDictionary<ExpressionNode, Calor.Compiler.Binding.BoundCallExpression>? BoundCalls { get; init; }
     private bool _disposed;
 
     /// <summary>#1413 (S2 R-NUM, amendments 1.3.1 and 1.3.2): whether the checked arithmetic is
@@ -150,6 +151,9 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
+        precondition = new RequiresNode(precondition.Span,
+            translator.NormalizeBclExpression(precondition.Condition), precondition.Message, precondition.Attributes);
+
         // Positive-whitelist gate (guarantees plan D-G2.3): unsupported is decided by
         // ModeledForms, not by whichever translator branch happens to return null.
         if (!ModeledForms.TryValidate(precondition.Condition, out var preOffending))
@@ -183,6 +187,8 @@ public sealed class Z3Verifier : IDisposable
         {
             using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(preconditionExpr);
+            foreach (var binding in translator.BindingConstraints)
+                solver.Assert(binding);
 
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
@@ -279,6 +285,13 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
+        preconditions = preconditions.Select(pre => new RequiresNode(pre.Span,
+            translator.NormalizeBclExpression(pre.Condition), pre.Message, pre.Attributes)).ToArray();
+        postcondition = new EnsuresNode(postcondition.Span,
+            translator.NormalizeBclExpression(postcondition.Condition), postcondition.Message, postcondition.Attributes);
+        if (body != null)
+            body = translator.NormalizeBclBody(body);
+
         // Positive-whitelist gate over every contract expression in this obligation
         // (guarantees plan D-G2.3).
         foreach (var contractExpr in preconditions.Select(p => p.Condition).Append(postcondition.Condition))
@@ -327,6 +340,8 @@ public sealed class Z3Verifier : IDisposable
             try
             {
                 using var preSolver = new IsolatedSolver(_ctx, _timeoutMs);
+                foreach (var binding in translator.BindingConstraints)
+                    preSolver.Assert(binding);
                 foreach (var preExpr in preconditionExprs)
                 {
                     preSolver.Assert(preExpr);
@@ -609,7 +624,7 @@ public sealed class Z3Verifier : IDisposable
                 }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(
-                        $"Proof is conditional on §S normal-return semantics: {string.Join("; ", reasons)}. Runtime check kept.",
+                        $"Proof is conditional on the postcondition's normal-return semantics: {string.Join("; ", reasons)}. Runtime check kept.",
                         assumptions)),
                     warnings,
                     sw.Elapsed);
@@ -721,6 +736,7 @@ public sealed class Z3Verifier : IDisposable
     {
         var translator = new ContractTranslator(_ctx);
         translator.SetUserTypeRegistry(_userTypeRegistry);
+        translator.BoundCalls = BoundCalls;
         return translator;
     }
 
@@ -1301,7 +1317,7 @@ public static class FunctionBodyEncoder
             case BindStatementNode bind:
             {
                 if (bind.IsMutable)
-                    return (null, "the body contains a mutable (§B{~}) binding, which is outside the encodable surface");
+                    return (null, "the body contains a mutable (var) binding, which is outside the encodable surface");
                 if (bind.Initializer == null)
                     return (null, "the body contains a binding without an initializer");
                 if (bind.Name == "result")

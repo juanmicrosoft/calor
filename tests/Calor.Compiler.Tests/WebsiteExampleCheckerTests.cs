@@ -1,5 +1,6 @@
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -12,23 +13,39 @@ namespace Calor.Compiler.Tests;
 public sealed class WebsiteExampleCheckerTests
 {
     private const string Good = """
-        §M{m001:Good}
-          §F{f001:Add:pub} (i32:a, i32:b) -> i32
-            §E{}
-            §R (+ a b)
+        module Good
+          func Add (int:a, int:b) → int
+            !
+            return a + b
         """;
 
     private const string UndefinedVariable = """
-        §M{m001:Calculator}
-          §F{f001:Increment:pub} (i32:value) -> i32
-            §E{}
-            §R (+ x 1)
+        module Calculator
+          func Increment (int:value) → int
+            !
+            return x + 1
         """;
 
     private static List<Diagnostic> Check(string mdx, WebsiteExampleChecker.Coverage? coverage = null) =>
         WebsiteExampleChecker.Check([new DocFile("website/content/page.mdx", mdx)], coverage);
 
     private static string Fence(string info, string body) => $"```{info}\n{body}\n```\n";
+
+    [Theory]
+    [InlineData("// Header\n")]
+    [InlineData("/// Header\n")]
+    [InlineData("\n// Header\n\n")]
+    public void NativeModuleAfterLeadingComments_IsChecked(string prefix)
+    {
+        var source = prefix + "module Good\n  func Value () → int\n    !\n    return 1\n";
+        var coverage = new WebsiteExampleChecker.Coverage();
+        Assert.Empty(Check(Fence("calor", source), coverage));
+        Assert.Equal(1, coverage.CompletePrograms);
+        Assert.Contains(Check(Fence("calor", source.Replace("return 1", "return \"wrong\"", StringComparison.Ordinal))),
+            diagnostic => diagnostic.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+        Assert.Contains(Check(Fence("text", source)),
+            diagnostic => diagnostic.Code == DiagnosticCode.DocDriftWebsiteAnnotation);
+    }
 
     [Fact]
     public void CompleteProgramThatCompiles_Passes()
@@ -50,21 +67,23 @@ public sealed class WebsiteExampleCheckerTests
     [Fact]
     public void GeneratedCSharpIsValidated_NotJustParsed()
     {
-        // Parses and binds, but the emitted C# names a type that does not exist (Calor1002).
+        // A missing parameter type reaches generated-C# validation, not unknown-call effect checking.
         var finding = Assert.Single(Check(Fence("calor", """
-            §M{m001:Orders}
-              §F{f001:Save:pub} () -> void
-                §E{db:w}
-                §C{DbContext.SaveChanges} §/C
+            module Orders
+              func Save (DbContext:context) → void
+                ! db:w
+                return
             """)));
         Assert.Contains("Calor1002", finding.Message);
+        Assert.Contains("CS0246", finding.Message);
+        Assert.Contains("DbContext", finding.Message);
     }
 
     [Fact]
     public void FragmentsAreNotCompiled()
     {
-        Assert.Empty(Check(Fence("calor", "§F{f001:Broken:pub}\n  §R (+ x 1)")));
-        Assert.Empty(Check(Fence("calor", "§MT{mt1:Compute:pub}\n  §R x")));
+        Assert.Empty(Check(Fence("calor", "func Broken () → int\n  return x + 1")));
+        Assert.Empty(Check(Fence("calor", "func Compute () → int\n  return x")));
     }
 
     [Fact]
@@ -91,28 +110,29 @@ public sealed class WebsiteExampleCheckerTests
     [Fact]
     public void NegativeExample_ThatAlsoRaisesAnUndeclaredWarning_Fails()
     {
-        // HandleRequest is public with no effect row: cross-module checking adds Calor0417.
+        // HandleRequest's System.Type parameter is a type the checker does not model, which
+        // adds the warning-only Calor0200 next to the cross-module Calor0410. (0.30: Calor0417,
+        // the old warning for a public function without a row, can no longer be reached.)
         const string page = """
             ```calor group=g
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
-                §O{void}
-                §E{db:w}
+            module OrderService
+              func SaveOrder () → void
+                ! db:w
             ```
 
-            Fails with Calor0410 and warns with Calor0417.
+            Fails with Calor0410 and warns with Calor0200.
 
             ```calor group=g expect=Calor0410
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
-                §O{void}
-                §C{SaveOrder} §/C
+            module Handler
+              func HandleRequest (System.Type:kind) → void
+                !
+                SaveOrder()
             ```
             """;
         var finding = Assert.Single(Check(page));
         Assert.Equal(DiagnosticCode.DocDriftWebsiteExampleMismatch, finding.Code);
-        Assert.Contains("Calor0417", finding.Message);
-        Assert.Empty(Check(page.Replace("expect=Calor0410", "expect=Calor0410,Calor0417")));
+        Assert.Contains("Calor0200", finding.Message);
+        Assert.Empty(Check(page.Replace("expect=Calor0410", "expect=Calor0410,Calor0200")));
     }
 
     [Fact]
@@ -120,18 +140,16 @@ public sealed class WebsiteExampleCheckerTests
     {
         const string page = """
             ```calor group=g
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
-                §O{void}
-                §E{db:w}
+            module OrderService
+              func SaveOrder () → void
+                ! db:w
             ```
 
             ```calor group=g
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
-                §O{void}
-                §E{db:w}
-                §C{SaveOrder} §/C
+            module Handler
+              func HandleRequest () → void
+                ! db:w
+                SaveOrder()
             ```
             """;
         var coverage = new WebsiteExampleChecker.Coverage();
@@ -147,13 +165,13 @@ public sealed class WebsiteExampleCheckerTests
         var uncited = Assert.Single(Check("An example.\n\n" + Fence("calor expect=Calor0200", UndefinedVariable)));
         Assert.Equal(DiagnosticCode.DocDriftWebsiteAnnotation, uncited.Code);
 
-        Assert.Empty(Check("### Calor0200\n\nRejected: `x` on line 4, column 11.\n\n" + Fence("calor expect=Calor0200", UndefinedVariable)));
-        var wrongPlace = Assert.Single(Check("### Calor0200\n\nRejected: `x` on line 4, column 12.\n\n" + Fence("calor expect=Calor0200", UndefinedVariable)));
+        Assert.Empty(Check("### Calor0200\n\nRejected: `x` on line 4, column 12.\n\n" + Fence("calor expect=Calor0200", UndefinedVariable)));
+        var wrongPlace = Assert.Single(Check("### Calor0200\n\nRejected: `x` on line 4, column 13.\n\n" + Fence("calor expect=Calor0200", UndefinedVariable)));
         Assert.Equal(DiagnosticCode.DocDriftWebsiteAnnotation, wrongPlace.Code);
-        Assert.Contains("line 4, column 12", wrongPlace.Message);
+        Assert.Contains("line 4, column 13", wrongPlace.Message);
 
         // A claim after the fence is checked too (review round 1, finding 7).
-        Assert.Empty(Check(Fence("calor expect=Calor0200", UndefinedVariable) + "\nCalor0200 occurs on line 4, column 11.\n"));
+        Assert.Empty(Check(Fence("calor expect=Calor0200", UndefinedVariable) + "\nCalor0200 occurs on line 4, column 12.\n"));
         var after = Assert.Single(Check(Fence("calor expect=Calor0200", UndefinedVariable) + "\nCalor0200 occurs on line 99, column 99.\n"));
         Assert.Contains("line 99, column 99", after.Message);
     }
@@ -164,16 +182,19 @@ public sealed class WebsiteExampleCheckerTests
         string Page(string output) => Fence("calor expect=Calor0200", UndefinedVariable) + "\n" + Fence("text output", output);
 
         var coverage = new WebsiteExampleChecker.Coverage();
-        Assert.Empty(Check(Page("Calculator.calr(4,11): error Calor0200: Undefined variable 'x'"), coverage));
+        Assert.Empty(Check(Page("Calculator.calr(4,12): error Calor0200: Undefined variable 'x'"), coverage));
         Assert.Equal(1, coverage.CheckedOutputs);
         Assert.Empty(Check(Page("Calor0200: Undefined\nvariable 'x'"))); // wrapped, no location or severity
+        Assert.Empty(Check(Page("Calculator.calr:4:12 Calor0200 Undefined variable 'x'")));
 
         foreach (var wrong in new[]
         {
-            "Calculator.calr(4,11): error Calor0200: Undefined variable 'y'",  // message
-            "Calculator.calr(4,12): error Calor0200: Undefined variable 'x'",  // location
-            "Calculator.calr(4,11): warning Calor0200: Undefined variable 'x'", // severity
+            "Calculator.calr(4,12): error Calor0200: Undefined variable 'y'",  // message
+            "Calculator.calr(4,13): error Calor0200: Undefined variable 'x'",  // location
+            "Calculator.calr(4,12): warning Calor0200: Undefined variable 'x'", // severity
             "Calor0200: Undefined variable 'x'\nCalor0201: Something else",     // extra
+            "Calculator.calr:4:13 Calor0200 Undefined variable 'x'",
+            "Calculator.calr:4:12 Calor0200 warning: Undefined variable 'x'",
             "Compilation failed with 1 error",                                   // not a diagnostic
         })
         {
@@ -189,6 +210,7 @@ public sealed class WebsiteExampleCheckerTests
 
     [Theory]
     [InlineData("```\nerror Calor0410: Function 'F' uses effect 'cw' but does not declare it\n```\n")]
+    [InlineData("```\n<input>:4:11 Calor0200 Undefined variable 'x'\n```\n")]
     [InlineData("```text\napp.calr:11:11 function Leaky\n```\n")]
     [InlineData("```\n=== Calor Migration Analysis ===\n```\n")]
     [InlineData("```\nBLOCKED: Cannot create C# file 'A.cs'\n```\n")]
@@ -202,15 +224,15 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Theory]
-    [InlineData("```calor expct=Calor0200\n" + "§M{m1:A}\n```\n")]
-    [InlineData("```calor expect=0200\n§M{m1:A}\n```\n")]
-    [InlineData("```calor expect=\n§M{m1:A}\n```\n")]
-    [InlineData("```calor expect=Calor0200\n§F{f1:A:pub}\n```\n")]
-    [InlineData("```calor group=a/b\n§M{m1:A}\n```\n")]
+    [InlineData("```calor expct=Calor0200\n" + "module A\n```\n")]
+    [InlineData("```calor expect=0200\nmodule A\n```\n")]
+    [InlineData("```calor expect=\nmodule A\n```\n")]
+    [InlineData("```calor expect=Calor0200\nfunc A () → void\n```\n")]
+    [InlineData("```calor group=a/b\nmodule A\n```\n")]
     [InlineData("```text output illustrative\nx\n```\n")]
     [InlineData("```text verified\nx\n```\n")]
-    [InlineData("```\n§M{m001:Hidden}\n```\n")]
-    [InlineData("```csharp\n§M{m001:Hidden}\n```\n")]
+    [InlineData("```\nmodule Hidden\n```\n")]
+    [InlineData("```csharp\nmodule Hidden\n```\n")]
     public void MalformedOrMisplacedAnnotation_Fails(string fence)
     {
         Assert.Contains(Check(fence), f => f.Code == DiagnosticCode.DocDriftWebsiteAnnotation);
@@ -248,19 +270,19 @@ public sealed class WebsiteExampleCheckerTests
         var finding = Assert.Single(Check(page));
         Assert.Equal(DiagnosticCode.DocDriftWebsiteExampleMismatch, finding.Code);
         Assert.Contains("Calor0200", finding.Message);
-        Assert.Empty(Check(page.Replace("(+ x 1)", "(+ value 1)")));
+        Assert.Empty(Check(page.Replace("x + 1", "value + 1")));
     }
 
     [Theory]
-    [InlineData("> ```calor\n> §M{m1:A}\n> ```\n")]
-    [InlineData(">   > ```calor\n>   > §M{m1:A}\n>   > ```\n")]
-    [InlineData("- ```calor\n  §M{m1:A}\n  ```\n")]
-    [InlineData("1. ```calor\n   §M{m1:A}\n   ```\n")]
-    [InlineData("> ~~~text\n> hello\n\n```calor\n§M{m1:A}\n```\n")]
-    [InlineData("- item\n\n  ```calor\n§M{m001:Broken}\n  ```\n")]
-    [InlineData("```calor\n§M{m1:A}\n")]
-    [InlineData("- - - ```calor\n      §M{m1:A}\n      ```\n")]
-    [InlineData("~~~calor `x`\n§M{m1:A}\n")]
+    [InlineData("> ```calor\n> module A\n> ```\n")]
+    [InlineData(">   > ```calor\n>   > module A\n>   > ```\n")]
+    [InlineData("- ```calor\n  module A\n  ```\n")]
+    [InlineData("1. ```calor\n   module A\n   ```\n")]
+    [InlineData("> ~~~text\n> hello\n\n```calor\nmodule A\n```\n")]
+    [InlineData("- item\n\n  ```calor\nmodule Broken\n  ```\n")]
+    [InlineData("```calor\nmodule A\n")]
+    [InlineData("- - - ```calor\n      module A\n      ```\n")]
+    [InlineData("~~~calor `x`\nmodule A\n")]
     public void ContainerDependentOrUnclosedFence_IsRejected(string page)
     {
         // Their extent depends on a list or blockquote container (review round 2, findings 1-2).
@@ -301,33 +323,35 @@ public sealed class WebsiteExampleCheckerTests
         // C#, but the lexer-failing Broken file stopped that C# from being validated.
         const string page = """
             ```calor group=g
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
-                §O{void}
-                §E{db:w}
+            module OrderService
+              func SaveOrder () → void
+                ! db:w
             ```
 
-            Handler fails with Calor0410 and warns with Calor0417.
+            Handler fails with Calor0410 and warns with Calor0200.
 
-            ```calor group=g expect=Calor0410,Calor0417
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
-                §O{void}
-                §C{SaveOrder} §/C
-              §F{f002:Flush:pub} () -> void
-                §E{db:w}
-                §C{DbContext.SaveChanges} §/C
+            ```calor group=g expect=Calor0410,Calor0200
+            module Handler
+              func HandleRequest () → void
+                !
+                SaveOrder()
+              func Flush (DbContext:context) → void
+                ! db:w
+                return
             ```
 
             Broken fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m003:Broken}
-              §F{f001:Run:pub} () -> void
-                §P "unterminated
+            module Broken
+              func Run () → void
+                Console.WriteLine("unterminated
             ```
             """;
-        Assert.Contains(Check(page), f => f.Message.Contains("Calor1002"));
+        var findings = Check(page);
+        Assert.DoesNotContain(findings, f => f.Message.Contains("declares expect=Calor0002"));
+        Assert.Contains(findings, f => f.Message.Contains("Calor1002")
+            && f.Message.Contains("CS0246") && f.Message.Contains("DbContext"));
     }
 
     [Fact]
@@ -336,27 +360,31 @@ public sealed class WebsiteExampleCheckerTests
         // Review round 2, finding 3: Orders expects only a warning, yet its generated C# is
         // broken; the lexer-negative member suppresses validation for the whole group.
         const string page = """
-            Orders warns with Calor0417.
+            Orders warns with Calor0200.
 
-            ```calor group=g expect=Calor0417
-            §M{m001:Orders}
-              §F{f001:Save:pub} () -> void
-                §E{db:w}
-                §C{DbContext.SaveChanges} §/C
-              §F{f002:Version:pub} () -> i32
-                §R 1
+            ```calor group=g expect=Calor0200
+            module Orders
+              func Save (DbContext:context) → void
+                ! db:w
+                return
+              func Version () → int
+                !
+                return 1
             ```
 
             This one fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m002:Broken}
-              §F{f001:Run:pub} () -> void
-                §E{cw}
-                §P "unterminated
+            module Broken
+              func Run () → void
+                ! cw
+                Console.WriteLine("unterminated
             ```
             """;
-        Assert.Contains(Check(page), f => f.Message.Contains("Calor1002"));
+        var findings = Check(page);
+        Assert.DoesNotContain(findings, f => f.Message.Contains("declares expect=Calor0002"));
+        Assert.Contains(findings, f => f.Message.Contains("Calor1002")
+            && f.Message.Contains("CS0246") && f.Message.Contains("DbContext"));
     }
 
     [Fact]
@@ -365,30 +393,31 @@ public sealed class WebsiteExampleCheckerTests
         // Review round 2, finding 5: the retry keeps warning-only members, so a caller that
         // depends on one still resolves.
         const string page = """
-            Warns with Calor0417.
+            Warns with Calor0200.
 
-            ```calor group=g expect=Calor0417
-            §M{m001:Store}
-              §F{f001:Save:pub} () -> i32
-                §E{}
-                §R 1
-              §F{f002:Version:pub} () -> i32
-                §R 2
+            ```calor group=g expect=Calor0200
+            module Store
+              func Save () → int
+                !
+                return 1
+              func Version (System.Type:kind) → int
+                !
+                return 2
             ```
 
             ```calor group=g
-            §M{m002:Caller}
-              §F{f001:Run:pub} () -> i32
-                §E{}
-                §R §C{Save} §/C
+            module Caller
+              func Run () → int
+                !
+                return Save()
             ```
 
             Fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m003:Broken}
-              §F{f001:Run:pub} () -> void
-                §P "unterminated
+            module Broken
+              func Run () → void
+                Console.WriteLine("unterminated
             ```
             """;
         Assert.Empty(Check(page));
@@ -401,22 +430,26 @@ public sealed class WebsiteExampleCheckerTests
         // group; the positive member must still be validated on its own (review round 1, finding 2).
         const string page = """
             ```calor group=g
-            §M{m001:Orders}
-              §F{f001:Save:pub} () -> void
-                §E{db:w}
-                §C{DbContext.SaveChanges} §/C
+            module Orders
+              func Save (DbContext:context) → void
+                ! db:w
+                return
             ```
 
             This one fails with Calor0002.
 
             ```calor group=g expect=Calor0002
-            §M{m002:Broken}
-              §F{f001:Run:pub} () -> void
-                §E{cw}
-                §P "unterminated
+            module Broken
+              func Run () → void
+                ! cw
+                Console.WriteLine("unterminated
             ```
             """;
-        Assert.Contains(Check(page), f => f.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch && f.Message.Contains("Calor1002"));
+        var findings = Check(page);
+        Assert.DoesNotContain(findings, f => f.Message.Contains("declares expect=Calor0002"));
+        Assert.Contains(findings, f => f.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch
+            && f.Message.Contains("Calor1002") && f.Message.Contains("CS0246")
+            && f.Message.Contains("DbContext"));
     }
 
     [Fact]
@@ -436,6 +469,192 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     // --- Repository wiring ---
+
+    private static (DocFile Source, List<DocFile> Components) LandingInputs()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        return (new DocFile(WebsiteExampleChecker.LandingSnippetsPath,
+            File.ReadAllText(Path.Combine(root, WebsiteExampleChecker.LandingSnippetsPath))),
+            WebsiteExampleChecker.LandingComponentNames.Select(name =>
+                new DocFile(WebsiteExampleChecker.LandingComponentPath(name),
+                    File.ReadAllText(Path.Combine(root, WebsiteExampleChecker.LandingComponentPath(name))))).ToList());
+    }
+
+    private static DocFile MutateLanding(DocFile source, Action<JsonObject> mutate)
+    {
+        var json = JsonNode.Parse(source.Content)!.AsObject();
+        mutate(json);
+        return source with { Content = json.ToJsonString() };
+    }
+
+    [Fact]
+    public void Landing_SharedDisplayedSourceCompiles_WithExactNegativeDiagnostics()
+    {
+        var (source, components) = LandingInputs();
+        var coverage = new WebsiteExampleChecker.Coverage();
+        var findings = WebsiteExampleChecker.CheckLanding(source, components, coverage);
+        Assert.True(findings.Count == 0, string.Join(Environment.NewLine, findings));
+        Assert.Equal(5, coverage.LandingComponents);
+        // #1722 removed the comparison, firstProgram and missingEffect landing snippets; the
+        // three FeatureGrid fragments (contracts, effects, stableId) remain.
+        Assert.Equal(3, coverage.LandingPrograms);
+        Assert.Equal(3, coverage.LandingFragments);
+        Assert.Equal(0, coverage.LandingNegativePrograms);
+    }
+
+    [Fact]
+    public void Landing_NativeContextsAfterLeadingComments_PreserveExactDiagnostics()
+    {
+        var (source, components) = LandingInputs();
+        var commented = MutateLanding(source, json =>
+        {
+            foreach (var (_, entry) in json.AsObject())
+            {
+                var key = string.IsNullOrEmpty(entry!["before"]!.GetValue<string>()) ? "code" : "before";
+                entry[key] = "\n// Native context\n" + entry[key]!.GetValue<string>();
+            }
+        });
+        Assert.Empty(WebsiteExampleChecker.CheckLanding(commented, components));
+    }
+
+    [Theory]
+    [InlineData("contracts", "x >= 0", "missing >= 0")]
+    [InlineData("effects", "! db:rw,net:rw", "! db:rw,net:rw\nMissingType.Save()")]
+    [InlineData("stableId", "func Process () → void", "func Process (MissingType:x) → void")]
+    public void Landing_MutatedDisplayedCodeFails(string id, string original, string replacement)
+    {
+        var (source, components) = LandingInputs();
+        source = MutateLanding(source, json =>
+        {
+            var code = json[id]!["code"]!.GetValue<string>();
+            Assert.Contains(original, code);
+            json[id]!["code"] = code.Replace(original, replacement);
+        });
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+    }
+
+    [Fact]
+    public void Landing_MissingSourceComponentsContextAndConsumersFail()
+    {
+        var (source, components) = LandingInputs();
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(null, components),
+            d => d.Code == DiagnosticCode.DocDriftMissingInput);
+        foreach (var component in components)
+            Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components.Where(c => c != component).ToList()),
+                d => d.Code == DiagnosticCode.DocDriftMissingInput && d.FilePath == component.Path);
+
+        foreach (var broken in new[]
+        {
+            "",
+            "{}",
+            "{\"snippet\": {\"code\": \"§P 1\"}}",
+            MutateLanding(source, json => json["contracts"]!["Code"] = json["contracts"]!["code"]!.GetValue<string>()).Content,
+            MutateLanding(source, json => json["contracts"]!["before"] = "").Content,
+            MutateLanding(source, json => json.Remove("contracts")).Content,
+            MutateLanding(source, json => json["extra"] = json["contracts"]!.DeepClone()).Content,
+        })
+            Assert.NotEmpty(WebsiteExampleChecker.CheckLanding(source with { Content = broken }, components));
+
+        var changed = components.Select(c => c with
+        {
+            Content = c.Content.Replace("landingSnippets.contracts.code", "'not checked'")
+        }).ToList();
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, changed),
+            d => d.Message.Contains("exactly one registered consumer"));
+    }
+
+    [Theory]
+    [InlineData("const extra = `§M{Uncovered}`;")]
+    [InlineData("const extra = '§Q (> unknown 0)';")]
+    [InlineData("const extra = `§P \"unchecked\"`;")]
+    [InlineData("const extra = '§R unknown';")]
+    [InlineData("const extra = '\\u00a7M{m999:Uncovered}';")]
+    [InlineData("const extra = `module Uncovered`;")]
+    [InlineData("const extra = 'requires unknown > 0';")]
+    [InlineData("const extra = 'return unknown';")]
+    public void Landing_NewInlineCalorCannotBypassSharedSource(string extra)
+    {
+        var (source, components) = LandingInputs();
+        components[0] = components[0] with { Content = components[0].Content + "\n" + extra };
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components),
+            d => d.Message.Contains("bypasses landing snippet validation"));
+    }
+
+    [Theory]
+    [InlineData("<code>{`(+ x 1)`}</code>")]
+    [InlineData("<pre>{`(+ x 1)`}</pre>")]
+    [InlineData("const extra = { code: '(+ x 1)' };")]
+    public void Landing_ExpressionOnlyDisplaysCannotBypassRegistration(string extra)
+    {
+        var (source, components) = LandingInputs();
+        components[0] = components[0] with { Content = components[0].Content + "\n" + extra };
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(source, components),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteAnnotation);
+    }
+
+    [Fact]
+    public void Landing_GeneratedCSharpValidationAndNegativeRepairAreReal()
+    {
+        var (source, components) = LandingInputs();
+        var brokenType = MutateLanding(source, json =>
+            json["stableId"]!["code"] = "func Process (MissingType:x) → void\n  !");
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(brokenType, components),
+            d => d.Message.Contains("Calor1002") && d.Message.Contains("CS0246") && d.Message.Contains("MissingType"));
+
+        // A clean snippet that claims a diagnostic it does not produce is a mismatch.
+        // (#1722 removed the landing negative example this test used to repair.)
+        var wrongExpectation = MutateLanding(source, json =>
+            json["effects"]!["expectedDiagnostics"] = new JsonArray(new JsonObject
+            {
+                ["code"] = "Calor0200", ["severity"] = "Error", ["message"] = "Wrong message"
+            }));
+        Assert.Contains(WebsiteExampleChecker.CheckLanding(wrongExpectation, components),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+    }
+
+    [Fact]
+    public void RepositoryScan_LoadsLandingSources_AndReportsEachMissingInput()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var loaded = DocDriftChecker.LoadFromRepository(root, []);
+        Assert.NotNull(loaded.LandingSnippets);
+        Assert.Equal(5, loaded.LandingComponents.Count);
+        var empty = Path.Combine(Path.GetTempPath(), "calor-landing-probe-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(empty);
+        try
+        {
+            var errors = new List<Diagnostic>();
+            DocDriftChecker.LoadFromRepository(empty, errors);
+            foreach (var path in WebsiteExampleChecker.LandingComponentNames
+                .Select(WebsiteExampleChecker.LandingComponentPath).Append(WebsiteExampleChecker.LandingSnippetsPath))
+                Assert.Contains(errors, d => d.Code == DiagnosticCode.DocDriftMissingInput && d.FilePath == path);
+        }
+        finally
+        {
+            Directory.Delete(empty, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DocDriftCheck_RunsLandingValidation_NotOnlyMdx()
+    {
+        var (source, components) = LandingInputs();
+        var broken = MutateLanding(source, json =>
+            json["contracts"]!["code"] = json["contracts"]!["code"]!.GetValue<string>().Replace("x >= 0", "missing >= 0"));
+        var inputs = new DocDriftInputs
+        {
+            Version = "0.0.0",
+            LexerKeywords = [],
+            DiagnosticCodes = [],
+            KnownEffectCodes = [],
+            DocumentedEffectCodes = [],
+            LandingSnippets = broken,
+            LandingComponents = components,
+        };
+        Assert.Contains(DocDriftChecker.Check(inputs),
+            d => d.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch && d.Message.Contains("contracts"));
+    }
 
     [Fact]
     public void RepositoryScan_ChecksWebsitePages_AndExcludesOnlyNamedHistoricalRecords()
@@ -498,9 +717,9 @@ public sealed class WebsiteExampleCheckerTests
 
         // Pinned so a convention change that silently skips examples fails here. Update
         // deliberately when pages add or remove examples.
-        Assert.Equal(Pinned,
-            $"pages={coverage.Pages} complete={coverage.CompletePrograms} negative={coverage.NegativePrograms} " +
-            $"grouped={coverage.GroupedPrograms} checkedOutputs={coverage.CheckedOutputs} illustrative={coverage.IllustrativeOutputs}");
+        var actual = $"pages={coverage.Pages} complete={coverage.CompletePrograms} negative={coverage.NegativePrograms} " +
+            $"grouped={coverage.GroupedPrograms} checkedOutputs={coverage.CheckedOutputs} illustrative={coverage.IllustrativeOutputs}";
+        Assert.True(Pinned == actual, $"Expected: {Pinned}\nExecuted: {actual}");
     }
 
     // #1139 (0.25 F4): complete 49 -> 51, the two converted-output examples in cli/convert.mdx.
@@ -516,28 +735,36 @@ public sealed class WebsiteExampleCheckerTests
     // transcript by W1GuideTranscriptTests) and one unchecked report excerpt.
     // #1529/#1530 (0.27): complete 62 -> 64 and negative 6 -> 7, the nominal-refinement example
     // and its Calor0202 refusal in syntax-reference/refinement-types.mdx.
-    // #1722: complete 64 -> 60. Agent-first guidance removed HelloApp from
-    // getting-started/how-it-works.mdx, MyApp from getting-started/index.mdx, and Calculator
-    // from guides/adding-calor-to-existing-projects.mdx and philosophy/index.mdx.
-    // Pages, negative/grouped programs, and checked/illustrative outputs are unchanged.
-    private const string Pinned = "pages=97 complete=60 negative=7 grouped=3 checkedOutputs=2 illustrative=34";
+    // #1617: NullableFallback and Division add two compile-checked complete programs.
+    // #1619: named static-container example and the corrected native W1-F6 Counter output.
+    // #1600: current-language.mdx adds one page and 82 actually compiled complete examples.
+    // Native records add one complete constructor/default/copy example.
+    // 0.30 native syntax: pages moved to native examples that now count as complete programs
+    // (complete 152 -> 275, negative 7 -> 23, illustrative 34 -> 31), mostly in the syntax
+    // reference and current-language pages rewritten between the cutover and the 3b439c47a
+    // checkpoint. Re-pinned in the 0.30 stale-test triage; no page is skipped.
+    // 0.30 D1 (h1): complete 275 -> 277, the Accessors and Settings (static-initialization row)
+    // examples in syntax-reference/effects.mdx; both are also executed by MarkdownReferenceTests.
+    private const string Pinned = "pages=98 complete=277 negative=23 grouped=3 checkedOutputs=2 illustrative=31";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]
-    [InlineData("guides/cross-module-effect-propagation.mdx", "expect=Calor0410,Calor0417", "expect=Calor0410")]
-    [InlineData("guides/dependent-types-tutorial.mdx", "    §I{i32:amount} | (> # INT:0)\n    §O{i32}\n    §Q", "    §I{i32:amount} | (> # INT:0)\n    §O{str}\n    §Q")]
-    [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\n§M{m001:Name}    // Module requires tag + ID + name\n```",
-        "```calor\n§M{m001:Name}    // Module requires tag + ID + name\nnamespace Name\n```")]
-    [InlineData("syntax-reference/structure-tags.mdx", "      §IF{if1} (> i 5)", "      §IF (> i 5)")]
-    [InlineData("cli/compile.mdx", "error Calor0200: Undefined variable 'x'", "error Calor0200: Undefined variable 'y'")]
-    [InlineData("guides/cross-module-effect-propagation.mdx", "warning Calor0417: Public function 'HandleRequest'", "warning Calor0417: Public function 'HandleRequests'")]
+    [InlineData("guides/cross-module-effect-propagation.mdx", "```calor group=orders expect=Calor0410\n", "```calor group=orders\n")]
+    [InlineData("guides/dependent-types-tutorial.mdx", "(int:balance, int:amount) → int\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount", "(int:balance, int:amount) → string\n    !\n    requires balance >= 0\n    requires amount > 0\n    requires balance >= amount")]
+    [InlineData("benchmarking/metrics/token-economics.mdx", "```calor\nmodule TokenHello\n",
+        "```calor\nmodule TokenHello\nnamespace Name\n")]
+    [InlineData("syntax-reference/structure-tags.mdx", "      if i > 1\n", "      if missing > 1\n")]
+    [InlineData("cli/compile.mdx", "Calor0200 Undefined variable 'x'", "Calor0200 Undefined variable 'y'")]
+    [InlineData("guides/cross-module-effect-propagation.mdx", "error Calor0410: Function 'HandleRequest'", "error Calor0410: Function 'HandleRequests'")]
     public void PublishedWebsite_MutatedExampleIsCaught(string page, string original, string mutated)
     {
         var root = CliTestHarness.FindRepoRoot();
         var path = Path.Combine(root, "website", "content", page);
         var content = File.ReadAllText(path).Replace("\r\n", "\n");
         Assert.Contains(original, content);
-        var findings = WebsiteExampleChecker.Check([new DocFile(page, content.Replace(original, mutated))]);
+        var changed = content.Replace(original, mutated);
+        Assert.NotEqual(content, changed);
+        var findings = WebsiteExampleChecker.Check([new DocFile(page, changed)]);
         Assert.NotEmpty(findings);
     }
 }

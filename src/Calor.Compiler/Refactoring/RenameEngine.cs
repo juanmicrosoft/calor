@@ -18,8 +18,8 @@ public enum RenameRefusal
     NotAnIdentifier,
     NameUnchanged,
     /// <summary>
-    /// The declaration spans several files under one name (a module, or a type
-    /// declared across files) but carries one identity per file, so the edit set
+    /// The type declaration spans several files under one qualified name
+    /// but carries one identity per file, so the edit set
     /// would cover only one part and split the declaration. See #922.
     /// </summary>
     SplitDeclaration,

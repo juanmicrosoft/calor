@@ -163,10 +163,11 @@ public class Test
     public void ValidateCalorSource_ValidSource_ReturnsNoErrors()
     {
         var validCalor = @"
-§M{m1:Test}
-    §CL{c1:Test}
-        §MT{mt1:M:pub}
-            §O{void}
+module Test Test block
+  class Test internal
+    func M () → void
+      !
+      return
 ";
         var errors = ConvertCommand.ValidateCalorSource(validCalor);
         Assert.Empty(errors);
@@ -176,7 +177,7 @@ public class Test
     public void ValidateCalorSource_InvalidSource_ReturnsErrors()
     {
         // Malformed Calor: unexpected token
-        var invalidCalor = "§M{m1:Test}\n§INVALID_TOKEN{c1:Test}\n";
+        var invalidCalor = "§M{Test}\n§INVALID_TOKEN{c1:Test}\n";
         var errors = ConvertCommand.ValidateCalorSource(invalidCalor);
         Assert.NotEmpty(errors);
     }

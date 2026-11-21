@@ -1,0 +1,141 @@
+{
+  "cli-convert": {
+    "command": "calor convert Report.cs -o Report.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 1",
+      "    <dir>/Report.cs:17 [string-interpolation-handler]",
+      "  Preservation paths: 1 by converter interop (unsupported construct)",
+      "Warnings (2):",
+      "  ⚠ Feature 'string-interpolation-formattable' is partially supported. Review preserved hole-free FormattableString calls; they stay C# interop",
+      "  ⚠ Unsupported feature [string-interpolation-handler] escalated to raw C# preservation of the containing member: $\"x={x}\"",
+      "Output: <dir>/Report.calr"
+    ],
+    "stderr": [],
+    "calor": "module Report overflow unchecked nullable oblivious\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      !\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      ! unknown\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      ! unknown\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      ! unknown\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Report.cs -o Report.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 9,
+    "interopPreservationCount": 1,
+    "lossCount": 1,
+    "losses": [
+      {
+        "feature": "string-interpolation-handler",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": [
+      "Calor1343 x2"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Report.calr --output Report.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": [
+      "Calor0419 x1"
+    ]
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 9,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "string-interpolation-handler",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "warning:Calor1343:string-interpolation-formattable",
+      "warning:Calor1343:string-interpolation-handler"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      !\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      ! unknown\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      ! unknown\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      ! unknown\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 9,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "string-interpolation-handler",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "warning:Calor1343:string-interpolation-formattable",
+      "warning:Calor1343:string-interpolation-handler"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System\n  using System.Text\n\n  module Report\n    func Line (string:item, double:amount) → string\n      !\n      return \"${item,-8}|${amount,10:F2}\"\n\n    func Kind (FormattableString:f) → string\n      ! unknown\n      return (\"fs:\" + f.Format)\n\n    func Kind (object:o) → string\n      ! unknown\n      return (\"object:\" + o)\n\n    func Pick (int:x) → string\n      ! unknown\n      return Kind(((global::System.FormattableString)\"k=${x}\"))\n\n    func Build (int:x) → string\n      ! alloc\n      let sb = new System.Text.StringBuilder()\n      raw member:string-interpolation-handler:Other:Statement%20preserved%20as%20raw%20C%23%3A%20sb.Append%28%24%22x%3D%7Bx%7D%22%29%3B 29\n        sb.Append($\"x={x}\");\n\n      return (sb).ToString()\n\n\n"
+  }
+}

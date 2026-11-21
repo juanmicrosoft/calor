@@ -14,15 +14,21 @@ namespace SkillSyntax
         public static void Main()
         {
             Console.WriteLine("=== Calor Skill Syntax Validation ===");
+
             Console.WriteLine("");
+
             TestArithmetic();
+
             TestComparison();
+
             TestControlFlow();
+
         }
 
         private static void TestArithmetic()
         {
             Console.WriteLine("Testing arithmetic operators...");
+
         }
 
         public static int Add(int a, int b)
@@ -43,6 +49,7 @@ namespace SkillSyntax
         private static void TestComparison()
         {
             Console.WriteLine("Testing comparison operators...");
+
         }
 
         public static bool IsPositive(int x)
@@ -58,6 +65,7 @@ namespace SkillSyntax
         private static void TestControlFlow()
         {
             Console.WriteLine("Testing control flow...");
+
             {
                 var __calorForFrom = 1;
                 var __calorForTo = 5;
@@ -88,10 +96,13 @@ namespace SkillSyntax
                     }
                     if (!(__calorForAscending ? i <= __calorForTo : i >= __calorForTo)) break;
                     Console.WriteLine(i);
+
                 }
             }
 
         }
 
     }
+
 }
+

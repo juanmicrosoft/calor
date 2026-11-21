@@ -1,0 +1,6 @@
+module Test_02_01 Test_02_01 overflow unchecked
+  interface IAnimal public
+    property string:Name public
+      get
+    func Speak () → string
+      !

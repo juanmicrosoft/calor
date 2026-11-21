@@ -1,0 +1,10 @@
+module DelayedResult DelayedResult
+  module DelayedResultModule
+    func DelayedValue public async (int:value, int:delayMs) → int
+      ! net
+      requires delayMs > 0
+      return value
+
+    func ImmediateValue public (int:value) → int
+      !
+      return value

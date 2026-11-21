@@ -20,9 +20,10 @@
                       Private="false" />
   </ItemGroup>
 
-  <!-- Include Calor files -->
+  <!-- program.calr is frozen historical replay input; build its active mirror. -->
   <ItemGroup>
-    <CalorCompile Include="**\*.calr" />
+    <CalorCompile Include="..\..\tests\TestData\ActiveSyntax\samples\SdkSample\program.calr"
+                  Link="program.calr" />
   </ItemGroup>
 
   <!-- Import Calor compilation targets -->

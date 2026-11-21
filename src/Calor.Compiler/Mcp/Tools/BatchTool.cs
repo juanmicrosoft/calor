@@ -31,10 +31,11 @@ public sealed class BatchTool : McpToolBase
         "action='convert': Convert an entire C# project to Calor in a single call. " +
         "Discovers .cs files, converts each to Calor, and writes output files. " +
         "Module names are derived from C# namespace declarations. Use moduleNameOverride to force a specific namespace. " +
-        "IMPORTANT: If results contain §CSHARP interop blocks, use calor_help to check for native equivalents. " +
+        "IMPORTANT: If results contain raw C# interop blocks, use calor_help to check for native equivalents. " +
         "action='analyze': Analyze convertibility of an entire C# project directory. " +
         "Returns aggregate scores, tier breakdowns, and top blockers across the project. " +
         "action='compile': Compile .calr files in batch. Discovers files via directory, explicit paths, or glob pattern. " +
+        "Synchronizes tooling identity for selected active inputs before compilation; identity metadata failures fail closed. " +
         "Returns per-file pass/fail with error summaries.";
 
     public override McpToolAnnotations? Annotations => new() { DestructiveHint = true };
@@ -43,6 +44,7 @@ public sealed class BatchTool : McpToolBase
         {
             "type": "object",
             "properties": {
+                "implicitSystem": { "type": "boolean", "default": true, "description": "System-only compilation context; false selects standalone validation." },
                 "action": {
                     "type": "string",
                     "enum": ["convert", "analyze", "compile"],
@@ -114,7 +116,7 @@ public sealed class BatchTool : McpToolBase
                 },
                 "passthroughOnError": {
                     "type": "boolean",
-                    "description": "Wrap unsupported constructs in §CSHARP blocks instead of emitting broken Calor (default: false)"
+                    "description": "Wrap unsupported constructs in raw C# blocks instead of emitting broken Calor (default: false)"
                 },
                 "files": {
                     "type": "array",
@@ -183,6 +185,7 @@ public sealed class BatchTool : McpToolBase
         {
             var options = new MigrationPlanOptions
             {
+                IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                 IncludeTests = includeTests,
                 Parallel = parallel,
                 MaxFiles = maxFiles,
@@ -295,9 +298,9 @@ public sealed class BatchTool : McpToolBase
             if (hasInteropBlocks)
             {
                 recommendations.Add(
-                    "Some files contain §CSHARP interop blocks. Many C# constructs have native Calor equivalents " +
+                    "Some files contain raw C# interop blocks. Many C# constructs have native Calor equivalents " +
                     "(foreach, switch, async/await, yield, structs, delegates, events, operators, preprocessor directives). " +
-                    "Use calor_help to check for native equivalents before leaving code in §CSHARP blocks.");
+                    "Use calor_help to check for native equivalents before leaving code in raw C# blocks.");
             }
 
             var totalCsharpBlocks = fileResults.Sum(f => f.CsharpBlockCount);
@@ -465,7 +468,7 @@ public sealed class BatchTool : McpToolBase
                 var source = File.ReadAllText(file);
                 var result = quick
                     ? analyzer.AnalyzeQuick(source, file)
-                    : analyzer.Analyze(source, file);
+                    : analyzer.Analyze(source, file, GetBool(arguments, "implicitSystem", true));
 
                 var relativePath = Path.GetRelativePath(directory, file);
                 fileResults.Add(new AnalyzeFileResult
@@ -573,7 +576,8 @@ public sealed class BatchTool : McpToolBase
         if (outputPath == null || !File.Exists(outputPath))
             return 0;
         var content = File.ReadAllText(outputPath);
-        return Regex.Matches(content, @"§CSHARP\s*\{").Count;
+        return Parsing.RawCSharpFrame.ReadTokens(content)
+            .Count(t => t.Kind == Parsing.TokenKind.CSharpInterop);
     }
 
     private McpToolResult HandleCompile(JsonElement? arguments, bool summaryMode, CancellationToken cancellationToken)
@@ -618,6 +622,57 @@ public sealed class BatchTool : McpToolBase
         var totalErrors = 0;
         var errorCategories = new Dictionary<string, int>();
 
+        var inputErrors = new Dictionary<string, IReadOnlyList<EnvelopeDiagnostic>>(StringComparer.Ordinal);
+        var activeFiles = new List<string>();
+        foreach (var path in filePaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(path) || !path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase))
+                continue;
+            try
+            {
+                DeclarationIdentityStore.Find(path)?.ReadRegisteredInputs();
+                DeclarationIdentityStore.Describe(path, File.ReadAllText(path));
+                activeFiles.Add(path);
+            }
+            catch (DeclarationIdentityParseException ex)
+            {
+                inputErrors[path] = DiagnosticEnvelope.Build(ex.Diagnostics)
+                    .Where(diagnostic => diagnostic.Severity == "error").ToArray();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+                or JsonException or UnauthorizedAccessException)
+            {
+                inputErrors[path] = [ConversionIssueEnvelope.Message(
+                    DiagnosticCode.DeclarationIdentityUnavailable, "error", ex.Message, path)];
+            }
+        }
+
+        try
+        {
+            DeclarationIdentityStore.SyncActiveInputs(activeFiles,
+                Directory.Exists(baseDir) ? baseDir : null);
+            foreach (var path in activeFiles)
+            {
+                if (DeclarationIdentityStore.Find(path)?.IsRegistered(path) != true)
+                    throw new InvalidOperationException(
+                        $"Declaration identity requires a non-ambient project directory for '{path}'.");
+            }
+        }
+        catch (DeclarationIdentityParseException ex)
+        {
+            foreach (var path in activeFiles)
+                inputErrors[path] = DiagnosticEnvelope.Build(ex.Diagnostics)
+                    .Where(diagnostic => diagnostic.Severity == "error").ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException
+            or JsonException or UnauthorizedAccessException)
+        {
+            foreach (var path in activeFiles)
+                inputErrors[path] = [ConversionIssueEnvelope.Message(
+                    DiagnosticCode.DeclarationIdentityUnavailable, "error", ex.Message, path)];
+        }
+
         foreach (var path in filePaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -638,9 +693,25 @@ public sealed class BatchTool : McpToolBase
                     continue;
                 }
 
+                if (inputErrors.TryGetValue(path, out var identityErrors))
+                {
+                    fileResults.Add(new CompileFileResult
+                    {
+                        FilePath = path,
+                        Success = false,
+                        ErrorCount = identityErrors.Count,
+                        Errors = identityErrors.ToList()
+                    });
+                    totalErrors++;
+                    foreach (var error in identityErrors)
+                        IncrementCategory(errorCategories, error.Code);
+                    continue;
+                }
+
                 var source = File.ReadAllText(path);
                 var compileOptions = new CompilationOptions
                 {
+                    IncludeImplicitSystemUsing = GetBool(arguments, "implicitSystem", true),
                     ContractMode = ContractMode.Off,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
                     VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
@@ -655,7 +726,7 @@ public sealed class BatchTool : McpToolBase
                 if (compileResult.Ast != null)
                 {
                     declarationIds = new DeclarationIdResolver();
-                    declarationIds.AddFile(path, source, compileResult.Ast);
+                    declarationIds.AddFile(path, source, compileResult.Ast, identitiesAttached: true);
                 }
                 var errors = DiagnosticEnvelope.Build(compileResult.Diagnostics, declarationIds)
                     .Where(e => e.Severity == "error")

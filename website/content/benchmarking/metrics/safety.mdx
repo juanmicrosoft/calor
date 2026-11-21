@@ -4,6 +4,8 @@ section: "benchmarking"
 order: 8
 ---
 
+> **Syntax and measurement:** Source illustrations use current ID-free headers. The published numerical results and archived output remain historical; these illustrations are not a remeasurement of those results.
+
 **Category:** Safety Benchmark
 **Status:** 1.59x structural estimate; not part of the historical eight-metric dashboard
 **What it estimates:** Signals rewarded by the safety scoring rubric
@@ -114,6 +116,10 @@ Tests boundary conditions and overflow scenarios:
 
 ### Calor ContractViolationException
 
+This is the archived error illustration and score, not a transcript from the
+native example below. Its old function identity and condition spelling are not
+current source syntax.
+
 ```text illustrative
 ContractViolationException: Precondition failed
   Location: SafeDivide.calr(5,3)
@@ -198,7 +204,9 @@ dotnet run --project tests/Calor.Evaluation -- safety-benchmark \
 3. **Measurable outcomes** - Did the code catch the bug or not?
 4. **No artificial penalties** - C# can pass by handling errors correctly
 
-The key insight: C# **can** achieve safety through careful guard clauses, but requires explicit effort. Calor contracts make safety the default through:
+These are intended design criteria, not established fairness results from the
+failed provider artifact. C# can express the same guards. Calor contracts can
+centralize them, subject to contract mode and supported lowering:
 - Preconditions that validate inputs
 - Postconditions that verify outputs
 - Rich exception metadata for debugging
@@ -211,13 +219,11 @@ The key insight: C# **can** achieve safety through careful guard clauses, but re
 
 **Calor:**
 ```calor
-§M{m001:Math}
-  §F{f001:SafeDivide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §R (/ a b)
+module Math
+  func SafeDivide public (int:a, int:b) → int
+    !
+    requires b != 0
+    return a / b
 ```
 
 **C#:**
@@ -232,12 +238,14 @@ public static int SafeDivide(int a, int b)
 
 If these examples are compiled with runtime contracts enabled and called as
 `SafeDivide(10, 0)`:
-- **Calor**: `ContractViolationException` with line 5, condition `(!= b 0)`
+- **Calor**: `ContractViolationException` for the `b != 0` precondition
 - **C#**: `ArgumentException` with message and parameter name
 
-Both are written to catch the error. The exact Calor runtime behavior depends
-on contract mode and guard placement; this illustrative comparison is not a
-benchmark result.
+Both are written to catch the error. With contract mode off, the Calor
+precondition is not checked and integer division by zero throws
+`DivideByZeroException` instead. Neither example adds an overflow precondition:
+`int.MinValue / -1` still throws `OverflowException`. These bounded behaviors
+are not a new safety score or evidence for the historical 1.59x estimate.
 
 ---
 

@@ -68,11 +68,12 @@ benchmarks. Their recorded versions and results remain unchanged; see
 The repository includes a deliberately refutable postcondition fixture:
 
 ```calor
-§M{m1:OutcomeRefuted}
-  §F{f1:Dec:pub} (i32:x) -> i32
-    §Q (> x 0)
-    §S (> result 10)
-    §R (- x 1)
+module OutcomeRefuted
+  func Dec (int:x) → int
+    !
+    requires x > 0
+    => result > 10
+    return x - 1
 ```
 
 When compiled with `--verify`, Z3 binds `result` to the body expression and
@@ -98,10 +99,10 @@ claim that verification proves arbitrary preconditions at every call site.
 
 | Bug Category | Contract | Detection |
 |:-------------|:---------|:----------|
-| Division by zero | `§Q (!= divisor 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
-| Negative index | `§Q (>= index 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
-| Out of bounds | `§Q (< index len)` | Array facts are conservatively `assumed` where models diverge |
-| Invalid range | `§S (>= result 0)` | Postcondition receives one of the seven statuses |
+| Division by zero | `requires divisor != 0` | `proven`/`refuted` when modeled; otherwise a non-proven status |
+| Negative index | `requires index >= 0` | `proven`/`refuted` when modeled; otherwise a non-proven status |
+| Out of bounds | `requires index < len` | Array facts are conservatively `assumed` where models diverge |
+| Invalid range | `=> result >= 0` | Postcondition receives one of the seven statuses |
 | Integer overflow | Bounds on operands | Checked arithmetic may throw; a postcondition alone does not establish exception-free execution |
 
 ### Postcondition Verification
@@ -109,11 +110,11 @@ claim that verification proves arbitrary preconditions at every call site.
 A postcondition constrains normal returns, not whether every input returns successfully:
 
 ```calor
-§F{f001:Square:pub} (i32:x) -> i32
-  §E{}
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
+func Square (int:x) → int
+  !
+  requires x >= 0
+  => result >= 0
+  return x * x
 ```
 
 For native Calor, `x = 46340` returns `2147395600`. `x = 46341` instead throws
@@ -133,20 +134,20 @@ Z3 verification supports:
 
 | Calor | Z3 | Description |
 |:------|:---|:------------|
-| `(+ a b)` | `a + b` | Addition |
-| `(- a b)` | `a - b` | Subtraction |
-| `(* a b)` | `a * b` | Multiplication |
-| `(/ a b)` | `a div b` | Division |
-| `(% a b)` | `a mod b` | Modulo |
-| `(== a b)` | `a = b` | Equality |
-| `(!= a b)` | `a ≠ b` | Inequality |
-| `(< a b)` | `a < b` | Less than |
-| `(<= a b)` | `a ≤ b` | Less or equal |
-| `(> a b)` | `a > b` | Greater than |
-| `(>= a b)` | `a ≥ b` | Greater or equal |
-| `(&& p q)` | `p ∧ q` | Logical and |
-| `(\|\| p q)` | `p ∨ q` | Logical or |
-| `(! p)` | `¬p` | Logical not |
+| `a + b` | `a + b` | Addition |
+| `a - b` | `a - b` | Subtraction |
+| `a * b` | `a * b` | Multiplication |
+| `a / b` | `a div b` | Division |
+| `a % b` | `a mod b` | Modulo |
+| `a == b` | `a = b` | Equality |
+| `a != b` | `a ≠ b` | Inequality |
+| `a < b` | `a < b` | Less than |
+| `a <= b` | `a ≤ b` | Less or equal |
+| `a > b` | `a > b` | Greater than |
+| `a >= b` | `a ≥ b` | Greater or equal |
+| `p && q` | `p ∧ q` | Logical and |
+| `p \|\| q` | `p ∨ q` | Logical or |
+| `!p` | `¬p` | Logical not |
 
 Integers use fixed-width bit-vectors, supported C# promotion rules, and the
 module's overflow policy. A bit-vector encoding does not mean native arithmetic

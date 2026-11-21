@@ -898,7 +898,7 @@ public sealed class ControlFlowGraph
             var after = CreateBlock();
             TerminateFallThrough(current, condition);
 
-            var conditionExpression = new BoundStructuralExpression(
+            BoundExpression conditionExpression = statement.Condition ?? new BoundStructuralExpression(
                 statement.Span,
                 "ForCondition",
                 "BOOL",
@@ -916,6 +916,13 @@ public sealed class ControlFlowGraph
             if (bodyEnd != null)
                 TerminateFallThrough(bodyEnd, step);
 
+            if (statement.Update != null)
+            {
+                var updateEnd = BuildStatements([statement.Update], step, context);
+                if (updateEnd != null)
+                    TerminateContinuation(updateEnd, condition, ControlFlowEdgeKind.BackEdge);
+                return after;
+            }
             var stepExpression = new BoundStructuralExpression(
                 statement.Span,
                 "ForStep",
@@ -959,6 +966,11 @@ public sealed class ControlFlowGraph
                 SyntheticOperationKind.ForeachIteration,
                 statement.Span,
                 statement.LoopVariable));
+            if (statement.DeconstructionVariable != null)
+                iteration.SyntheticOperations.Add(new SyntheticOperation(
+                    SyntheticOperationKind.ForeachIteration,
+                    statement.Span,
+                    statement.DeconstructionVariable));
             TerminateFallThrough(iteration, body);
 
             TerminateFallThrough(current, condition);

@@ -1,0 +1,12 @@
+module GuardMatch GuardMatch
+  module GuardMatchModule
+    func Classify public (int:x, int:y) → int
+      !
+      if x == 0 && y == 0
+        return 0
+      else if x == y
+        return 1
+      else if x == 0 - y
+        return 2
+      else
+        return 3

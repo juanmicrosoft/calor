@@ -26,7 +26,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterModule()
     {
-        var tokens = Tokenize("§M");
+        var tokens = Tokenize("module");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Module, tokens[0].Kind);
@@ -36,79 +36,25 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterFunc()
     {
-        var tokens = Tokenize("§F");
+        var tokens = Tokenize("func");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Func, tokens[0].Kind);
     }
 
     [Fact]
-    public void Lexer_RecognizesSingleLetterCall()
-    {
-        var tokens = Tokenize("§C");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Call, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterBind()
-    {
-        var tokens = Tokenize("§B");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Bind, tokens[0].Kind);
-    }
-
-    [Fact]
     public void Lexer_RecognizesSingleLetterReturn()
     {
-        var tokens = Tokenize("§R");
+        var tokens = Tokenize("return");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Return, tokens[0].Kind);
     }
 
     [Fact]
-    public void Lexer_RecognizesSingleLetterInput()
-    {
-        var tokens = Tokenize("§I");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.In, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterOutput()
-    {
-        var tokens = Tokenize("§O");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Out, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterArg()
-    {
-        var tokens = Tokenize("§A");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Arg, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterEffects()
-    {
-        var tokens = Tokenize("§E");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Effects, tokens[0].Kind);
-    }
-
-    [Fact]
     public void Lexer_RecognizesSingleLetterLoop()
     {
-        var tokens = Tokenize("§L");
+        var tokens = Tokenize("for");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.For, tokens[0].Kind);
@@ -117,7 +63,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterMatch()
     {
-        var tokens = Tokenize("§W");
+        var tokens = Tokenize("match");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Match, tokens[0].Kind);
@@ -126,7 +72,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterCase()
     {
-        var tokens = Tokenize("§K");
+        var tokens = Tokenize("case");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Case, tokens[0].Kind);
@@ -135,129 +81,24 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesSingleLetterRequires()
     {
-        var tokens = Tokenize("§Q");
+        var tokens = Tokenize("requires");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Requires, tokens[0].Kind);
     }
-
-    [Fact]
-    public void Lexer_RecognizesSingleLetterEnsures()
-    {
-        var tokens = Tokenize("§S");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Ensures, tokens[0].Kind);
-    }
-
     #endregion
-
     #region Closing Tags
-
-    [Fact]
-    public void Lexer_RecognizesClosingModule()
-    {
-        var tokens = Tokenize("§/M");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndModule, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingFunc()
-    {
-        var tokens = Tokenize("§/F");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndFunc, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingCall()
-    {
-        var tokens = Tokenize("§/C");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndCall, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingIf()
-    {
-        var tokens = Tokenize("§/I");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndIf, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingLoop()
-    {
-        var tokens = Tokenize("§/L");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndFor, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesClosingMatch()
-    {
-        var tokens = Tokenize("§/W");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndMatch, tokens[0].Kind);
-    }
 
     [Fact]
     public void Lexer_RecognizesDoKeyword()
     {
-        var tokens = Tokenize("§DO");
+        var tokens = Tokenize("do");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Do, tokens[0].Kind);
     }
-
-    [Fact]
-    public void Lexer_RecognizesEndDoKeyword()
-    {
-        var tokens = Tokenize("§/DO");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndDo, tokens[0].Kind);
-    }
-
     #endregion
-
     #region Full Program
-
-    [Fact]
-    public void Lexer_TokenizesProgram()
-    {
-        // Lexer test: verifies all token kinds are recognized including legacy closers
-        var source = @"
-§M{m001:Hello}
-    §F{f001:Main:pub}
-          §O{void}
-          §E{cw}
-          §C{Console.WriteLine}
-            §A ""Hello from Calor v2!""
-          §/C
-    §/F{f001}
-§/M{m001}
-";
-        var tokens = Tokenize(source);
-
-        // Verify key tokens are present
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Module);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Func);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Out);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Effects);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Call);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Arg);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndCall);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndFunc);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndModule);
-    }
 
     #endregion
 
@@ -351,7 +192,7 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void Lexer_TokenizesOptionType()
+    public void Lexer_TokenizesNullableType()
     {
         var tokens = Tokenize("[?i32]");
 
@@ -363,7 +204,7 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void Lexer_TokenizesResultType()
+    public void Lexer_TokenizesExclamationBetweenIdentifiers()
     {
         var tokens = Tokenize("[i32!str]");
 
@@ -384,7 +225,7 @@ public class SyntaxTests
     public void Parser_ParsesModuleWithPositionalAttributes()
     {
         var diagnostics = new DiagnosticBag();
-        var source = "§M{m001:Hello}";
+        var source = "module Hello Hello block";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -392,7 +233,9 @@ public class SyntaxTests
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        Assert.Equal("m001", module.Id);
+        Assert.NotEmpty(module.LocalId);
+        Assert.Null(module.ToolingId);
+        Assert.Equal(module.LocalId, module.Id);
         Assert.Equal("Hello", module.Name);
     }
 
@@ -401,9 +244,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:MyFunc:pub}
-      §O{void}";
+module Test Test block
+  func MyFunc () → void
+    !
+    return";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -421,10 +265,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §O{i32}
-        §R 0";
+module Test Test block
+  func Add () → int
+    !
+    return 0";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -432,7 +276,7 @@ public class SyntaxTests
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        Assert.Equal("INT", module.Functions[0].Output?.TypeName);
+        Assert.Equal("int", module.Functions[0].Output?.TypeName);
     }
 
     [Fact]
@@ -440,12 +284,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-        §R 0";
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return 0";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -455,7 +297,7 @@ public class SyntaxTests
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         Assert.Equal(2, module.Functions[0].Parameters.Count);
         Assert.Equal("a", module.Functions[0].Parameters[0].Name);
-        Assert.Equal("INT", module.Functions[0].Parameters[0].TypeName);
+        Assert.Equal("int", module.Functions[0].Parameters[0].TypeName);
     }
 
     [Fact]
@@ -463,10 +305,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
-      §O{void}
-      §E{cw}";
+module Test Test block
+  func Print () → void
+    ! cw
+    return";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -484,13 +326,10 @@ public class SyntaxTests
         var diagnostics = new DiagnosticBag();
         // No §BODY/§END_BODY markers - implicit body
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
-      §O{void}
-      §E{cw}
-      §C{Console.WriteLine}
-        §A ""Hello v2!""
-      §/C";
+module Test Test block
+  func Print () → void
+    ! cw
+    Console.WriteLine(""Hello v2!"")";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -507,16 +346,11 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
-      §O{void}
-      §E{cw}
-      §C{Console.WriteLine}
-        §A ""Line 1""
-      §/C
-      §C{Console.WriteLine}
-        §A ""Line 2""
-      §/C";
+module Test Test block
+  func Print () → void
+    ! cw
+    Console.WriteLine(""Line 1"")
+    Console.WriteLine(""Line 2"")";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -546,17 +380,17 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void AttributeHelper_ExpandsOptionType()
+    public void AttributeHelper_ExpandsNullableType()
     {
         var result = AttributeHelper.ExpandType("?i32");
-        Assert.Equal("OPTION[inner=INT]", result);
+        Assert.Equal("NULLABLE[inner=INT]", result);
     }
 
     [Fact]
-    public void AttributeHelper_ExpandsResultType()
+    public void AttributeHelper_DoesNotExpandRemovedResultShorthand()
     {
         var result = AttributeHelper.ExpandType("i32!str");
-        Assert.Equal("RESULT[ok=INT][err=STRING]", result);
+        Assert.Equal("i32!str", result);
     }
 
     [Fact]
@@ -588,13 +422,19 @@ public class SyntaxTests
     }
 
     [Fact]
-    public void Lexer_RecognizesBareNegativeInteger()
+    public void Lexer_SeparatesBareNegativeIntegerSign()
     {
         var tokens = Tokenize("-42");
 
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.IntLiteral, tokens[0].Kind);
-        Assert.Equal(-42, Assert.IsType<IntLiteralInfo>(tokens[0].Value).SignedValue);
+        Assert.Equal(3, tokens.Count);
+        Assert.Equal(TokenKind.Minus, tokens[0].Kind);
+        Assert.Equal(0, tokens[0].Span.Start);
+        Assert.Equal(1, tokens[0].Span.End);
+        Assert.Equal(TokenKind.IntLiteral, tokens[1].Kind);
+        Assert.Equal(42, Assert.IsType<IntLiteralInfo>(tokens[1].Value).SignedValue);
+        Assert.Equal(1, tokens[1].Span.Start);
+        Assert.Equal(3, tokens[1].Span.End);
+        Assert.Equal(TokenKind.Eof, tokens[2].Kind);
     }
 
     [Fact]
@@ -698,7 +538,7 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesArrow()
     {
-        var tokens = Tokenize("->");
+        var tokens = Tokenize("→");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Arrow, tokens[0].Kind);
@@ -879,10 +719,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §O{i32}
-        §R (+ 1 2)";
+module Test Test block
+  func Add () → int
+    !
+    return (1 + 2)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -903,10 +743,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub}
-      §O{bool}
-        §R (== (% i 15) 0)";
+module Test Test block
+  func Calc () → bool
+    !
+    return ((i % 15) == 0)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -930,11 +770,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{i32:x}
-      §O{i32}
-        §R (+ x 1)";
+module Test Test block
+  func Test (int:x) → int
+    !
+    return (x + 1)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -954,11 +793,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-      §I{BOOL:flag}
-      §O{BOOL}
-        §R (! flag)";
+module Test Test block
+  func Test (bool:flag) → bool
+    !
+    return (!flag)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -977,9 +815,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub} () -> i32
-        §R (+ §THIS.Value INT:1)";
+module Test Test block
+  func Calc () → int
+    !
+    return (this . Value + 1)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -1004,9 +843,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Calc:pub} () -> i32
-        §R (+ §BASE.Value INT:1)";
+module Test Test block
+  func Calc () → int
+    !
+    return (base . Value + 1)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -1024,38 +864,18 @@ public class SyntaxTests
         Assert.IsType<BaseExpressionNode>(memberAccess.Target);
         Assert.Equal("Value", memberAccess.FieldName);
     }
-
     #endregion
-
     #region Print Alias
-
-    [Fact]
-    public void Lexer_RecognizesPrintAlias()
-    {
-        var tokens = Tokenize("§P");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Print, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesPrintFAlias()
-    {
-        var tokens = Tokenize("§Pf");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.PrintF, tokens[0].Kind);
-    }
 
     [Fact]
     public void Parser_ParsesPrintStatement()
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §O{void}
-        §P ""Hello World""";
+module Test Test block
+  func Main () → void
+    !
+    Console.WriteLine(""Hello World"")";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -1064,9 +884,10 @@ public class SyntaxTests
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         Assert.Single(module.Functions[0].Body);
-        Assert.IsType<PrintStatementNode>(module.Functions[0].Body[0]);
-        var printStmt = (PrintStatementNode)module.Functions[0].Body[0];
-        Assert.True(printStmt.IsWriteLine);
+        var printStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var printCall = Assert.IsType<ExpressionCallNode>(printStmt.Expression);
+        Assert.Equal("WriteLine", Assert.IsType<FieldAccessNode>(printCall.TargetExpression).FieldName);
+        Assert.Single(printCall.Arguments);
     }
 
     [Fact]
@@ -1074,11 +895,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §I{i32:x}
-      §O{void}
-        §P (+ x 1)";
+module Test Test block
+  func Main (int:x) → void
+    !
+    Console.WriteLine((x + 1))";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -1086,8 +906,10 @@ public class SyntaxTests
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        var printStmt = (PrintStatementNode)module.Functions[0].Body[0];
-        Assert.IsType<BinaryOperationNode>(printStmt.Expression);
+        var printStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var printCall = Assert.IsType<ExpressionCallNode>(printStmt.Expression);
+        Assert.Equal("WriteLine", Assert.IsType<FieldAccessNode>(printCall.TargetExpression).FieldName);
+        Assert.IsType<BinaryOperationNode>(Assert.Single(printCall.Arguments));
     }
 
     #endregion
@@ -1099,11 +921,11 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §I{BOOL:flag}
-      §O{void}
-        §IF{i1} flag → §P ""Yes""";
+module Test Test block
+  func Main (bool:flag) → void
+    !
+    if flag
+      Console.WriteLine(""Yes"")";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -1115,22 +937,14 @@ public class SyntaxTests
         var ifStmt = module.Functions[0].Body[0] as IfStatementNode;
         Assert.NotNull(ifStmt);
         Assert.Single(ifStmt!.ThenBody);
-        Assert.IsType<PrintStatementNode>(ifStmt.ThenBody[0]);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesElseIfShortcut()
-    {
-        var tokens = Tokenize("§EI");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.ElseIf, tokens[0].Kind);
+        var thenStmt = Assert.IsType<ExpressionStatementNode>(ifStmt.ThenBody[0]);
+        Assert.IsType<ExpressionCallNode>(thenStmt.Expression);
     }
 
     [Fact]
     public void Lexer_RecognizesElseShortcut()
     {
-        var tokens = Tokenize("§EL");
+        var tokens = Tokenize("else");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.Else, tokens[0].Kind);
@@ -1139,19 +953,10 @@ public class SyntaxTests
     [Fact]
     public void Lexer_RecognizesWhileShortcut()
     {
-        var tokens = Tokenize("§WH");
+        var tokens = Tokenize("while");
 
         Assert.Equal(2, tokens.Count);
         Assert.Equal(TokenKind.While, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesEndWhileShortcut()
-    {
-        var tokens = Tokenize("§/WH");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.EndWhile, tokens[0].Kind);
     }
 
     #endregion
@@ -1163,10 +968,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §O{void}
-        §C{Console.WriteLine} ""Hello""";
+module Test Test block
+  func Main () → void
+    !
+    Console.WriteLine(""Hello"")";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -1175,9 +980,9 @@ public class SyntaxTests
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
         Assert.Single(module.Functions[0].Body);
-        var callStmt = module.Functions[0].Body[0] as CallStatementNode;
-        Assert.NotNull(callStmt);
-        Assert.Single(callStmt!.Arguments);
+        var callStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var call = Assert.IsType<ExpressionCallNode>(callStmt.Expression);
+        Assert.Single(call.Arguments);
     }
 
     [Fact]
@@ -1185,11 +990,10 @@ public class SyntaxTests
     {
         var diagnostics = new DiagnosticBag();
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-      §I{i32:x}
-      §O{void}
-        §C{Console.WriteLine} (+ x 1)";
+module Test Test block
+  func Main (int:x) → void
+    !
+    Console.WriteLine((x + 1))";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
@@ -1197,34 +1001,34 @@ public class SyntaxTests
         var module = parser.Parse();
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-        var callStmt = module.Functions[0].Body[0] as CallStatementNode;
-        Assert.NotNull(callStmt);
-        Assert.Single(callStmt!.Arguments);
-        Assert.IsType<BinaryOperationNode>(callStmt.Arguments[0]);
+        var callStmt = Assert.IsType<ExpressionStatementNode>(module.Functions[0].Body[0]);
+        var call = Assert.IsType<ExpressionCallNode>(callStmt.Expression);
+        Assert.Single(call.Arguments);
+        Assert.IsType<BinaryOperationNode>(call.Arguments[0]);
     }
 
     #endregion
 
-    #region Backtick Identifiers
+    #region Using directives
 
-    [Fact]
-    public void Lexer_RecognizesBacktickIdentifier()
+    [Theory]
+    [InlineData("using Buffers = System.Buffers")]
+    [InlineData("using static System.Math")]
+    [InlineData("global using System.Text")]
+    public void Parser_UsingOnLastLineWithoutTrailingNewline_Parses(string directive)
     {
-        var tokens = Tokenize("`true`");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
-        Assert.Equal("true", tokens[0].Text);
-    }
-
-    [Fact]
-    public void Lexer_RecognizesBacktickIdentifierWithSpaces()
-    {
-        var tokens = Tokenize("`my var`");
-
-        Assert.Equal(2, tokens.Count);
-        Assert.Equal(TokenKind.Identifier, tokens[0].Kind);
-        Assert.Equal("my var", tokens[0].Text);
+        // The closing dedents of a file without a final newline sit on the using's own
+        // line; they must not be read as trailing tokens of the directive.
+        foreach (var source in new[]
+        {
+            "module UsingTail\n  " + directive,
+            "module UsingTail UsingTail block\n  pp FEATURE\n    " + directive,
+        })
+        {
+            var diagnostics = new DiagnosticBag();
+            var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        }
     }
 
     #endregion

@@ -1,0 +1,13 @@
+module Sort Sort
+  module SortModule
+    func CompareAsc public (int:a, int:b) → bool
+      !
+      return a < b
+
+    func CompareDesc public (int:a, int:b) → bool
+      !
+      return a > b
+
+    func IsSorted public (int:prev, int:current) → bool
+      !
+      return prev <= current

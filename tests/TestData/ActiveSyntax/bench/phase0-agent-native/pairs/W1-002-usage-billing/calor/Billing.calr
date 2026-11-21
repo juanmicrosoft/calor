@@ -1,0 +1,14 @@
+module Billing Billing block
+  module BillingModule partial
+    func BillBasic (int:units) → int
+      !
+      => (result >= 500)
+      => (result <= 70500)
+      var int:u = units
+      if (u < 0)
+        set u 0
+      if (u > 100000)
+        set u 100000
+      return (((u * 7) / 10) + 500)
+
+

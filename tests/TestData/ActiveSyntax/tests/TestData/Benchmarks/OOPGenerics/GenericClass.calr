@@ -1,0 +1,10 @@
+module GenericClass GenericClass
+  module GenericClassModule
+    func HasValue public (bool:isPresent) → bool
+      !
+      return isPresent
+
+    func Count public (int:count) → int
+      !
+      => result >= 0
+      return count

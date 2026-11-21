@@ -1,0 +1,118 @@
+module L3M20 L3M20 block
+  module L3M20Module public
+
+    func l3m20_fn01 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 5)
+
+    func l3m20_fn02 public (int:x, int:y) → int
+      !
+      requires (x >= 2)
+      requires (y >= 0)
+      => (result >= 24683)
+      let int:total = ((x * 3) + y)
+      if (total < 24683)
+        return 24683
+      else
+        return total
+
+    func l3m20_fn03 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24690)
+        return (acc + 24690)
+      else
+        return ((acc * 2) + 24690)
+
+    func l3m20_fn04 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24697)
+        return (acc + 24697)
+      else
+        return ((acc * 2) + 24697)
+
+    func l3m20_fn05 public (int:x, int:y) → int
+      !
+      requires (x > 6)
+      => (x >= 7)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24704)
+        return (acc + 24704)
+      else
+        return ((acc * 2) + 24704)
+
+    func l3m20_fn06 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 18)
+
+    func l3m20_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 3)
+      requires (y >= 0)
+      => (result >= 24711)
+      let int:total = ((x * 3) + y)
+      if (total < 24711)
+        return 24711
+      else
+        return total
+
+    func l3m20_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 50)
+
+    func l3m20_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24718)
+      if (x >= 24718)
+        return x
+      else
+        return 24718
+
+    func l3m20_fn10 public (int:x, int:y) → int
+      !
+      requires (x > 5)
+      => (x >= 6)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24725)
+        return (acc + 24725)
+      else
+        return ((acc * 2) + 24725)
+
+    func l3m20_fn11 public (int:x, int:y) → int
+      !
+      requires (x > 0)
+      => (x >= 1)
+      let int:acc = ((x * 5) + y)
+      if (acc > 24732)
+        return (acc + 24732)
+      else
+        return ((acc * 2) + 24732)
+
+    func l3m20_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24739)
+      let int:total = ((x * 2) + y)
+      if (total > 24739)
+        return 24739
+      return total
+
+    func l3m20_fn13 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24746)
+      if (x >= 24746)
+        return x
+      else
+        return 24746

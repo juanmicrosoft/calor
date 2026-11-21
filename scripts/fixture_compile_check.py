@@ -5,6 +5,10 @@ each registered multi-file group) with the checkout-built compiler and
 compare the outcome with its expectation in
 eng/tier2-fixture-expectations.json (#1241). It does not perform an AST round
 trip. Its predecessor, `ast_roundtrip_check.py`, claimed one but did not.
+The current lane resolves original inputs through the manifest's explicit
+ActiveSyntax registry, never by rewriting historical source. Reports retain
+both the registered subject and the actual current input. Tracked mirrors
+also need their own registration; resolution does not remove any subjects.
 
 Every tracked fixture under the selected roots needs exactly one entry:
 `compile` (must compile), `reject` (must fail with exactly the registered
@@ -61,6 +65,7 @@ STATUSES = SUCCESS + ("known-failure", "failed", "unexpected-pass",
                       "unclassified", "invalid", "crashed",
                       "TimeoutOrUnavailable")
 CS_CODE = re.compile(r"\((CS\d{4})\)")
+DECLARATION_URI = re.compile(r"calor://declaration/([A-Za-z0-9_]+)")
 
 
 def errors_of(diagnostics: list[dict]) -> list[dict]:
@@ -68,10 +73,14 @@ def errors_of(diagnostics: list[dict]) -> list[dict]:
             if str(d.get("severity", "")).lower() == "error"]
 
 
-def signature(diagnostics: list[dict]) -> list[str]:
+def signature(diagnostics: list[dict],
+              declaration_keys: dict[str, str] | None = None) -> list[str]:
     """One `file|code|declaration|message` entry per error, sorted, with
     duplicates kept, so an error with another location, declaration, or
-    cause, or one more error, changes the signature. `file` is the base
+    cause, or one more error, changes the signature. Fresh scratch-sidecar
+    IDs, including candidate references in messages, resolve to exact
+    file/kind/container/name/signature descriptors.
+    `file` is the base
     name; Calor1002 carries its Roslyn code; whitespace is collapsed.
     """
     sig = []
@@ -82,11 +91,107 @@ def signature(diagnostics: list[dict]) -> list[str]:
             code = f"Calor1002:{m.group(1)}" if m else "Calor1002"
         where = Path(str((d.get("location") or {}).get("file") or "-")).name
         msg = " ".join(str(d.get("message", "")).split())
-        sig.append(f"{where}|{code}|{d.get('declarationId') or '-'}|{msg}")
+        if declaration_keys is not None:
+            def candidate_reference(match: re.Match[str]) -> str:
+                identity = match.group(1)
+                if identity not in declaration_keys:
+                    raise ValueError(f"unresolved diagnostic declaration {identity}")
+                return "calor://declaration/" + declaration_keys[identity]
+            msg = DECLARATION_URI.sub(candidate_reference, msg)
+        declaration = d.get("declarationId") or "-"
+        if declaration != "-" and declaration_keys is not None:
+            if declaration not in declaration_keys:
+                raise ValueError(f"unresolved diagnostic declaration {declaration}")
+            declaration = declaration_keys[declaration]
+        sig.append(f"{where}|{code}|{declaration}|{msg}")
     return sorted(sig)
 
 
+def scratch_declaration_keys(work: Path, files: list[Path]) -> dict[str, str]:
+    """Keep semantic identity exact without comparing freshly minted IDs."""
+    keys: dict[str, str] = {}
+    inputs = (work / "in").resolve()
+    stores: set[Path] = set()
+    for source in files:
+        parent = source.resolve(strict=True).parent
+        if not parent.is_relative_to(inputs):
+            raise ValueError(f"scratch input escapes its root: {source}")
+        while parent.is_relative_to(inputs):
+            sidecar = parent / ".calor" / "ids.json"
+            if sidecar.is_file():
+                stores.add(sidecar)
+                break
+            parent = parent.parent
+    for path in sorted(stores):
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict) or type(state.get("Version")) is not int \
+                or state["Version"] != 1 \
+                or not isinstance(state.get("Declarations"), list):
+            raise ValueError(f"invalid scratch identity storage: {path}")
+        for declaration in state["Declarations"]:
+            if not isinstance(declaration, dict) \
+                    or not all(isinstance(declaration.get(field), str)
+                               for field in ("Id", "File", "Container", "Name", "Signature")) \
+                    or not declaration["Id"] or not declaration["Name"] \
+                    or type(declaration.get("Kind")) is not int:
+                raise ValueError(f"invalid scratch declaration: {path}")
+            identity = declaration["Id"]
+            if identity in keys:
+                raise ValueError(f"duplicate scratch declaration {identity}")
+            source = (path.parent.parent / declaration["File"]).resolve(strict=True)
+            relative = source.relative_to(inputs).as_posix()
+            keys[identity] = json.dumps([
+                relative, declaration["Kind"], declaration["Container"],
+                declaration["Name"], declaration["Signature"],
+            ], separators=(",", ":"))
+    return keys
+
+
 # ---------------------------------------------------------------- manifest
+
+def current_input_paths(repo_root: Path, manifest: dict) -> dict[str, str]:
+    """Resolve only explicitly registered current copies; missing data fails."""
+    if "currentInputs" not in manifest:
+        return {}
+    registry = manifest["currentInputs"]
+
+    def relative(value):
+        if not isinstance(value, str) or not value \
+                or Path(value).is_absolute() \
+                or Path(value).as_posix() != value \
+                or any(part in ("", ".", "..") for part in value.split("/")):
+            raise ValueError(f"invalid current input path: {value!r}")
+        return value
+
+    registry = relative(registry)
+    path = repo_root / registry
+    if not path.resolve(strict=True).is_relative_to(repo_root.resolve()):
+        raise ValueError(f"current input registry escapes repository: {registry}")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict) \
+            or not isinstance(document.get("originalPaths"), list) \
+            or not document["originalPaths"]:
+        raise ValueError("current input registry needs non-empty originalPaths")
+    resolved: dict[str, str] = {}
+    targets: set[Path] = set()
+    root = repo_root.resolve()
+    for original in document["originalPaths"]:
+        original = relative(original)
+        mirror = (path.parent / original).relative_to(repo_root).as_posix()
+        if original in resolved:
+            raise ValueError(f"duplicate current input: {original}")
+        for candidate in (original, mirror):
+            source = (repo_root / candidate).resolve(strict=True)
+            if not source.is_relative_to(root) or not source.is_file() \
+                    or not candidate.endswith(".calr"):
+                raise ValueError(f"invalid current input: {candidate}")
+        target = (repo_root / mirror).resolve()
+        if target in targets or mirror in document["originalPaths"]:
+            raise ValueError(f"duplicate or chained current mirror: {mirror}")
+        targets.add(target)
+        resolved[original] = mirror
+    return resolved
+
 
 def validate_manifest(manifest: dict) -> list[str]:
     """Structural problems in the expectations file (empty when valid)."""
@@ -178,6 +283,11 @@ def run_unit(compiler_cmd: list[str], repo_root: Path, files: list[str],
         except subprocess.TimeoutExpired:
             return "timeout", [], f"exceeded {timeout:.0f}s", []
         outcome, sig, detail, errs = _parse_result(cp.returncode, cp.stdout)
+        if outcome is not None:
+            try:
+                sig = signature(errs, scratch_declaration_keys(work, inputs))
+            except (OSError, ValueError, TypeError) as error:
+                return None, [], f"invalid scratch declaration identity: {error}", errs
         if outcome == "ok":
             outputs = ([work / "out.g.cs"] if len(inputs) == 1
                        else [p.with_suffix(".g.cs") for p in inputs])
@@ -210,6 +320,12 @@ def check(repo_root: Path, manifest: dict, roots: list[str], discovered: list[st
     """Run the registered expectations for `discovered` and build a report."""
     rows: list[dict] = []
     problems = validate_manifest(manifest)
+    current: dict[str, str] = {}
+    if not problems:
+        try:
+            current = current_input_paths(repo_root, manifest)
+        except (OSError, ValueError, TypeError) as error:
+            problems.append(f"invalid current input registry: {error}")
     if problems:
         rows += [{"group": None, "files": [], "status": "invalid", "detail": p}
                  for p in problems]
@@ -255,11 +371,13 @@ def check(repo_root: Path, manifest: dict, roots: list[str], discovered: list[st
 
     def work(unit):
         g, batch = unit
-        outcome, sig, detail, errs = run_unit(compiler_cmd, repo_root, batch,
+        inputs = [current.get(f, f) for f in batch]
+        outcome, sig, detail, errs = run_unit(compiler_cmd, repo_root, inputs,
                                               g.get("options", []), timeout)
         expected_sig = g.get("errors") or []
         status = classify(g["expect"], expected_sig, outcome, sig)
-        row = {"group": g["id"], "files": batch, "expect": g["expect"],
+        row = {"group": g["id"], "files": batch, "currentFiles": inputs,
+               "expect": g["expect"],
                "options": g.get("options", []), "status": status,
                "signature": sig}
         if g["expect"] != "compile":
@@ -302,6 +420,8 @@ def _report(manifest: dict, roots: list[str], discovered: list[str],
         "schemaVersion": 1,
         "check": "fixture-compile-check",
         "astRoundTrip": False,
+        "inputContract": "current-compiler",
+        "currentInputs": manifest.get("currentInputs"),
         "roots": roots,
         "manifestSha256": hashlib.sha256(
             json.dumps(manifest, sort_keys=True).encode()).hexdigest(),
@@ -321,8 +441,11 @@ def print_summary(report: dict) -> None:
     for s, n in report["counts"].items():
         print(f"  {s:<22} {n}") if n else None
     for r in (r for r in report["rows"] if r["status"] not in SUCCESS):
+        current = (f" current input: {', '.join(r['currentFiles'])}"
+                   if r.get("currentFiles") != r["files"]
+                   and r.get("currentFiles") else "")
         print(f"  [{r['status']}] {', '.join(r['files']) or '-'} "
-              f"{r.get('detail', '')} got {r.get('signature')} expected "
+              f"{r.get('detail', '')}{current} got {r.get('signature')} expected "
               f"{r.get('expectedSignature', [])}")
     print(f"fixture_compile_check: {report['verdict']} "
           f"{'; '.join(report['failReasons'])}")
@@ -337,16 +460,18 @@ def self_test() -> int:
     except checkout_compiler.CompilerResolutionError as e:
         print(f"fixture_compile_check self-test: {e}", file=sys.stderr)
         return 2
-    good = "§M{m001:Pos}\n  §F{f001:Echo:pub} (i32:x) -> i32\n    §R x\n"
-    broken = "§M{m001:Neg}\n  §Q (unterminated\n"
-    effect = "§M{m001:Eff}\n  §F{f001:Hi:pub} () -> void\n    §P \"hi\"\n"
+    good = "module Pos\n  func Echo public (int:x) \u2192 int\n    !\n    return x\n"
+    broken = "module Neg\n  requires (unterminated\n"
+    effect = ("module Eff Eff block\n  func Hi public () \u2192 void\n    !\n"
+              "    Console.WriteLine(\"hi\")\n")
     cases = [  # (source, expect, errors, wanted status)
         (good, "compile", [], "passed"),
         (broken, "compile", [], "failed"),
-        (good, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "unexpected-pass"),
-        (effect, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "expected-negative"),
-        (effect, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'db' but does not declare it"], "failed"),
-        (effect, "known-failure", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "known-failure"),
+        (good, "reject", ["Calor0410|<Hi>|Function 'Hi' uses effect 'cw' but does not declare it"], "unexpected-pass"),
+        (effect, "reject", ["Calor0410|<Hi>|Function 'Hi' uses effect 'cw' but does not declare it"], "expected-negative"),
+        (effect, "reject", ["Calor0410|<Hi>|Function 'Hi' uses effect 'db' but does not declare it"], "failed"),
+        (effect, "known-failure", ["Calor0410|<Hi>|Function 'Hi' uses effect 'cw' but does not declare it"], "known-failure"),
+        (effect, "reject", ["Calor0410|<Other>|Function 'Hi' uses effect 'cw' but does not declare it"], "failed"),
     ]
     failures = 0
     with tempfile.TemporaryDirectory() as td:
@@ -356,7 +481,15 @@ def self_test() -> int:
             (root / f"fx/c{i}.calr").write_text(src, encoding="utf-8")
             g = {"id": f"c{i}", "files": [f"fx/c{i}.calr"], "mode": "each",
                  "expect": expect, "evidence": "self-test"}
-            g.update({"errors": [f"c{i}.calr|{e}" for e in errs]} if errs
+            def control_identity(name: str) -> str:
+                return json.dumps([
+                    f"c{i}.calr", 1, "Eff", name,
+                    '{"arity":0,"parameters":[],"output":"void"}',
+                ], separators=(",", ":"))
+
+            g.update({"errors": [
+                f"c{i}.calr|{e.replace('<Hi>', control_identity('Hi')).replace('<Other>', control_identity('Other'))}"
+                for e in errs]} if errs
                      else {})
             g.update({"defect": "self-test"} if expect == "known-failure"
                      else {"negativeKind": "designed"} if expect == "reject"

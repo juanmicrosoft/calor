@@ -1,9 +1,10 @@
-§M{m003:Invoice}
-  §F{f004:InvoiceLine:pub} (i32:price) -> i32
-    §B{t} §C{ComputeTax} §A price §/C
-    §R (+ price t)
+module Invoice Invoice block
+  func InvoiceLine (int:price) → int
+    !
+    let t = ComputeTax(price)
+    return (price + t)
 
-  §F{f005:InvoiceFooter:pub} (i32:subtotal) -> i32
-    §B{t} §C{ComputeTax} §A subtotal §/C
-    §R t
-
+  func InvoiceFooter (int:subtotal) → int
+    !
+    let t = ComputeTax(subtotal)
+    return t

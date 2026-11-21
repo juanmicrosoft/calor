@@ -1,6 +1,6 @@
-§M{m002:Order}
-  §F{f003:OrderTotal:pub} (i32:price) -> i32
-    §B{t1} §C{ComputeTaxWrapper} §A price §/C
-    §B{t2} §C{ComputeTaxWrapper} §A price §/C
-    §R (+ price (+ t1 t2))
-
+module Order Order block
+  func OrderTotal (int:price) → int
+    !
+    let t1 = ComputeTaxWrapper(price)
+    let t2 = ComputeTaxWrapper(price)
+    return (price + (t1 + t2))

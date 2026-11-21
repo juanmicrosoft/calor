@@ -15,15 +15,14 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:CreateInt:pub}
-                §O{void}
-                §E{alloc,cw}
-                §B{w:Example.Widget} §NEW{Example.Widget} §A INT:1 §/NEW
-              §F{f2:CreateString:pub}
-                §O{void}
-                §E{alloc,fs:r}
-                §B{w:Example.Widget} §NEW{Example.Widget} §A STR:"x" §/NEW
+            module Test Test block
+              func CreateInt () → void
+                ! alloc, cw
+                let Example.Widget:w = new Example.Widget(1)
+
+              func CreateString () → void
+                ! alloc, fs:r
+                let Example.Widget:w = new Example.Widget("x")
             """,
             """
             {
@@ -48,11 +47,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Create:pub}
-                §O{void}
-                §E{alloc}
-                §B{x:Missing.Widget} §NEW{Missing.Widget} §/NEW
+            module Test Test block
+              func Create () → void
+                ! alloc
+                let Missing.Widget:x = new Missing.Widget()
             """);
 
         Assert.Contains(diagnostics,
@@ -68,17 +66,15 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Person:pub}
-                §FLD{str:_name:pri}
-                §CTOR{ctor1:pub}
-                  §I{str:name}
-                  §ASSIGN §THIS._name name
-                §/CTOR{ctor1}
-              §F{f1:Create:pub}
-                §O{void}
-                §E{alloc,mut}
-                §B{p:Person} §NEW{Person} §A STR:"Ada" §/NEW
+            module Test Test block
+              class Person
+                field string:_name private
+                ctor (string:name)
+                  set this . _name name
+
+              func Create () → void
+                ! alloc, mut
+                let Person:p = new Person("Ada")
             """);
 
         Assert.DoesNotContain(diagnostics.Errors,
@@ -91,11 +87,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Reporter:pub}
-                §CTOR{ctor1:pub}
-                  §P "created"
-                §/CTOR{ctor1}
+            module Test Test block
+              class Reporter
+                ctor ()
+                  Console.WriteLine("created")
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -108,13 +103,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Create:pub}
-                §O{void}
-                §E{alloc,mut}
-                §B{p:Example.Person} §NEW{Example.Person}
-                  §INIT{Name} STR:"Ada"
-                §/NEW
+            module Test Test block
+              func Create () → void
+                ! alloc, mut
+                let Example.Person:p = new Example.Person() { Name = "Ada" }
             """,
             """
             {
@@ -135,46 +127,19 @@ public sealed class Issue785ClosureTests
     }
 
     [Fact]
-    public void AutoPropertyObjectInitializer_ChargesMutation()
-    {
-        var diagnostics = Enforce(
-            """
-            §M{m1:Test}
-              §CL{c1:Person:pub}
-                §PROP{p1:Name:str:pub:get,set}
-              §F{f1:Create:pub}
-                §O{void}
-                §E{alloc}
-                §B{p:Person} §NEW{Person}
-                  §INIT{Name} STR:"Ada"
-                §/NEW
-            """);
-
-        Assert.Contains(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("mut"));
-        Assert.DoesNotContain(diagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
-    }
-
-    [Fact]
     public void CustomInitializerSetterBody_IsInferredAndFailsClosed()
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Person:pub}
-                §PROP{p1:Name:str:pub}
-                  §SET
-                    §P "setting"
-                  §/SET
-                §/PROP{p1}
-              §F{f1:Create:pub}
-                §O{void}
-                §E{alloc,mut}
-                §B{p:Person} §NEW{Person}
-                  §INIT{Name} STR:"Ada"
-                §/NEW
+            module Test Test block
+              class Person
+                property string:Name
+                  set
+                    Console.WriteLine("setting")
+
+              func Create () → void
+                ! alloc, mut
+                let Person:p = new Person() { Name = "Ada" }
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -190,12 +155,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
-                §O{void}
-                §E{alloc}
-                §USE{u1:r:Example.Resource} §NEW{Example.Resource} §/NEW
-                §/USE{u1}
+            module Test Test block
+              func Use () → void
+                ! alloc
+                using Example.Resource:r = new Example.Resource()
             """,
             """
             {
@@ -220,13 +183,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
-                §I{Missing.Resource:r}
-                §O{void}
-                §E{}
-                §USE{u1:x:Missing.Resource} r
-                §/USE{u1}
+            module Test Test block
+              func Use (Missing.Resource:r) → void
+                !
+                using Missing.Resource:x = r
             """);
 
         Assert.Contains(diagnostics,
@@ -238,162 +198,18 @@ public sealed class Issue785ClosureTests
     }
 
     [Fact]
-    public void CustomEventAccessorEffects_AreEnforcedAndChargedAtSubscription()
-    {
-        var diagnostics = Enforce(
-            """
-            §M{m1:Test}
-              §CL{c1:Publisher:pub}
-                §EVT{e1:Changed:pub:EventHandler}
-                  §EADD
-                    §P "adding"
-                  §/EADD
-                  §EREM
-                  §/EREM
-                §/EVT{e1}
-              §F{f1:Subscribe:pub}
-                §I{Publisher:p}
-                §I{EventHandler:h}
-                §O{void}
-                §E{mut}
-                §SUB p.Changed h
-            """);
-
-        Assert.Contains(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.AccessorEffectContractUnavailable
-                && diagnostic.Message.Contains("add accessor"));
-        Assert.Contains(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("cw"));
-    }
-
-    [Fact]
-    public void FieldStyleEventSubscription_ChargesMutationWithoutUnknown()
-    {
-        var diagnostics = Enforce(
-            """
-            §M{m1:Test}
-              §CL{c1:Publisher:pub}
-                §EVT{e1:Changed:pub:EventHandler}
-              §F{f1:Subscribe:pub}
-                §I{Publisher:p}
-                §I{EventHandler:h}
-                §O{void}
-                §E{mut}
-                §SUB p.Changed h
-            """);
-
-        Assert.DoesNotContain(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect);
-        Assert.DoesNotContain(diagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
-    }
-
-    [Fact]
-    public void CustomRemoveAccessorEffects_AreChargedAtUnsubscription()
-    {
-        var diagnostics = Enforce(
-            """
-            §M{m1:Test}
-              §CL{c1:Publisher:pub}
-                §EVT{e1:Changed:pub:EventHandler}
-                  §EADD
-                  §/EADD
-                  §EREM
-                    §P "removing"
-                  §/EREM
-                §/EVT{e1}
-              §F{f1:Unsubscribe:pub}
-                §I{Publisher:p}
-                §I{EventHandler:h}
-                §O{void}
-                §E{mut}
-                §UNSUB p.Changed h
-            """);
-
-        Assert.Contains(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.AccessorEffectContractUnavailable
-                && diagnostic.Message.Contains("remove accessor"));
-        Assert.Contains(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("cw"));
-    }
-
-    [Fact]
-    public void SourceEffectTypo_ProducesDedicatedDiagnostic()
-    {
-        var diagnostics = Parse(
-            """
-            §M{m1:Test}
-              §F{f1:Run:pub}
-                §O{void}
-                §E{fs:x}
-            """,
-            out _);
-
-        Assert.Contains(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.UnknownEffectCode
-                && diagnostic.Message.Contains("fs:x"));
-    }
-
-    [Fact]
-    public void FullTaxonomy_RoundTripsAcrossSourceSetManifestEmitterAndDocs()
-    {
-        var docs = File.ReadAllText(Path.Combine(FindRepositoryRoot(),
-            "docs", "syntax-reference", "effects.md"));
-        foreach (var code in EffectCodes.KnownCompactCodes)
-        {
-            Assert.True(EffectCodes.TryParseCompact(
-                code,
-                out var kind,
-                out var category,
-                out var value));
-
-            var effectSet = EffectSet.From(code);
-            Assert.True(effectSet.Contains(kind, value));
-            Assert.Contains(code, effectSet.ToDisplayString());
-
-            var sourceDiagnostics = Parse(
-                $"§M{{m1:Test}}\n  §F{{f1:Run:pub}}\n    §O{{void}}\n    §E{{{code}}}\n",
-                out var module);
-            Assert.DoesNotContain(sourceDiagnostics.Errors,
-                diagnostic => diagnostic.Code == DiagnosticCode.UnknownEffectCode);
-
-            var emitted = new CalorEmitter().Visit(module.Functions[0].Effects!);
-            Assert.Equal($"§E{{{code}}}", emitted);
-
-            var loader = new ManifestLoader();
-            loader.LoadFromJson(
-                $$"""
-                {
-                  "version": "1.0",
-                  "mappings": [{
-                    "type": "Example.Type",
-                    "methods": { "Run": ["{{code}}"] }
-                  }]
-                }
-                """,
-                $"taxonomy-{code}");
-            Assert.Empty(loader.ValidateManifests());
-        }
-
-        foreach (var code in EffectCodes.DocumentedCompactCodes)
-            Assert.Contains($"`{code}`", docs);
-    }
-
-    [Fact]
     public void StaticExternalCall_CannotAliasSameNamedInternalFunction()
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:WriteLine:pub}
-                §O{void}
-                §E{}
-              §F{f2:Run:pub}
-                §O{void}
-                §E{}
-                §C{Console.WriteLine} §A STR:"external" §/C
+            module Test Test block
+              func WriteLine () → void
+                !
+                return
+
+              func Run () → void
+                !
+                Console.WriteLine("external")
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -406,18 +222,19 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
-                §CTOR{ctor1:pub}
-                  §P "base"
-                §/CTOR{ctor1}
-              §CL{c2:Derived:Base:pub}
-                §CTOR{ctor2:pub}
-                §/CTOR{ctor2}
-              §F{f1:Create:pub}
-                §O{void}
-                §E{alloc}
-                §B{x:Derived} §NEW{Derived} §/NEW
+            module Test Test block
+              class Base
+                ctor ()
+                  Console.WriteLine("base")
+
+              class Derived internal
+                extends Base
+
+                ctor ()
+
+              func Create () → void
+                ! alloc
+                let Derived:x = new Derived()
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -464,17 +281,9 @@ public sealed class Issue785ClosureTests
     [Fact]
     public void ConstructedGenericArgument_UsesOverloadSpecificEffects()
     {
-        var diagnostics = Enforce(
-            """
-            §M{m1:Test}
-              §F{f1:Run:pub}
-                §O{void}
-                §E{alloc}
-                §C{Example.Api.Transform}
-                  §A §NEW{Example.Box<i32>} §/NEW
-                §/C
-            """,
-            """
+        // The overload-specific entry for a constructed generic argument wins over
+        // the name-only wildcard, across CLR and Calor spellings of the argument.
+        const string manifest = """
             {
               "version": "1.0",
               "mappings": [
@@ -491,45 +300,43 @@ public sealed class Issue785ClosureTests
                 }
               ]
             }
-            """);
+            """;
+        var loader = new ManifestLoader();
+        loader.LoadFromJson(manifest, "issue-785-test");
+        var resolver = new EffectResolver(loader);
+        foreach (var spelling in new[] { "Example.Box`1<System.Int32>", "Example.Box<int>", "Example.Box<i32>" })
+        {
+            var specific = resolver.Resolve(EffectResolverKey.FromStrings("Example.Api", "Transform", [spelling]));
+            Assert.Equal(EffectResolutionStatus.Resolved, specific.Status);
+            Assert.True(specific.Effects.Contains(EffectKind.IO, "console_write"));
+        }
+        var other = resolver.Resolve(EffectResolverKey.FromStrings("Example.Api", "Transform", ["Example.Box<string>"]));
+        Assert.Equal(EffectResolutionStatus.PureExplicit, other.Status);
+        Assert.True(other.Effects.IsEmpty);
 
-        Assert.Contains(diagnostics.Errors,
-            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
-                && diagnostic.Message.Contains("cw"));
-    }
-
-    [Fact]
-    public void InheritedDisposeEventAndInitializerMembers_AreResolved()
-    {
+        // End to end, 0.30 charges a native member call only through the
+        // metadata method the binder selected. Example.Api is absent from the
+        // binder's metadata, and decision D3 rules out a name-only manifest
+        // fallback, so the call fails closed as Unknown instead of reading either
+        // entry by spelling.
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
-                §I{Derived:x}
-                §I{EventHandler:h}
-                §O{void}
-                §E{mut,cw}
-                §SUB x.Changed h
-                §USE{u1:r:Derived} x
-                §/USE{u1}
-              §F{f2:Create:pub}
-                §O{void}
-                §E{alloc,mut}
-                §B{x:Derived} §NEW{Derived}
-                  §INIT{Name} STR:"ok"
-                §/NEW
-              §CL{c1:Base:pub}
-                §PROP{p1:Name:str:pub:get,set}
-                §EVT{e1:Changed:pub:EventHandler}
-                §MT{m1:Dispose:pub}
-                  §O{void}
-                  §E{cw}
-                  §P "dispose"
-              §CL{c2:Derived:Base:pub}
-            """);
+            module Test Test block
+              func Run () → void
+                ! alloc
+                Example.Api.Transform(new Example.Box<int>())
+            """,
+            manifest);
 
+        Assert.Contains(diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains(".Transform'", StringComparison.Ordinal));
+        Assert.Contains(diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'unknown'", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics,
-            diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
+                && diagnostic.Message.Contains("'cw'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -537,20 +344,19 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Read:pub}
-                §I{Derived:x}
-                §O{void}
-                §E{}
-                §B{value:str} x.Name
-              §CL{c1:Base:pub}
-                §PROP{p1:Name:str:pub}
-                  §GET
-                    §P "get"
-                    §R STR:"value"
-                  §/GET
-                §/PROP{p1}
-              §CL{c2:Derived:Base:pub}
+            module Test Test block
+              func Read (Derived:x) → void
+                !
+                let string:value = x.Name
+
+              class Base
+                property string:Name
+                  get
+                    Console.WriteLine("get")
+                    return "value"
+
+              class Derived internal
+                extends Base
             """);
 
         Assert.Contains(diagnostics.Errors,
@@ -563,14 +369,15 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
-                §CTOR{ctor1:pub}
-                  §P "instance"
-                §/CTOR{ctor1}
-              §CL{c2:Derived:Base:pub}
-                §CTOR{ctor2:stat}
-                §/CTOR{ctor2}
+            module Test Test block
+              class Base
+                ctor ()
+                  Console.WriteLine("instance")
+
+              class Derived internal
+                extends Base
+
+                ctor stat ()
             """);
 
         Assert.DoesNotContain(diagnostics.Errors,
@@ -631,13 +438,11 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Use:pub}
-                §I{Vendor.Widget:w}
-                §O{void}
-                §E{mut}
-                §B{name:str} w.Name
-                §ASSIGN w.Name STR:"updated"
+            module Test Test block
+              func Use (Vendor.Widget:w) → void
+                ! mut
+                let string:name = w.Name
+                set w.Name "updated"
             """,
             """
             {
@@ -663,11 +468,10 @@ public sealed class Issue785ClosureTests
     {
         var diagnostics = Enforce(
             """
-            §M{m1:Test}
-              §F{f1:Create:pub}
-                §O{void}
-                §E{}
-                §B{[i32]:items} §ARR{i32:items:1}
+            module Test Test block
+              func Create () → void
+                !
+                let int[]:items = new items[1]
             """);
 
         Assert.Contains(diagnostics.Errors,

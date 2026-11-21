@@ -1,0 +1,2643 @@
+---
+title: Current language reference
+description: Generated current Calor constructs and complete examples
+---
+
+{/* Generated from Teaching/reference.json by calor self-check docs --fix. */}
+
+# Current Calor language reference
+
+Write .calr files. Bodies use two-space indentation and structural blocks end at dedent.
+Declarations use lowercase space-separated headers. Functions use func and →; public is the default.
+Types use C# names, T[] arrays and T? nullability. Binding and parameter types precede names.
+Use let for immutable bindings and var for mutable bindings; set performs updates.
+Expressions use infix operators with C# precedence and expression-valued postfix calls/indexing.
+Effects (!) and postconditions (=&gt;) occur before the first body statement. result is the body result.
+Collection iteration uses each; counted loops use for, with distinct snapshot and reevaluated forms.
+Plain strings interpolate $&#123;expression&#125;; \$&#123;0&#125; preserves literal placeholder text.
+Use declaration /// documentation. Tooling owns source identities; do not write declaration IDs.
+Do not handwrite raw C# passthrough; converters own byte-counted raw payloads.
+The optional namespace follows the module label: module FileLabel Contoso.Tools.
+Omitting the namespace means the global namespace; the module label is not a namespace.
+Token-count decisions do not by themselves establish semantics or a measured full-reference budget.
+
+## Calor Language Overview
+
+Module, class and function bodies use indentation and lowercase, space-separated headers.
+Functions use func, type:name parameters and → returnType; public visibility is the default.
+Types and members include class, record, interface, property and this[...] indexer declarations.
+Use let for immutable bindings, var for mutable bindings and set for updates.
+Control flow includes if/else if/else, while, each collection iteration and two distinct for modes.
+Contracts and authoritative effects describe obligations and side effects with requires, =&gt; and !.
+Async functions distinguish their body result from the callable Task or ValueTask carrier.
+Expressions use C# precedence, postfix calls and indexing. Collections use ordinary .NET types.
+Types use C# names, T[] arrays and T? nullability. Literals include 42, true, "hello" and 18.00m.
+CLI/project/MCP compilation and editor diagnostics import System only by default; Tasks, LINQ and IO are not implied. Low-level APIs remain standalone. Use --no-implicit-system, CalorImplicitSystemUsing=false, or the MCP/LSP implicitSystem setting to opt out. SDK ImplicitUsings and explicit imports are independent. Downstream C# needs the same context. Aliases or fully qualified names resolve CS0104 ambiguity; imports never make raw C# native or unknown calls pure.
+Query a specific feature for complete examples; use action=features for conversion support.
+
+## object instantiation
+
+Creates a new instance with ordinary constructor-call syntax. Arguments are comma-separated; a zero-argument constructor still uses (). Preserve the selected constructor and left-to-right argument evaluation.
+
+Syntax: `new ClassName(arg1, arg2)`
+
+C# equivalents (fragments):
+
+```csharp
+var user = new User("John", 25);
+var list = new List<int>();
+return new Widget(value);
+```
+
+Complete example: [objects](#example-complete_objects).
+
+## variable declaration
+
+let declares an immutable binding; var declares a mutable binding. Both infer an omitted type. Types precede names; var is mutability, not a type-inference keyword. Give null an accurate explicit nullable type. In a match case, var name binds the matched value instead of declaring a mutable binding.
+
+Syntax: `let type:name = expression; var type:name = expression`
+
+C# equivalents (fragments):
+
+```csharp
+var count = 0;
+int mutableCount = 0; // needs to be modified later
+string name = "John";
+string? name = null;
+```
+
+Complete example: [Bindings](#example-primer_bindings).
+
+Complete example: [Nested array expressions](#example-nested_arrays).
+
+## method definition
+
+Declares a class method with the same function header as module functions. Preserve modifiers, visibility, contracts and authoritative effect rows; public is the default.
+
+Syntax: `func Name (type:param, ...) → returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public void Process(int value) { ... }
+public virtual string GetName() { return _name; }
+public override int Calculate(int x) { ... }
+```
+
+Complete example: [Calculator](#example-task_28).
+
+## function definition
+
+Declares a function or class method. Visibility is public by default; explicitly private and protected declarations retain their intended visibility. Parameters put the type before the name; parameter modifiers precede the type. Class methods may carry virtual, override, abstract or static modifiers. Functions inside a named static module are implicitly static.
+
+Syntax: `func Name (type:param, ...) → returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public static int Add(int a, int b) { return a + b; }
+private void Log(string message) { Console.WriteLine(message); }
+```
+
+Complete example: [Contracts](#example-primer_contracts).
+
+## lambda expression
+
+Creates a lambda with expression or indented statement body. An explicit effect row follows the parameters: (int:x) ! cw =&gt; body; empty ! declares a pure row. Do not write brace bodies or structural closers. The parameter-list closing parenthesis, optional row and =&gt; belong on the same line. Target delegate types and higher-order effect requirements remain authoritative; an unannotated lambda is not automatically a proof of purity.
+
+Syntax: `(type:name, ...) =&gt; expression; indented statements after =&gt;`
+
+C# equivalents (fragments):
+
+```csharp
+x => x * 2
+(a, b) => a + b
+items.Where(x => x > 5)
+```
+
+Complete example: [ApplyComplex](#example-task_25).
+
+Complete example: [Expression-valued call target with an explicit pure delegate row](#example-complete_postfix).
+
+## property definition
+
+Declares a property with indented get, set or init accessors. Empty accessor bodies are auto-implemented; explicit bodies contain statements. Restricted accessor visibility follows its keyword, such as set private. Preserve defaults, modifiers and accessor effects.
+
+Syntax: `property type:Name`
+
+C# equivalents (fragments):
+
+```csharp
+public string Name { get; set; }
+public int Count { get; private set; }
+public int Value { get { return _value; } set { _value = value; } }
+```
+
+Complete example: [Product](#example-task_31).
+
+Complete example: [Person](#example-task_32).
+
+## indexer definition
+
+Declares an indexer with inline typed parameters and indented get/set accessors. Preserve key order, restricted accessor visibility, defaults, modifiers and full accessor bodies.
+
+Syntax: `this[int:index] → resultType`
+
+C# equivalents (fragments):
+
+```csharp
+public int this[int index] { get; set; }
+public string this[string key] { get; set; }
+public int this[int row, int col] { get; set; }
+public int this[int i] { get { return _data[i]; } set { _data[i] = value; } }
+```
+
+Complete example: [indexer](#example-complete_indexer).
+
+## property access vs method call
+
+Use bare member access for properties and fields, without parentheses. Parentheses invoke a method. Calls and indexing can chain on expression-valued receivers.
+
+Syntax: `Property: obj.Property. Method: obj.Method(arg).`
+
+C# equivalents (fragments):
+
+```csharp
+var items = Data.Products;
+var items = Data.GetProducts();
+```
+
+Complete example: [Product](#example-task_31).
+
+Complete example: [objects](#example-complete_objects).
+
+## for loop
+
+One counted-loop keyword has two distinct semantics. The from/to/step header snapshots start, end and step once, in order, and includes the endpoint; omitted step is +1 and zero step throws. The =/semicolon form reevaluates its condition before each iteration and updates after the body or continue, not after break. Checked range overflow ends the snapshot range. Do not replace one form with the other.
+
+Syntax: `for i from start to end step stepValue; for i = start; condition; i = next`
+
+C# equivalents (fragments):
+
+```csharp
+for (int i = 0; i < 10; i++) { ... }
+for (int i = 0; i <= 10; i++) { ... }
+for (int i = 0; i < 100; i += 2) { ... }
+```
+
+Complete example: [Loops](#example-primer_loops).
+
+Complete example: [Reevaluated counted-loop condition with a changing local bound](#example-complete_reevaluated_for).
+
+Complete example: [Collection allocation, loop mutation and count](#example-copilot_smoke).
+
+## foreach loop
+
+Iterates synchronously over a collection with an indented body. An explicit type precedes the item name; string?:item retains a nullable string type. Two names deconstruct each element without tuple parentheses; collection evaluation remains once.
+
+Syntax: `each item in collection; each Type:item in collection; each key, value in collection`
+
+C# equivalents (fragments):
+
+```csharp
+foreach (var item in items) { ... }
+foreach (var (key, value) in dictionary) { ... }
+```
+
+Complete example: [SumList](#example-task_14).
+
+Complete example: [PrintDictionary](#example-task_16).
+
+## while loop
+
+Evaluates the condition before each iteration and executes an indented body while true.
+
+Syntax: `while condition`
+
+C# equivalents (fragments):
+
+```csharp
+while (count > 0) { count--; }
+while (true) { if (done) break; }
+```
+
+Complete example: [Countdown](#example-task_12).
+
+## if statement
+
+Conditional branches have indented bodies. else if and else align with if. Only the selected branch runs. Resolved System.String.IsNullOrEmpty and IsNullOrWhiteSpace calls prove a string non-null when false, including continuation after a returning true branch. Same-named user methods provide no such proof.
+
+Syntax: `if condition; else if condition; else`
+
+C# equivalents (fragments):
+
+```csharp
+if (x > 0) { return true; }
+if (x > 0) { a(); } else { b(); }
+if (x > 0) { } else if (x < 0) { } else { }
+```
+
+Complete example: [Branching](#example-primer_branching).
+
+## ternary / conditional expression
+
+Use a conditional expression when a condition chooses a value; use if for statement bodies and side effects. Only the selected expression branch evaluates. Conditional and null-coalescing operators associate right; ordinary binary operators associate left. Calor1305 offers a safe conditional-return patch for matching primitive literals and compatible declared return types; calls, assignments, lambdas, comments and mixed types are not rewritten.
+
+Syntax: `condition ? trueValue : falseValue`
+
+C# equivalents (fragments):
+
+```csharp
+var x = condition ? a : b;
+return count > 0 ? "items" : "none";
+var label = isActive ? GetLabel() : "default";
+```
+
+Complete example: [Abs](#example-task_4).
+
+## return statement
+
+Returns a value or exits a void-result body. Async body results differ from their callable task carriers; preserve that distinction.
+
+Syntax: `return expression; return`
+
+C# equivalents (fragments):
+
+```csharp
+return 42;
+return user.Name;
+return;
+```
+
+Complete example: [Abs](#example-task_4).
+
+## class definition
+
+Declares a class, public by default. Its members have indented bodies. Preserve inheritance, implemented interfaces, generic constraints, visibility and supported modifiers.
+
+Syntax: `class Name`
+
+C# equivalents (fragments):
+
+```csharp
+public class User { }
+public class Admin : User, IAdmin { }
+public abstract class BaseEntity { }
+```
+
+Complete example: [Classes](#example-primer_classes).
+
+Complete example: [Class with Fields, Constructor + Operators](#example-complex_class).
+
+## async method
+
+Declares an async function or class method using the async modifier.
+
+An async declaration with scalar output `T` is callable as `Task&lt;T&gt;`, but its body
+returns `T`. A `void` output produces `Task`. Explicit .NET `Task&lt;T&gt;` and
+`ValueTask&lt;T&gt;` outputs preserve that carrier and return `T` in the body; their
+non-generic forms have a void body result. Postconditions describe the body
+result, not the task object. Ordinary synchronous task-returning declarations
+keep their declared return type.
+
+Syntax: `func Name async (type:param, ...) → returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public async Task<string> FetchDataAsync() { ... }
+public async Task ProcessAsync() { await DoWork(); }
+```
+
+Complete example: [Async Method with Try/Catch](#example-complex_async).
+
+## await expression
+
+Awaits an asynchronous operation.
+
+Awaiting a .NET `Task&lt;T&gt;` or `ValueTask&lt;T&gt;` produces `T`. Awaiting a non-generic
+carrier produces no value and cannot initialize a binding. `await` can also be
+used as a statement. A custom type named `MyTask&lt;T&gt;` or a source declaration
+named `Task&lt;T&gt;` is not automatically a .NET async carrier. Unsupported custom
+awaitables are diagnosed or checked by generated C# validation, never inferred
+from a name suffix.
+
+Syntax: `await expression`
+
+C# equivalents (fragments):
+
+```csharp
+var result = await FetchAsync();
+await Task.Delay(1000);
+```
+
+Complete example: [Async Method with Try/Catch](#example-complex_async).
+
+## try catch
+
+Groups an indented try body with one or more catch clauses and/or finally cleanup. Catch types, binders and filters are optional; preserve exception selection, filter evaluation and cleanup on every exit.
+
+Syntax: `try; catch ExceptionType:name when condition; finally`
+
+C# equivalents (fragments):
+
+```csharp
+try { x(); } catch { y(); }
+try { } catch (Exception ex) { Log(ex); }
+try { } finally { Cleanup(); }
+```
+
+Complete example: [Async Method with Try/Catch](#example-complex_async).
+
+## throw statement
+
+Throws an exception expression. Bare throw rethrows the current exception inside a catch handler, preserving its original stack rather than constructing or throwing a replacement.
+
+Syntax: `throw expression; throw`
+
+C# equivalents (fragments):
+
+```csharp
+throw new ArgumentException("Invalid");
+throw;
+```
+
+Complete example: [SafeDivide](#example-task_8).
+
+## side effects
+
+Declares authoritative effects in the function header-clause region before the first body statement. Public/protected and declaration-only boundaries require an explicit own row; empty ! declares Pure. Private/internal bodies infer their rows and reject own annotations. Public callers must still cover every reachable effect. A body row does not certify open virtual dispatch. Callback parameter, returned-callback and delegate contracts require explicit rows, including ! unknown when no invocation contract is known. Unknown is not permission: strict invocation fails, even when the caller declares every known effect. An unused declared Unknown callback is allowed; transporting it can report Calor0425 when a row fit cannot be proved. Permissive mode waives uncertainty, never known undeclared effects. ! unknown is not a callable's own effect declaration, binding row or lambda row. Effect variables bind with &lt;! e&gt; and occur in rows as ! e; a scoped variable named unknown retains its identity. Parameter rows follow type:name; output rows follow the output type; binding rows precede =; lambda rows precede =&gt;. Preserve these distinct positions. Omitted binding and lambda rows can retain effects inferred from their initializer or body; they do not mean pure. In expression position, ! is logical negation, not an effect row. An unknown external call or manifest charge is not a metadata-resolution or purity proof.
+
+Syntax: `! effect1,effect2,...`
+
+C# equivalents (fragments):
+
+```csharp
+// Method that writes to console
+// Method that reads file and writes console
+// Pure function (no effects)
+```
+
+Complete example: [Effects](#example-primer_effects).
+
+## precondition
+
+Declares a condition that must hold when the function is called. The example retains the divisor guard. A custom-message spelling is not part of this native form; use explicit exceptions when a custom failure message is required.
+
+Syntax: `requires condition`
+
+C# equivalents (fragments):
+
+```csharp
+// Contract.Requires(value >= 0)
+// Guard.Against.Null(input)
+```
+
+Complete example: [Contracts](#example-primer_contracts).
+
+## postcondition
+
+Declares a postcondition before the first body statement. result denotes the body return value, including async body results rather than task objects. In expression lambdas =&gt; is the lambda delimiter, not a postcondition.
+
+Syntax: `=&gt; condition`
+
+C# equivalents (fragments):
+
+```csharp
+// Contract.Ensures(result >= 0)
+// Ensures non-empty result
+```
+
+Complete example: [Contracts](#example-primer_contracts).
+
+## module invariant
+
+Declares an invariant checked at the corresponding compilation-unit or type boundaries. Preserve the native contract AST and proof obligations, not an opaque runtime call.
+
+Syntax: `invariant condition`
+
+C# equivalents (fragments):
+
+```csharp
+// [ContractInvariantMethod] void Invariants() { Contract.Invariant(_count >= 0); }
+```
+
+Complete example: [invariant](#example-complete_invariant).
+
+## method call
+
+Calls a method or function with comma-separated arguments. Named arguments use name: value; ref, out and in modifiers precede values. The callee can be an expression; chains preserve left-to-right evaluation and short-circuit regions.
+
+Syntax: `target(arg1, arg2); target&lt;T&gt;(arg); Factory()(arg)`
+
+C# equivalents (fragments):
+
+```csharp
+Console.WriteLine("Hello");
+user.Save();
+Calculate(x, y) // internal pure call
+```
+
+Complete example: [Files](#example-primer_files).
+
+Complete example: [Expression-valued call target with an explicit pure delegate row](#example-complete_postfix).
+
+## field definition
+
+Declares a field with type before name, optional visibility and modifiers, and an optional initializer. Public is the default; preserve explicit private or protected visibility and readonly or static modifiers.
+
+Syntax: `field type:name private = expression`
+
+C# equivalents (fragments):
+
+```csharp
+private string _name;
+private readonly int _id;
+```
+
+Complete example: [Person](#example-task_33).
+
+## interface definition
+
+Declares an interface with indented func signatures. Preserve generic variance, inherited interfaces, effective visibility and method contracts. Explicit visibility follows the name and type parameters.
+
+Syntax: `interface Name`
+
+C# equivalents (fragments):
+
+```csharp
+public interface IRepository { void Save(Entity e); }
+```
+
+Complete example: [interface](#example-complete_interface).
+
+## enum definition
+
+Declares an enumeration with indented named members and optional explicit values. Preserve the underlying CLR type; omission defaults to int.
+
+Syntax: `enum Name byte`
+
+C# equivalents (fragments):
+
+```csharp
+public enum Status { Active, Inactive, Pending }
+public enum Priority : byte { Low = 0, High = 1 }
+```
+
+Complete example: [Enum with Switch/Match](#example-complex_enum).
+
+## constructor
+
+Declares a constructor with an indented body. Explicit visibility precedes the parameter list. A base(args) or this(args) initializer is the first body clause; preserve ordered arguments and base versus same-type delegation.
+
+Syntax: `ctor (type:param, ...)`
+
+C# equivalents (fragments):
+
+```csharp
+public User(string name) { _name = name; }
+public Admin(string name) : base(name) { }
+```
+
+Complete example: [Person](#example-task_33).
+
+## switch expression
+
+Matches an expression against ordered patterns. Expression arms use → followed by a result; statement arms have indented bodies. Preserve pattern guards and use return match when returning a match expression.
+
+Syntax: `match expression with indented case pattern → result arms`
+
+C# equivalents (fragments):
+
+```csharp
+x switch { 1 => "one", 2 => "two", _ => "other" }
+shape switch { Circle c => c.Area(), Rectangle r => r.Width * r.Height }
+```
+
+Complete example: [Enum with Switch/Match](#example-complex_enum).
+
+## null check
+
+Null-coalescing returns the left value when non-null, otherwise the fallback. Null-conditional access reads the member only when the target is non-null.
+
+Syntax: `left ?? fallback; target?.Member`
+
+C# equivalents (fragments):
+
+```csharp
+name ?? "default"
+user?.Name
+GetValue() ?? fallback
+```
+
+Complete example: [TryDouble](#example-task_6).
+
+## using statement
+
+Ordinary using imports a namespace or declares an alias at compilation-unit scope. Under a named module header, namespace using retains namespace-local lookup; it is an import marker, not a namespace block. Global using applies across compilation units. Resolved imports do not establish the effects of calls. A file that is one named namespace with its own imports converts natively by default; other namespace topologies need ConvertProject or migrate --split-namespaces, and default single-file conversion preserves them as whole-file C#.
+
+In a function body, using introduces a resource and an indented body that disposes it on exit, including exceptions. Preserve the distinction between imports and resource lifetime management.
+
+Typed resource headers preserve nullable annotations: `using System.IDisposable?:handle = input` keeps `handle` nullable inside the body.
+
+Generated C# already imports `System`, so names such as `StringComparison` do not need an explicit `using System`. Source declarations, parameters, type parameters and aliases still participate in name lookup; the import does not override them.
+
+Syntax: `using System.Text; using Text = System.Text; namespace using Text = System.Text; using type:name = resource`
+
+C# equivalents (fragments):
+
+```csharp
+using (var stream = File.OpenRead(path)) { ... }
+using var connection = new SqlConnection(connStr);
+```
+
+Complete example: [using](#example-complete_using).
+
+Complete example: [Explicit file-scoped namespace, independent of the file label](#example-complete_namespace).
+
+Complete example: [Explicit block namespace with the same CLR type identity](#example-complete_block_namespace).
+
+## generic type
+
+Declares a generic type. Put generic parameters immediately after the declaration name. Indented where clauses retain reference-type, value-type, constructor and interface constraints; generic arguments use ordinary C# type spellings.
+
+Syntax: `class Repository&lt;T&gt;`
+
+C# equivalents (fragments):
+
+```csharp
+public class Repository<T> where T : class { }
+public T Get<T>(int id) where T : new() { }
+```
+
+Complete example: [Container](#example-task_29).
+
+## LINQ query
+
+LINQ calls use ordinary postfix syntax, but syntax and metadata resolution do not prove their effects. Enumerable.Where and Enumerable.ToArray currently remain unknown under strict checking, even with a pure typed predicate and fully qualified IEnumerable&lt;T&gt; result. The complete example instead traverses the input once into a private buffer, then copies the matched prefix into an exact-sized result. It preserves encounter order and duplicates without rereading caller-owned entries; it is not LINQ support or deferred enumeration. Its alloc and mut row covers constructing and filling both arrays. Do not relax effect policy or use casts to hide the LINQ boundary.
+
+Syntax: `System.Linq.Enumerable.Where(collection, predicate)`
+
+C# equivalents (fragments):
+
+```csharp
+items.Where(x => x > 5).Select(x => x * 2)
+from item in items where item.Active select item.Name
+```
+
+Complete example: [Stable positive-array filtering (native loop alternative, not LINQ)](#example-complete_linq).
+
+## string interpolation
+
+Ordinary strings use $&#123;expression&#125; for runtime interpolation. Use string, nullable-string, char or bool holes in native teaching examples; nameof also produces a string. Escape the opening marker as \$&#123;0&#125; to keep literal placeholder text. String alignment can use $&#123;name,-8&#125;. Numeric and arbitrary-object formatting can invoke culture or provider callbacks: neither $&#123;value&#125; nor a format clause supplies an authoritative effect contract. A numeric expression such as Math.Max still needs numeric formatting. Do not substitute interpolation for an unproven numeric ToString call or treat compiler admission as proof that formatting is pure.
+
+Syntax: `Inline: "text $&#123;expression&#125; text"`
+
+C# equivalents (fragments):
+
+```csharp
+$"Hello, {name}!"
+$"Total: {price:C2}"
+$"{firstName} {lastName}"
+$"Result: {Calculate(x, y)} units"
+```
+
+Complete example: [interpolation](#example-complete_interpolation).
+
+## break and continue
+
+break exits the nearest loop; continue proceeds to its next iteration. A C#-form counted loop still performs its update after continue.
+
+Syntax: `break; continue`
+
+C# equivalents (fragments):
+
+```csharp
+if (done) break;
+if (skip) continue;
+```
+
+Complete example: [break continue](#example-complete_break_continue).
+
+## record type
+
+Declares a C# record class. Positional parameters retain their constructor defaults and public init properties. Indent properties and methods beneath the header. C# supplies value equality, hashing, ToString, deconstruction and with/copy behavior. Derived positional records use `record D (int:X, int:Y) : B(X)`. Record structs, partial or nested declarations and unrepresented member variants remain exact converter-owned C# fallback, not native records.
+
+Syntax: `record Point (int:X, int:Y)`
+
+C# equivalents (fragments):
+
+```csharp
+public record Point(int X, int Y);
+```
+
+Complete example: [Native record construction and copying](#example-complete_records).
+
+## Array Creation/Initialization
+
+Creates a fixed-size array with a typed initializer or explicit dimensions. Initializer elements are comma-separated expressions. Multidimensional arrays retain their rank and ordered dimension evaluation; they are not jagged arrays or lists.
+
+Syntax: `new int[]&#123;1, 2, 3&#125;; new int[length]; new int[rows, columns]`
+
+C# equivalents (fragments):
+
+```csharp
+int[] numbers = { 5, 4, 1, 3 };
+var items = new int[] { 1, 2, 3 };
+string[] names = new[] { "Alice", "Bob" };
+```
+
+Complete example: [Array values and indexed access](#example-complete_arrays).
+
+## static class
+
+Declares a named static container with a nested module. Its functions are implicitly static, so Counter.Read retains its CLR identity. The outer module labels the compilation unit; it is not the container. class Counter static is intentionally rejected. Non-static classes may still declare static members.
+
+Syntax: `module Counter`
+
+C# equivalents (fragments):
+
+```csharp
+public static class StringHelper { }
+```
+
+Complete example: [Named static module with implicit static function](#example-complete_static_class).
+
+## virtual method
+
+Declares a virtual class method using virtual. Derived classes may override it.
+
+Syntax: `func Name virtual (type:param, ...) → returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public virtual string GetName() { return _name; }
+protected virtual void OnChanged() { }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## override method
+
+Overrides a virtual or abstract base method using override. Preserve the inherited signature and contracts.
+
+Syntax: `func Name override (type:param, ...) → returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public override string ToString() { return _name; }
+public override int GetHashCode() { return _id; }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## abstract class
+
+Declares an abstract class using abstract. It cannot be instantiated directly.
+
+Syntax: `class Name abstract`
+
+C# equivalents (fragments):
+
+```csharp
+public abstract class Shape { }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## abstract method
+
+Declares an abstract class method using abstract, without a body. Concrete derived classes must implement it.
+
+Syntax: `func Name abstract (type:param, ...) → returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public abstract double GetArea();
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## sealed class
+
+Declares a sealed class using sealed. It cannot be inherited from.
+
+Syntax: `class Name sealed`
+
+C# equivalents (fragments):
+
+```csharp
+public sealed class FinalClass { }
+```
+
+Complete example: [inheritance](#example-complete_inheritance).
+
+## lock statement
+
+Executes an indented body while holding the selected monitor. Preserve evaluate-once lock-object selection and monitor release on returns and exceptions.
+
+Syntax: `lock gate`
+
+C# equivalents (fragments):
+
+```csharp
+lock (_sync) { _count++; }
+```
+
+Complete example: [sync](#example-complete_sync).
+
+## todo comment
+
+Use ordinary comments for todo items, fixmes and hacks.
+
+Syntax: `// TODO: description`
+
+C# equivalents (fragments):
+
+```csharp
+// TODO: Implement caching
+// FIXME: This breaks with null input
+// HACK: Temporary workaround for API bug
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## obsolete attribute
+
+Attach a declaration documentation line with the deprecation version and optional replacement. For an exact Obsolete attribute message, use the ordinary attribute form.
+
+Syntax: `/// deprecated version [Replacement]`
+
+C# equivalents (fragments):
+
+```csharp
+[Obsolete("Use NewMethod instead")]
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## complexity documentation
+
+Document algorithmic complexity in an ordinary comment.
+
+Syntax: `// Complexity: O(n)`
+
+C# equivalents (fragments):
+
+```csharp
+// Complexity: O(n log n)
+// Complexity: O(1) - constant time
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## access modifiers
+
+Public visibility is the default. Write full-word visibility modifiers after the declaration name and generic parameters; compound visibility uses protected-internal or private-protected.
+
+Syntax: `public (default), private, protected, internal, protected-internal, private-protected`
+
+C# equivalents (fragments):
+
+```csharp
+public void Method() { }
+private int _field;
+protected virtual void OnChange() { }
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## event definition
+
+Declares an event, optionally with paired indented add and remove accessor bodies. Preserve the delegate type, visibility and supported modifiers. Named-module events are static; ordinary classes may explicitly declare a static event. Converter preservation of an unsupported event shape is not an authoring spelling. The complete example demonstrates declaration only. Native event subscription and unsubscription statements are not admitted yet; do not write retired section markers or invent +=/-= statements. Convert original C# when preservation is needed.
+
+Syntax: `event DelegateType:Name`
+
+C# equivalents (fragments):
+
+```csharp
+public event EventHandler OnDataReceived;
+```
+
+Complete example: [Event declaration; subscription statements are not yet native](#example-task_23).
+
+## operator overload
+
+Declares an operator overload or conversion with an indented body. Conversion operators use implicit or explicit after op. Public operators require a standalone ! effect row before contracts and body statements; an empty ! declares Pure. The row is enforced and does not hide effects from callers. Direct source calls, including native enum-extension calls, preserve C# overload selection and argument mapping for implicit conversions at function, method and constructor inputs. A missing row is a parse error, even when optional effect checking is disabled. The converter synthesizes explicit rows from the emitted native body. Operator effects are checked in every preprocessor configuration, up to eight condition symbols; larger conditional images fail effect checking rather than assuming purity. Preserve parameter order, result type and C# signature requirements.
+
+Syntax: `op + (type:left, type:right) → resultType; op implicit (type:value) → resultType`
+
+C# equivalents (fragments):
+
+```csharp
+public static MyType operator+(MyType left, MyType right) { return new MyType(left.Value + right.Value); }
+public static MyType operator-(MyType value) { return new MyType(-value.Value); }
+public static implicit operator int(MyType value) { return value.Value; }
+public static explicit operator MyType(int value) { return new MyType(value); }
+```
+
+Complete example: [Class with Fields, Constructor + Operators](#example-complex_class).
+
+## decimal literal
+
+Decimal literals use the m/M suffix for precise decimal values; unsuffixed fractional literals are double.
+
+Syntax: `18.00m (or M suffix)`
+
+C# equivalents (fragments):
+
+```csharp
+decimal price = 18.0000m;
+decimal total = 100m;
+```
+
+Complete example: [decimal](#example-complete_decimal).
+
+## char type
+
+Single Unicode character. Uses 'char' type name directly (no abbreviation).
+
+Syntax: `char`
+
+C# equivalents (fragments):
+
+```csharp
+char c = 'A';
+```
+
+Complete example: [DigitValue](#example-task_41).
+
+## yield return
+
+Yields a value from an iterator or ends iteration. Preserve lazy execution, suspension, iterator disposal and cleanup; do not materialize the sequence eagerly.
+
+Syntax: `yield expression; yield break`
+
+C# equivalents (fragments):
+
+```csharp
+yield return item;
+yield break;
+public IEnumerable<int> GetNumbers() { for (int i = 0; i < 10; i++) yield return i; }
+```
+
+Complete example: [Yield Iterator](#example-complex_yield).
+
+## delegate definition
+
+Declares a delegate signature at compilation-unit or class scope. Parameters are inline; an optional indented ! row retains the delegate's effect contract. Omission and ! unknown mean Unknown, while empty ! means Pure. Unknown is not a wildcard permission or a purity proof. Callback parameter and return contracts follow the same distinction. Preserve parameter modifiers and the result type.
+
+Syntax: `delegate Name (type:param, ...) → returnType`
+
+C# equivalents (fragments):
+
+```csharp
+public delegate void EventCallback(string message);
+public delegate int Transformer(int value);
+public class MyClass { public delegate void Handler(int x); }
+```
+
+Complete example: [MathOperation](#example-task_26).
+
+## preprocessor directive
+
+Conditionally includes indented code. Chained pp clauses align with their opening pp. Conditions retain verbatim C# preprocessor text; preserve nested conditions and inactive branch contents under converter fidelity rules.
+
+Syntax: `pp CONDITION; pp elif CONDITION; pp else`
+
+C# equivalents (fragments):
+
+```csharp
+#if DEBUG
+    Console.WriteLine("Debug mode");
+#endif
+#if NET8_0_OR_GREATER
+    UseNewApi();
+#else
+    UseLegacyApi();
+#endif
+```
+
+Complete example: [preprocessor](#example-complete_preprocessor).
+
+## struct definition
+
+Declares a value type with the struct modifier. Preserve fields, properties, interfaces and value semantics rather than converting it to a reference class.
+
+Syntax: `class Name struct`
+
+C# equivalents (fragments):
+
+```csharp
+public struct Point { public int X; public int Y; }
+public readonly struct Vector2D { public readonly double X; public readonly double Y; }
+```
+
+Complete example: [struct](#example-complete_struct).
+
+## generic type constraint
+
+Adds generic constraints before a declaration body. Preserve each reference/value-type, constructor, base-type and interface requirement, rather than treating a type parameter as an unconstrained object. Inside a quantified contract, where introduces its guard instead of a generic constraint.
+
+Syntax: `where T : class, new()`
+
+C# equivalents (fragments):
+
+```csharp
+public class Repository<T> where T : class, IEntity { }
+public T Create<T>() where T : new() { return new T(); }
+public void Process<T>(T item) where T : struct { }
+```
+
+Complete example: [Repository](#example-task_30).
+
+## do-while loop
+
+Executes the body at least once. The trailing while condition is at the same indentation as do; there is no structural closer.
+
+Syntax: `do indentedBody; while condition at the do indentation`
+
+C# equivalents (fragments):
+
+```csharp
+do { Process(); } while (HasMore());
+```
+
+Complete example: [DoWhileDemo](#example-task_13).
+
+## partial class
+
+Defines part of a class that can be split across multiple files. Uses the 'partial' modifier.
+
+Syntax: `class Name partial`
+
+C# equivalents (fragments):
+
+```csharp
+public partial class UserService { public void Save() { } }
+```
+
+Complete example: [partial](#example-complete_partial).
+
+## unsafe block
+
+Introduces an indented unsafe body. Preserve unsafe effects and compile with unsafe support; the keyword is not permission to bypass diagnostics.
+
+Syntax: `unsafe`
+
+C# equivalents (fragments):
+
+```csharp
+unsafe { int* ptr = &value; *ptr = 42; }
+```
+
+Complete example: [unsafe](#example-complete_unsafe).
+
+## null-coalescing assignment
+
+Use a null check and set for a conditional binding update. Assignment expressions, including ??=, are not authored expression forms.
+
+Syntax: `if x == null
+  set x fallback`
+
+C# equivalents (fragments):
+
+```csharp
+x ??= GetDefault();
+_cache ??= new Dictionary<string, int>();
+```
+
+Complete example: [nullable](#example-complete_nullable).
+
+## attribute
+
+Attaches metadata after the declaration header it annotates.
+
+Syntax: `Attach [@AttributeName] or [@Attr(arg1, arg2)] after a declaration header`
+
+C# equivalents (fragments):
+
+```csharp
+[Serializable]
+public class Data { }
+[Obsolete("Use NewMethod")]
+public void OldMethod() { }
+```
+
+Complete example: [struct](#example-complete_struct).
+
+## is pattern with combinators
+
+Express Boolean combinations with infix &amp;&amp;, || and unary !. These are expressions, not new pattern or block headers.
+
+Syntax: `(x &gt; 0) &amp;&amp; (x &lt; 100); (x &lt; 0) || (x &gt; 100)`
+
+C# equivalents (fragments):
+
+```csharp
+if (x is > 0 and < 100)
+return x is < 0 or > 100;
+if (x is not < 0)
+```
+
+Complete example: [patterns](#example-complete_patterns).
+
+## range expression
+
+Use ordinary half-open C# ranges and index-from-end expressions inside brackets. A slice creates a new array; it is not an alias for the original array.
+
+Syntax: `array[start..end]; array[^offset]; array[start..]`
+
+C# equivalents (fragments):
+
+```csharp
+var slice = array[0..5];
+var last = items[^1];
+var tail = data[2..];
+```
+
+Complete example: [array ranges](#example-complete_ranges).
+
+## positional and property patterns
+
+During C# → Calor migration, positional and property patterns retain converter fidelity. For handwritten decomposition, use if/else if with explicit comparisons.
+
+Syntax: `Supported in C# → Calor migration; use if chains for handwritten decomposition.`
+
+C# equivalents (fragments):
+
+```csharp
+(hour, minute) switch { (0, 0) => "midnight" }
+obj switch { { Length: > 0 } => true }
+```
+
+Complete example: [patterns](#example-complete_patterns).
+
+## #pragma warning directive
+
+Pragma directives use explicit source-ordered conversion nodes. Query calor_help action=features for current support; do not handwrite passthrough.
+
+Syntax: `No authored Calor form`
+
+## tuple type and tuple literal
+
+Tuple types use comma-separated types, such as (int, string). Tuple literals use comma-separated expressions, such as (1, "hello"). Named type elements are supported: (int X, int Y). A parenthesized single expression is grouping, not a tuple.
+
+Syntax: `(Type1, Type2) for types; (expr1, expr2) for literals`
+
+C# equivalents (fragments):
+
+```csharp
+(int, string) pair = (1, "hello");
+(int X, int Y) point = (10, 20);
+return (a + b, a - b);
+```
+
+Complete example: [tuples](#example-complete_tuples).
+
+## null coalescing operator
+
+Returns left when non-null; otherwise evaluates and returns fallback. Coalescing associates right.
+
+Syntax: `left ?? fallback`
+
+C# equivalents (fragments):
+
+```csharp
+var result = value ?? "default";
+return name ?? "Anonymous";
+```
+
+Complete example: [nullable](#example-complete_nullable).
+
+## null conditional operator
+
+Accesses Member only when target is non-null; otherwise returns null.
+
+Syntax: `target?.Member`
+
+C# equivalents (fragments):
+
+```csharp
+var name = user?.Name;
+var len = text?.Length;
+```
+
+Complete example: [objects](#example-complete_objects).
+
+## goto case / goto default
+
+Transfers control to a constant match case, the default arm, or a label written name:. Preserve the target and surrounding cleanup; goto case does not repeat the match selector's evaluation.
+
+Syntax: `goto case expression; goto default; goto label`
+
+C# equivalents (fragments):
+
+```csharp
+goto case 1;
+goto case "hello";
+goto default;
+goto myLabel;
+```
+
+Complete example: [goto](#example-complete_goto).
+
+## string operations
+
+Strings use ordinary C# properties, indexing and method syntax, but only selected overloads have authoritative effect contracts. Concatenation with left + right is supported and pure when both operands are strings. Length, UTF-16 character access, Contains(char), IndexOf(char), ToUpperInvariant() and ToLowerInvariant() are supported here. string.Concat(a, b) and comparison-mode searches such as text.IndexOf(value, StringComparison.Ordinal) are ordinary call syntax, but their strict effect contracts are unavailable. These calls, Contains(string), Substring and trimming remain unknown under strict checking; syntax is not permission. StringContains keeps its non-null string parameters and pure row by comparing UTF-16 code units directly, including an empty substring. FirstField scans for a comma and copies the prefix into a char array; its alloc and mut row covers that buffer. Neither algorithm substitutes culture-dependent comparison.
+
+Syntax: `Pure string addition: left + right. Supported string access and char overloads: text.Length; text[index]; text.Contains(character); text.IndexOf(character). Ordinary syntax only (strict effect contract unavailable): string.Concat(a, b); text.IndexOf(value, StringComparison.Ordinal).`
+
+C# equivalents (fragments):
+
+```csharp
+string.Concat(a, b); text.Substring(start, count); text.IndexOf(value, StringComparison.Ordinal);
+```
+
+Complete example: [Strings](#example-primer_strings).
+
+Complete example: [StringContains](#example-task_37).
+
+Complete example: [BuildGreeting](#example-task_38).
+
+## character operations
+
+Characters use single-quoted literals, ordinary indexing, scalar casts and char methods. Character classification follows the corresponding .NET method, including its Unicode behavior. Do not confuse a char with a one-character string.
+
+Syntax: `text[index]; (int)character; char.IsDigit(character); '0'`
+
+C# equivalents (fragments):
+
+```csharp
+text[index]; (int)value; char.IsDigit(value);
+```
+
+Complete example: [GetFirstChar](#example-task_36).
+
+Complete example: [DigitValue](#example-task_41).
+
+Complete example: [Offset](#example-task_42).
+
+## array element access
+
+Use T[] for arrays and T[][] for jagged arrays. Indexing and calls can chain on expression-valued receivers. File.ReadAllLines returns string[], not List&lt;string&gt;.
+
+Syntax: `items[index]`
+
+C# equivalents (fragments):
+
+```csharp
+array[index]
+```
+
+Complete example: [Nested array expressions](#example-nested_arrays).
+
+Complete example: [Files](#example-primer_files).
+
+## variable assignment
+
+Updates mutable bindings, fields or indexed storage. Indexed stores preserve left-to-right evaluate-once receiver, key and value evaluation, and dictionary updates are upserts rather than Add. Increment/decrement and compound assignment aliases are not separate expression forms. Inside a property or indexer, set declares a setter instead.
+
+Syntax: `set target expression; set receiver[index] expression`
+
+C# equivalents (fragments):
+
+```csharp
+name = expression;
+```
+
+Complete example: [Accumulate](#example-task_27).
+
+## primitive types
+
+Use C# type names and ordinary .NET generic types. Nullable types use a suffix (int?, string?); arrays use T[]. Integer widths and signedness use L, U or UL suffixes, decimal uses m/M and float uses f/F. Negative bounds such as -2147483648 retain their literal meaning. Absence and failure use nullability and exceptions, not dedicated Option/Result forms.
+
+Syntax: `int, long, short, sbyte, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]`
+
+C# equivalents (fragments):
+
+```csharp
+int, long, short, byte, ushort, uint, ulong, float, double, decimal, string, bool, char, object, void, T?, T[]
+```
+
+Complete example: [Bindings](#example-primer_bindings).
+
+Complete example: [TryDouble](#example-task_6).
+
+## Infix expressions and precedence
+
+Expressions use infix operators with C# precedence and postfix calls/indexing. Binary operators associate left; ?? and ?: associate right. Lazy Boolean, coalescing and conditional operands retain their evaluation regions. No legacy prefix operator or section-call delimiters are authored. Express implication as !p || q.
+
+Syntax: `a + b; p &amp;&amp; q; !p; condition ? yes : no; f(x); receiver[index]`
+
+C# equivalents (fragments):
+
+```csharp
+a + b; a == b; p && q; !p; condition ? thenValue : elseValue
+```
+
+Complete example: [Abs](#example-task_4).
+
+Complete example: [Max](#example-task_10).
+
+Complete example: [Nested array expressions](#example-nested_arrays).
+
+Complete example: [Expression-valued call target with an explicit pure delegate row](#example-complete_postfix).
+
+## quantified contracts
+
+Quantified contracts retain lexical binders and native proof semantics. Ranges are half-open: start &lt;= i &amp;&amp; i &lt; end, and an empty range is vacuous for forall and false for exists. Use where for other guards; runtime checking still requires supported finite bounds. Express implication as !condition || consequence, not a special operator. Do not replace quantified proofs with unmodeled CLR calls.
+
+Syntax: `forall int:i in start..end : body; exists int:i in start..end : body; forall int:i where guard : body`
+
+C# equivalents (fragments):
+
+```csharp
+// Universal/existential contracts with bounded ranges.
+```
+
+Complete example: [AllPositive](#example-task_39).
+
+Complete example: [HasNegative](#example-task_40).
+
+## collection operations
+
+Ordinary List&lt;T&gt;, Dictionary&lt;K,V&gt; and HashSet&lt;T&gt; are distinct from arrays. Mutating heap collections requires mut; significant allocation requires alloc. Count reads size and Contains tests membership. Dictionary indexed updates are upserts, not Add. Preserve source-generic receiver metadata and method overloads without casts or fake types.
+
+Syntax: `items.Add(value); set counts[key] value; items.Count; items.Contains(value)`
+
+C# equivalents (fragments):
+
+```csharp
+list.Add(value); dictionary[key] = value;
+```
+
+Complete example: [SumList](#example-task_14).
+
+Complete example: [GetListLength](#example-task_15).
+
+Complete example: [PrintDictionary](#example-task_16).
+
+Complete example: [Collections](#example-primer_collections).
+
+Complete example: [Collection allocation, loop mutation and count](#example-copilot_smoke).
+
+## Staged section call
+
+Legacy section-call delimiters are retired. This migration lookup points to ordinary postfix calls, not a compatibility syntax. A manifest effect charge alone does not establish authoritative method metadata or a purity proof.
+
+Syntax: `target&lt;T&gt;(arg)`
+
+C# equivalents (fragments):
+
+```csharp
+System.Linq.Enumerable.ToArray<int>(filtered)
+```
+
+## module definition
+
+At file scope, labels the compilation unit. The optional qualified namespace follows the label; omission means the global namespace. That label is neither a namespace nor a static class declaration. A trailing block records block-namespace origin rather than file-scoped origin. Inside the compilation unit, a nested module declares a named static container with implicitly static functions.
+
+Syntax: `module FileLabel Contoso.Tools`
+
+C# equivalents (fragments):
+
+```csharp
+namespace Contoso.Tools;
+```
+
+Complete example: [Explicit file-scoped namespace, independent of the file label](#example-complete_namespace).
+
+Complete example: [Explicit block namespace with the same CLR type identity](#example-complete_block_namespace).
+
+Complete example: [Named static module with implicit static function](#example-complete_static_class).
+
+## enum extension methods
+
+Enum extensions use an ordinary named static module, not a separate enum-extension container head. The receiver is the first parameter, with this before its type. Preserve the EnumNameExtensions CLR container and the extension method's static identity.
+
+Other source receiver types use the same `this` parameter syntax. Native member calls bind to the exact source declaration and constructed argument map selected by the emitted native C# image. These calls retain receiver syntax: rewriting them as provider-qualified static calls could select a different non-extension overload. The source callee's effects and receiver/argument evaluation effects are charged normally; a same-named metadata contract cannot supply the source method's row. This requires a complete, configuration-consistent image. Unresolved, ambiguous, or preserved source selections remain opaque. A nullable or oblivious extension receiver is a static argument, not an ordinary instance receiver: its declared nullability is checked without adding an instance null guard. The existing bounded enum-extension lookup is unchanged.
+
+Syntax: `module ModeExtensions; func IsActive (this Mode:value) → bool`
+
+C# equivalents (fragments):
+
+```csharp
+public static class ModeExtensions { public static bool IsActive(this Mode value) => value == Mode.Active; }
+```
+
+Complete example: [Enum extension functions in their named static container](#example-complete_enum_extensions).
+
+## introduction version metadata
+
+Records a declaration's introduction version in a documentation comment immediately before the declaration. Supply one valid version. This is structured API metadata, not a runtime version check.
+
+Syntax: `/// since 1.0.0`
+
+C# equivalents (fragments):
+
+```csharp
+// Available since version 1.0.0
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## breaking change metadata
+
+Records a breaking change before a declaration. Supply a valid version and one C# string literal description; repeated lines retain multiple changes. Preserve the version and complete description rather than replacing them with an unstructured compatibility claim.
+
+Syntax: `/// breaking 2.0.0 "Description of the change"`
+
+C# equivalents (fragments):
+
+```csharp
+// Breaking change in version 2.0.0: Description of the change
+```
+
+Complete example: [documentation](#example-complete_documentation).
+
+## Example complete_records
+
+Native record construction and copying
+
+```calor
+module Records
+  record Point (int:X, int:Y = 2)
+  func Create () → Point
+    ! alloc,mut
+    return new Point(1)
+  func Shift (Point:point) → Point
+    ! alloc,mut
+    return point with { X = 3 }
+```
+
+## Example copilot_smoke
+
+Collection allocation, loop mutation and count
+
+```calor
+module CopilotSmoke
+  func Collect (int:n) → int
+    ! mut,alloc
+    let List<int>:items = new List<int>()
+    for i from 1 to n step 1
+      items.Add(i)
+    let int:count = items.Count
+    return count
+```
+
+## Example complete_arrays
+
+Array values and indexed access
+
+```calor
+module ArrayValues
+  func First () → int
+    ! alloc
+    let items = new int[]{10, 20, 30}
+    return items[0]
+```
+
+## Example task_0
+
+ReadInput
+
+```calor
+module AgentReference0
+  func ReadInput () → string?
+    ! cr
+    let line = Console.ReadLine()
+    return line
+```
+
+## Example task_1
+
+PrintValue
+
+```calor
+module AgentReference1
+  func PrintValue (int:x) → void
+    ! cw
+    Console.WriteLine(x)
+```
+
+## Example task_2
+
+ClampScore
+
+```calor
+module AgentReference2
+  func ClampScore (int:score) → int
+    !
+    let int:value = Math.Clamp(value: score, min: 0, max: 100)
+    return value
+```
+
+## Example task_3
+
+SquareRoot
+
+```calor
+module AgentReference3
+  func SquareRoot (int:x) → int
+    !
+    requires (x >= 0)
+    return x
+```
+
+## Example task_4
+
+Abs
+
+```calor
+module AgentReference4
+  func Abs (int:x) → int
+    !
+    => (result >= 0)
+    return ((x < 0) ? (0 - x) : x)
+```
+
+## Example task_5
+
+PrintNumber
+
+```calor
+module AgentReference5
+  func PrintNumber (int:x) → void
+    ! cw
+    Console.WriteLine(x)
+```
+
+## Example task_6
+
+TryDouble
+
+```calor
+module AgentReference6
+  func TryDouble (int:x) → int?
+    !
+    if (x > 0)
+      return (x * 2)
+    else
+      return null
+```
+
+## Example task_7
+
+TryParseDigit
+
+```calor
+module AgentReference7
+  func TryParseDigit (char:c) → int?
+    !
+    if ((c >= '0') && (c <= '9'))
+      return (c - '0')
+    else
+      return null
+```
+
+## Example task_8
+
+SafeDivide
+
+```calor
+module AgentReference8
+  func SafeDivide (int:a, int:b) → int
+    ! alloc,throw
+    if b != 0
+      return a / b
+    else
+      throw new ArgumentException("Division by zero")
+```
+
+## Example task_9
+
+Classify
+
+```calor
+module AgentReference9
+  func Classify (int:n) → string
+    !
+    if (n < 0)
+      return "negative"
+    else if (n == 0)
+      return "zero"
+    else
+      return "positive"
+```
+
+## Example task_10
+
+Max
+
+```calor
+module AgentReference10
+  func Max (int:a, int:b) → int
+    !
+    if (a >= b)
+      return a
+    else
+      return b
+```
+
+## Example task_11
+
+GetGrade
+
+```calor
+module AgentReference11
+  func GetGrade (int:score) → string
+    !
+    var string:grade = "F"
+    if (score >= 90)
+      set grade "A"
+    else if (score >= 80)
+      set grade "B"
+    else if (score >= 70)
+      set grade "C"
+    else
+      set grade "F"
+    return grade
+```
+
+## Example task_12
+
+Countdown
+
+```calor
+module AgentReference12
+  func Countdown () → void
+    ! cw
+    var int:count = 5
+    while (count > 0)
+      Console.WriteLine(count)
+      set count (count - 1)
+```
+
+## Example task_13
+
+DoWhileDemo
+
+```calor
+module AgentReference13
+  func DoWhileDemo () → void
+    ! cw
+    var int:x = 0
+    do
+      Console.WriteLine(x)
+      set x (x + 1)
+    while (x < 3)
+```
+
+## Example task_14
+
+SumList
+
+```calor
+module AgentReference14
+  func SumList () → int
+    ! alloc,mut
+    let List<int>:nums = new List<int>()
+    nums.Add(10)
+    nums.Add(20)
+    nums.Add(30)
+    var int:sum = 0
+    each n in nums
+      set sum sum + n
+    return sum
+```
+
+## Example task_15
+
+GetListLength
+
+```calor
+module AgentReference15
+  func GetListLength (int:n) → int
+    ! alloc,mut
+    requires n >= 0
+    let List<int>:nums = new List<int>()
+    for i from 1 to n step 1
+      nums.Add(i)
+    return nums.Count
+```
+
+## Example task_16
+
+PrintDictionary
+
+```calor
+module AgentReference16
+  func PrintDictionary (Dictionary<string,int>:scores) → void
+    ! cw
+    each k, v in scores
+      Console.WriteLine(k)
+      Console.WriteLine(v)
+```
+
+## Example task_17
+
+GetDataAsync
+
+```calor
+module AgentReference17
+  func GetDataAsync async () → Task<int>
+    !
+    return 42
+```
+
+## Example task_18
+
+GetStatus
+
+```calor
+module AgentReference18
+  func GetStatus (int:code) → string
+    !
+    return match code
+      case 200 → "OK"
+      case 404 → "Not Found"
+      case 500 → "Server Error"
+      case _ → "Unknown"
+```
+
+## Example task_19
+
+DayName
+
+```calor
+module AgentReference19
+  func DayName (int:day) → int
+    !
+    return match day
+      case 1 → 100
+      case 2 → 100
+      case 3 → 100
+      case 4 → 100
+      case 5 → 100
+      case 6 → 200
+      case 7 → 200
+      case _ → 0
+```
+
+## Example task_20
+
+GetGrade
+
+```calor
+module AgentReference20
+  func GetGrade (int:score) → string
+    !
+    return match score
+      case >= 90 → "A"
+      case >= 80 → "B"
+      case >= 70 → "C"
+      case _ → "F"
+```
+
+## Example task_21
+
+Describe
+
+```calor
+module AgentReference21
+  func Describe (int:x) → string
+    !
+    return match x
+      case var n when (n > 100) → "large"
+      case var n when (n < 0) → "negative"
+      case 0 → "zero"
+      case _ → "normal"
+```
+
+## Example task_22
+
+IsSingleDigit
+
+```calor
+module AgentReference22
+  func IsSingleDigit (int:n) → bool
+    !
+    return match n
+      case 0 → true
+      case 1 → true
+      case 2 → true
+      case 3 → true
+      case 4 → true
+      case 5 → true
+      case 6 → true
+      case 7 → true
+      case 8 → true
+      case 9 → true
+      case _ → false
+```
+
+## Example task_23
+
+Event declaration; subscription statements are not yet native
+
+```calor
+module AgentReference23
+  class EventPublisher
+    event EventHandler:OnDataReceived
+```
+
+## Example task_24
+
+ApplyDouble
+
+```calor
+module AgentReference24
+  func ApplyDouble (int:x) → int
+    !
+    let Func<int,int>:doubler = (int:n) => (n * 2)
+    return doubler(x)
+```
+
+## Example task_25
+
+ApplyComplex
+
+```calor
+module AgentReference25
+  func ApplyComplex (int:x) → int
+    !
+    let Func<int,int>:process = (int:n) =>
+      return n > 0 ? n * 2 : 0
+    return process(x)
+```
+
+## Example task_26
+
+MathOperation
+
+```calor
+module AgentReference26
+  delegate MathOperation (int:x, int:y) → int
+    ! unknown
+```
+
+## Example task_27
+
+Accumulate
+
+```calor
+module AgentReference27
+  func Accumulate (int:n) → int
+    !
+    var int:acc = 0          // Bind mutable variable acc = 0
+    set acc (acc + n)   // Assign acc = acc + n
+    set acc (acc + n)   // Assign again
+    set acc (acc + n)   // And again
+    return acc
+```
+
+## Example task_28
+
+Calculator
+
+```calor
+module AgentReference28
+  class Calculator
+    func Add (int:a, int:b) → int
+      !
+      return (a + b)
+```
+
+## Example task_29
+
+Container
+
+```calor
+module AgentReference29
+  class Container<T>
+    field T:_value private
+    func Get () → T
+      !
+      return _value
+    func HashSet (T:value) → void
+      ! mut
+      set _value value
+```
+
+## Example task_30
+
+Repository
+
+```calor
+module AgentReference30
+  class Repository<T>
+    where T : class
+    field List<T>:_items private
+    func Add (T:item) → void
+      ! mut
+      _items.Add(item)
+```
+
+## Example task_31
+
+Product
+
+```calor
+module AgentReference31
+  class Product
+    field double:_price private
+    property double:Price
+      get
+        return _price
+      set
+        set _price value
+```
+
+## Example task_32
+
+Person
+
+```calor
+module AgentReference32
+  class Person
+    property string:Name
+      get
+      set
+```
+
+## Example task_33
+
+Person
+
+```calor
+module AgentReference33
+  class Person
+    field string:_name private
+    field int:_age private
+    ctor (string:name, int:age)
+      set _name name
+      set _age age
+    func GetName () → string
+      !
+      return _name
+```
+
+## Example task_34
+
+AbsoluteValue
+
+```calor
+module AgentReference34
+  func AbsoluteValue (int:x) → int
+    !
+    => (result >= 0)
+    => (!((x >= 0)) || (result == x))
+    => (!((x < 0)) || (result == (0 - x)))
+    return ((x < 0) ? (0 - x) : x)
+```
+
+## Example task_35
+
+LogToFileAndConsole
+
+```calor
+module AgentReference35
+  func LogToFileAndConsole (string:path, string:message) → void
+    ! cw,fs:w
+    Console.WriteLine(message)
+    File.AppendAllText(path, message)
+```
+
+## Example task_36
+
+GetFirstChar
+
+```calor
+module AgentReference36
+  func GetFirstChar (string:s) → char
+    !
+    requires s.Length > 0
+    return s[0]
+```
+
+## Example task_37
+
+StringContains
+
+```calor
+module AgentReference37
+  func StringContains (string:s, string:sub) → bool
+    !
+    if sub.Length > s.Length
+      return false
+    var int:start = 0
+    while start <= s.Length - sub.Length
+      var int:offset = 0
+      while offset < sub.Length && s[start + offset] == sub[offset]
+        set offset offset + 1
+      if offset == sub.Length
+        return true
+      set start start + 1
+    return false
+```
+
+## Example task_38
+
+BuildGreeting
+
+```calor
+module AgentReference38
+  func BuildGreeting (string:name) → string
+    ! alloc,mut
+    let System.Text.StringBuilder:sb = new System.Text.StringBuilder()
+    sb.Append("Hello, ")
+    sb.Append(name)
+    sb.Append("!")
+    return sb.ToString()
+```
+
+## Example task_39
+
+AllPositive
+
+```calor
+module AgentReference39
+  func AllPositive (int[]:arr, int:n) → bool
+    !
+    requires n == arr.Length
+    => !result || !(exists int:i in 0..n : arr[i] <= 0)
+    var bool:allPos = true
+    for i from 0 to arr.Length - 1 step 1
+      if arr[i] <= 0
+        set allPos false
+    return allPos
+```
+
+## Example task_40
+
+HasNegative
+
+```calor
+module AgentReference40
+  func HasNegative (int[]:arr, int:n) → bool
+    !
+    requires n == arr.Length
+    => result == (exists int:i in 0..n : arr[i] < 0)
+    for i from 0 to arr.Length - 1 step 1
+      if arr[i] < 0
+        return true
+    return false
+```
+
+## Example task_41
+
+DigitValue
+
+```calor
+module AgentReference41
+  func DigitValue (char:c) → int
+    !
+    requires char.IsDigit(c)
+    return c - '0'
+```
+
+## Example task_42
+
+Offset
+
+```calor
+module AgentReference42
+  func Offset (char:c) → int
+    !
+    return (c - '0')
+```
+
+## Example primer_contracts
+
+Contracts
+
+```calor
+module Contracts
+  func Square (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x
+
+  func Divide (int:a, int:b) → int
+    !
+    requires b != 0
+    return a / b
+```
+
+## Example primer_branching
+
+Branching
+
+```calor
+module Branching
+  func Sign (int:x) → int
+    !
+    if (x > 0)
+      return 1
+    else if (x < 0)
+      return (-1)
+    else
+      return 0
+```
+
+## Example primer_files
+
+Files
+
+```calor
+module Files
+  func Append (string:path, string:key, string:value) → void
+    ! fs:w
+    File.AppendAllText(path, (key + ("=" + (value + "\n"))))
+
+  func CountLines (string:path) → int
+    ! fs:r
+    let bool:ok = File.Exists(path)
+    if (!ok)
+      return 0
+    let string[]:lines = File.ReadAllLines(path)
+    return lines.Length
+```
+
+## Example primer_strings
+
+Strings
+
+```calor
+module Strings
+  func FirstField (string:line) → string
+    ! alloc, mut
+    var int:end = 0
+    while end < line.Length && line[end] != ','
+      set end end + 1
+    if end == line.Length
+      return line
+    let char[]:prefix = new char[end]
+    var int:i = 0
+    while i < end
+      set prefix[i] line[i]
+      set i i + 1
+    return new string(prefix)
+```
+
+## Example primer_collections
+
+Collections
+
+```calor
+module Collections
+  func Tally (string:key) → int
+    ! mut,alloc
+    let Dictionary<string,int>:counts = new Dictionary<string,int>()
+    set counts[key] 1
+    return counts[key]
+```
+
+## Example primer_effects
+
+Effects
+
+```calor
+module Effects
+  func Greet (string:name) → void
+    ! cw
+    Console.WriteLine("Hello")
+    Console.WriteLine(name)
+```
+
+## Example primer_loops
+
+Loops
+
+```calor
+module Loops
+  func PrintOneToFive () → void
+    ! cw
+    for i from 1 to 5 step 1
+      Console.WriteLine(i)
+```
+
+## Example primer_bindings
+
+Bindings
+
+```calor
+module Bindings
+  func Demo () → void
+    ! cw
+    let string:greeting = "Ada"
+    var int:count = 0
+    Console.WriteLine(greeting)
+    Console.WriteLine(count)
+```
+
+## Example primer_classes
+
+Classes
+
+```calor
+module Classes
+  class Greeter
+    func Greet () → string
+      !
+      return "hello"
+```
+
+## Example nested_arrays
+
+Nested array expressions
+
+```calor
+module NestedArrayExpressions
+  func SumPair (int[]:data) → int
+    !
+    => (result == (data[0] + data[1]))
+    var sum = 0
+    set sum (sum + data[0])
+    return (sum + data[1])
+
+  func MixFirst (int[]:data, int:hash) → int
+    !
+    return (hash ^ data[0])
+```
+
+## Example complex_class
+
+Class with Fields, Constructor + Operators
+
+```calor
+module PointModule
+  class Point
+    field int:_x private
+    field int:_y private
+
+    ctor (int:x, int:y)
+      set this._x x
+      set this._y y
+
+    func Equals (Point:other) → bool
+      !
+      if (other == null)
+        return false
+      else
+        return true
+
+    op == (Point:left, Point:right) → bool
+      !
+      if (left == null)
+        return (right == null)
+      else
+        return left.Equals(right)
+
+    op != (Point:left, Point:right) → bool
+      !
+      return (!(left == right))
+```
+
+## Example complex_async
+
+Async Method with Try/Catch
+
+```calor
+module ConvertedModule
+  using System
+  using System.Threading.Tasks
+  class DataService
+    func FetchAsync async (string:url) → string
+      !
+      try
+        await Task.Delay(100)
+        return "data from " + url
+      catch Exception:ex
+        return "error: " + ex.Message
+```
+
+## Example complex_enum
+
+Enum with Switch/Match
+
+```calor
+module ConvertedModule
+  enum Status
+    Pending
+    Active
+    Suspended
+    Closed
+
+  class StatusHelper
+    func GetLabel static (Status:s) → string
+      !
+      return match s
+        case Status.Pending → "Pending Review"
+        case Status.Active → "Active"
+        case Status.Suspended → "Temporarily Suspended"
+        case Status.Closed → "Closed"
+        case _ → "Unknown"
+```
+
+## Example complex_yield
+
+Yield Iterator
+
+```calor
+module ConvertedModule
+  using System.Collections.Generic
+
+  class NumberGen
+    func GetEvens (int:max) → IEnumerable<int>
+      !
+      for i from 0 to max step 2
+        yield i
+```
+
+## Example complete_objects
+
+objects
+
+```calor
+module Objects
+  class Person
+    property string:Name
+      get
+      set
+  func Create () → Person
+    ! alloc
+    return new Person()
+  func ReadName (Person:person) → string?
+    !
+    return person?.Name
+```
+
+## Example complete_indexer
+
+indexer
+
+```calor
+module Indexers
+  class Numbers
+    this[int:index] → int
+      get
+        return index + 1
+```
+
+## Example complete_invariant
+
+invariant
+
+```calor
+module Invariants
+  invariant (1 > 0)
+  func Read () → int
+    !
+    return 1
+```
+
+## Example complete_interface
+
+interface
+
+```calor
+module Interfaces
+  interface ICounter
+    func Count () → int
+      !
+  class Counter
+    implements ICounter
+    func Count () → int
+      !
+      return 1
+```
+
+## Example complete_using
+
+using
+
+```calor
+module Resources
+  func Read (string:value) → string
+    ! alloc
+    using System.IO.StringReader:reader = new System.IO.StringReader(value)
+      return reader.ReadToEnd()
+```
+
+## Example complete_linq
+
+Stable positive-array filtering (native loop alternative, not LINQ)
+
+```calor
+module Queries
+  func Positive (int[]:values) → int[]
+    ! alloc, mut
+    let int[]:buffer = new int[values.Length]
+    var int:count = 0
+    each int:value in values
+      if value > 0
+        set buffer[count] value
+        set count count + 1
+    let int[]:filtered = new int[count]
+    var int:index = 0
+    while index < count
+      set filtered[index] buffer[index]
+      set index index + 1
+    return filtered
+```
+
+## Example complete_interpolation
+
+interpolation
+
+```calor
+module Interpolation
+  func Greet (string:name) → string
+    !
+    return "Hello ${name}"
+```
+
+## Example complete_break_continue
+
+break continue
+
+```calor
+module LoopControl
+  func FirstPositive (int[]:values) → int
+    !
+    var int:answer = 0
+    each int:value in values
+      if (value <= 0)
+        continue
+      set answer value
+      break
+    return answer
+```
+
+## Example complete_inheritance
+
+inheritance
+
+```calor
+module Inheritance
+  class Base abstract
+    func Read abstract () → int
+      !
+    func Label virtual () → string
+      !
+      return "base"
+  class Derived sealed
+    extends Base
+    func Read override () → int
+      !
+      return 7
+    func Label override () → string
+      !
+      return "derived"
+```
+
+## Example complete_sync
+
+sync
+
+```calor
+module Synchronization
+  func Read (object:gate) → int
+    !
+    lock (gate)
+      return 7
+```
+
+## Example complete_documentation
+
+documentation
+
+```calor
+module Documentation
+  // TODO: add another algorithm.
+  // Complexity: O(1).
+  /// deprecated 1.0.0 ReadCurrent
+  func Read () → int
+    !
+    return 7
+  /// since 1.0.0
+  /// breaking 2.0.0 "Returns the current value instead of the cached value."
+  func ReadCurrent private () → int
+    return 8
+```
+
+## Example complete_decimal
+
+decimal
+
+```calor
+module Decimals
+  func Price () → decimal
+    !
+    return 18.00m
+```
+
+## Example complete_preprocessor
+
+preprocessor
+
+```calor
+module Preprocessor
+  func Mode () → string
+    !
+    pp DEBUG
+      return "debug"
+    pp else
+      return "release"
+```
+
+## Example complete_struct
+
+struct
+
+```calor
+module Values
+  class Point struct [@Serializable]
+    property int:X
+      get
+      set
+```
+
+## Example complete_partial
+
+partial
+
+```calor
+module PartialTypes
+  class Counter partial
+    func Read () → int
+      !
+      return 1
+```
+
+## Example complete_unsafe
+
+unsafe
+
+```calor
+module UnsafeCode
+  func Size () → int
+    ! unsafe
+    unsafe
+      return 4
+```
+
+## Example complete_nullable
+
+nullable
+
+```calor
+module NullableValues
+  func DefaultName (string?:name) → string
+    !
+    var string?:value = name
+    if (value == null)
+      set value "unknown"
+    return (value ?? "unknown")
+```
+
+## Example complete_patterns
+
+patterns
+
+```calor
+module Patterns
+  func InRange (int:value) → bool
+    !
+    return ((value > 0) && (value < 100))
+```
+
+## Example complete_tuples
+
+tuples
+
+```calor
+module Tuples
+  func Pair (int:value) → (int, string)
+    !
+    return (value, "value")
+```
+
+## Example complete_goto
+
+goto
+
+```calor
+module Jumps
+  func Normalize (int:value) → int
+    !
+    match value
+      case 0
+        goto case 1
+      case 1
+        return 1
+      case _
+        return 0
+```
+
+## Example complete_ranges
+
+array ranges
+
+```calor
+module ArrayRanges
+  func FirstTwo (int[]:values) → int[]
+    !
+    return values[0..2]
+```
+
+## Example complete_postfix
+
+Expression-valued call target with an explicit pure delegate row
+
+```calor
+module PostfixCalls
+  func Apply (Holder:h) → int
+    !
+    return h.Make()(41)
+  class Holder
+    func Make () → Func<int,int> !
+      !
+      return (int:x) ! => x + 1
+```
+
+## Example complete_reevaluated_for
+
+Reevaluated counted-loop condition with a changing local bound
+
+```calor
+module ReevaluatedLoops
+  func Count () → int
+    !
+    var int:limit = 3
+    var int:count = 0
+    for i = 0; i < limit; i = i + 1
+      set count count + 1
+      if i == 0
+        set limit 4
+    return count
+```
+
+## Example complete_static_class
+
+Named static module with implicit static function
+
+```calor
+module StaticTypes
+  module Counter
+    func Read () → int
+      !
+      return 7
+  func Run () → int
+    !
+    return Counter.Read()
+```
+
+## Example complete_namespace
+
+Explicit file-scoped namespace, independent of the file label
+
+```calor
+module NamespaceFile Contoso.Tools
+  using Text = System.Text
+  class Box
+    field Text.StringBuilder?:Builder
+    func Read () → int
+      !
+      return 7
+```
+
+## Example complete_block_namespace
+
+Explicit block namespace with the same CLR type identity
+
+```calor
+module BlockFile Contoso.Tools block
+  using Text = System.Text
+  class Box
+    field Text.StringBuilder?:Builder
+    func Read () → int
+      !
+      return 7
+```
+
+## Example complete_enum_extensions
+
+Enum extension functions in their named static container
+
+```calor
+module EnumExtensionExample
+  enum Mode byte
+    Inactive = 0
+    Active = 1
+  module ModeExtensions
+    func IsActive (this Mode:value) → bool
+      !
+      return value == Mode.Active
+```

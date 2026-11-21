@@ -1,0 +1,14 @@
+module Spans Spans block
+  module SpansModule partial
+    func TotalCovered (int[]:starts, int[]:ends) → int
+      !
+      requires (starts.Length == ends.Length)
+      => (result >= 0)
+      var int:total = 0
+      var int:i = 0
+      while (i < starts.Length)
+        set total (total + (ends[i] - starts[i]))
+        set i (i + 1)
+      return total
+
+

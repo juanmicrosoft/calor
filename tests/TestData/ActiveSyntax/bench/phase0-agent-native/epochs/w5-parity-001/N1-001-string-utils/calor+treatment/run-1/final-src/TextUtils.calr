@@ -1,0 +1,23 @@
+// Active migration/semantic check; not a replay of historical raw input.
+module TextUtils TextUtils block
+  module TextUtilsModule public
+    func Slugify (string:s) → string
+      !
+      let string:lower = s.ToLowerInvariant()
+      return lower.Replace(" ", "-")
+
+    func Truncate (string:s, int:maxLen) → string
+      !
+      if (s.Length <= maxLen)
+        return s
+      if (maxLen > 3)
+        return string.Concat((s).Substring(0, (maxLen - 3)), "...")
+      return (s).Substring(0, maxLen)
+
+    func WordCount (string:s) → int
+      !
+      let string:trimmed = (s).Trim()
+      if (trimmed.Length == 0)
+        return 0
+      let words = System.Text.RegularExpressions.Regex.Split(trimmed, "\\s+")
+      return words.Length

@@ -1,6 +1,8 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
+using Calor.Enforcement.Tests;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -400,6 +402,51 @@ public class SwitchExpressionConversionTests
 
         // The initializer should be a match expression
         Assert.IsType<MatchExpressionNode>(bindStmt.Initializer);
+        Assert.Contains("message = match code", result.CalorSource);
+    }
+
+    [Theory]
+    [InlineData("var", 0, "Success")]
+    [InlineData("var", 1, "Error")]
+    [InlineData("var", -1, "Negative")]
+    [InlineData("string", 0, "Success")]
+    [InlineData("string", 1, "Error")]
+    [InlineData("string", -1, "Negative")]
+    public void Convert_SwitchInitializer_ReparsesAndExecutes(string type, int code, string expected)
+    {
+        var result = _converter.Convert($$"""
+            public static class Service
+            {
+                public static string Read(int code)
+                {
+                    {{type}} message = code switch
+                    {
+                        0 => "Success",
+                        var negative when negative < 0 => "Negative",
+                        _ => "Error"
+                    };
+                    return message;
+                }
+            }
+            """);
+        Assert.True(result.Success, GetErrorMessage(result));
+
+        var parsed = CalorSourceHelper.Parse(result.CalorSource!);
+        Assert.True(parsed.IsSuccess, string.Join("\n", parsed.Errors));
+        var binding = Assert.IsType<BindStatementNode>(Assert.Single(parsed.Ast!.Classes).Methods[0].Body[0]);
+        Assert.IsType<MatchExpressionNode>(binding.Initializer);
+        foreach (var source in new[] { result.CalorSource!, new CalorEmitter().Emit(parsed.Ast) })
+        {
+            var execution = TestHarness.Execute(source, "Read", [code], new CompilationOptions
+            {
+                EnableTypeChecking = true,
+                EnforceEffects = true,
+                VerifyContracts = false,
+                StatusWriter = TextWriter.Null
+            });
+            Assert.Null(execution.Exception);
+            Assert.Equal(expected, execution.ReturnValue);
+        }
     }
 
     [Fact]

@@ -1,0 +1,29 @@
+module RangeContracts RangeContracts
+  module RangeContractsModule
+    func ClampByte public (int:value) → int
+      !
+      => result >= 0
+      => result <= 255
+      if value < 0
+        return 0
+      else if value > 255
+        return 255
+      else
+        return value
+
+    func Percentage public (int:part, int:whole) → int
+      !
+      requires whole > 0
+      requires part >= 0
+      requires part <= whole
+      => result >= 0
+      => result <= 100
+      return (part * 100) / whole
+
+    func MapRange public (int:value, int:inMin, int:inMax, int:outMin, int:outMax) → int
+      !
+      requires inMin < inMax
+      requires outMin < outMax
+      requires value >= inMin
+      requires value <= inMax
+      return outMin + (((value - inMin) * (outMax - outMin)) / (inMax - inMin))

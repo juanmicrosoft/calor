@@ -128,6 +128,15 @@ public static class RenameCommand
         if (dryRun)
             return 0;
 
+        var identityStore = Ids.DeclarationIdentityStore.Find(targetPath);
+        if (identityStore != null && identityStore.IsRegistered(targetPath))
+        {
+            identityStore.Apply(result.Edits.Select(edit => edit.FilePath).Distinct(StringComparer.Ordinal)
+                .Select(filePath => new Ids.DeclarationIdentityStore.SourceChange(filePath, sources[filePath], updated[filePath]))
+                .ToArray());
+            return 0;
+        }
+
         foreach (var group in result.Edits.GroupBy(edit => edit.FilePath, StringComparer.Ordinal))
             File.WriteAllText(group.Key, updated[group.Key]);
 

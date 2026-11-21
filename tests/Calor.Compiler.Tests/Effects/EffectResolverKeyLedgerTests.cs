@@ -1,8 +1,8 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -13,6 +13,10 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// v0.15 E1 slice 2c — the effect-resolver KEY ledger
 /// (<c>bench/phase0-agent-native/effect-resolver-key-ledger.json</c>).
+/// The immutable ledger is replayed with its recorded compiler and original
+/// source tree. Today's compiler has separate ordinary expectations under
+/// <c>tests/TestData/Effects/</c>; its measurement keeps active copies separate
+/// from the original logical input identities.
 ///
 /// <para><b>What it measures, and why a ledger rather than an assertion.</b>
 /// Exit pin (c) (roadmap §4.2 E1) is structural: it says no
@@ -51,20 +55,19 @@ namespace Calor.Compiler.Tests;
 /// swap a red test. It is also the honest form of the claim: the ledger says
 /// which files it could not measure, not merely how many.</para>
 ///
-/// <para><b>Anti-tautology.</b> Exact per-subject and aggregate equality
-/// against the committed ledger, recomputed live — the
-/// <c>MetadataBinderCorpusMeasurementTests</c> pattern — plus a
-/// <c>measuredCommit</c> stamped from <c>HEAD</c> and asserted to be a 40-hex
-/// SHA, and a pre-registered <c>floor</c> so a collapse to near-zero keys
+/// <para><b>Anti-tautology.</b> Exact per-subject and aggregate equality,
+/// recomputed live — the <c>MetadataBinderCorpusMeasurementTests</c> pattern.
+/// The historical ledger's <c>measuredCommit</c> selects its original producer;
+/// current expectations claim no historical identity. A pre-registered
+/// <c>floor</c> ensures a collapse to near-zero keys
 /// cannot pass as "the numbers moved". A missing ledger file is a FAILURE, not
-/// a silent regeneration (the #1095 R2-A pattern): regeneration happens only
-/// under <c>CALOR_REGENERATE_EFFECT_RESOLVER_KEY_LEDGER=1</c>, so an instrument
-/// deleted in a PR cannot quietly rewrite itself on the next run.</para>
+/// a silent regeneration (the #1095 R2-A pattern). Historical regeneration is
+/// forbidden; current expectation changes must explain the compiler delta.</para>
 ///
-/// <para><b>Skips</b> only when the repository holds no committed <c>.calr</c>
-/// at all (a partial checkout). It needs no submodules: the subjects are
-/// in-repo <c>.calr</c>, not the C# conversion corpora. It runs in the
-/// <c>compiler</c> shard.</para>
+/// <para>The current test skips only when the repository holds no committed
+/// <c>.calr</c> at all (a partial checkout), and needs no submodules.
+/// Historical replay requires original history and initialized submodule object
+/// stores; missing prerequisites fail rather than skip.</para>
 /// </summary>
 public class EffectResolverKeyLedgerTests
 {
@@ -106,9 +109,32 @@ public class EffectResolverKeyLedgerTests
 
     private static readonly string RepoRoot = CliTestHarness.FindRepoRoot();
 
+    /// <summary>
+    /// The current fixture (not the immutable historical ledger).
+    /// <para><b>0.30 refresh: bound 280 -> 2103, string 874 -> 688.</b> The inputs
+    /// themselves changed. (1) File set: +6 D-S1.5 fixtures (bb946729b: checked,
+    /// unchecked, record; 8 string keys); 14 inputs still written in the retired
+    /// <c>§</c> syntax with no native mirror no longer parse and are listed in
+    /// notMeasured (the 12 BinderIncompleteRatchetTests registers, plus
+    /// scripts/h2_deep_fixture.calr and h2_edit_fixture.calr). (2) Every other input is
+    /// now read in 0.30 native syntax, where a call is an expression on a bound
+    /// receiver (<c>Console.WriteLine(i)</c> binds <c>Console</c>) instead of a
+    /// <c>§C{Console.WriteLine}</c> string target, and output that <c>§P</c> wrote without
+    /// asking the resolver is now an ordinary call that does. Checked exactly on
+    /// samples/: the 2cc3cf3e5 compiler on the 5f3bc87bb sources gives 1 bound / 29
+    /// string, the current compiler on the native sources 71 / 5.</para>
+    /// <para><b>0.30 k1 refresh: bound 2099 -> 2517, string unchanged at 685.</b> An
+    /// element access on a non-array receiver now charges its indexer, so every
+    /// <c>list[i]</c>, <c>dict[k]</c> or <c>config["k"]</c> asks the resolver for the
+    /// selected accessor with a bound key (bench +409, samples +3, src +3, tests +3).
+    /// Measured with the indexer charge disabled, the counts are exactly the previous
+    /// fixture (2099 / 685), so the manifest review in the same change moved nothing.</para>
+    /// </summary>
     [SkippableFact]
-    public void KeyOrigins_OverCommittedCalorCorpus_MatchLedgerExactly()
+    public void CurrentCompiler_KeyOrigins_OverCommittedCalorCorpus_MatchExpectationsExactly()
     {
+        Assert.False(Environment.GetEnvironmentVariable(RegenerateEnvVar) == "1",
+            "The historical key ledger is immutable; current expectations are a separate test fixture.");
         Skip.If(
             EnumerateCalorFiles(RepoRoot).Count == 0,
             "no committed .calr found under the repository root — partial checkout");
@@ -128,48 +154,40 @@ public class EffectResolverKeyLedgerTests
         Console.WriteLine(
             $"key-ledger aggregate: bound {aggregateBound} / string {aggregateString}");
 
-        // The floor is checked against the LIVE measurement, before any
-        // comparison, so a collapsed denominator fails even in a regeneration
-        // run — which is the only run that could otherwise enshrine it.
+        // Check the live floor independently of the expected counts.
         Assert.True(
             aggregateBound + aggregateString >= Floor,
             $"key ledger measured {aggregateBound + aggregateString} keys, below the "
             + $"pre-registered floor of {Floor}. {FloorRule}");
 
-        var ledgerPath = LedgerPath();
-
-        if (string.Equals(
-                Environment.GetEnvironmentVariable(RegenerateEnvVar), "1", StringComparison.Ordinal))
-        {
-            var ledger = new KeyLedger(
-                SchemaVersion: 1,
-                RegisteredAt: "2026-08-26",
-                MeasuredCommit: HeadSha(),
-                Floor: Floor,
-                FloorRule: FloorRule,
-                Scope: ScopeText,
-                AggregateKeysFromBound: aggregateBound,
-                AggregateKeysFromString: aggregateString,
-                PerSubject: perSubject);
-            File.WriteAllText(
-                ledgerPath,
-                JsonSerializer.Serialize(
-                    ledger, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            Console.WriteLine($"key ledger regenerated: {ledgerPath}");
-            return;
-        }
-
-        // A missing ledger is a DELETED INSTRUMENT, not a first run. Writing one
-        // here would let a PR remove the freeze and have it silently reappear
-        // with whatever the PR's own numbers happen to be.
-        Assert.True(
-            File.Exists(ledgerPath),
-            $"key ledger is missing at {ledgerPath}. It is committed; regenerate deliberately "
-            + $"with {RegenerateEnvVar}=1 and disclose the delta.");
-
-        using var stream = File.OpenRead(ledgerPath);
+        using var stream = File.OpenRead(CurrentExpectationsPath());
         var committed = JsonSerializer.Deserialize<JsonElement>(stream);
+        AssertCurrentExpectations(committed, perSubject);
+    }
 
+    [Fact]
+    [Trait("Category", "HistoricalReplay")]
+    public async Task KeyOrigins_OverCommittedCalorCorpus_MatchLedgerExactly()
+    {
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot, "scripts", "registered_ledger_historical_replay.py"), "key"],
+            RepoRoot, TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical key replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
+    private static string CurrentExpectationsPath() => Path.Combine(
+        RepoRoot, "tests", "TestData", "Effects", "effect-resolver-key-current-expectations.json");
+
+    private static void AssertCurrentExpectations(JsonElement committed, List<KeySubject> perSubject)
+    {
+        Assert.Equal(1, committed.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(Floor, committed.GetProperty("floor").GetInt32());
+        Assert.Equal(FloorRule, committed.GetProperty("floorRule").GetString());
+        Assert.Equal(ScopeText, committed.GetProperty("scope").GetString());
+        var aggregateBound = perSubject.Sum(s => s.KeysFromBound);
+        var aggregateString = perSubject.Sum(s => s.KeysFromString);
+        Assert.True(aggregateBound + aggregateString >= Floor);
         Assert.Equal(committed.GetProperty("aggregateKeysFromBound").GetInt32(), aggregateBound);
         Assert.Equal(committed.GetProperty("aggregateKeysFromString").GetInt32(), aggregateString);
 
@@ -191,6 +209,32 @@ public class EffectResolverKeyLedgerTests
                     .Select(e => e.GetString() ?? string.Empty).ToList(),
                 live.NotMeasured);
         }
+    }
+
+    [Theory]
+    [InlineData("keysFromBound")]
+    [InlineData("keysFromString")]
+    [InlineData("filesMeasured")]
+    [InlineData("notMeasured")]
+    public void CurrentExpectations_RejectCountOrNamedExclusionTampering(string field)
+    {
+        var text = File.ReadAllText(CurrentExpectationsPath());
+        var original = JsonSerializer.Deserialize<JsonElement>(text);
+        var live = original.GetProperty("perSubject").EnumerateArray().Select(s => new KeySubject(
+            s.GetProperty("subject").GetString()!,
+            s.GetProperty("keysFromBound").GetInt32(),
+            s.GetProperty("keysFromString").GetInt32(),
+            s.GetProperty("filesMeasured").GetInt32(),
+            s.GetProperty("notMeasured").EnumerateArray().Select(f => f.GetString()!).ToList())).ToList();
+        AssertCurrentExpectations(original, live);
+        var changed = System.Text.Json.Nodes.JsonNode.Parse(text)!;
+        var subject = changed["perSubject"]![0]!;
+        if (field == "notMeasured")
+            subject[field]![0] = "deliberately-wrong-input.calr";
+        else
+            subject[field] = subject[field]!.GetValue<int>() + 1;
+        var tampered = JsonSerializer.Deserialize<JsonElement>(changed.ToJsonString());
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertCurrentExpectations(tampered, live));
     }
 
     /// <summary>
@@ -278,7 +322,8 @@ public class EffectResolverKeyLedgerTests
             try
             {
                 var diagnostics = new DiagnosticBag();
-                var source = File.ReadAllText(file).Replace("\r\n", "\n");
+                var active = ActiveSyntaxInputs.ForCurrentCompiler(root, file);
+                var source = File.ReadAllText(active).Replace("\r\n", "\n");
                 // TokenizeAllForParser, not Tokenize: the parser-facing token
                 // stream is what Program.Compile feeds the parser, and the two
                 // are not interchangeable — measuring through the wrong one
@@ -347,29 +392,12 @@ public class EffectResolverKeyLedgerTests
                     //     dispositioned when the pairs landed; PpwFixture records that disposition and why
                     //     the other two options it listed are unavailable. Counts are unchanged either way.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
-                    && !PpwFixture.IsMatch(rel);
+                    && !PpwFixture.IsMatch(rel)
+                    && !ActiveSyntaxInputs.IsActiveCopy(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))
             .ToList();
-    }
-
-    private static string HeadSha()
-    {
-        var psi = new ProcessStartInfo("git", "rev-parse HEAD")
-        {
-            WorkingDirectory = RepoRoot,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        using var process = Process.Start(psi)!;
-        var output = process.StandardOutput.ReadToEnd().Trim();
-        process.WaitForExit();
-        Assert.True(
-            process.ExitCode == 0 && Regex.IsMatch(output, "^[0-9a-f]{40}$"),
-            $"could not resolve HEAD via `git rev-parse HEAD`: '{output}'");
-        return output;
     }
 
     private sealed class SubjectTotals
@@ -379,17 +407,6 @@ public class EffectResolverKeyLedgerTests
         public int Measured { get; set; }
         public List<string> NotMeasured { get; } = [];
     }
-
-    private sealed record KeyLedger(
-        [property: JsonPropertyName("schemaVersion")] int SchemaVersion,
-        [property: JsonPropertyName("registeredAt")] string RegisteredAt,
-        [property: JsonPropertyName("measuredCommit")] string MeasuredCommit,
-        [property: JsonPropertyName("floor")] int Floor,
-        [property: JsonPropertyName("floorRule")] string FloorRule,
-        [property: JsonPropertyName("scope")] string Scope,
-        [property: JsonPropertyName("aggregateKeysFromBound")] int AggregateKeysFromBound,
-        [property: JsonPropertyName("aggregateKeysFromString")] int AggregateKeysFromString,
-        [property: JsonPropertyName("perSubject")] IReadOnlyList<KeySubject> PerSubject);
 
     private sealed record KeySubject(
         [property: JsonPropertyName("subject")] string Subject,

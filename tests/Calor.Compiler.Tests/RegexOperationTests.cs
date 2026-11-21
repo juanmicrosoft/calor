@@ -21,11 +21,10 @@ public class RegexOperationTests
     private static string WrapInFunction(string body)
     {
         return $$"""
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{string:s}
-                  §O{object}
-                  {{body}}
+            module Test Test block
+              func Main (string:s) → object
+                !
+                {{body}}
             """;
     }
 
@@ -38,175 +37,13 @@ public class RegexOperationTests
         Assert.NotNull(strOp);
         return strOp!;
     }
-
     #region AST Tests
-
-    [Fact]
-    public void Parse_RegexTest_ReturnsStringOperationNode()
-    {
-        var source = WrapInFunction("§R (regex-test s \"\\\\d+\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var strOp = GetReturnExpression(module);
-        Assert.Equal(StringOp.RegexTest, strOp.Operation);
-        Assert.Equal(2, strOp.Arguments.Count);
-    }
-
-    [Fact]
-    public void Parse_RegexMatch_ReturnsStringOperationNode()
-    {
-        var source = WrapInFunction("§R (regex-match s \"\\\\d+\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var strOp = GetReturnExpression(module);
-        Assert.Equal(StringOp.RegexMatch, strOp.Operation);
-        Assert.Equal(2, strOp.Arguments.Count);
-    }
-
-    [Fact]
-    public void Parse_RegexReplace_ReturnsStringOperationNode()
-    {
-        var source = WrapInFunction("§R (regex-replace s \"\\\\s+\" \"-\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var strOp = GetReturnExpression(module);
-        Assert.Equal(StringOp.RegexReplace, strOp.Operation);
-        Assert.Equal(3, strOp.Arguments.Count);
-    }
-
-    [Fact]
-    public void Parse_RegexSplit_ReturnsStringOperationNode()
-    {
-        var source = WrapInFunction("§R (regex-split s \",\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-        var strOp = GetReturnExpression(module);
-        Assert.Equal(StringOp.RegexSplit, strOp.Operation);
-        Assert.Equal(2, strOp.Arguments.Count);
-    }
-
     #endregion
-
     #region C# Emission Tests
-
-    [Fact]
-    public void Emit_RegexTest_ProducesCorrectCSharp()
-    {
-        var source = WrapInFunction("§R (regex-test s \"\\\\d+\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-
-        // The emitted C# will have \\d+ because Calor source has \\d+ (which is \d+ in the parsed string)
-        Assert.Contains("System.Text.RegularExpressions.Regex.IsMatch(s, \"\\\\d+\")", code);
-    }
-
-    [Fact]
-    public void Emit_RegexMatch_ProducesCorrectCSharp()
-    {
-        var source = WrapInFunction("§R (regex-match s \"\\\\d+\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-
-        Assert.Contains("System.Text.RegularExpressions.Regex.Match(s, \"\\\\d+\")", code);
-    }
-
-    [Fact]
-    public void Emit_RegexReplace_ProducesCorrectCSharp()
-    {
-        var source = WrapInFunction("§R (regex-replace s \"\\\\s+\" \"-\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-
-        Assert.Contains("System.Text.RegularExpressions.Regex.Replace(s, \"\\\\s+\", \"-\")", code);
-    }
-
-    [Fact]
-    public void Emit_RegexSplit_ProducesCorrectCSharp()
-    {
-        var source = WrapInFunction("§R (regex-split s \",\")");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-
-        var emitter = new CSharpEmitter();
-        var code = emitter.Emit(module);
-
-        Assert.Contains("System.Text.RegularExpressions.Regex.Split(s, \",\")", code);
-    }
-
     #endregion
-
     #region Round-Trip Tests
-
-    [Theory]
-    [InlineData("(regex-test s \"\\\\d+\")")]
-    [InlineData("(regex-match s \"\\\\d+\")")]
-    [InlineData("(regex-replace s \"\\\\s+\" \"-\")")]
-    [InlineData("(regex-split s \",\")")]
-    public void RoundTrip_RegexOp_ProducesValidCalor(string op)
-    {
-        var source = WrapInFunction($"§R {op}");
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
-
-        var calorEmitter = new CalorEmitter();
-        var roundTripped = calorEmitter.Emit(module);
-
-        // Extract the expected op name from the expression
-        var opName = op.Split(' ')[0].TrimStart('(');
-        Assert.Contains(opName, roundTripped);
-    }
-
     #endregion
-
     #region Error Tests
-
-    [Fact]
-    public void Parse_RegexTest_NoArgs_ReportsError()
-    {
-        var source = WrapInFunction("§R (regex-test)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-    }
-
-    [Fact]
-    public void Parse_RegexTest_OneArg_ReportsError()
-    {
-        var source = WrapInFunction("§R (regex-test s)");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 2 argument"));
-    }
-
-    [Fact]
-    public void Parse_RegexReplace_TwoArgs_ReportsError()
-    {
-        var source = WrapInFunction("§R (regex-replace s \"pattern\")");
-        Parse(source, out var diagnostics);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Message.Contains("requires at least 3 argument"));
-    }
 
     #endregion
 
@@ -291,12 +128,12 @@ public class RegexOperationTests
     }
 
     [Theory]
-    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "regex-test")]
-    [InlineData("Regex.Match(s, \"\\\\d+\")", "regex-match")]
-    [InlineData("Regex.Split(s, \",\")", "regex-split")]
-    public void Migration_RegexStaticMethod_ConvertsToStringOp(string csharpExpr, string expectedCalorOp)
+    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "Regex.IsMatch(s, ")]
+    [InlineData("Regex.Match(s, \"\\\\d+\")", "Regex.Match(s, ")]
+    [InlineData("Regex.Split(s, \",\")", "Regex.Split(s, ")]
+    public void Migration_RegexStaticMethod_ConvertsToStringOp(string csharpExpr, string expectedCalorCall)
     {
-        // The C# to Calor converter converts Regex static methods
+        // The C# to Calor converter keeps Regex static methods as ordinary native calls
         var csharp = $@"
 using System.Text.RegularExpressions;
 public class Test {{ public object M(string s) {{ return {csharpExpr}; }} }}";
@@ -308,13 +145,13 @@ public class Test {{ public object M(string s) {{ return {csharpExpr}; }} }}";
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains(expectedCalorOp, calor);
+        Assert.Contains(expectedCalorCall, calor);
     }
 
     [Fact]
     public void Migration_RegexReplace_ConvertsToStringOp()
     {
-        // The C# to Calor converter converts Regex.Replace
+        // The C# to Calor converter keeps Regex.Replace as an ordinary native call
         var csharp = @"
 using System.Text.RegularExpressions;
 public class Test { public string M(string s) { return Regex.Replace(s, ""\\s+"", ""-""); } }";
@@ -326,13 +163,13 @@ public class Test { public string M(string s) { return Regex.Replace(s, ""\\s+""
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("regex-replace", calor);
+        Assert.Contains("Regex.Replace(s, ", calor);
     }
 
     [Fact]
     public void Migration_RegexIsMatch_FullyQualified_ConvertsToStringOp()
     {
-        // The C# to Calor converter converts fully qualified Regex.IsMatch
+        // The C# to Calor converter keeps fully qualified Regex.IsMatch as a native call
         var csharp = @"
 public class Test { public bool M(string s) { return System.Text.RegularExpressions.Regex.IsMatch(s, ""\\d+""); } }";
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
@@ -343,15 +180,15 @@ public class Test { public bool M(string s) { return System.Text.RegularExpressi
         // Check via round-trip
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
-        Assert.Contains("regex-test", calor);
+        Assert.Contains("System.Text.RegularExpressions.Regex.IsMatch(s, ", calor);
     }
 
     [Theory]
-    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "regex-test")]
-    [InlineData("Regex.Match(s, \"\\\\d+\")", "regex-match")]
-    [InlineData("Regex.Replace(s, \"\\\\s+\", \"-\")", "regex-replace")]
-    [InlineData("Regex.Split(s, \",\")", "regex-split")]
-    public void Migration_RegexOperation_RoundTripsToCalor(string csharpExpr, string expectedCalorOp)
+    [InlineData("Regex.IsMatch(s, \"\\\\d+\")", "Regex.IsMatch(s, ")]
+    [InlineData("Regex.Match(s, \"\\\\d+\")", "Regex.Match(s, ")]
+    [InlineData("Regex.Replace(s, \"\\\\s+\", \"-\")", "Regex.Replace(s, ")]
+    [InlineData("Regex.Split(s, \",\")", "Regex.Split(s, ")]
+    public void Migration_RegexOperation_RoundTripsToCalor(string csharpExpr, string expectedCalorCall)
     {
         var csharp = $@"
 using System.Text.RegularExpressions;
@@ -364,7 +201,7 @@ public class Test {{ public object M(string s) => {csharpExpr}; }}";
         var calorEmitter = new CalorEmitter();
         var calor = calorEmitter.Emit(result.Ast!);
 
-        Assert.Contains(expectedCalorOp, calor);
+        Assert.Contains(expectedCalorCall, calor);
     }
 
     #endregion

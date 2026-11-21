@@ -32,15 +32,21 @@ The answer depends on:
 - **Overflow behavior**: Does `INT_MAX + 1` wrap, trap, or produce undefined behavior?
 - **Null semantics**: What happens when you dereference `null`?
 
-If your spec says "emits C#", you've delegated these decisions to C#—but C# may not fully specify them, or may change them between versions.
+C# does specify left-to-right argument evaluation and many other relevant
+behaviors. Calor must state where it relies on those guarantees and where its
+emitter adds different behavior, such as checked native arithmetic.
 
-**For agents, this is catastrophic.** An agent trained on one set of behaviors will generate incorrect code when those behaviors change or differ.
+A successful translation alone does not establish that every language rule or
+interop boundary was checked.
 
 ---
 
 ## Calor's Solution: Crisp, Backend-Independent Semantics
 
-Calor defines its semantics **independently of any backend**. The C# emitter must conform to Calor semantics, not define them.
+The specification describes intended rules; the production C# emitter must
+implement them. The CNF prototype is not a mandatory enforcement stage, and
+there is no current native source-version declaration. Those missing mechanisms
+must not be inferred from this section's design goals.
 
 ### What We Specify
 
@@ -48,18 +54,18 @@ Calor defines its semantics **independently of any backend**. The C# emitter mus
 |:--------|:----------------|:---------------|
 | **Evaluation Order** | Strictly left-to-right | Agents can reason about side-effect ordering |
 | **Short-Circuit** | `&&`/`||` always short-circuit | Predictable control flow |
-| **Scoping** | Lexical with explicit shadowing | No surprises from dynamic lookup |
+| **Scoping** | Lexical lookup, subject to declaration-space restrictions | Nested reads do not imply unrestricted local shadowing |
 | **Integer Overflow** | TRAP by default | Safety-first; silent bugs are unacceptable |
 | **Type Conversions** | Explicit for narrowing | Prevents accidental data loss |
-| **Nullability** | `Option\<T\>` for explicit optional values | Reduces implicit nulls; raw .NET references and unsafe unwraps still require analysis |
+| **Nullability** | .NET nullable types and `null` | Models absence; supported receiving boundaries are checked, not whole-program null safety |
 | **Exceptions** | Typed, with semantic meaning | `ContractViolationException` carries context |
 
 ### Why This Matters for Agents
 
 1. **Trainable Rules**: Agents can be trained on precise semantics, not approximations.
-2. **Testable Behavior**: Every semantic decision has corresponding tests.
-3. **Version Stability**: Semantics are versioned; agents know which rules apply.
-4. **Trust**: Code behaves the same regardless of backend implementation details.
+2. **Testable Behavior**: Exercise actual emitted code, including failure boundaries.
+3. **Version Stability**: Pin the installed compiler and test upgrades.
+4. **Reviewable Limits**: Distinguish intended rules from admitted, measured behavior.
 
 ---
 
@@ -67,7 +73,7 @@ Calor defines its semantics **independently of any backend**. The C# emitter mus
 
 ### 1. Precise Definitions
 
-Every construct has a formal definition:
+The core reference describes:
 
 - **Evaluation order**: [Core Semantics](/docs/semantics/core/) Section 2
 - **Scoping and shadowing**: [Core Semantics](/docs/semantics/core/) Section 3
@@ -80,43 +86,43 @@ The [backend specification](/docs/semantics/dotnet-backend/) defines exactly how
 
 - When direct emission is safe (C# matches Calor)
 - When additional code is required (checked arithmetic, temporaries)
-- Type mappings (Calor `i32` to C# `int`)
+- Type mappings (native Calor uses C# spellings such as `int`)
 - Exception types and their contents
 
 ### 3. Stable Versioning
 
-Agents will be trained and prompted against specific rules. The [versioning specification](/docs/semantics/versioning/) ensures:
+The [versioning reference](/docs/semantics/versioning/) distinguishes:
 
-- **Semantic Versioning**: MAJOR.MINOR.PATCH with clear upgrade rules
-- **Module Declaration**: Code declares which semantics version it targets
-- **Compatibility Checking**: Compiler warns/errors on version mismatches
-- **Migration Path**: Clear guidance for upgrading between versions
+- **Compatibility policy**: MAJOR.MINOR.PATCH and a retained comparison API
+- **Current native source**: May declare `semver "2.0.0"`; mismatched majors are refused
+- **Historical declarations**: Not syntax to copy into current modules
+- **Upgrade checks**: Pin the compiler and rerun affected programs
 
 ---
 
 ## How It Works: The CNF Pipeline
 
-Calor uses an intermediate representation called **Calor Normal Form (CNF)** to enforce semantics:
+The production pipeline binds and analyzes the AST, then emits C#:
 
 ```
-Source -> Parser -> AST -> TypeChecker -> Binder -> CNF Lowering -> CNF -> C# Emitter -> C#
-                                                        ^
-                                              Semantics enforced here
+Source -> Lexer/Parser -> AST -> Binder/Checks/Analysis -> C# Emitter -> C#
 ```
 
-CNF makes semantics explicit:
-- **Explicit temporaries**: Evaluation order is baked in
-- **Explicit control flow**: No implicit fall-through
-- **Explicit types**: No implicit conversions
-- **Explicit labels/branches**: Short-circuit lowered to control flow
+The separate **Calor Normal Form (CNF)** prototype explores explicit
+temporaries, types, labels, and branches. It does not receive every native
+program and is not consumed by the production C# emitter.
 
-See [Normal Form](/docs/semantics/normal-form/) for the full CNF specification.
+See [Normal Form](/docs/semantics/normal-form/) for its implemented subset and
+limitations, including rejected complex callees and unsupported-node placeholders.
 
 ---
 
 ## Test-Backed Semantics
 
-Every semantic decision is backed by tests:
+The following are historical semantics-test obligations. Several retained
+fixtures still use retired source syntax; their names are not evidence of
+current native acceptance. The core and normal-form references also have
+separate ordinarily enforced native programs with CLR execution controls.
 
 | Semantic | Test | What It Verifies |
 |:---------|:-----|:-----------------|
@@ -128,9 +134,8 @@ Every semantic decision is backed by tests:
 | S6 | `ReturnFromNestedScope` | Return unwinds to function boundary |
 | S7 | `IntegerOverflow_Traps` | Overflow throws `OverflowException` |
 | S8 | `NumericConversion_IntToFloat` | Implicit widening works |
-| S9 | `OptionNone_BehavesCorrectly` | `Option\<T\>` semantics correct |
 | S10 | `RequiresFails_ThrowsContractViolation` | Contracts throw with function ID |
-| S11 | `SemanticsVersionMismatch_EmitsDiagnostic` | Version checking works |
+| S11 | `NativeSemanticsVersion_EnforcesCompatibility` | Native declaration checks major/minor compatibility |
 
 ---
 
@@ -139,7 +144,7 @@ Every semantic decision is backed by tests:
 If you're building agents that generate Calor code:
 
 1. **Train on the spec, not the output**: Use the Core Semantics as the source of truth
-2. **Version your prompts**: Include `§SEMVER{2.0.0}` in generated modules (the current semantics major; `§SEMVER{1.0.0}` files are refused with `Calor0701`)
+2. **Version your prompts**: Pin the installed compiler; do not generate a retired semantics-version tag
 3. **Test against semantics tests**: Your generated code should pass the same tests
 4. **Don't assume C# behavior**: If it's not in the Calor spec, don't rely on it
 
@@ -147,9 +152,10 @@ If you're building agents that generate Calor code:
 
 ## Current Version
 
-**Semantics Version: 1.0.0**
+**Semantics Version: 2.0.0**
 
-This is the initial formal semantics specification.
+This identifies the current semantics helper, not a separate source-level
+selection mechanism or proof of conformance for every construct.
 
 ---
 

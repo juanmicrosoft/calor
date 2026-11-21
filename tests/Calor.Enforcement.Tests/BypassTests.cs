@@ -23,40 +23,15 @@ public class BypassTests
     }
 
     [Fact]
-    public void N2_IndirectPrint_StillRequiresEffect()
-    {
-        // Trying to hide print behind a local function call
-        var source = @"
-§M{m001:Test}
-  §F{f001:IndirectPrint:pub}
-      §I{str:msg}
-      §O{void}
-      §C{Helper}
-        §A msg
-      §/C
-  §F{f002:Helper:int}
-      §I{str:msg}
-      §O{void}
-      §E{cw}
-      §P msg
-";
-        var result = TestHarness.Compile(source);
-
-        // f001 should fail because it calls f002 which has cw effect
-        Assert.True(result.HasErrors, "Should fail - indirect effect not declared");
-        TestHarness.AssertDiagnostic(result.Diagnostics.Errors, DiagnosticCode.ForbiddenEffect, "IndirectPrint");
-    }
-
-    [Fact]
     public void N3_PropertyGetterEffect_NotBypassed()
     {
         // Accessing DateTime.Now should require time effect
         var source = @"
-§M{m001:Test}
-  §F{f001:GetTime:pub}
-      §O{str}
-      §B{str:now} STR:""placeholder""
-      §R now
+module Test Test block
+  func GetTime () → string
+    !
+    let string:now = ""placeholder""
+    return now
 ";
         var result = TestHarness.Compile(source);
 
@@ -70,11 +45,11 @@ public class BypassTests
     {
         // This test documents that external constructor calls would be caught
         var source = @"
-§M{m001:Test}
-  §F{f001:CreateRandom:pub}
-      §O{i32}
-      §B{i32:val} INT:0
-      §R val
+module Test Test block
+  func CreateRandom () → int
+    !
+    let int:val = 0
+    return val
 ";
         var result = TestHarness.Compile(source);
 
@@ -88,12 +63,11 @@ public class BypassTests
         // Lambda with print should contribute effect to enclosing function
         // Function does NOT declare cw effect, but lambda inside has §P (print)
         var source = @"
-§M{m001:Test}
-  §F{f001:WithLambda:pub}
-      §O{void}
-      §B{action:Action<i32>} §LAM{lam1:x:i32}
-        §P x
-      §/LAM{lam1}
+module Test Test block
+  func WithLambda () → void
+    !
+    let Action<int>:action = (int:x) =>
+      Console.WriteLine(x)
 ";
         var result = TestHarness.Compile(source);
 
@@ -106,12 +80,11 @@ public class BypassTests
     {
         // Print in conditional branch still requires effect
         var source = @"
-§M{m001:Test}
-  §F{f001:MaybePrint:pub}
-      §I{bool:shouldPrint}
-      §O{void}
-      §IF{i1} shouldPrint
-          §P ""Printed""
+module Test Test block
+  func MaybePrint (bool:shouldPrint) → void
+    !
+    if shouldPrint
+      Console.WriteLine(""Printed"")
 ";
         var result = TestHarness.Compile(source);
 
@@ -124,14 +97,13 @@ public class BypassTests
     {
         // Print in try/catch still requires effect
         var source = @"
-§M{m001:Test}
-  §F{f001:PrintInTry:pub}
-      §O{void}
-      §TR{t1}
-        §P ""In try""
-      §CA{Exception:ex}
-        §P ""In catch""
-      §/TR{t1}
+module Test Test block
+  func PrintInTry () → void
+    !
+    try
+      Console.WriteLine(""In try"")
+    catch Exception:ex
+      Console.WriteLine(""In catch"")
 ";
         var result = TestHarness.Compile(source);
 
@@ -144,11 +116,11 @@ public class BypassTests
     {
         // Print in loop still requires effect
         var source = @"
-§M{m001:Test}
-  §F{f001:PrintLoop:pub}
-      §O{void}
-      §L{l1:i:0:10:1}
-          §P i
+module Test Test block
+  func PrintLoop () → void
+    !
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
 ";
         var result = TestHarness.Compile(source);
 

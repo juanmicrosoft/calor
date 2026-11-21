@@ -31,6 +31,28 @@ public class TypeCheckerDefectTests
             string.Join("\n", result.Diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
     }
 
+    /// <summary>
+    /// The native C# spelling of a documented Calor type name. The theories keep the documented
+    /// names because the checker echoes them in its diagnostics; the source uses the native type.
+    /// </summary>
+    private static string Native(string type) => type switch
+    {
+        "i8" => "sbyte",
+        "i16" => "short",
+        "i32" => "int",
+        "i64" => "long",
+        "u8" => "byte",
+        "u16" => "ushort",
+        "u32" => "uint",
+        "u64" => "ulong",
+        "f32" => "float",
+        "f64" or "FLOAT" => "double",
+        "str" => "string",
+        ['[', .. var element, ']'] => Native(element) + "[]",
+        [.. var element, '[', ']'] => Native(element) + "[]",
+        _ => type,
+    };
+
     // ---- Types the checker did not know ----
 
     [Theory]
@@ -49,7 +71,7 @@ public class TypeCheckerDefectTests
     {
         // Every one of these is in docs/syntax-reference/types.md. `Unknown type 'u32'` for a
         // documented type is the checker contradicting the language reference.
-        AssertNoErrors($"§M{{m:S}}\n  §F{{f:Do:pub}} ({type}:x) -> void\n    §E{{}}\n    §R\n");
+        AssertNoErrors($"module S S block\n  func Do ({Native(type)}:x) → void\n    !\n    return\n");
     }
 
     /// <summary>
@@ -72,10 +94,22 @@ public class TypeCheckerDefectTests
     [InlineData("f32")]
     public void DocumentedPrimitiveTypes_AreCheckedNotJustAccepted(string type)
     {
-        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} BOOL:true\n    §R\n");
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let {Native(type)}:x = true\n    return\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
-        Assert.Contains(type, error.Message);
+        // `type short`, not just `short`, so `ushort` cannot satisfy the `short` case.
+        Assert.Contains($"type {Native(type)}", error.Message);
+    }
+
+    [Theory]
+    [InlineData("float", "float")]
+    [InlineData("FLOAT", "double")]
+    [InlineData("double", "double")]
+    public void FloatingTypeSpellings_PreserveDiagnosticWidth(string spelling, string surface)
+    {
+        Assert.Equal(surface, TypeChecking.PrimitiveType.FromName(spelling)!.SurfaceName);
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let {Native(spelling)}:x = true\n");
+        Assert.Contains(surface, Assert.Single(result.Diagnostics.Errors).Message);
     }
 
     /// <summary>
@@ -87,15 +121,15 @@ public class TypeCheckerDefectTests
     public void ObjectIsATopType_NotAUniversalEscape()
     {
         // Everything assigns TO object...
-        AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{o:object} STR:\"a\"\n    §R\n");
+        AssertNoErrors("module S S block\n  func Do () → void\n    !\n    let object:o = \"a\"\n    return\n");
 
         // ...and nothing assigns FROM it without a cast, which is what C# requires.
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} (object:o) -> void\n    §E{}\n    §B{n:i32} o\n    §R\n");
+        var result = Check("module S S block\n  func Do (object:o) → void\n    !\n    let int:n = o\n    return\n");
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
     }
 
     /// <summary>
-    /// A declared generic parameter is not an unknown type. `§F{f:Identity<T>:pub}` — the spelling
+    /// A declared generic parameter is not an unknown type. `§F{Identity<T>:pub}` — the spelling
     /// the shipped sample and the docs use — leaves `<T>` embedded in the function NAME rather
     /// than in `TypeParameters`, so the checker warned that a correct construct might be a typo,
     /// three times per parameter.
@@ -103,14 +137,14 @@ public class TypeCheckerDefectTests
     [Fact]
     public void DeclaredGenericParameter_IsNotWarnedAbout()
     {
-        var result = Check("§M{m:S}\n  §F{f001:Identity<T>:pub} (T:value) -> T\n    §R value\n");
+        var result = Check("module S S block\n  func Identity<T> (T:value) → T\n    !\n    return value\n");
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
     }
 
     /// <summary>PUSH must stay silent on a receiver the checker cannot model, like its siblings.</summary>
     [Fact]
     public void PushOnUnmodeledReceiver_IsNotAnError()
-        => AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} (SomeUnknownBag:items) -> void\n    §E{mut}\n    §PUSH{items} INT:1\n    §R\n");
+        => AssertNoErrors("module S S block\n  func Do (SomeUnknownBag:items) → void\n    ! unknown\n    items.Add(1)\n    return\n");
 
     [Theory]
     [InlineData("[str]")]   // the collection-literal spelling in the syntax reference
@@ -118,7 +152,7 @@ public class TypeCheckerDefectTests
     [InlineData("str[]")]
     public void ArrayTypes_Resolve(string type)
     {
-        AssertNoErrors($"§M{{m:S}}\n  §F{{f:Do:pub}} ({type}:xs) -> void\n    §E{{}}\n    §R\n");
+        AssertNoErrors($"module S S block\n  func Do ({Native(type)}:xs) → void\n    !\n    return\n");
     }
 
     /// <summary>
@@ -132,7 +166,7 @@ public class TypeCheckerDefectTests
     public void ArrayTypes_RejectMismatchedElements(string paramType, string bindType)
     {
         var result = Check(
-            $"§M{{m:S}}\n  §F{{f:Do:pub}} ({paramType}:xs) -> void\n    §E{{}}\n    §B{{a:{bindType}}} xs\n    §R\n");
+            $"module S S block\n  func Do ({Native(paramType)}:xs) → void\n    !\n    let {Native(bindType)}:a = xs\n    return\n");
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
     }
@@ -152,7 +186,7 @@ public class TypeCheckerDefectTests
     [InlineData("Strng")]   // ...and one that looks external, which a case heuristic would miss
     public void UnresolvedType_IsWarnedAboutNotSilentlyAccepted(string type)
     {
-        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} STR:\"a\"\n    §R\n");
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let {type}:x = \"a\"\n    return\n");
 
         Assert.False(result.HasErrors);
         Assert.Contains(result.Diagnostics.Warnings, d => d.Message.Contains($"'{type}' is not known"));
@@ -163,7 +197,7 @@ public class TypeCheckerDefectTests
     public void DecimalMixedWithFloat_IsRejected()
     {
         var result = Check(
-            "§M{m:S}\n  §F{f:Do:pub} (decimal:d, f64:x) -> void\n    §E{}\n    §B{r:decimal} (+ d x)\n    §R\n");
+            "module S S block\n  func Do (decimal:d, double:x) → void\n    !\n    let decimal:r = (d + x)\n    return\n");
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("decimal"));
     }
@@ -177,13 +211,13 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SwitchExpressionPatternVariable_IsBound()
         => AssertNoErrors("""
-            §M{m:S}
-              §F{f:Do:pub} (i32:diff) -> i32
-                §E{}
-                §B{result:i32} §W{sw1:expr} diff
-                  §K §VAR{d} §WHEN (> d 0) → d
-                  §K _ → 0
-                §R result
+            module S S block
+              func Do (int:diff) → int
+                !
+                let int:result = match diff
+                  case var d when (d > 0) → d
+                  case _ → 0
+                return result
             """);
 
     /// <summary>
@@ -194,11 +228,11 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SetIndexOnArray_IsAccepted()
         => AssertNoErrors("""
-            §M{m:S}
-              §F{f:Do:pub} (i32[]:xs, i32:i, i32:v) -> i32
-                §E{mut}
-                §SETIDX{xs} i v
-                §R INT:0
+            module S S block
+              func Do (int[]:xs, int:i, int:v) → int
+                ! mut
+                set xs[i] v
+                return 0
             """);
 
     /// <summary>
@@ -210,11 +244,11 @@ public class TypeCheckerDefectTests
     [Fact]
     public void SizedType_MismatchEchoesTheWrittenWidth()
     {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i64} STR:\"a\"\n    §R INT:0\n");
+        var result = Check("module S S block\n  func Do () → int\n    !\n    let long:x = \"a\"\n    return 0\n");
 
         var error = Assert.Single(result.Diagnostics.Errors);
-        Assert.Contains("i64", error.Message);
-        Assert.DoesNotContain("i32", error.Message);
+        Assert.Contains("type long", error.Message);
+        Assert.DoesNotContain("type int", error.Message);
     }
 
     // ---- Operators the checker got wrong ----
@@ -225,7 +259,7 @@ public class TypeCheckerDefectTests
     /// </summary>
     [Fact]
     public void StringConcatenation_IsNotAnArithmeticError()
-        => AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} () -> str\n    §E{}\n    §R (+ STR:\"hello\" STR:\"world\")\n");
+        => AssertNoErrors("module S S block\n  func Do () → string\n    !\n    return (\"hello\" + \"world\")\n");
 
     // ---- References the checker mistook for variables ----
 
@@ -238,7 +272,7 @@ public class TypeCheckerDefectTests
     {
         // These are member accesses the emitter passes through to C# verbatim. Reporting them as
         // undefined VARIABLES rejected code that compiles and runs.
-        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{v:object}} {member}\n    §R\n");
+        var result = Check($"module S S block\n  func Do () → void\n    !\n    let object:v = {member}\n    return\n");
         Assert.DoesNotContain(result.Diagnostics.Errors,
             d => d.Message.Contains("Undefined variable"));
     }
@@ -247,7 +281,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void BareUnknownIdentifier_IsStillReported()
     {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §E{}\n    §R nonexistent_xyz\n");
+        var result = Check("module S S block\n  func Do () → int\n    !\n    return nonexistent_xyz\n");
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Message.Contains("Undefined variable 'nonexistent_xyz'"));
     }
@@ -258,54 +292,25 @@ public class TypeCheckerDefectTests
     /// The checker models no BCL surface, so an external call yields an unknown type. Reporting
     /// "IF condition must be bool, got &lt;error&gt;" turns the checker's ignorance into the
     /// user's error — and it cascades to every downstream use of the value. This exact program
-    /// shape is the MCP primer's `§M{m3:Files}` module.
+    /// shape is the MCP primer's `§M{Files}` module.
     /// </summary>
     [Fact]
     public void UnknownCallResult_DoesNotCascadeIntoAConditionError()
     {
         AssertNoErrors("""
-            §M{m:S}
-              §F{f:Do:pub} (str:path) -> i32
-                §E{fs:r}
-                §B{ok:bool} §C{File.Exists} §A path §/C
-                §IF{i1} (== ok BOOL:true)
-                  §R INT:1
-                §R INT:0
+            module S S block
+              func Do (string:path) → int
+                ! fs:r
+                let bool:ok = File.Exists(path)
+                if (ok == true)
+                  return 1
+                return 0
             """);
     }
 
     [Fact]
     public void UnknownReceiver_DoesNotCascadeIntoAFieldAccessError()
-        => AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{v:object} System.Environment.NewLine\n    §R\n");
-
-    // ---- Diagnostics that belong to another pass ----
-
-    /// <summary>
-    /// `BindValidationPass` owns this condition as Calor0250, with a quickfix. The checker
-    /// reported it too, as the vaguer Calor0202 — so turning the checker on REPLACED a precise
-    /// diagnostic with a worse one for the same program.
-    /// </summary>
-    [Fact]
-    public void BareBinding_ReportsCalor0250_NotTheCheckersOwnTypeMismatch()
-    {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x}\n    §R\n");
-
-        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
-        Assert.DoesNotContain(result.Diagnostics.Errors,
-            d => d.Message.Contains("Variable binding requires either a type annotation"));
-    }
-
-    /// <summary>
-    /// The permissive external-type fallback must NOT reach refinement base types: those are a
-    /// Calor-level construct the refinement machinery reasons about, so "some .NET type we do not
-    /// model" is not an acceptable answer there.
-    /// </summary>
-    [Fact]
-    public void RefinementWithUnknownBaseType_IsStillAnError()
-    {
-        var result = Check("§M{m:S}\n  §RTYPE{r1:MyType:nonexistent_type_xyz} (>= # INT:0)\n");
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.RefinementUndefinedBaseType);
-    }
+        => AssertNoErrors("module S S block\n  func Do () → void\n    !\n    let object:v = System.Environment.NewLine\n    return\n");
     /// <summary>
     /// A type the module DECLARES is not an unknown external type. Found in release review of
     /// v0.12.0: the checker registered only type parameters, so a class declared eight lines
@@ -316,15 +321,16 @@ public class TypeCheckerDefectTests
     public void ModuleDeclaredTypes_AreNotReportedAsUnknown()
     {
         var result = Check("""
-            §M{m001:ClsTest}
-              §CL{c001:Point:pub}
-                §FLD{i32:X:pub}
-                §CTOR{ctor1:pub} (i32:x)
-                  §ASSIGN X x
-              §F{f001:Use:pub} () -> void
-                §E{}
-                §B{p:Point} §NEW{Point} §A INT:3 §/NEW
-                §R
+            module ClsTest ClsTest block
+              class Point
+                field int:X
+                ctor (int:x)
+                  set X x
+
+              func Use () → void
+                !
+                let Point:p = new Point(3)
+                return
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
@@ -337,7 +343,7 @@ public class TypeCheckerDefectTests
     [Fact]
     public void UndeclaredType_IsStillReported()
     {
-        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n");
+        var result = Check("module S S block\n  func Do () → void\n    !\n    let NoSuchTypeXyz:x = \"a\"\n    return\n");
         Assert.Contains(result.Diagnostics, d => d.Message.Contains("'NoSuchTypeXyz' is not known"));
     }
 
@@ -351,18 +357,19 @@ public class TypeCheckerDefectTests
     public void PreprocessorWrappedAndNestedDeclarations_AreNotReportedAsUnknown()
     {
         var result = Check("""
-            §M{m001:PpTest}
-              §PP{DEBUG}
-                §CL{c001:Dbg:pub}
-                  §FLD{i32:N:pub}
-              §/PP{DEBUG}
-              §CL{c002:Outer:pub}
-                §CL{c003:Inner:pub}
-                  §FLD{i32:M:pub}
-              §F{f001:Use:pub} (Dbg:d) -> void
-                §E{}
-                §B{i:Outer.Inner}
-                §R
+            module PpTest PpTest block
+              pp DEBUG
+                class Dbg
+                  field int:N
+
+              class Outer
+                class Inner
+                  field int:M
+
+              func Use (Dbg:d) → void
+                !
+                let Outer.Inner:i
+                return
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
@@ -379,109 +386,18 @@ public class TypeCheckerDefectTests
     public void BareNestedTypeName_IsStillReported()
     {
         var result = Check("""
-            §M{m001:NestTest}
-              §CL{c002:Outer:pub}
-                §CL{c003:Inner:pub}
-                  §FLD{i32:M:pub}
-              §F{f001:Use:pub} () -> void
-                §E{}
-                §B{i:Inner}
-                §R
+            module NestTest NestTest block
+              class Outer
+                class Inner
+                  field int:M
+
+              func Use () → void
+                !
+                let Inner:i
+                return
             """);
 
         Assert.Contains(result.Diagnostics, d => d.Message.Contains("'Inner' is not known"));
-    }
-
-    /// <summary>
-    /// A §RTYPE whose base names a module class must not ALSO warn that a class declared two lines
-    /// above "may be a typo". Stated precisely, because an earlier revision of this test claimed
-    /// more than is true: such a program is still <c>Calor1102</c> — a module-declared type is an
-    /// <c>ExternalType</c>, which <c>RegisterRefinementType</c> rejects as a base outright, before
-    /// and after v0.12. The declared-type pass running first buys only the removal of a redundant
-    /// second diagnostic on an already-failing program. That is the whole benefit; it is not a
-    /// claim that the program now works.
-    /// </summary>
-    [Fact]
-    public void RefinementBaseNamingAModuleClass_DoesNotAlsoWarnUnknownType()
-    {
-        var result = Check("""
-            §M{m001:RtBase}
-              §CL{c001:Money:pub}
-                §FLD{i32:V:pub}
-              §RTYPE{r001:PosMoney:Money} (> value INT:0)
-            """);
-
-        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'Money' is not known"));
-        // The pre-existing rejection is unchanged, and saying so here keeps the test from reading
-        // as "this compiles now".
-        Assert.Contains(result.Diagnostics, d => d.Message.Contains("undefined base type 'Money'"));
-    }
-
-    /// <summary>
-    /// A refinement may claim a name the declared-type pass seeded — but only ONE may. The first
-    /// cut of that exemption used a set membership test that never expired, so every later §RTYPE
-    /// of the same name was exempt too and two conflicting refinements compiled clean, a
-    /// regression against main. Found by the third round of release review.
-    /// </summary>
-    [Fact]
-    public void TwoRefinementsSharingAClassName_IsStillADuplicate()
-    {
-        var result = Check("""
-            §M{m001:Dup2}
-              §CL{c001:Positive:pub}
-                §FLD{i32:V:pub}
-              §RTYPE{r001:Positive:i32} (> value INT:0)
-              §RTYPE{r002:Positive:i32} (> value INT:1)
-            """);
-
-        Assert.Contains(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name 'Positive'"));
-    }
-
-    /// <summary>
-    /// §ITYPE declarations are part of the declared-type pass and were unpinned: deleting that
-    /// line from the enumeration left the whole suite green while emitting a false Calor0200.
-    /// </summary>
-    [Fact]
-    public void IndexedTypeDeclaration_IsNotReportedAsUnknown()
-    {
-        const string src = """
-            §M{m001:ItypeTest}
-              §ITYPE{it1:NonEmptyList:List:n} (> # INT:0)
-              §F{f001:Use:pub} (NonEmptyList:a) -> void
-                §E{}
-                §R
-            """;
-
-        var result = Check(src);
-
-        // The fixture must actually be a §ITYPE program. The first version of this test wrote the
-        // §RTYPE attribute shape and failed Calor0102 "Missing required attribute 'sizeParam'" —
-        // it asserted the absence of a warning on a program that never got far enough to produce
-        // one, and passed with the §ITYPE line deleted from the checker entirely.
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.MissingRequiredAttribute);
-        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'NonEmptyList' is not known"));
-    }
-
-    /// <summary>
-    /// The declared-type pass must not steal a name from a §RTYPE. RegisterRefinementType rejects
-    /// an already-defined name, so registering module types first would newly reject a refinement
-    /// sharing a class name — a program that compiled before v0.12. Refinements are registered
-    /// first and the declared-type pass skips names already taken.
-    /// </summary>
-    [Fact]
-    public void RefinementType_KeepsItsName_AgainstASameNamedClass()
-    {
-        var result = Check("""
-            §M{m001:RtTest}
-              §CL{c001:Positive:pub}
-                §FLD{i32:V:pub}
-              §RTYPE{r001:Positive:i32} (> value INT:0)
-              §F{f001:Use:pub} () -> void
-                §E{}
-                §R
-            """);
-
-        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name"));
     }
 
     // The opt-out itself is pinned in CliTypeCheckDefaultTests, against the real CLI. A pin that

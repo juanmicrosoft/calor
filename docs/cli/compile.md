@@ -33,7 +33,25 @@ calor -i MyModule.calr -o MyModule.g.cs
 
 # With verbose output
 calor -v -i MyModule.calr -o MyModule.g.cs
+
+# Compile a project together; write one .g.cs beside each input
+calor -i Library.calr -i App.calr --strict-effects --no-cache
 ```
+
+Repeat `-i` for every source file in a batch. Omit `-o` for a multi-file
+invocation: one explicit output path would be shared by all inputs.
+Calls to another file's named static module use its declared CLR namespace
+and owner, for example `Contracts.Arithmetic.Pick(41)`. Binding selects the
+actual source overload in the caller's namespace and import context, and
+effect checking charges that declaration's row along with argument effects.
+The project index uses the same source selections for call edges.
+Ambiguous, inaccessible, or invalid calls remain unresolved; they do not
+borrow another source or metadata contract. Foreign instance methods and
+owners with static initialization are not closed by this source-call path.
+Refused calls retain receiver evaluation before argument evaluation. Known
+receiver and argument effects remain enforced under `--permissive-effects`.
+Explicit `ref` and `out` arguments also invalidate pre-call nullability
+narrowing, even when the foreign call remains unresolved.
 
 ---
 
@@ -53,7 +71,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--no-cache` | | No | Disable caching (verification results and incremental builds; overrides `--cache`) |
 | `--clear-cache` | | No | Clear caches before compiling (verification cache and `.calor-build-state.json`) |
 | `--contract-mode` | | No | Contract enforcement mode: off, debug, release (default: debug) |
-| `--strict-api` | | No | Require `§BR` breaking-change markers for public API changes |
+| `--strict-api` | | No | Require constrained `/// breaking version "description"` metadata for public API changes |
 | `--require-docs` | | No | Require documentation on public functions |
 | `--enforce-effects` | | No | Enforce effect declarations (default: true) |
 | `--no-enforce-effects` | | No | Disable effect enforcement (opt out of the v0.11 default-on behavior) |
@@ -70,6 +88,17 @@ that are provably unchanged: same source content hash, same recorded output
 content hash, options/compiler/effect-manifests unchanged, and a cached
 per-module effect summary available so cross-module effect enforcement still
 runs over skipped modules.
+
+For multi-file builds, changes to emitted cross-file targets or source paths
+invalidate the project cache. Other source-only edits can preserve unchanged
+outputs only after a conservative independence check against both the old and
+current companion declarations. Unproven cases, including conditional branches,
+recompile rather than reuse a potentially stale output. Native top-level
+functions may share the compiler-generated `GlobalModule`; reuse still checks
+both the old and current companion member names. Authored partial types, fields,
+and static constructors do not qualify for that shared-owner exception.
+Validation records for warning-bearing files can support that check, but those
+files themselves recompile so their diagnostics are reported again.
 
 ```bash
 calor --input a.calr --input b.calr --cache    # first run: compiles both
@@ -112,6 +141,46 @@ and honors `AllowUnsafeBlocks`, `OutputType`, `DefineConstants`, and
 `LangVersion`, including whether `ImplicitUsings` is enabled.
 `<CalorTranspileOnly>true</CalorTranspileOnly>` provides the same unsafe
 behavior as the CLI; the default is `false`.
+
+Effect checking also covers formatting performed by interpolation and by
+built-in string concatenation (`+`, chained `+`, and converted `+=`). Formatting
+a value of a built-in type, or a `Nullable<T>` of one, charges what the effect
+manifest records for that type's parameterless `ToString()`; with the built-in
+manifests that is pure for strings, characters, Booleans and the common numeric
+types. Custom-object, generic and unresolved values stay Unknown (`Calor0411`,
+and `Calor0410` in a pure function), because formatting them can run an
+arbitrary `ToString` override. Effects from evaluating every hole and operand
+are still charged. See the known gap in
+[effects and contracts enforcement](/calor/philosophy/effects-contracts-enforcement/).
+Numeric addition is not string formatting. User-defined operators and operand
+conversions retain their own effect charges, as do operand evaluation,
+assignment targets, and bound source initialization. This includes bare
+static-field reads and explicit static-constructor entry without a field read.
+Implicit static initializers are also checked at their type declaration, against
+the same intrinsic mutation/allocation contract as explicit constructors.
+`BeforeFieldInit` permits eager CLR initialization; an empty callback trace from
+one method call is not a purity proof. Uncontracted formatting is refused even
+when the type has no explicit static constructor and its method reads no fields.
+String interpolation in initializers uses the same bound hole-type rule as
+interpolation in method bodies. Proven string, char, Boolean and null holes are
+supported; operand and alignment operations retain their effect checks.
+Source instance calls also need dispatch proof: an open virtual call cannot use
+only the selected base declaration's effect row. Bound nonvirtual calls and
+sealed dispatch retain their existing contracts. A source property accessor
+reached from an initializer (an object-initializer setter, a static property
+read) is charged through its bound body like a method; unavailable body proof
+still produces Unknown. Field updates (`++Counter.N`, `x += v`) are mutation,
+and creating a delegate charges what its target does. Inside an object or
+collection initializer, the created object's own nonvirtual metadata members
+(a setter, `Add`, an indexer) use their effect contracts; other native metadata
+calls in an initializer remain unproved.
+The same check follows initializer-reachable source helpers transitively using
+their bound bodies, rather than trusting a source call graph's inferred purity.
+Ordinary open virtual source calls charge the selected declaration's effect row,
+as checked by override/interface effect variance. They cannot substitute one
+implementation's smaller inferred row. Nonvirtual, base-qualified and sealed
+calls retain implementation precision; callback values still carry their
+destination's declared row.
 
 ---
 
@@ -172,8 +241,8 @@ When compilation fails, errors are reported with file location:
 Error in Calculator.calr:12:5
   Undefined variable 'x' in expression
 
-  §R (+ x 1)
-       ^
+  return x + 1
+         ^
 
 Compilation failed with 1 error
 ```

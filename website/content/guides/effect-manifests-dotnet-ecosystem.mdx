@@ -12,17 +12,20 @@ When Calor code calls into .NET libraries, the compiler needs to know what side 
 
 ## The Problem
 
-Calor enforces that every function declares its effects:
+An explicit effect row bounds the effects allowed in a function. This standalone
+example uses the built-in console contract:
 
 ```calor
-§F{f001:SaveUser:pub}
-  §O{void}
-  §E{db:w,cw}
-  §C{DbContext.SaveChanges} §/C
-  §C{ILogger.LogInformation} §A STR:"User saved" §/C
+module VisibleManifest
+  func LogSaved () → void
+    ! cw
+    System.Console.WriteLine("User saved")
 ```
 
-But how does the compiler know that `DbContext.SaveChanges` has effect `db:w` and `ILogger.LogInformation` has effect `cw`? Without this knowledge, every external call would be flagged as `Unknown`.
+The manifest supplies `cw` for the selected console call. Framework policies
+also include database writes and logging, but an entry's presence does not
+establish that a particular project call binds to it. Missing references,
+unresolved overloads and unknown receivers still need resolution.
 
 ## What's Covered
 
@@ -45,50 +48,89 @@ Core .NET types the compiler has always known about, plus recent additions:
 | `bcl-concurrent` | ConcurrentDictionary, Channel, BlockingCollection | `ConcurrentDictionary.TryAdd → mut` |
 | `bcl-crypto` | SHA256, RSA, Aes, RandomNumberGenerator | `SHA256.HashData → pure`, `RandomNumberGenerator.GetBytes → rand` |
 | `bcl-framework-interfaces` | ILogger, DbContext, IConfiguration, IHost, ControllerBase | See below |
-| `calor-runtime` | Option and Result combinators | Pure modulo callback arguments |
+| `calor-runtime` | Calor.Runtime.Unit | Existing runtime helper methods have an empty row |
 
 ### Framework Interfaces (Tier B)
 
-The most commonly used .NET framework types — these are the calls AI agents generate most often:
+Examples of framework policy entries, not proof that a project call binds to
+that policy:
 
 | Type | Method | Effect | Why |
 |------|--------|--------|-----|
-| `ILogger.LogInformation` | All log methods | `cw` | Observable output |
+| `ILogger`, `LoggerExtensions` | `Log`, `LogInformation`, other listed log methods | `cw` | Observable output |
 | `DbContext.SaveChanges` | SaveChanges/Async | `db:w` | Database write |
 | `DbContext.Find` | Find/FindAsync | `db:r` | Database read |
-| `IConfiguration.GetSection` | GetSection, GetValue | `env:r` | Environment/config read |
+| `IConfiguration` | GetSection, GetChildren, the `config["key"]` indexer | `env:r` | Environment/config read |
 | `ControllerBase.Ok` | Ok, NotFound, BadRequest | pure | No side effects |
-| `HttpResponse.WriteAsync` | WriteAsync, Redirect | `net:w` | Network write |
-| `IHost.RunAsync` | Run, Start, Stop | `net:rw` | Starts network listener |
-| `IServiceProvider.GetService` | GetService | pure | DI resolution |
-| `IOptions<T>.Value` | Value getter | pure | Configuration read |
-| `DbSet<T>.ToListAsync` | All query extensions | `db:r` | Database query |
-| `DatabaseFacade.Migrate` | Migrate, EnsureCreated | `db:w` | Schema modification |
+| `HttpResponse` | Redirect, StartAsync, CompleteAsync | `net:w` | Network write |
+| `DbContext.Add` | Add, Attach, Update (and Async/Range forms) | `mut`, `db:rw` | Tracking can run a key generator such as HiLo, which reads and advances a database sequence |
+| `IServiceScopeFactory` | CreateScope | pure | Creates an empty scope; no service is built |
+| `IServiceProvider`, `GetRequiredService` | Resolving a service | `unknown` | Runs the service's constructor and factories |
+| `IOptions<T>.Value` | Value getter | `unknown` | The first read runs configure and validate callbacks |
+| `IHost`, `IHostBuilder.Build` | StartAsync, StopAsync, RunAsync, Build | `unknown` | Run hosted services and configuration delegates |
+| `EntityFrameworkQueryableExtensions` | ToListAsync, other listed query methods | `db:r` | Database query |
+| `DatabaseFacade` | EnsureCreated, EnsureDeleted | `db:w` | Schema modification |
+
+Extension-call syntax does not change the declaring type. For example,
+`LogInformation` is a `LoggerExtensions` method, not an `ILogger` member.
+An entry under the wrong owner cannot supply missing CLR binding facts.
 
 ### Ecosystem Libraries (4 manifests)
 
-Popular NuGet packages that AI agents commonly generate code for:
+The four ecosystem manifest files include these library policies:
 
 | Library | Key types | Effects |
 |---------|-----------|---------|
 | **Serilog** | `Log.Information`, `ILogger.Write` | `cw` |
 | **Newtonsoft.Json** | `JsonConvert.SerializeObject` | pure |
 | **Dapper** | `SqlMapper.Query` / `Execute` | `db:r` / `db:w` |
-| **MediatR** | `IMediator.Send` | pure (handler-dependent) |
-| **AutoMapper** | `IMapper.Map` | pure |
-| **FluentValidation** | `IValidator.Validate` | pure |
-| **Polly** | `Policy.Execute` | pure (wraps delegate) |
+| **MediatR** | `IMediator.Send` | `unknown` (runs your handlers) |
+| **AutoMapper** | `IMapper.Map` | `unknown` (runs your resolvers and converters) |
+| **FluentValidation** | `IValidator.Validate` | `unknown` (runs your rules) |
+| **Polly** | `Policy.Execute` | `unknown` (runs stored retry and fallback callbacks) |
+
+A member whose job is to run your code is `unknown`: the manifest cannot see
+that code. Declare `! unknown` on the caller, or move the call behind a function
+whose row you can state. Here **pure** means the manifest assigns an empty
+effect row; review a policy against the implementations your project executes.
+Do not treat policy coverage as complete behavioral verification.
+
+The built-in framework and ecosystem manifests have no namespace-wide defaults:
+a member they do not list is `unknown`, even when its type sits next to listed
+ones.
 
 ## How Resolution Works
 
-When the compiler encounters `§C{DbContext.SaveChanges}`, it:
+For a resolved call, binding supplies the selected owner, overload and argument
+facts. The effect resolver then looks for the applicable method, accessor,
+constructor or fallback policy. The console example selects
+`System.Console.WriteLine(string)` and receives `cw`.
 
-1. Parses the target: type = `DbContext`, method = `SaveChanges`
-2. Maps the short name: `DbContext` → `Microsoft.EntityFrameworkCore.DbContext`
-3. Looks up the manifest: finds `bcl-framework-interfaces.calor-effects.json`
-4. Returns the effect: `db:w`
+Instance receivers also require valid bindings. Writing a familiar short type
+name is not proof of its CLR identity. A call such as `client.GetAsync(...)`
+must retain its actual receiver and selected method; unresolved calls do not
+become native coverage merely because a similarly named manifest entry exists.
 
-For instance calls like `§C{client.GetAsync}` (from converted C# code), the compiler also checks variable declarations — if `§B{client} §NEW{HttpClient}`, it resolves `client` → `System.Net.Http.HttpClient` → `net:rw`.
+The compiler needs the actual selected source declarations or referenced
+assembly metadata. A `using` directive changes name lookup; it does not add an
+assembly reference. In an SDK project, restore the real package/project
+references and build with `Calor.Sdk`, which passes resolved assembly paths to
+compilation and generated-C# validation. From the command line, pass each
+assembly with `-r`. The standalone examples here use only the tool's available
+framework references.
+
+The binder loads exactly the referenced files, next to its own `System.*` set.
+For example, compiled with `-r` for `Microsoft.Extensions.Logging.Abstractions.dll`,
+a function with an `ILogger:logger` parameter and `using Microsoft.Extensions.Logging`
+binds `logger.LogInformation("...")` to `LoggerExtensions.LogInformation` and is
+charged `cw`. Without the reference, or without the `using` that brings the
+extension method into scope, the same call is unknown. A referenced member that no
+manifest lists is unknown too: binding to real metadata is not an effect grant.
+
+If a call remains unknown, adding a guessed effect row is not a resolution.
+Default enforcement retains the unknown charge; a known row such as `! cw`
+cannot cover it. Neither a successful manifest lookup nor generated C# alone
+proves that the complete project has valid effect authority.
 
 ### Resolution Priority
 
@@ -104,6 +146,10 @@ Manifests are loaded in priority order (higher overrides lower):
 ## Adding Custom Manifests
 
 For types not covered by the built-in manifests, create a `.calor-effects.json` file in your project root:
+
+The following is a **schema example**: `MyApp` types are placeholders, not
+library declarations or a runnable program. Replace them with the actual
+declaring types and reviewed policies for your referenced implementation.
 
 ```json
 {
@@ -135,9 +181,16 @@ Each manifest supports:
 
 - **`methods`** — Per-method effects (or `"*"` wildcard for all methods)
 - **`getters`** / **`setters`** — Property accessor effects
+- **`fields`** — Field read effects, for that exact field only (no fallback to `defaultEffects`)
 - **`constructors`** — Constructor effects (keyed by parameter signature)
 - **`defaultEffects`** — Fallback for any method not explicitly listed
-- **`namespaceDefaults`** — Default effects for entire namespaces
+- **`namespaceDefaults`** — Default effects for entire namespaces (use sparingly: a
+  default also covers every member nobody reviewed)
+
+An indexer access such as `config["key"]` or `cache[id]` is charged like a property:
+the `getters` (read) or `setters` (store) entry for the indexer's metadata name,
+usually `Item`. An array element costs nothing extra. An indexer with no entry is
+`unknown`.
 
 ## Generate a Starting Manifest
 
@@ -148,6 +201,13 @@ surface instead of requiring a blank manifest by hand:
 calor import Serilog --project .
 calor import path/to/My.Library.dll --references path/to/dependencies
 ```
+
+Here `--project` selects the directory for project-local policies and default
+output; it does not restore packages or add compilation references.
+`--references` supplies real dependencies for import's IL analysis. Review the
+generated policy, then install it in one of the locations above: an arbitrary
+`<package>.calor-effects.json` in the project root is not the project-local
+`.calor-effects.json`.
 
 Fully resolved concrete IL chains are emitted with `inferred` provenance.
 Existing curated coverage is reported but not duplicated. Unresolved members
@@ -181,6 +241,9 @@ Broader effects encompass narrower ones: `fs:rw` covers both `fs:r` and `fs:w`.
 ## CLI Tools
 
 ### Resolve effects for a method
+
+These are **text-only policy lookups**, not compilations. They do not select a
+CLR overload, validate a receiver or prove that a project references the API:
 
 ```bash
 calor effects resolve Console.WriteLine    # → cw
@@ -219,14 +282,19 @@ With IL analysis enabled, the compiler can trace `UserRepository.Save()` → `Db
 
 | Approach | Best for | Coverage |
 |----------|----------|----------|
-| **Built-in manifests** | .NET and Calor Runtime types (DbCommand, HttpClient, ILogger, Option/Result) | Curated embedded coverage |
-| **Custom manifests** | Ecosystem libraries, interface-heavy patterns | Precise, reviewed |
+| **Built-in manifests** | .NET types (DbCommand, HttpClient, ILogger) | Curated embedded coverage |
+| **Custom manifests** | Ecosystem libraries, interface-heavy patterns | Project policy that requires review |
 | **IL analysis** | Your own assemblies with concrete call chains | Automatic, best-effort |
 
 See the [IL analysis guide](/docs/guides/il-analysis/) for details.
 
 ## Architecture: Why Manifests?
 
-Calor is designed for AI agents as primary code authors. When an agent generates Calor code that calls `DbContext.SaveChanges()`, the compiler needs to verify the function declares `§E{db:w}`. Without manifests, every external call would be Unknown — defeating the purpose of effect enforcement.
+When a selected external call has the declared database-write policy, the
+enclosing function needs a row that admits `db:w`. Native declaration rows use
+`! db:w`, not a separate call-tag syntax.
 
-Manifests are the primary resolution mechanism because they're curated, precise, and cover the interface-heavy patterns (ILogger, IConfiguration) where IL analysis has a 0% resolution rate. IL analysis complements manifests by handling concrete call chains in user code — the gap between "framework types covered by manifests" and "Unknown."
+Manifests provide explicit policy for framework and interface-heavy APIs.
+IL analysis can propagate those seeds through concrete implementation chains;
+its limits and leaf assumptions still apply. Neither mechanism alone proves
+that every external behavior has been modeled.

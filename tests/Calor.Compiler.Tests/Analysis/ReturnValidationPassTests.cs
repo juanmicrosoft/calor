@@ -47,9 +47,10 @@ public class ReturnValidationPassTests
     public void VoidFunction_InlineHeader_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §R INT:0
+module T T block
+  func Do () → void
+    !
+    return 0
 ");
     }
 
@@ -57,9 +58,10 @@ public class ReturnValidationPassTests
     public void VoidFunction_OmittedReturnType_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub}
-    §R INT:0
+module T T block
+  func Do ()
+    !
+    return 0
 ");
     }
 
@@ -67,10 +69,10 @@ public class ReturnValidationPassTests
     public void VoidFunction_OutputVoidMarker_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub}
-    §O{void}
-    §R INT:0
+module T T block
+  func Do () → void
+    !
+    return 0
 ");
     }
 
@@ -78,9 +80,10 @@ public class ReturnValidationPassTests
     public void AsyncVoidFunction_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §AF{f1:DoAsync:pub}
-    §R INT:0
+module T T block
+  func DoAsync async ()
+    !
+    return 0
 ");
     }
 
@@ -88,11 +91,11 @@ public class ReturnValidationPassTests
     public void Iterator_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Nums:pub}
-    §O{i32}
-    §YIELD 42
-    §R INT:0
+module T T block
+  func Nums () → int
+    !
+    yield 42
+    return 0
 ");
     }
 
@@ -100,10 +103,11 @@ public class ReturnValidationPassTests
     public void VoidMethod_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §MT{mt1:Do:pub} () -> void
-      §R INT:0
+module T T block
+  class C
+    func Do () → void
+      !
+      return 0
 ");
     }
 
@@ -111,10 +115,10 @@ public class ReturnValidationPassTests
     public void Constructor_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §CTOR{ctor1:pub} ()
-      §R INT:0
+module T T block
+  class C
+    ctor ()
+      return 0
 ");
     }
 
@@ -122,16 +126,13 @@ public class ReturnValidationPassTests
     public void Setter_ReturnsValue_Fires_ButGetterDoesNot()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §PROP{p1:Name:str:pub}
-      §GET
-        §R ""x""
-      §/GET
-      §SET
-        §R INT:0
-      §/SET
-    §/PROP{p1}
+module T T block
+  class C
+    property string:Name
+      get
+        return ""x""
+      set
+        return 0
 ");
     }
 
@@ -139,13 +140,13 @@ public class ReturnValidationPassTests
     public void EventAddAccessor_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §EVT{e1:Click:pub:EventHandler}
-    §EADD
-    §R INT:0
-    §/EADD
-    §/EVT{e1}
+module T T block
+  class C
+    event EventHandler:Click
+      add
+        return 0
+      remove
+        return
 ");
     }
 
@@ -153,12 +154,11 @@ public class ReturnValidationPassTests
     public void EnumExtensionVoidMethod_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §EEXT{ext1:Color}
-    §F{f1:Describe:pub}
-      §I{Color:self}
-      §R INT:0
-  §/EEXT{ext1}
+module T T block
+  module ColorExtensions
+    func Describe (this Color:self) → void
+      !
+      return 0
 ");
     }
 
@@ -166,10 +166,11 @@ public class ReturnValidationPassTests
     public void NestedInIf_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §IF{if1} BOOL:true
-      §R INT:0
+module T T block
+  func Do () → void
+    !
+    if true
+      return 0
 ");
     }
 
@@ -177,10 +178,11 @@ public class ReturnValidationPassTests
     public void NestedInForLoop_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §L{for1:i:1:10:1}
-      §R INT:0
+module T T block
+  func Do () → void
+    !
+    for i from 1 to 10 step 1
+      return 0
 ");
     }
 
@@ -188,10 +190,11 @@ public class ReturnValidationPassTests
     public void NestedInWhile_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §WH{w1} BOOL:true
-      §R INT:0
+module T T block
+  func Do () → void
+    !
+    while true
+      return 0
 ");
     }
 
@@ -199,28 +202,29 @@ public class ReturnValidationPassTests
     public void NestedInTryBody_ReturnsValue_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §TR{t1}
-    §R INT:0
-    §CA{Exception:e}
-    §P ""x""
-    §/TR{t1}
+module T T block
+  func Do () → void
+    !
+    try
+      return 0
+    catch Exception:e
+      Console.WriteLine(""x"")
 ");
     }
 
     [Theory]
-    [InlineData("INT:0")]
-    [InlineData("BOOL:true")]
-    [InlineData("STR:\"hello\"")]
-    [InlineData("(* INT:2 INT:3)")]
-    [InlineData("(> INT:1 INT:0)")]
+    [InlineData("0")]
+    [InlineData("true")]
+    [InlineData("\"hello\"")]
+    [InlineData("2 * 3")]
+    [InlineData("1 > 0")]
     public void VoidFunction_DefiniteValueForms_Fire(string valueExpr)
     {
         AssertFires($@"
-§M{{m1:T}}
-  §F{{f1:Do:pub}} () -> void
-    §R {valueExpr}
+module T T block
+  func Do () → void
+    !
+    return {valueExpr}
 ");
     }
 
@@ -228,11 +232,10 @@ public class ReturnValidationPassTests
     public void VoidFunction_ReturnsReference_Fires()
     {
         AssertFires(@"
-§M{m1:T}
-  §F{f1:Do:pub}
-    §I{i32:x}
-    §O{void}
-    §R x
+module T T block
+  func Do (int:x) → void
+    !
+    return x
 ");
     }
 
@@ -242,9 +245,10 @@ public class ReturnValidationPassTests
     public void NonVoidFunction_ReturnsValue_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> i32
-    §R INT:0
+module T T block
+  func Do () → int
+    !
+    return 0
 ");
     }
 
@@ -252,9 +256,10 @@ public class ReturnValidationPassTests
     public void VoidFunction_BareReturn_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §R
+module T T block
+  func Do () → void
+    !
+    return
 ");
     }
 
@@ -262,10 +267,10 @@ public class ReturnValidationPassTests
     public void AsyncFunctionWithReturnType_ReturnsValue_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §AF{f1:GetAsync:pub}
-    §O{str}
-    §R ""data""
+module T T block
+  func GetAsync async () → string
+    !
+    return ""data""
 ");
     }
 
@@ -275,9 +280,10 @@ public class ReturnValidationPassTests
         // A call can be void-typed (a migrated `void F() => VoidCall();` lowers to
         // `§R <call>`), so the pass conservatively does not flag it.
         AssertSilent(@"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §R §C{Helper.Run} INT:1
+module T T block
+  func Do () → void
+    !
+    return Helper.Run(1)
 ");
     }
 
@@ -285,13 +291,11 @@ public class ReturnValidationPassTests
     public void Getter_ReturnsValue_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §PROP{p1:Name:str:pub}
-      §GET
-        §R ""x""
-      §/GET
-    §/PROP{p1}
+module T T block
+  class C
+    property string:Name
+      get
+        return ""x""
 ");
     }
 
@@ -299,9 +303,10 @@ public class ReturnValidationPassTests
     public void AbstractMethod_NoBody_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §CL{c1:C:int:abs}
-    §MT{mt1:Do:pub:abs} () -> void
+module T T block
+  class C internal abstract
+    func Do abstract () → void
+      !
 ");
     }
 
@@ -309,10 +314,11 @@ public class ReturnValidationPassTests
     public void VoidMethodWithModifier_BareReturn_Silent()
     {
         AssertSilent(@"
-§M{m1:T}
-  §CL{c1:C:pub}
-    §MT{mt1:Do:pub:stat} () -> void
-      §R
+module T T block
+  class C
+    func Do static () → void
+      !
+      return
 ");
     }
 
@@ -322,9 +328,10 @@ public class ReturnValidationPassTests
     public void Compile_VoidFunctionReturningValue_EmitsCalor0205_WithoutTypeChecking()
     {
         var source = @"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §R INT:0
+module T T block
+  func Do () → void
+    !
+    return 0
 ";
         var result = Program.Compile(source, filePath: null, new CompilationOptions { EnableTypeChecking = false });
 
@@ -336,9 +343,10 @@ public class ReturnValidationPassTests
     public void Compile_CleanVoidFunction_NoCalor0205()
     {
         var source = @"
-§M{m1:T}
-  §F{f1:Do:pub} () -> void
-    §R
+module T T block
+  func Do () → void
+    !
+    return
 ";
         var result = Program.Compile(source, filePath: null, new CompilationOptions { EnableTypeChecking = false });
 

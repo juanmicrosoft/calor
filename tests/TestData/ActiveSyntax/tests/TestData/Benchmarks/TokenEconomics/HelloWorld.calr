@@ -1,0 +1,5 @@
+module Hello Hello
+  module HelloModule
+    func Main public () → void
+      ! cw
+      System.Console.WriteLine("Hello from Calor!")

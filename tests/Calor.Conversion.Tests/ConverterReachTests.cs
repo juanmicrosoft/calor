@@ -1,9 +1,12 @@
 using System.Text.RegularExpressions;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -20,7 +23,7 @@ namespace Calor.Conversion.Tests;
 /// the test is red.</para>
 ///
 /// <para>#1097: a lambda parameter whose type inference fails was written as
-/// <c>§LAM{id:x:?}</c>; the binder's canonicalizer throws on <c>?</c> and the
+/// <c>§LAM{x:?}</c>; the binder's canonicalizer throws on <c>?</c> and the
 /// member is abandoned with an AnalysisICE (Calor0932). The (b) fixture binds the
 /// converted output and asserts no Calor0932 — the roadmap's discriminating line
 /// ("revert (b) → the ICE fixture test is red").</para>
@@ -66,7 +69,7 @@ public class ConverterReachTests
         // fails for single-file fixtures that reference types they do not declare.
         Assert.False(string.IsNullOrEmpty(result.CalorSource),
             string.Join("; ", result.Issues.Select(i => i.Message)));
-        var calor = result.CalorSource!.Replace("\r\n", "\n");
+        var calor = RawCSharpFrame.NormalizeLineEndings(result.CalorSource!);
         _output.WriteLine(calor);
 
         var diagnostics = new DiagnosticBag();
@@ -123,11 +126,35 @@ public class ConverterReachTests
         return bag;
     }
 
-    /// <summary>Every §LAM header that carries a bare "?" (or a nested "?") type.</summary>
-    private static IEnumerable<string> UnknownTypedLambdaHeaders(string calor)
-        => Regex.Matches(calor, @"§LAM\{[^}\n]*\}")
-            .Select(m => m.Value)
-            .Where(h => Regex.IsMatch(h, @"[:<]\?[:}>,\]]|:\?$"));
+    private static IEnumerable<AstNode> Nodes(AstNode root)
+    {
+        yield return root;
+        foreach (var child in RecursiveAstWalker.GetAllChildren(root))
+            foreach (var descendant in Nodes(child))
+                yield return descendant;
+    }
+
+    private static IEnumerable<LambdaExpressionNode> Lambdas(ModuleNode module)
+        => Nodes(module).OfType<LambdaExpressionNode>();
+
+    private static IEnumerable<string> UnknownTypedLambdaHeaders(ModuleNode module)
+        => Lambdas(module).SelectMany(lambda => lambda.Parameters)
+            .Select(parameter => parameter.TypeName)
+            .OfType<string>()
+            .Where(type => Regex.IsMatch(type, @"(^|[<,])\s*\?(?=\s*($|[>,\[\]]))"));
+
+    private static void AssertPreservedMethod(
+        ModuleNode module, string csharp, string owner, string method, string feature)
+    {
+        var original = CSharpSyntaxTree.ParseText(csharp).GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(candidate => candidate.Identifier.ValueText == method
+                && candidate.Parent is ClassDeclarationSyntax declaration
+                && declaration.Identifier.ValueText == owner);
+        var block = Assert.Single(module.Classes.Single(cls => cls.Name == owner).InteropBlocks);
+        Assert.Equal(feature, block.FeatureName);
+        Assert.Equal(original.ToFullString(), block.CSharpCode);
+    }
 
     // ----- #903 cluster 1: Calor0099 dedent mismatch ----------------------
 
@@ -163,7 +190,7 @@ public class ConverterReachTests
         AssertParsesClean(rt);
         // #943 (D1 RO-DECL-1): an out var inside a lambda is never lowered (main emitted a typeless
         // §B that failed with Calor0250), so the member is kept as C# and still parses clean.
-        Assert.Contains("§CSHARP{", rt.Calor);
+        TestHelpers.AssertRawFraming(rt.Calor);
         // The block lands under a hoisted binding at the statement's own indent —
         // never at column 0 mid-module.
         Assert.DoesNotMatch(new Regex(@"\n§/LAM\{"), rt.Calor);
@@ -206,7 +233,11 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster1Nested");
 
         AssertParsesClean(rt);
-        Assert.Equal(2, Regex.Matches(rt.Calor, @"§/LAM\{").Count);
+        var lambdas = Lambdas(rt.Module).ToArray();
+        Assert.Equal(2, lambdas.Length);
+        Assert.Equal(2, lambdas[0].StatementBody!.Count);
+        Assert.Equal(3, lambdas[1].StatementBody!.Count);
+        Assert.Equal("p", Assert.Single(lambdas[1].Parameters).Name);
     }
 
     /// <summary>
@@ -260,10 +291,8 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster1Initializer");
 
         AssertParsesClean(rt);
-        // #1541: a custom Add-collection has no Calor form. It used to become
-        // `§NEW{TestValidator}` with `_item0 = …` assignments, which is not what the C# does;
-        // now the creation stays C#, so the lambdas are still passed to TestValidator.Add.
-        Assert.Contains("§CS{(new TestValidator", rt.Calor);
+        // The entire method retains the original Add calls and lambda scopes.
+        AssertPreservedMethod(rt.Module, csharp, "Tester", "Build", "initializer-interop");
         Assert.DoesNotContain("_item0", rt.Calor);
     }
 
@@ -389,7 +418,11 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Cluster1List");
 
         AssertParsesClean(rt);
-        Assert.Contains("§LIST{testData:Order}", rt.Calor);
+        var list = Assert.Single(Nodes(rt.Module).OfType<NewExpressionNode>(),
+            creation => creation.TypeName == "System.Collections.Generic.List<Order>");
+        Assert.Equal(2, list.CollectionInitializers.Count);
+        Assert.All(list.CollectionInitializers, entry =>
+            Assert.Equal("Order", Assert.IsType<NewExpressionNode>(Assert.Single(entry.Arguments)).TypeName));
     }
 
     // ----- #903 cluster 2: Calor0100 empty §IFACE followed by a sibling ----
@@ -468,7 +501,7 @@ public class ConverterReachTests
         AssertParsesClean(rt);
         // Indexed conditions remain in their branches, without eager bindings
         // or an artificial chain of nested else/if statements.
-        Assert.Contains("§EL", rt.Calor);
+        Assert.Contains("else if ", rt.Calor);
         Assert.DoesNotContain("_hoist", rt.Calor);
         var method = rt.Module.Classes.Single().Methods.Single();
         var outerIf = method.Body.OfType<IfStatementNode>().Single();
@@ -502,7 +535,7 @@ public class ConverterReachTests
         var chain = rt.Module.Classes.Single().Methods.Single().Body.OfType<IfStatementNode>().Single();
         Assert.Equal(2, chain.ElseIfClauses.Count);
         Assert.NotNull(chain.ElseBody);
-        Assert.Equal(2, Regex.Matches(rt.Calor, @"§EI ").Count);
+        Assert.Equal(2, Regex.Matches(rt.Calor, @"(?m)^ +else if ").Count);
     }
 
     // ----- #1097: bare "?" lambda parameter type -> AnalysisICE -------------
@@ -534,8 +567,8 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Issue1097");
 
         AssertParsesClean(rt);
-        Assert.Empty(UnknownTypedLambdaHeaders(rt.Calor));
-        Assert.Contains("§LAM{", rt.Calor);
+        Assert.Empty(UnknownTypedLambdaHeaders(rt.Module));
+        Assert.Equal("x", Assert.Single(Assert.Single(Lambdas(rt.Module)).Parameters).Name);
 
         var bag = Bind(rt);
         var ices = bag.Where(d => d.Code == DiagnosticCode.AnalysisICE).Select(d => d.Message).ToList();
@@ -575,7 +608,8 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Issue1097Nested");
 
         AssertParsesClean(rt);
-        Assert.Empty(UnknownTypedLambdaHeaders(rt.Calor));
+        Assert.Empty(UnknownTypedLambdaHeaders(rt.Module));
+        Assert.Equal(4, Lambdas(rt.Module).Count());
         Assert.DoesNotContain("<?", rt.Calor);
 
         var bag = Bind(rt);
@@ -607,8 +641,10 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Issue1097Named");
 
         AssertParsesClean(rt);
-        Assert.Contains("ctx:ValidationContext", rt.Calor);
-        Assert.Empty(UnknownTypedLambdaHeaders(rt.Calor));
+        var parameter = Assert.Single(Assert.Single(Lambdas(rt.Module)).Parameters);
+        Assert.Equal("ctx", parameter.Name);
+        Assert.Equal("ValidationContext", parameter.TypeName);
+        Assert.Empty(UnknownTypedLambdaHeaders(rt.Module));
         Assert.DoesNotContain(Bind(rt), d => d.Code == DiagnosticCode.AnalysisICE);
     }
 
@@ -628,7 +664,9 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "Issue1097Inferred");
 
         AssertParsesClean(rt);
-        Assert.Contains("n:str", rt.Calor);
+        var parameter = Assert.Single(Assert.Single(Lambdas(rt.Module)).Parameters);
+        Assert.Equal("n", parameter.Name);
+        Assert.Equal("string", TypeMapper.ToSurfaceType(parameter.TypeName!));
     }
 
     // ----- review C1: a block lambda inside another lambda's scope -----------
@@ -728,12 +766,12 @@ public class ConverterReachTests
         Assert.False(string.IsNullOrEmpty(result.CalorSource));
         var diagnostics = new DiagnosticBag();
         _ = new Parser(
-            new Lexer(result.CalorSource!.Replace("\r\n", "\n"), diagnostics).TokenizeAllForParser(),
+            new Lexer(RawCSharpFrame.NormalizeLineEndings(result.CalorSource!), diagnostics).TokenizeAllForParser(),
             diagnostics).Parse();
         Assert.False(diagnostics.HasErrors,
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}"))
             + "\n\n" + result.CalorSource);
-        Assert.Contains("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource);
     }
 
     /// <summary>
@@ -794,12 +832,12 @@ public class ConverterReachTests
         _output.WriteLine(result.CalorSource);
         // Not merely rescued — the nesting is emitted natively, with no §B hoisted
         // out of the lambdas that declare the captured names.
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        TestHelpers.AssertRawFraming(result.CalorSource, present: false);
         Assert.DoesNotContain("§B{_hoistLam", result.CalorSource);
 
         var diagnostics = new DiagnosticBag();
         _ = new Parser(
-            new Lexer(result.CalorSource!.Replace("\r\n", "\n"), diagnostics).TokenizeAllForParser(),
+            new Lexer(RawCSharpFrame.NormalizeLineEndings(result.CalorSource!), diagnostics).TokenizeAllForParser(),
             diagnostics).Parse();
         Assert.False(diagnostics.HasErrors,
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
@@ -873,17 +911,15 @@ public class ConverterReachTests
         _output.WriteLine(result.CalorSource);
         var diagnostics = new DiagnosticBag();
         _ = new Parser(
-            new Lexer(result.CalorSource!.Replace("\r\n", "\n"), diagnostics).TokenizeAllForParser(),
+            new Lexer(RawCSharpFrame.NormalizeLineEndings(result.CalorSource!), diagnostics).TokenizeAllForParser(),
             diagnostics).Parse();
         Assert.False(diagnostics.HasErrors,
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
 
-        // ...and it is not native. This pinned the member-level §CSHARP rescue until #1524:
-        // the object-initializer hoist that left the lambdas' scope is closed now, because a
-        // creation whose initializer value is a lambda over `new Node { … }.Run` has no exact
-        // Calor form and stays C# in place (§CS, reported as initializer-interop).
-        Assert.Contains("§CS{(new Node", result.CalorSource);
-        Assert.Contains(result.Losses, loss => loss.Feature == "initializer-interop");
+        AssertPreservedMethod(result.Ast!, csharp, "Demo", "Build", "initializer-interop");
+        var loss = Assert.Single(result.Losses);
+        Assert.Equal(ConversionLossKind.InteropPreserved, loss.Kind);
+        Assert.Equal("initializer-interop", loss.Feature);
     }
 
     // ----- review N1: hoists must land before the §ARR2D opener --------------
@@ -919,15 +955,16 @@ public class ConverterReachTests
         var rt = ConvertAndParse(csharp, "N1Arr2D");
 
         AssertParsesClean(rt);
-        Assert.DoesNotContain("§CSHARP", rt.Calor);
-        var lines = rt.Calor.Split('\n');
-        var opener = Array.FindIndex(lines, l => l.Contains("§ARR2D{", StringComparison.Ordinal));
-        Assert.True(opener >= 0, rt.Calor);
-        // #1132: object initializers now stay on their §ROW line (`§NEW{Cell} V = 1
-        // §/NEW`), so nothing is hoisted at all - neither inside the block (N1's
-        // Calor0100) nor ahead of it (which evaluated elements out of source order).
-        Assert.DoesNotContain("§B{~_hoist", rt.Calor);
-        Assert.Contains(lines, l => l.TrimStart().StartsWith("§ROW §NEW{Cell} V = 1 §/NEW", StringComparison.Ordinal));
+        TestHelpers.AssertRawFraming(rt.Calor, present: false);
+        var array = Assert.Single(Nodes(rt.Module).OfType<MultiDimArrayCreationNode>());
+        Assert.Equal(2, array.Rank);
+        Assert.Equal("Cell", array.ElementType);
+        Assert.Equal(2, array.Initializer.Count);
+        Assert.All(array.Initializer, row => Assert.Equal(2, row.Count));
+        Assert.Equal(new long[] { 1, 2, 3, 4 }, array.Initializer.SelectMany(row => row)
+            .Select(element => Assert.IsType<IntLiteralNode>(
+                Assert.Single(Assert.IsType<NewExpressionNode>(element).Initializers).Value).Value));
+        Assert.DoesNotContain("_hoist", rt.Calor);
         AssertRoundTripCompiles(rt);
     }
 
@@ -1167,7 +1204,7 @@ public class ConverterReachTests
             """;
 
         var rt = ConvertAndParse(csharp, "M4Issue1097");
-        Assert.Empty(UnknownTypedLambdaHeaders(rt.Calor));
+        Assert.Empty(UnknownTypedLambdaHeaders(rt.Module));
         AssertRoundTripCompiles(rt);
     }
 
@@ -1194,7 +1231,7 @@ public class ConverterReachTests
 
         var rt = ConvertAndParse(csharp, "StageAJsonValueFormatter");
         AssertParsesClean(rt);
-        Assert.Contains("§CS{(value ?? \"null\").ToString()!}", rt.Calor);
+        AssertPreservedMethod(rt.Module, csharp, "Formatter", "Write", "null-forgiving-expression");
 
         var compilation = Compiler.Program.Compile(
             rt.Calor,
@@ -1232,9 +1269,9 @@ public class ConverterReachTests
 
         var rt = ConvertAndParse(csharp, "StageANullForgivingSideEffect");
         AssertParsesClean(rt);
-        Assert.Contains("§CS{values[index++]!}", rt.Calor);
+        AssertPreservedMethod(rt.Module, csharp, "Values", "Read", "null-forgiving-expression");
         Assert.Single(Regex.Matches(rt.Calor, Regex.Escape("index++")));
-        Assert.DoesNotContain("§SET{index}", rt.Calor);
+        Assert.DoesNotContain(Nodes(rt.Module), node => node is AssignmentStatementNode);
 
         var compilation = Compiler.Program.Compile(
             rt.Calor,
@@ -1276,8 +1313,8 @@ public class ConverterReachTests
 
         var rt = ConvertAndParse(csharp, "StageALogEventPropertyValue");
         AssertParsesClean(rt);
-        Assert.Contains("§MT{", rt.Calor);
-        Assert.Contains("§CSHARP{", rt.Calor);
+        Assert.Single(rt.Module.Classes.Single().Methods, method => method.Name == "ToString");
+        TestHelpers.AssertRawFraming(rt.Calor);
         Assert.Contains("using var output", rt.Calor);
 
         var compilation = Compiler.Program.Compile(
@@ -1322,7 +1359,7 @@ public class ConverterReachTests
 
         var rt = ConvertAndParse(csharp, "StageANegativeControl");
         AssertParsesClean(rt);
-        Assert.Contains("§CSHARP{", rt.Calor);
+        TestHelpers.AssertRawFraming(rt.Calor);
         Assert.Contains("string Other()", rt.Calor);
 
         var compilation = Compiler.Program.Compile(

@@ -372,7 +372,7 @@ def main() -> int:
     parser.add_argument(
         "--trx-dir", type=Path,
         help="#1666: every *.trx file in this directory is one part of the shard (the compiler shard writes "
-             "two). The shard script empties the directory first, so it holds only this run's reports; a "
+             "four). The shard script empties the directory first, so it holds only this run's reports; a "
              "missing part shows as a short total.")
     parser.add_argument("--project")
     parser.add_argument("--manifest", type=Path, default=Path("eng/test-manifest.json"))

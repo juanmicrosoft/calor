@@ -23,11 +23,36 @@ check '! [[ -f "$WORK_DIR/WebApi/CLAUDE.md" ]]' "CLAUDE.md should NOT be in WebA
 check '! [[ -f "$WORK_DIR/DataAccess/CLAUDE.md" ]]' "CLAUDE.md should NOT be in DataAccess/"
 check '! [[ -f "$WORK_DIR/Shared/CLAUDE.md" ]]' "CLAUDE.md should NOT be in Shared/"
 
-# --- 2. Claude skills ---
-check '[[ -d "$WORK_DIR/.claude/skills" ]]' ".claude/skills/ missing from solution root"
-check '[[ -f "$WORK_DIR/.claude/skills/calor/SKILL.md" ]]' "calor skill missing"
-check '[[ -f "$WORK_DIR/.claude/skills/calor-convert/SKILL.md" ]]' "calor-convert skill missing"
-check '[[ -f "$WORK_DIR/.claude/skills/calor-semantics/SKILL.md" ]]' "calor-semantics skill missing"
+# --- 2. Current teaching artifacts (MCP guidance replaces installed skills) ---
+check '! [[ -d "$WORK_DIR/.claude/skills" ]]' "Retired slash skills should not be installed"
+check 'grep -q "<!-- BEGIN CalorC SECTION" "$WORK_DIR/CLAUDE.md"' "Managed teaching section missing"
+check 'grep -q "<!-- END CalorC SECTION -->" "$WORK_DIR/CLAUDE.md"' "Managed teaching section is incomplete"
+if ! python3 - "$WORK_DIR" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+config = json.loads((root / ".home/.claude.json").read_text())
+projects = config["projects"]
+assert len(projects) == 1, "Expected exactly the disposable solution's MCP entry"
+project_path, project = next(iter(projects.items()))
+assert Path(project_path).resolve() == root.resolve(), "MCP configuration belongs to a different project"
+calor = project["mcpServers"]["calor"]
+assert calor["type"] == "stdio"
+assert calor["command"] == "calor"
+assert calor["args"] == ["mcp", "--stdio"]
+settings = json.loads((root / ".claude/settings.json").read_text())
+assert "mcpServers" not in settings, "MCP must stay in the isolated user configuration"
+hooks = settings["hooks"]
+assert "PreToolUse" in hooks and "PostToolUse" in hooks
+for command in ("validate-write", "validate-edit", "validate-calr-content", "validate-ids", "post-write-lint"):
+    assert "calor hook " + command in json.dumps(hooks), command
+PY
+then
+    echo "FAIL: isolated MCP configuration or Calor-first hooks are incomplete"
+    ERRORS=$((ERRORS + 1))
+fi
 
 # --- 3. Claude settings ---
 check '[[ -f "$WORK_DIR/.claude/settings.json" ]]' ".claude/settings.json missing"

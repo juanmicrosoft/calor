@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Files": [
+    "matching.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_k3dhn2x6h18j",
+      "File": "matching.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "PatternMatchingDemo",
+      "Signature": ""
+    },
+    {
+      "Id": "f_m95nngz5qjfw",
+      "File": "matching.calr",
+      "Container": "PatternMatchingDemo",
+      "Kind": 1,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

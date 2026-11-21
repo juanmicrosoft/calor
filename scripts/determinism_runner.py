@@ -411,8 +411,27 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
     # bound the invocation was given; the cause is decided from that bound, never from the measured duration.
     allowed = deadline - time.time()
     deadline_bound = allowed < budget
-    code, timed_out = run_with_timeout(test_command(profile, cases, trx_dir), child, min(budget, allowed),
-                                       invocation_dir / "console.log")
+    remaining = min(budget, allowed)
+    code, timed_out = 0, False
+    if any(a["name"] == "translator-fixture" for a in dp.profile_artifacts(profile, cases)):
+        historical = Path(child["CALOR_DETERMINISM_RECORD_DIR"]) / "historical-translator"
+        code, timed_out = run_with_timeout(
+            [sys.executable, str(ROOT / "scripts/registered_ledger_historical_replay.py"),
+             "translator", "--record-dir", str(historical)],
+            child, remaining, invocation_dir / "historical-translator.log",
+        )
+        observed = historical / "generated/translator-fixture"
+        if observed.is_file():
+            generated = Path(child["CALOR_DETERMINISM_RECORD_DIR"]) / "generated"
+            generated.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(observed, generated / "translator-fixture")
+        remaining -= time.monotonic() - started
+    if code == 0 and not timed_out:
+        if remaining <= 0:
+            code, timed_out = None, True
+        else:
+            code, timed_out = run_with_timeout(test_command(profile, cases, trx_dir), child, remaining,
+                                               invocation_dir / "console.log")
     seconds = round(time.monotonic() - started, 1)  # the subprocess duration, taken before any result is read
     cut = timed_out and deadline_bound
     trx, outcomes, summary, broken = trx_dir / f"{profile['id']}.trx", None, "Missing", None

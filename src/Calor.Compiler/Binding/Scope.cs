@@ -11,17 +11,19 @@ namespace Calor.Compiler.Binding;
 /// </summary>
 public readonly record struct SymbolId
 {
-    private readonly string? _value;
+    private readonly IdentityPath? _path;
 
-    public string Value => _value ?? string.Empty;
-    public bool IsNone => string.IsNullOrEmpty(_value);
+    public string Value => _path?.Value ?? string.Empty;
+    public bool IsNone => _path == null;
     public static SymbolId None => default;
 
     public SymbolId(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        _value = value;
+        _path = new IdentityPath(null, value);
     }
+
+    private SymbolId(IdentityPath path) => _path = path;
 
     public static SymbolId Create(params string[] components)
     {
@@ -40,10 +42,91 @@ public readonly record struct SymbolId
         if (IsNone)
             return Create(components);
 
-        return new SymbolId(Value + "/" + string.Join("/", components.Select(Escape)));
+        var suffix = components.Length switch
+        {
+            1 => string.Concat("/", Escape(components[0])),
+            2 => string.Concat("/", Escape(components[0]), "/", Escape(components[1])),
+            3 => string.Concat("/", Escape(components[0]), "/", Escape(components[1]), "/", Escape(components[2])),
+            _ => "/" + string.Join("/", components.Select(Escape))
+        };
+        return new SymbolId(new IdentityPath(_path, suffix));
+    }
+
+    internal SymbolId AppendEscapedSuffix(string suffix)
+    {
+        if (IsNone || !suffix.StartsWith("/", StringComparison.Ordinal))
+            throw new InvalidOperationException("An escaped identity suffix requires a parent and separator.");
+        return new SymbolId(new IdentityPath(_path, suffix));
     }
 
     public override string ToString() => IsNone ? "<none>" : Value;
+
+    public bool Equals(SymbolId other)
+    {
+        if (ReferenceEquals(_path, other._path)) return true;
+        if (_path == null || other._path == null
+            || _path.Length != other._path.Length || _path.Hash != other._path.Hash) return false;
+        var left = _path;
+        var right = other._path;
+        var leftIndex = left.Segment.Length - 1;
+        var rightIndex = right.Segment.Length - 1;
+        while (left != null && right != null)
+        {
+            if (ReferenceEquals(left, right) && leftIndex == rightIndex) return true;
+            if (left.Segment[leftIndex--] != right.Segment[rightIndex--]) return false;
+            if (leftIndex < 0)
+            {
+                left = left.Parent;
+                if (left != null) leftIndex = left.Segment.Length - 1;
+            }
+            if (rightIndex < 0)
+            {
+                right = right.Parent;
+                if (right != null) rightIndex = right.Segment.Length - 1;
+            }
+        }
+        return left == null && right == null;
+    }
+
+    public override int GetHashCode() => _path?.Hash ?? 0;
+
+    private sealed class IdentityPath
+    {
+        public IdentityPath? Parent { get; }
+        public string Segment { get; }
+        public int Length { get; }
+        public int Hash { get; }
+        private string? _value;
+
+        public IdentityPath(IdentityPath? parent, string segment)
+        {
+            Parent = parent;
+            Segment = segment;
+            Length = checked((parent?.Length ?? 0) + segment.Length);
+            var hash = parent?.Hash ?? unchecked((int)2166136261);
+            foreach (var character in segment) hash = unchecked((hash ^ character) * 16777619);
+            Hash = hash;
+            if (parent == null) _value = segment;
+        }
+
+        public string Value
+        {
+            get
+            {
+                if (_value != null) return _value;
+                var value = string.Create(Length, this, static (target, path) =>
+                {
+                    var end = target.Length;
+                    for (IdentityPath? current = path; current != null; current = current.Parent)
+                    {
+                        end -= current.Segment.Length;
+                        current.Segment.AsSpan().CopyTo(target[end..]);
+                    }
+                });
+                return Interlocked.CompareExchange(ref _value, value, null) ?? value;
+            }
+        }
+    }
 
     private static string Escape(string component) =>
         Uri.EscapeDataString(component ?? throw new ArgumentNullException(nameof(component)));
@@ -129,15 +212,17 @@ public static class BindingDiagnosticPolicy
             Active(DiagnosticCode.AmbiguousOverload, "Ambiguous internal overload selection is already a compilation error."),
             Active(DiagnosticCode.NoMatchingOverload, "Failed internal overload selection is already a compilation error."),
             Active(DiagnosticCode.BindRequiresTypeOrInitializer, "A missing binding type/value is already a compilation error."),
+            Active(DiagnosticCode.BindArrayToConcreteCollection, "Array-to-concrete-collection mismatches are already compilation errors; native calls use selected metadata."),
             Active(DiagnosticCode.InstanceMemberInStaticContext, "Illegal static-context member access is already a compilation error."),
+            new(DiagnosticCode.InvalidReference, BindingDiagnosticDisposition.CompilationError,
+                "Invalid module instance shapes and extension declaration containers must fail before C# emission.", 1619),
             Active(DiagnosticCode.EffectRowMisplaced, "Effect-row declaration placement is already enforced."),
             Active(DiagnosticCode.EffectVariableScope, "Unbound effect-row variables are already enforced."),
+            Active(DiagnosticCode.MissingCallableEffectRow, "0.30 decision D2: an omitted callback parameter or return row is a hard error before the effect pass; '! unknown' is the explicit spelling."),
             new(DiagnosticCode.InvalidByReferenceOperand, BindingDiagnosticDisposition.CompilationError,
                 "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2.", 943),
             new(DiagnosticCode.WriteToReadOnlyLocal, BindingDiagnosticDisposition.CompilationError,
-                "A write to an immutable §B binding or §L loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1.", 1550),
-            new(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticDisposition.CompilationError,
-                "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation.", 1397),
+                "A write to an immutable let binding or a counted-loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1.", 1550),
             Analysis(DiagnosticCode.ExpectedTypeName, "Parser owns the user-facing missing-type error; binder recovery is not a new activation.", 1396),
             Analysis(DiagnosticCode.UndefinedReference, "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception.", 1396),
             Analysis(DiagnosticCode.TypeMismatch, "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit.", 1397),
@@ -200,6 +285,17 @@ public static class BindingDiagnosticPolicy
                 continue;
             destination.Add(diagnostic);
         }
+        if (source is DiagnosticBag bag)
+            PropagateFixesToExistingDiagnostics(bag, destination);
+    }
+
+    internal static void PropagateFixesToExistingDiagnostics(DiagnosticBag source, DiagnosticBag destination)
+    {
+        var active = source.Where(IsCompilationError).ToArray();
+        destination.ImportMatchingFixes(source.DiagnosticsWithFixes.Where(fix => active.Any(diagnostic =>
+            diagnostic.Code == fix.Code && diagnostic.Span == fix.Span
+            && diagnostic.Severity == fix.Severity && diagnostic.FilePath == fix.FilePath
+            && diagnostic.Message == fix.Message)));
     }
 
     private static BindingDiagnosticRule Active(string code, string reason) =>
@@ -228,7 +324,7 @@ public static class BindingDiagnosticPolicy
                         BindingDiagnosticDisposition.CompilationError,
                         shape == BindingReceivingShape.ScalarString
                             ? "Stage A activates scalar STRING receiving boundaries."
-                            : "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries.",
+                            : "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension.",
                         shape == BindingReceivingShape.ScalarString ? 1385 : 1402)
                     : Analysis(
                         boundary.Item1,
@@ -325,6 +421,23 @@ public static class SymbolSourceIdentity
 /// </summary>
 public static class TypeIdentity
 {
+    internal static bool TrySplitNativeArray(string typeName, out string element, out int rank)
+    {
+        if (typeName.TrimEnd().EndsWith(']')
+            && Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(typeName)
+            is Microsoft.CodeAnalysis.CSharp.Syntax.ArrayTypeSyntax { ContainsDiagnostics: false } array)
+        {
+            rank = array.RankSpecifiers[0].Rank;
+            element = array.RankSpecifiers.Count == 1
+                ? array.ElementType.ToString()
+                : array.WithRankSpecifiers(array.RankSpecifiers.RemoveAt(0)).ToString();
+            return true;
+        }
+        element = string.Empty;
+        rank = 0;
+        return false;
+    }
+
     /// <summary>
     /// Produces the metadata-style lookup identity used for declared generic
     /// types while preserving namespace and nested-type qualification.
@@ -408,13 +521,6 @@ public static class TypeIdentity
         return lookupName;
     }
 
-    public static bool TryUnwrapOptionOrNullable(string typeName, out string elementType)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
-        return AttributeHelper.TryUnwrapNullableAnnotation(typeName, out elementType)
-            || AttributeHelper.TryUnwrapRuntimeOption(typeName, out elementType);
-    }
-
     private static string StripLookupDecorators(string type)
     {
         while (type.StartsWith('?') && type.Length > 1)
@@ -452,17 +558,12 @@ public static class TypeIdentity
         if (AttributeHelper.TryUnwrapNullableAnnotation(type, out var nullableReferent))
             return $"{Canonicalize(nullableReferent)}?";
 
-        if (AttributeHelper.TryUnwrapRuntimeOption(type, out var optionElement))
-            return $"OPTION<{Canonicalize(optionElement)}>";
-
         if (TryStripPostfix(type, out var elementType, out var postfix))
             return Canonicalize(elementType) + postfix;
 
         if (TrySplitGeneric(type, out var genericName, out var arguments))
         {
-            var canonicalName = genericName.Equals("Option", StringComparison.OrdinalIgnoreCase)
-                ? "OPTION"
-                : genericName.Trim();
+            var canonicalName = genericName.Trim();
             return $"{canonicalName}<{string.Join(",", arguments.Select(Canonicalize))}>";
         }
 
@@ -477,8 +578,15 @@ public static class TypeIdentity
             "i64" or "long" or "int64" or "int[bits=64][signed=true]" => "LONG",
             "u64" or "ulong" or "uint64" or "int[bits=64][signed=false]" => "ULONG",
             "f32" or "single" or "float[bits=32]" => "FLOAT[bits=32]",
+            // The C# keyword `float` is single precision. The comparison is case-insensitive,
+            // so the canonical double spelling `FLOAT` also lowers to "float": only the exact
+            // lowercase keyword is the single-precision type. Mapping `float` to FLOAT made the
+            // binder read a declared `float` as double, so `Scale(1.5f)` against
+            // `Scale (float:x)` was Calor0208 and `celsius + 273.15` passed as double.
+            "float" when type == "float" => "FLOAT[bits=32]",
             "f64" or "float" or "double" => "FLOAT",
             "dec" or "decimal" => "DECIMAL",
+            "char" when type is "char" or "CHAR" => "CHAR",
             "str" or "string" => "STRING",
             "bool" or "boolean" => "BOOL",
             "any" or "object" or "unknown" => "OBJECT",
@@ -494,7 +602,7 @@ public static class TypeIdentity
     /// </summary>
     private static readonly HashSet<string> ProvablyNonFunctionCanonicalNames = new(StringComparer.Ordinal)
     {
-        "INT", "UINT", "LONG", "ULONG", "DECIMAL", "STRING", "BOOL", "OBJECT", "VOID", "NEVER",
+        "INT", "UINT", "LONG", "ULONG", "DECIMAL", "CHAR", "STRING", "BOOL", "OBJECT", "VOID", "NEVER",
         "FLOAT", "FLOAT[bits=32]",
         "INT[bits=8][signed=true]", "INT[bits=8][signed=false]",
         "INT[bits=16][signed=true]", "INT[bits=16][signed=false]",
@@ -511,8 +619,7 @@ public static class TypeIdentity
     /// pointer and nullable decorators already stripped.
     /// </summary>
     public static bool IsBuiltinCanonicalName(string canonical) =>
-        ProvablyNonFunctionCanonicalNames.Contains(canonical)
-        || string.Equals(canonical, "OPTION", StringComparison.Ordinal);
+        ProvablyNonFunctionCanonicalNames.Contains(canonical);
 
     /// <summary>
     /// v0.15 E3 slice a, review round 1 (F2) — "is this type PROVABLY not a
@@ -533,7 +640,7 @@ public static class TypeIdentity
     ///
     /// <para>So the rule is inverted to fail OPEN. A row is misplaced only when
     /// the compiler can PROVE the position cannot carry one — a built-in scalar,
-    /// <c>void</c>, an array, a tuple, a pointer, or an <c>Option</c>. An unknown
+    /// <c>void</c>, an array, a tuple, or a pointer. An unknown
     /// NOMINAL is never Calor0405: the honest answer there is "I do not know what
     /// this is", and §4.3's whole discipline is that an unknown is not a
     /// verdict.</para>
@@ -546,7 +653,7 @@ public static class TypeIdentity
         // No type at all is "nothing is known" and must stay silent.
         if (typeName is null) return false;
 
-        // A type position the author left BLANK (`§FLD{:c:pri}`) is different:
+        // A type position the author left BLANK (`§FLD{:c:priv}`) is different:
         // there is no type for a row to attach to, so the row is provably
         // misplaced. This is the R2-A case PR #1102's review round 2 added, and
         // it must keep reporting rather than fall through the fail-open rule.
@@ -567,8 +674,7 @@ public static class TypeIdentity
         }
 
         var canonical = Canonicalize(trimmed);
-        return ProvablyNonFunctionCanonicalNames.Contains(canonical)
-            || canonical.StartsWith("OPTION<", StringComparison.Ordinal);
+        return ProvablyNonFunctionCanonicalNames.Contains(canonical);
     }
 
     /// <summary>
@@ -629,6 +735,82 @@ public static class TypeIdentity
 
     public static string Substitute(string typeName, IReadOnlyDictionary<string, string> substitutions) =>
         Canonicalize(ReplaceIdentifiers(typeName, substitutions));
+
+    internal static bool TryResolveNativeInstanceMemberType(
+        ModuleNode module, string receiverType, string memberName, out string memberType)
+    {
+        memberType = "";
+        var receiver = AttributeHelper.ToSurfaceSpelling(receiverType);
+        if (AttributeHelper.TryUnwrapNullableAnnotation(receiver, out var referent))
+            receiver = referent;
+        if (receiver.EndsWith(']') || receiver.EndsWith('*'))
+            return false;
+        var declaration = ResolveNativeClass(module, receiver);
+        if (declaration == null)
+            return false;
+        var members = declaration.Fields.Where(field => field.Name == memberName && !field.IsStatic)
+            .Select(field => field.TypeName)
+            .Concat(declaration.Properties.Where(property => property.Name == memberName
+                && !property.IsStatic && property.Getter != null).Select(property => property.TypeName)).ToArray();
+        if (members.Length != 1)
+            return false;
+        var arguments = TrySplitGeneric(receiver, out _, out var supplied) ? supplied : [];
+        if (arguments.Count != declaration.TypeParameters.Count)
+            return false;
+        var substitutions = declaration.TypeParameters.Select((parameter, index) => (parameter.Name, arguments[index]))
+            .ToDictionary(pair => pair.Name, pair => pair.Item2, StringComparer.Ordinal);
+        memberType = SubstituteMember(AttributeHelper.ToSurfaceSpelling(members[0]));
+        return true;
+
+        string SubstituteMember(string type)
+        {
+            if (AttributeHelper.TryUnwrapNullableAnnotation(type, out var inner))
+            {
+                var substituted = SubstituteMember(inner);
+                var parameter = declaration.TypeParameters.FirstOrDefault(parameter => parameter.Name == inner);
+                // Unconstrained T? is an annotation, not Nullable<T> for a value-type argument.
+                var annotatedValueParameter = parameter != null
+                    && !parameter.Constraints.Any(constraint =>
+                        constraint.Kind is TypeConstraintKind.Struct or TypeConstraintKind.Unmanaged)
+                    && (IsBuiltinCanonicalName(Canonicalize(substituted))
+                            && Canonicalize(substituted) is not ("STRING" or "OBJECT" or "VOID" or "NEVER")
+                        || substituted is "char" or "CHAR"
+                        || ResolveNativeClass(module, substituted) is { IsStruct: true });
+                return annotatedValueParameter || AttributeHelper.TryUnwrapNullableAnnotation(substituted, out _)
+                    ? substituted : substituted + "?";
+            }
+            if (TryStripPostfix(type, out var element, out var suffix))
+                return SubstituteMember(element) + suffix;
+            if (TrySplitGeneric(type, out var name, out var children))
+                return $"{name}<{string.Join(",", children.Select(SubstituteMember))}>";
+            return Substitute(type, substitutions);
+        }
+    }
+
+    internal static ClassDefinitionNode? ResolveNativeClass(ModuleNode module, string typeName)
+    {
+        var lookup = ToLookupName(typeName);
+        var declarations = Classes(module.Classes, null).ToArray();
+        var candidates = declarations.Where(candidate => candidate.Name == lookup).ToArray();
+        if (candidates.Length == 0 && !lookup.Contains('.'))
+            candidates = declarations.Where(candidate =>
+                ToLookupName(candidate.Declaration.Name, candidate.Declaration.TypeParameters.Count) == lookup).ToArray();
+        return candidates.Length == 1 ? candidates[0].Declaration : null;
+
+        IEnumerable<(ClassDefinitionNode Declaration, string Name)> Classes(
+            IReadOnlyList<ClassDefinitionNode> classes, string? enclosing)
+        {
+            foreach (var cls in classes)
+            {
+                var prefix = enclosing ?? cls.NamespaceIdentity ?? module.NamespaceIdentity ?? module.Name;
+                var name = ToLookupName(string.IsNullOrEmpty(prefix) ? cls.Name : $"{prefix}.{cls.Name}",
+                    cls.TypeParameters.Count);
+                yield return (cls, name);
+                foreach (var nested in Classes(cls.NestedClasses, name))
+                    yield return nested;
+            }
+        }
+    }
 
     private static bool TryUnifyCanonical(
         string parameterType,
@@ -835,26 +1017,17 @@ public static class TypeIdentity
     {
         if (string.IsNullOrWhiteSpace(shortName))
             return shortName;
-        // Nullable annotations do not introduce a runtime Option receiver.
         if (AttributeHelper.TryUnwrapNullableAnnotation(shortName, out var referent))
         {
             var canonical = Canonicalize(referent);
             var mapped = MapShortTypeNameToFullName(referent);
             var knownValue = IsBuiltinCanonicalName(canonical)
-                && canonical is not ("STRING" or "OBJECT" or "VOID" or "NEVER" or "OPTION");
+                && canonical is not ("STRING" or "OBJECT" or "VOID" or "NEVER");
             return knownValue || canonical is "char" or "CHAR"
                 || NullableValueMetadataNames.Contains(mapped)
-                || mapped is "Calor.Runtime.Option`1" or "Calor.Runtime.Result`2"
                     ? "System.Nullable`1"
                     : mapped;
         }
-        if (AttributeHelper.TryUnwrapRuntimeOption(shortName, out _))
-            return "Calor.Runtime.Option`1";
-        if (shortName.StartsWith("Result<"))
-            return "Calor.Runtime.Result`2";
-        if (shortName.Contains('!') && !shortName.Contains('.') && !shortName.Contains('('))
-            return "Calor.Runtime.Result`2";
-
         // Normalize declared generic collection types ("List<i32>") to their
         // manifest identities so typed receivers resolve to the correct entries
         // (e.g. List`1.Add = mut) instead of hitting the unknown-call chain.
@@ -876,6 +1049,8 @@ public static class TypeIdentity
                     "System.Collections.Generic.HashSet`1",
                 "Task" or "System.Threading.Tasks.Task" =>
                     "System.Threading.Tasks.Task`1",
+                "ValueTask" or "System.Threading.Tasks.ValueTask" =>
+                    "System.Threading.Tasks.ValueTask`1",
                 _ => null
             };
             if (mapped != null)
@@ -899,9 +1074,6 @@ public static class TypeIdentity
 
     private static string MapKnownShortTypeName(string shortName) => shortName switch
     {
-        // Calor runtime static helper classes
-        "Option" => "Calor.Runtime.Option",
-        "Result" => "Calor.Runtime.Result",
         // BCL types
         "Console" => "System.Console",
         // Generic collections referenced by bare name (e.g. §NEW{List<i32>}
@@ -938,6 +1110,8 @@ public static class TypeIdentity
         "string" => "System.String",
         "STRING" => "System.String",
         "String" => "System.String",
+        "char" or "CHAR" or "Char" => "System.Char",
+        "byte" or "u8" or "BYTE" or "Byte" => "System.Byte",
         "i32" => "System.Int32",
         "int" => "System.Int32",
         "INT" => "System.Int32",
@@ -945,6 +1119,7 @@ public static class TypeIdentity
         "i64" => "System.Int64",
         "long" => "System.Int64",
         "Int64" => "System.Int64",
+        "float" or "FLOAT[bits=32]" => "System.Single",
         "f64" => "System.Double",
         "double" => "System.Double",
         "FLOAT" => "System.Double",
@@ -960,6 +1135,7 @@ public static class TypeIdentity
         "Trace" => "System.Diagnostics.Trace",
         "Thread" => "System.Threading.Thread",
         "Task" => "System.Threading.Tasks.Task",
+        "ValueTask" => "System.Threading.Tasks.ValueTask",
         "JsonSerializer" => "System.Text.Json.JsonSerializer",
         "JsonDocument" => "System.Text.Json.JsonDocument",
         "Regex" => "System.Text.RegularExpressions.Regex",
@@ -1166,6 +1342,8 @@ public sealed class VariableSymbol : Symbol
     public bool IsField { get; }
     public bool IsProperty { get; }
     public bool IsStatic { get; }
+    internal bool IsEnumMember { get; init; }
+    internal EventDefinitionNode? EventDeclaration { get; init; }
     public ParameterModifier Modifier { get; }
     public ExpressionNode? DefaultValue { get; }
     public bool IsOptional => DefaultValue != null;
@@ -1187,9 +1365,14 @@ public sealed class VariableSymbol : Symbol
     // Inferred references retain the producer's identity, which may not resolve
     // from its display spelling in the local's lexical namespace.
     internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
+    internal IReadOnlyList<BoundNamedValue>? AnonymousObjectMembers { get; set; }
     internal bool IsTypeInferred { get; init; }
-    internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; init; }
-    internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; init; }
+    // Static type authority belongs to the declaration, not its current value.
+    // Assignments cannot recover an unknown var type or erase a known object type.
+    internal bool HasUnknownInferredType { get; set; }
+    internal Microsoft.CodeAnalysis.IArrayTypeSymbol? MetadataArrayResultType { get; set; }
+    internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; set; }
+    internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; set; }
     internal VariableSymbol StorageIdentity { get; set; }
 
     /// <summary>
@@ -1278,6 +1461,8 @@ public sealed class VariableSymbol : Symbol
 public sealed class FunctionSymbol : Symbol
 {
     public string ReturnType { get; }
+    /// <summary>The type a return statement produces, before an async carrier is applied.</summary>
+    public string BodyReturnType { get; init; }
 
     /// <summary>
     /// v0.15 E2 slice b, design-doc §8.2 — the RETURN's function type when the
@@ -1329,6 +1514,7 @@ public sealed class FunctionSymbol : Symbol
         : base(id, name, declarationSpan, definitionSpan, conditionalAlternative)
     {
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
+        BodyReturnType = returnType;
         Parameters = parameters?.ToArray() ?? throw new ArgumentNullException(nameof(parameters));
         TypeParameters = typeParameters?.ToArray() ?? Array.Empty<string>();
         Visibility = visibility;
@@ -1371,6 +1557,8 @@ public sealed class TypeSymbol : Symbol
     public string QualifiedName { get; }
     public Visibility Visibility { get; }
     public bool IsReferenceType { get; init; }
+    public bool IsRecord { get; init; }
+    public bool IsEnum { get; init; }
 
     /// <summary>
     /// v0.15 E1 slice 2b — true for a type declared with <c>§DEL</c>. This is
@@ -1408,6 +1596,7 @@ public enum OverloadResolutionKind
     NoMatch,
     Ambiguous,
     Resolved,
+    UnresolvedArguments,
 }
 
 /// <summary>An entry from the winning argument map, indexed in source evaluation order.</summary>
@@ -1431,6 +1620,20 @@ public sealed class OverloadResolutionResult
     public IReadOnlyList<FunctionSymbol> Functions { get; }
     public IReadOnlyList<ResolvedOverloadMatch> Matches { get; }
     internal bool ReplacesNativeOverloadError { get; }
+    internal bool HasOpaqueOverloads { get; private init; }
+    /// <summary>
+    /// 0.30: the choice rests on a comparison or an applicability check outside what this
+    /// binder models (a user type, an interface, a later C# tie-breaker). The caller keeps it
+    /// only when Roslyn's selection in the module's C# projection confirms it.
+    /// </summary>
+    internal bool NeedsConfirmation { get; private init; }
+
+    internal OverloadResolutionResult RequiringConfirmation() =>
+        new(Kind, Function, ResolvedReturnType, Candidates, Functions, Matches, ReplacesNativeOverloadError)
+        {
+            HasOpaqueOverloads = HasOpaqueOverloads,
+            NeedsConfirmation = true
+        };
 
     private OverloadResolutionResult(
         OverloadResolutionKind kind,
@@ -1456,6 +1659,15 @@ public sealed class OverloadResolutionResult
 
     public static OverloadResolutionResult NotFound() =>
         new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>());
+
+    internal static OverloadResolutionResult UnresolvedArguments() =>
+        new(OverloadResolutionKind.UnresolvedArguments, null, null, Array.Empty<FunctionSymbol>());
+
+    internal static OverloadResolutionResult Opaque() =>
+        new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>())
+        {
+            HasOpaqueOverloads = true
+        };
 
     public static OverloadResolutionResult Inaccessible(
         IReadOnlyList<FunctionSymbol> candidates) =>
@@ -1701,7 +1913,13 @@ public sealed class Scope
         IReadOnlyList<string>? typeArguments,
         Func<string, string, int?>? implicitConversionCost,
         bool allowNullableStringCompatibility,
-        Func<string, string, bool>? isBetterNullConversionTarget = null)
+        Func<string, string, bool>? isBetterNullConversionTarget = null,
+        Func<FunctionSymbol, string, string>? resolveParameterType = null,
+        Func<int, string, string, int?>? argumentConversionCost = null,
+        Func<int, string, string, bool>? isBetterArgumentConversionTarget = null,
+        Func<int, string, string, int?>? compareArgumentConversions = null,
+        Func<int, string, bool>? requiresExactBetterness = null,
+        Func<string, string, bool>? isConversionModeled = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -1718,13 +1936,20 @@ public sealed class Scope
                     typeArguments,
                     implicitConversionCost,
                     allowNullableStringCompatibility,
-                    isBetterNullConversionTarget)
+                    isBetterNullConversionTarget,
+                    resolveParameterType,
+                    argumentConversionCost,
+                    isBetterArgumentConversionTarget,
+                    compareArgumentConversions,
+                    requiresExactBetterness,
+                    isConversionModeled)
                 ?? OverloadResolutionResult.NotFound();
         }
 
-        var applicable = new List<(FunctionSymbol Function, string ReturnType, int Score,
-            bool UsesNullableStringCompatibility,
-            IReadOnlyList<ResolvedArgumentMapping> Arguments)>();
+        var applicable = new List<ApplicableOverload>();
+        // A candidate rejected at a conversion this binder does not model (boxing to an
+        // interface, a user-defined conversion, a user struct under `?`) may be applicable in C#.
+        var possiblyApplicableElsewhere = false;
         foreach (var function in overloads)
         {
             if (TryMatch(
@@ -1735,17 +1960,29 @@ public sealed class Scope
                     typeArguments,
                     implicitConversionCost,
                     allowNullableStringCompatibility,
+                    resolveParameterType,
+                    argumentConversionCost,
                     out var resolvedReturnType,
                     out var score,
                     out var usesNullableStringCompatibility,
-                    out var mappedArguments))
+                    out var mappedArguments,
+                    out var substitutedParameterTypes,
+                    out var usesExpandedParams,
+                    isConversionModeled,
+                    out var unmodeledRejection))
             {
-                applicable.Add((
+                applicable.Add(new ApplicableOverload(
                     function,
                     resolvedReturnType,
                     score,
                     usesNullableStringCompatibility,
-                    mappedArguments));
+                    mappedArguments,
+                    substitutedParameterTypes,
+                    usesExpandedParams));
+            }
+            else
+            {
+                possiblyApplicableElsewhere |= unmodeledRejection;
             }
         }
 
@@ -1753,142 +1990,344 @@ public sealed class Scope
             return OverloadResolutionResult.NoMatch(overloads);
 
         var bestScore = applicable.Min(item => item.Score);
-        var best = applicable.Where(item => item.Score == bestScore).ToArray();
-        if (best.Length == 1)
-            return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
-
-        if (isBetterNullConversionTarget != null
-            && argumentTypes.Any(type => string.Equals(
-                TypeIdentity.Canonicalize(type), "NULL", StringComparison.Ordinal)))
+        var usesArgumentValueConversion = argumentConversionCost != null && implicitConversionCost != null
+            && applicable.Any(candidate => candidate.Arguments.Any(argument =>
+                implicitConversionCost(argument.ParameterType, argumentTypes[argument.ArgumentIndex]) is null
+                && argumentConversionCost(
+                    argument.ArgumentIndex, argument.ParameterType, argumentTypes[argument.ArgumentIndex]) is not null));
+        // 0.30: C#'s better-function-member rule (§12.6.4.3) decides when the caller can compare
+        // conversions argument by argument. A call that uses a nullable or constant conversion
+        // must be decided by it: a summed cost would prefer `int?` (identity, lifted) over
+        // `byte` (constant) for the literal 1, where C# picks `byte`. Such a call is resolved
+        // exactly, or reported ambiguous exactly when C# reports it, or left opaque. Any other
+        // call with several candidates is resolved exactly when every comparison is known, and
+        // otherwise falls back to the rules below.
+        var exactUndecided = false;
+        if (compareArgumentConversions != null)
         {
-            var undominated = best
-                .Where(candidate => !best.Any(other =>
-                    !ReferenceEquals(candidate.Function, other.Function)
-                    && IsBetterNullConversionCandidate(
-                        other,
-                        candidate,
-                        argumentTypes,
-                        isBetterNullConversionTarget)))
-                .ToArray();
-            if (undominated.Length != 0 && undominated.Length < best.Length)
+            var exactRequired = requiresExactBetterness != null && applicable.Any(candidate =>
+                candidate.Arguments.Any(argument =>
+                    requiresExactBetterness(argument.ArgumentIndex, argument.ParameterType)));
+            if (exactRequired || applicable.Count > 1)
             {
-                best = undominated;
-                if (best.Length == 1)
+                var exact = ResolveExactOverload(applicable, argumentTypes.Count, compareArgumentConversions);
+                if (exact.Winners is [var winner])
                 {
-                    return OverloadResolutionResult.Resolved(
-                        best[0].Function,
-                        best[0].ReturnType,
-                        best[0].Arguments);
+                    var exactResult = OverloadResolutionResult.Resolved(winner.Function, winner.ReturnType, winner.Arguments);
+                    return possiblyApplicableElsewhere ? exactResult.RequiringConfirmation() : exactResult;
                 }
+                if (exact.Winners.Count > 1)
+                {
+                    // One declaration per configuration: `#if` alternatives with one signature.
+                    var returnTypes = exact.Winners.Select(item => TypeIdentity.Canonicalize(item.ReturnType))
+                        .Distinct(StringComparer.Ordinal).ToArray();
+                    var alternatives = OverloadResolutionResult.ResolvedAlternatives(
+                        exact.Winners.Select(item => item.Function).ToArray(),
+                        returnTypes.Length == 1 ? returnTypes[0] : "OBJECT",
+                        exact.Winners.Select(item => new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                            .ToArray());
+                    return possiblyApplicableElsewhere ? alternatives.RequiringConfirmation() : alternatives;
+                }
+                if (exact.IsAmbiguous)
+                    return OverloadResolutionResult.Ambiguous(applicable.Select(item => item.Function).ToArray());
+                if (exactRequired)
+                    return OverloadResolutionResult.Opaque();
+                exactUndecided = true;
             }
         }
 
-        var concreteNullableStringGroups = best
-            .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
-            .GroupBy(item => item.Function.SignatureKey, StringComparer.Ordinal)
-            .Where(group =>
-            {
-                var candidates = group.Select(item => item.Function).ToArray();
-                return candidates
-                    .Skip(1)
-                    .All(candidate => candidates
-                        .Where(other => !ReferenceEquals(other, candidate))
-                        .All(other => AreMutuallyExclusiveAlternatives(candidate, other)));
-            })
-            .Select(group => group.ToArray())
-            .ToArray();
-        if (concreteNullableStringGroups.Length == 1)
-        {
-            var selected = concreteNullableStringGroups[0];
-            var selectedFunctions = selected.Select(item => item.Function).ToHashSet();
-            if (best.Where(item => !selectedFunctions.Contains(item.Function))
-                .All(item => item.Function.GenericArity > 0))
-            {
-                if (selected.Length == 1)
-                {
-                    return OverloadResolutionResult.Resolved(
-                        selected[0].Function,
-                        selected[0].ReturnType,
-                        selected[0].Arguments);
-                }
+        // The rules below sum conversion costs, which is not C#'s rule. Their choice among
+        // several candidates whose comparison is unknown, or any choice while a rejected
+        // candidate may apply in C#, stands only when Roslyn confirms it.
+        var legacy = ResolveByCost();
+        return (exactUndecided || possiblyApplicableElsewhere) && isConversionModeled != null
+            && legacy.Kind == OverloadResolutionKind.Resolved
+                ? legacy.RequiringConfirmation()
+                : legacy;
 
-                var alternativeReturnTypes = selected
+        OverloadResolutionResult ResolveByCost()
+        {
+            // A new literal conversion can introduce crossed preferences that a summed score hides.
+            var best = usesArgumentValueConversion
+                ? applicable.ToArray()
+                : applicable.Where(item => item.Score == bestScore).ToArray();
+            if (best.Length == 1)
+                return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+
+            if (isBetterArgumentConversionTarget != null
+                || isBetterNullConversionTarget != null
+                && argumentTypes.Any(type => string.Equals(
+                    TypeIdentity.Canonicalize(type), "NULL", StringComparison.Ordinal)))
+            {
+                var undominated = best
+                    .Where(candidate => !best.Any(other =>
+                        !ReferenceEquals(candidate.Function, other.Function)
+                        && IsBetterConversionCandidate(
+                            other,
+                            candidate,
+                            argumentTypes.Count,
+                            IsBetterArgumentTarget)))
+                    .ToArray();
+                if (undominated.Length != 0 && undominated.Length < best.Length)
+                {
+                    best = undominated;
+                    if (best.Length == 1)
+                    {
+                        return OverloadResolutionResult.Resolved(
+                            best[0].Function,
+                            best[0].ReturnType,
+                            best[0].Arguments);
+                    }
+                }
+            }
+
+            if (usesArgumentValueConversion)
+            {
+                best = best.Where(candidate => !best.Any(other => other.Score < candidate.Score
+                    && candidate.Arguments.Select(argument => TypeIdentity.Canonicalize(argument.ParameterType))
+                        .SequenceEqual(other.Arguments.Select(argument =>
+                            TypeIdentity.Canonicalize(argument.ParameterType))))).ToArray();
+                if (best.Length == 1)
+                    return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+            }
+
+            best = best.Where(candidate => candidate.Function.GenericArity == 0
+                || !best.Any(other => other.Function.GenericArity == 0
+                    && HaveEquivalentParameterShapes(other, candidate))).ToArray();
+            if (best.Length == 1)
+                return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+
+            var concreteNullableStringGroups = best
+                .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
+                .GroupBy(item => item.Function.SignatureKey, StringComparer.Ordinal)
+                .Where(group =>
+                {
+                    var candidates = group.Select(item => item.Function).ToArray();
+                    return candidates
+                        .Skip(1)
+                        .All(candidate => candidates
+                            .Where(other => !ReferenceEquals(other, candidate))
+                            .All(other => AreMutuallyExclusiveAlternatives(candidate, other)));
+                })
+                .Select(group => group.ToArray())
+                .ToArray();
+            if (concreteNullableStringGroups.Length == 1)
+            {
+                var selected = concreteNullableStringGroups[0];
+                var selectedFunctions = selected.Select(item => item.Function).ToHashSet();
+                if (best.Where(item => !selectedFunctions.Contains(item.Function))
+                    .All(item => item.Function.GenericArity > 0))
+                {
+                    if (selected.Length == 1)
+                    {
+                        return OverloadResolutionResult.Resolved(
+                            selected[0].Function,
+                            selected[0].ReturnType,
+                            selected[0].Arguments);
+                    }
+
+                    var alternativeReturnTypes = selected
+                        .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray();
+                    return OverloadResolutionResult.ResolvedAlternatives(
+                        selected.Select(item => item.Function).ToArray(),
+                        alternativeReturnTypes.Length == 1
+                            ? alternativeReturnTypes[0]
+                            : "OBJECT",
+                        selected.Select(item =>
+                                new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                            .ToArray());
+                }
+            }
+
+            var bestFunctions = best.Select(item => item.Function).ToArray();
+            if (bestFunctions
+                .Skip(1)
+                .All(candidate =>
+                    string.Equals(
+                        candidate.SignatureKey,
+                        bestFunctions[0].SignatureKey,
+                        StringComparison.Ordinal)
+                    && bestFunctions
+                        .Where(other => !ReferenceEquals(other, candidate))
+                        .All(other => AreMutuallyExclusiveAlternatives(candidate, other))))
+            {
+                var alternativeReturnTypes = best
                     .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
                     .Distinct(StringComparer.Ordinal)
                     .ToArray();
                 return OverloadResolutionResult.ResolvedAlternatives(
-                    selected.Select(item => item.Function).ToArray(),
+                    bestFunctions,
                     alternativeReturnTypes.Length == 1
                         ? alternativeReturnTypes[0]
                         : "OBJECT",
-                    selected.Select(item =>
-                            new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                    best.Select(item => new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
                         .ToArray());
             }
+
+            return OverloadResolutionResult.Ambiguous(bestFunctions);
         }
 
-        var bestFunctions = best.Select(item => item.Function).ToArray();
-        if (bestFunctions
-            .Skip(1)
-            .All(candidate =>
-                string.Equals(
-                    candidate.SignatureKey,
-                    bestFunctions[0].SignatureKey,
-                    StringComparison.Ordinal)
-                && bestFunctions
-                    .Where(other => !ReferenceEquals(other, candidate))
-                    .All(other => AreMutuallyExclusiveAlternatives(candidate, other))))
+        bool IsBetterArgumentTarget(int index, string candidateType, string otherType)
         {
-            var alternativeReturnTypes = best
-                .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-            return OverloadResolutionResult.ResolvedAlternatives(
-                bestFunctions,
-                alternativeReturnTypes.Length == 1
-                    ? alternativeReturnTypes[0]
-                    : "OBJECT",
-                best.Select(item => new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
-                    .ToArray());
-        }
+            if (TypeIdentity.Canonicalize(argumentTypes[index]) == "NULL")
+                return isBetterNullConversionTarget?.Invoke(candidateType, otherType) == true;
+            if (isBetterArgumentConversionTarget?.Invoke(index, candidateType, otherType) == true)
+                return true;
+            if (!usesArgumentValueConversion
+                || isBetterArgumentConversionTarget?.Invoke(index, otherType, candidateType) == true)
+                return false;
 
-        return OverloadResolutionResult.Ambiguous(bestFunctions);
+            var candidateCost = argumentConversionCost?.Invoke(index, candidateType, argumentTypes[index]);
+            var otherCost = argumentConversionCost?.Invoke(index, otherType, argumentTypes[index]);
+            return candidateCost is { } cost && otherCost is { } alternativeCost && cost < alternativeCost;
+        }
     }
 
-    private static bool IsBetterNullConversionCandidate(
-        (FunctionSymbol Function, string ReturnType, int Score,
-            bool UsesNullableStringCompatibility,
-            IReadOnlyList<ResolvedArgumentMapping> Arguments) candidate,
-        (FunctionSymbol Function, string ReturnType, int Score,
-            bool UsesNullableStringCompatibility,
-            IReadOnlyList<ResolvedArgumentMapping> Arguments) other,
-        IReadOnlyList<string> argumentTypes,
-        Func<string, string, bool> isBetterNullConversionTarget)
+    /// <summary>
+    /// C#'s better function member: the winner is better than every other applicable
+    /// candidate, where P is better than Q when no argument converts worse to P than to Q and
+    /// at least one converts better. <paramref name="compare"/> answers +1 (better), -1
+    /// (worse), 0 (neither) or null (unknown) per argument. Candidates with equivalent
+    /// parameter types go through C#'s first tie-breakers. With no winner the call is
+    /// ambiguous only when no candidate's status was left unknown.
+    /// </summary>
+    private static (IReadOnlyList<ApplicableOverload> Winners, bool IsAmbiguous) ResolveExactOverload(
+        IReadOnlyList<ApplicableOverload> applicable, int argumentCount, Func<int, string, string, int?> compare)
+    {
+        bool? Better(ApplicableOverload candidate, ApplicableOverload other)
+        {
+            var anyBetter = false;
+            var anyUnknown = false;
+            var equivalent = true;
+            for (var index = 0; index < argumentCount; index++)
+            {
+                var candidateType = candidate.Arguments[index].ParameterType;
+                var otherType = other.Arguments[index].ParameterType;
+                if (TypeIdentity.Canonicalize(candidateType) == TypeIdentity.Canonicalize(otherType))
+                    continue;
+                equivalent = false;
+                var result = compare(index, candidateType, otherType);
+                if (result is null)
+                    anyUnknown = true;
+                else if (result < 0)
+                    return false;
+                else if (result > 0)
+                    anyBetter = true;
+            }
+            if (!equivalent)
+                return anyUnknown ? null : anyBetter;
+            // Equivalent parameter types: C#'s first tie-breakers. A non-generic member is
+            // better than a generic one, normal form better than expanded `params`, and a call
+            // that supplies every parameter better than one that relies on a default. Later
+            // tie-breakers (more specific types, ref kinds) are not modeled: unknown.
+            if ((candidate.Function.GenericArity == 0) != (other.Function.GenericArity == 0))
+                return candidate.Function.GenericArity == 0;
+            if (candidate.UsesExpandedParams != other.UsesExpandedParams)
+                return !candidate.UsesExpandedParams;
+            if (!candidate.UsesExpandedParams && OmitsDefault(candidate) != OmitsDefault(other))
+                return !OmitsDefault(candidate);
+            return null;
+        }
+
+        static bool OmitsDefault(ApplicableOverload overload) =>
+            overload.Function.Parameters.Count
+                > overload.Arguments.Select(argument => argument.ParameterIndex).Distinct().Count();
+
+        if (applicable.Any(candidate => candidate.Arguments.Count != argumentCount
+                || candidate.Arguments.Select((argument, index) => argument.ArgumentIndex != index).Any(moved => moved)))
+            return ([], false);
+
+        // `#if` alternatives with one signature are one candidate: only one exists in any
+        // configuration, so they never compete with each other.
+        bool Alternatives(ApplicableOverload left, ApplicableOverload right) =>
+            AreMutuallyExclusiveAlternatives(left.Function, right.Function)
+            && left.Arguments.Count == right.Arguments.Count
+            && left.Arguments.Zip(right.Arguments).All(pair =>
+                TypeIdentity.Canonicalize(pair.First.ParameterType) == TypeIdentity.Canonicalize(pair.Second.ParameterType));
+
+        var winners = new List<ApplicableOverload>();
+        var anyUndecided = false;
+        foreach (var candidate in applicable)
+        {
+            var status = (bool?)true;
+            foreach (var other in applicable)
+            {
+                if (ReferenceEquals(candidate, other) || Alternatives(candidate, other))
+                    continue;
+                var better = Better(candidate, other);
+                if (better == false)
+                {
+                    status = false;
+                    break;
+                }
+                if (better is null)
+                    status = null;
+            }
+            if (status == true)
+                winners.Add(candidate);
+            else if (status is null)
+                anyUndecided = true;
+        }
+
+        if (winners.Count == 1 || winners.Count > 1
+            && winners.All(left => winners.All(right => ReferenceEquals(left, right) || Alternatives(left, right))))
+            return (winners, false);
+        if (winners.Count > 1)
+            return ([], false);
+        // No winner and every comparison known: C# reports the call ambiguous too (a pair whose
+        // comparison is unknown would need to be the winner's, and none could win anyway).
+        return ([], !anyUndecided);
+    }
+
+    private sealed record ApplicableOverload(
+        FunctionSymbol Function,
+        string ReturnType,
+        int Score,
+        bool UsesNullableStringCompatibility,
+        IReadOnlyList<ResolvedArgumentMapping> Arguments,
+        IReadOnlyList<string> ParameterTypes,
+        bool UsesExpandedParams);
+
+    private static bool HaveEquivalentParameterShapes(
+        ApplicableOverload left,
+        ApplicableOverload right)
+    {
+        if (left.UsesExpandedParams != right.UsesExpandedParams
+            || !left.ParameterTypes.SequenceEqual(right.ParameterTypes, StringComparer.Ordinal))
+            return false;
+
+        const ParameterModifier byReference = ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In;
+        if (!left.Function.Parameters.Select(parameter => parameter.Modifier & byReference)
+            .SequenceEqual(right.Function.Parameters.Select(parameter => parameter.Modifier & byReference)))
+            return false;
+
+        return left.Arguments.Zip(right.Arguments).All(pair =>
+            pair.First.IsExpandedParams == pair.Second.IsExpandedParams
+            && string.Equals(
+                TypeIdentity.Canonicalize(pair.First.ParameterType),
+                TypeIdentity.Canonicalize(pair.Second.ParameterType),
+                StringComparison.Ordinal));
+    }
+
+    private static bool IsBetterConversionCandidate(
+        ApplicableOverload candidate,
+        ApplicableOverload other,
+        int argumentCount,
+        Func<int, string, string, bool> isBetterConversionTarget)
     {
         var strictlyBetter = false;
-        for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
+        for (var argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++)
         {
             var candidateType = candidate.Arguments[argumentIndex].ParameterType;
             var otherType = other.Arguments[argumentIndex].ParameterType;
-            if (!string.Equals(
-                    TypeIdentity.Canonicalize(argumentTypes[argumentIndex]),
-                    "NULL",
-                    StringComparison.Ordinal))
-            {
-                if (!string.Equals(
-                        TypeIdentity.Canonicalize(candidateType),
-                        TypeIdentity.Canonicalize(otherType),
-                        StringComparison.Ordinal))
-                    return false;
-                continue;
-            }
-
             if (string.Equals(
                     TypeIdentity.Canonicalize(candidateType),
                     TypeIdentity.Canonicalize(otherType),
                     StringComparison.Ordinal))
                 continue;
-            if (!isBetterNullConversionTarget(candidateType, otherType))
+            if (!isBetterConversionTarget(argumentIndex, candidateType, otherType))
                 return false;
             strictlyBetter = true;
         }
@@ -1995,15 +2434,24 @@ public sealed class Scope
         IReadOnlyList<string>? typeArguments,
         Func<string, string, int?>? implicitConversionCost,
         bool allowNullableStringCompatibility,
+        Func<FunctionSymbol, string, string>? resolveParameterType,
+        Func<int, string, string, int?>? argumentConversionCost,
         out string resolvedReturnType,
         out int score,
         out bool usesNullableStringCompatibility,
-        out IReadOnlyList<ResolvedArgumentMapping> mappedArguments)
+        out IReadOnlyList<ResolvedArgumentMapping> mappedArguments,
+        out IReadOnlyList<string> substitutedParameterTypes,
+        out bool usesExpandedParams,
+        Func<string, string, bool>? isConversionModeled,
+        out bool unmodeledRejection)
     {
+        unmodeledRejection = false;
         resolvedReturnType = function.ReturnType;
         score = int.MaxValue;
         usesNullableStringCompatibility = false;
         mappedArguments = Array.Empty<ResolvedArgumentMapping>();
+        substitutedParameterTypes = Array.Empty<string>();
+        usesExpandedParams = false;
 
         if (typeArguments != null && function.GenericArity != typeArguments.Count)
             return false;
@@ -2043,6 +2491,7 @@ public sealed class Scope
                     matches = false;
                     break;
                 }
+                parameterType = resolveParameterType?.Invoke(function, parameterType) ?? parameterType;
                 parameterTypes[argumentIndex] = parameterType;
 
                 if (TypeIdentity.TryUnify(
@@ -2066,11 +2515,15 @@ public sealed class Scope
                 var resolvedParameterType = substitutions.Count == 0
                     ? parameterType
                     : TypeIdentity.Substitute(parameterType, substitutions);
-                var conversionCost = implicitConversionCost?.Invoke(
-                    resolvedParameterType,
-                    argumentTypes[argumentIndex]);
+                var conversionCost = argumentConversionCost != null
+                    && (parameter.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) == 0
+                        ? argumentConversionCost(argumentIndex, resolvedParameterType, argumentTypes[argumentIndex])
+                        : implicitConversionCost?.Invoke(resolvedParameterType, argumentTypes[argumentIndex]);
                 if (conversionCost == null)
                 {
+                    // Rejected at a conversion this binder may not model: C# might accept it.
+                    unmodeledRejection |= isConversionModeled != null
+                        && !isConversionModeled(resolvedParameterType, argumentTypes[argumentIndex]);
                     matches = false;
                     break;
                 }
@@ -2078,21 +2531,24 @@ public sealed class Scope
                 conversionScore += conversionCost.Value;
             }
 
-            if (!matches
-                || function.TypeParameters.Any(typeParameter => !substitutions.ContainsKey(typeParameter)))
+            if (matches && function.TypeParameters.Any(typeParameter => !substitutions.ContainsKey(typeParameter)))
             {
+                // Type inference this binder did not complete is not a C# rejection.
+                unmodeledRejection |= isConversionModeled != null;
                 continue;
             }
-
-            var candidateScore =
-                (mapping.UsesParams ? mapping.UsesExpandedParams ? 200 : 100 : 0)
-                + mapping.OmittedOptionalCount * 10
-                + conversionScore;
-            if (candidateScore >= score)
+            if (!matches)
                 continue;
 
-            score = candidateScore;
+            score =
+                (mapping.UsesExpandedParams ? 200 : 0)
+                + mapping.OmittedOptionalCount * 10
+                + conversionScore;
             usesNullableStringCompatibility = mappingUsesNullableStringCompatibility;
+            usesExpandedParams = mapping.UsesExpandedParams;
+            substitutedParameterTypes = function.Parameters
+                .Select(parameter => TypeIdentity.Substitute(parameter.TypeName, substitutions))
+                .ToArray();
             resolvedReturnType = substitutions.Count == 0
                 ? function.ReturnType
                 : TypeIdentity.Substitute(function.ReturnType, substitutions);
@@ -2104,9 +2560,12 @@ public sealed class Scope
                         ? parameterTypes[argumentIndex]
                         : TypeIdentity.Substitute(parameterTypes[argumentIndex], substitutions),
                     mapping.ExpandedParams[argumentIndex])).ToArray();
+            // MapArguments yields normal form first; expansion is only applicable
+            // when the declaration cannot accept this call in normal form.
+            return true;
         }
 
-        return score != int.MaxValue;
+        return false;
     }
 
     internal static bool HasNullableStringAnnotationDifference(string parameterType, string argumentType)
@@ -2136,14 +2595,13 @@ public sealed class Scope
 
     private static bool IsSupportedStringContainer(string name) =>
         name[(name.LastIndexOf('.') + 1)..] is
-            "OPTION" or "Option" or "List" or "IList" or "IEnumerable"
+            "List" or "IList" or "IEnumerable"
             or "IReadOnlyList" or "ICollection" or "IReadOnlyCollection";
 
     private sealed record ArgumentMapping(
         int[] ParameterMap,
         bool[] ExpandedParams,
         int OmittedOptionalCount,
-        bool UsesParams,
         bool UsesExpandedParams);
 
     private static IEnumerable<ArgumentMapping> MapArguments(
@@ -2264,7 +2722,6 @@ public sealed class Scope
                 parameterMap,
                 expandedParams,
                 omittedOptionalCount,
-                UsesParams: false,
                 UsesExpandedParams: false);
             yield break;
         }
@@ -2277,7 +2734,6 @@ public sealed class Scope
                 (int[])parameterMap.Clone(),
                 normalExpanded,
                 omittedOptionalCount,
-                UsesParams: true,
                 UsesExpandedParams: false);
         }
 
@@ -2285,7 +2741,6 @@ public sealed class Scope
             parameterMap,
             expandedParams,
             omittedOptionalCount,
-            UsesParams: true,
             UsesExpandedParams: !namedParamsAssigned
                 && (positionalParamsArguments.Count != 1
                     || expandedParams.Any(value => value)));
@@ -2294,6 +2749,8 @@ public sealed class Scope
     private static string? GetParamsElementType(string typeName)
     {
         var type = typeName.Trim();
+        if (AttributeHelper.TryUnwrapNullableAnnotation(type, out var referent))
+            type = referent.Trim();
         if (type.StartsWith('[') && type.EndsWith(']') && type.Length > 2)
             return type[1..^1].Trim();
         if (type.EndsWith("[]", StringComparison.Ordinal) && type.Length > 2)

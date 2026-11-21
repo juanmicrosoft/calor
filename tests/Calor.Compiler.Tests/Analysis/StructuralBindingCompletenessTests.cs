@@ -179,11 +179,10 @@ public sealed class StructuralBindingCompletenessTests
             Bind(
                 new NullCoalesceNode(
                     Span,
-                    new NoneExpressionNode(Span, "i32"),
+                    new ReferenceNode(Span, "null"),
                     new IntLiteralNode(Span, 0)),
                 out _));
-        // Runtime None<T> is an Option value, not a nullable T operand.
-        Assert.Equal("OBJECT", coalesce.Type.DisplayString);
+        Assert.Equal("INT", coalesce.Type.DisplayString);
 
         var match = new MatchExpressionNode(
             Span,
@@ -273,7 +272,7 @@ public sealed class StructuralBindingCompletenessTests
     [Fact]
     public void GeneralTraversal_ReachesDivisionInsideStructuralWrapper()
     {
-        var expression = new SomeExpressionNode(
+        var expression = new ThrowExpressionNode(
             Span,
             new ArrayCreationNode(
                 Span,
@@ -409,8 +408,13 @@ public sealed class StructuralBindingCompletenessTests
         public override void Accept(IAstVisitor visitor) =>
             throw new NotSupportedException();
 
+        // 0.30: binding emits the module once to build its source-dispatch proof context
+        // (CallGraphAnalysis.ResolveOperatorCalls). Give that emitter an opaque C#
+        // operand so the binder's own unsupported-node handling is what gets tested.
         public override T Accept<T>(IAstVisitor<T> visitor) =>
-            throw new NotSupportedException();
+            visitor is Calor.Compiler.CodeGen.CSharpEmitter
+                ? (T)(object)"default"
+                : throw new NotSupportedException();
     }
 
     [Fact]

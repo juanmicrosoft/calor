@@ -1,5 +1,8 @@
 using System.Reflection;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3.Cache;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -19,15 +22,15 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void InheritedGuards_ExecuteAtEveryNestingDepth(int depth, bool verify)
     {
         var implementation = """
-            §CL{c1:Inner:pub}
-              §IMPL{IPositive}
-              §MT{mt1:Get:pub} (i32:value) -> i32
-                §E{}
-                §R (? (== value INT:13) INT:-1 value)
+            class Inner public
+              implements IPositive
+              func Get public (int:value) → int
+                !
+                return value == 13 ? -1 : value
             """;
         for (var level = depth - 1; level >= 0; level--)
-            implementation = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(implementation);
-        var source = "§M{m1:NestedContracts}\n" + Indent(PositiveInterface)
+            implementation = $"class Outer{level} public\n" + Indent(implementation);
+        var source = "module NestedContracts NestedContracts block\n" + Indent(NativePositiveInterface)
             + "\n" + Indent(implementation);
         var assembly = Compile(source, verify);
         var typeName = "NestedContracts." + string.Concat(
@@ -41,24 +44,25 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void NestedClassAndInterfaceChains_ResolveInTheirDeclarationScopes(bool verify)
     {
         var source = """
-            §M{m1:NestedContracts}
-              §CL{c0:Outer:pub}
-                §IFACE{i1:IPositive}
-                  §MT{im1:Get} (i32:x) -> i32
-                    §Q (> x INT:0)
-                    §S (> result INT:0)
-                §IFACE{i2:IChild}
-                  §EXT{IPositive}
-                §CL{c1:Base:pub:abs}
-                  §IMPL{IChild}
-                  §MT{bm1:Get:pub:abs} (i32:x) -> i32
-                    §E{}
-                §CL{c2:Middle:pub}
-                  §CL{c3:Inner:pub}
-                    §EXT{Base}
-                    §MT{mt1:Get:pub:over} (i32:value) -> i32
-                      §E{}
-                      §R (? (== value INT:13) INT:-1 value)
+            module NestedContracts NestedContracts block
+              class Outer public
+                interface IPositive
+                  func Get (int:x) → int
+                    !
+                    requires x > 0
+                    => result > 0
+                interface IChild
+                  extends IPositive
+                class Base public abstract
+                  implements IChild
+                  func Get public abstract (int:x) → int
+                    !
+                class Middle public
+                  class Inner public
+                    extends Base
+                    func Get public override (int:value) → int
+                      !
+                      return value == 13 ? -1 : value
             """;
         AssertGuards(Compile(source, verify).GetType("NestedContracts.Outer+Middle+Inner")!,
             1, -1, 13);
@@ -70,22 +74,23 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void SameNamedNestedTypes_DoNotShareContracts(bool verify)
     {
         var positive = """
-            §CL{c1:Positive:pub}
-              §IFACE{i1:IValue}
-                §MT{im1:Get} (i32:x) -> i32
-                  §Q (> x INT:0)
-                  §S (> result INT:0)
-              §CL{c2:Inner:pub}
-                §IMPL{IValue}
-                §MT{mt1:Get:pub} (i32:x) -> i32
-                  §E{}
-                  §R x
+            class Positive public
+              interface IValue
+                func Get (int:x) → int
+                  !
+                  requires x > 0
+                  => result > 0
+              class Inner public
+                implements IValue
+                func Get public (int:x) → int
+                  !
+                  return x
             """;
         var negative = positive.Replace("Positive", "Negative")
             .Replace("c1", "c3").Replace("c2", "c4")
             .Replace("i1", "i2").Replace("im1", "im2").Replace("mt1", "mt2")
-            .Replace("(> ", "(< ");
-        var assembly = Compile("§M{m1:NestedContracts}\n" + Indent(positive)
+            .Replace(" > ", " < ");
+        var assembly = Compile("module NestedContracts NestedContracts block\n" + Indent(positive)
             + "\n" + Indent(negative), verify);
         AssertGuards(assembly.GetType("NestedContracts.Positive+Inner")!, 1, -1);
         AssertGuards(assembly.GetType("NestedContracts.Negative+Inner")!, -1, 1);
@@ -97,14 +102,14 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void ExplicitNestedInterfaceNames_ResolveWithoutLosingGuards(string method)
     {
         var source = """
-            §M{m1:NestedContracts}
-              §CL{c1:Outer:pub}
-            """ + "\n" + Indent(Indent(PositiveInterface)) + "\n" + Indent(Indent($$"""
-            §CL{c2:Inner:pub}
-              §IMPL{IPositive}
-              §MT{mt1:{{method}}:pub} (i32:value) -> i32
-                §E{}
-                §R value
+            module NestedContracts NestedContracts block
+              class Outer
+            """ + "\n" + Indent(Indent(NativePositiveInterface)) + "\n" + Indent(Indent($$"""
+            class Inner
+              implements IPositive
+              func {{method}} (int:value) → int
+                !
+                return value
             """));
         AssertGuards(Compile(source, false).GetType("NestedContracts.Outer+Inner")!, 1, -1);
     }
@@ -115,19 +120,21 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void ClassHeader_DoesNotBindToItsOwnNestedInterface(bool verify)
     {
         const string source = """
-            §M{m1:NestedContracts}
-              §IFACE{i1:IValue}
-                §MT{im1:Get} (i32:x) -> i32
-                  §Q (> x INT:0)
-              §CL{c1:Outer:pub}
-                §CL{c2:Inner:pub}
-                  §IMPL{IValue}
-                  §IFACE{i2:IValue}
-                    §MT{im2:Get} (i32:x) -> i32
-                      §Q (< x INT:0)
-                  §MT{mt1:Get:pub} (i32:value) -> i32
-                    §E{}
-                    §R value
+            module NestedContracts NestedContracts block
+              interface IValue
+                func Get (int:x) → int
+                  !
+                  requires x > 0
+              class Outer public
+                class Inner public
+                  implements IValue
+                  interface IValue
+                    func Get (int:x) → int
+                      !
+                      requires x < 0
+                  func Get public (int:value) → int
+                    !
+                    return value
             """;
         var assembly = Compile(source, verify);
         var type = assembly.GetType("NestedContracts.Outer+Inner")!;
@@ -141,19 +148,20 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void EnclosingBaseClass_ContributesInheritedNestedInterfaces(bool verify)
     {
         const string source = """
-            §M{m1:NestedContracts}
-              §CL{c1:Base:pub}
-                §IFACE{i1:IPositive}
-                  §MT{im1:Get} (i32:x) -> i32
-                    §Q (> x INT:0)
-                    §S (> result INT:0)
-              §CL{c2:Outer:pub}
-                §EXT{Base}
-                §CL{c3:Inner:pub}
-                  §IMPL{IPositive}
-                  §MT{mt1:Get:pub} (i32:value) -> i32
-                    §E{}
-                    §R (? (== value INT:13) INT:-1 value)
+            module NestedContracts NestedContracts block
+              class Base public
+                interface IPositive
+                  func Get (int:x) → int
+                    !
+                    requires x > 0
+                    => result > 0
+              class Outer public
+                extends Base
+                class Inner public
+                  implements IPositive
+                  func Get public (int:value) → int
+                    !
+                    return value == 13 ? -1 : value
             """;
         var assembly = Compile(source, verify);
         var type = assembly.GetType("NestedContracts.Outer+Inner")!;
@@ -167,26 +175,28 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void ConstructedEnclosingType_PreservesContractsAndTypeSubstitutions(bool verify)
     {
         const string source = """
-            §M{m1:NestedContracts}
-              §CL{c1:Outer:pub}<T>
-                §IFACE{i1:IPositive}
-                  §MT{im1:Get} (i32:x) -> i32
-                    §Q (> x INT:0)
-                    §S (> result INT:0)
-                §IFACE{i2:IValue}
-                  §MT{im2:Check} (object:x) -> object
-                    §Q (is x T)
-                    §S (is result T)
-              §CL{c2:Inner:pub}
-                §IMPL{Outer<i32>.IPositive}
-                §MT{mt1:Get:pub} (i32:value) -> i32
-                  §E{}
-                  §R (? (== value INT:13) INT:-1 value)
-              §CL{c3:Typed:pub}
-                §IMPL{Outer<i32>.IValue}
-                §MT{mt2:Check:pub} (object:value) -> object
-                  §E{}
-                  §R value
+            module NestedContracts NestedContracts block
+              class Outer<T> public
+                interface IPositive
+                  func Get (int:x) → int
+                    !
+                    requires x > 0
+                    => result > 0
+                interface IValue
+                  func Check (object:x) → object
+                    !
+                    requires x is T
+                    => result is T
+              class Inner public
+                implements Outer<int>.IPositive
+                func Get public (int:value) → int
+                  !
+                  return value == 13 ? -1 : value
+              class Typed public
+                implements Outer<int>.IValue
+                func Check public (object:value) → object
+                  !
+                  return value
             """;
         var assembly = Compile(source, verify);
         AssertGuards(assembly.GetType("NestedContracts.Inner")!, 1, -1, 13);
@@ -204,21 +214,22 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void GenericEnclosingArity_DistinguishesOtherwiseIdenticalNestedTypes(bool verify)
     {
         const string positive = """
-            §CL{c1:Outer:pub}
-              §IFACE{i1:IValue}
-                §MT{im1:Get} (i32:x) -> i32
-                  §Q (> x INT:0)
-                  §S (> result INT:0)
-              §CL{c2:Inner:pub}
-                §IMPL{IValue}
-                §MT{mt1:Get:pub} (i32:x) -> i32
-                  §E{}
-                  §R x
+            class Outer public
+              interface IValue
+                func Get (int:x) → int
+                  !
+                  requires x > 0
+                  => result > 0
+              class Inner public
+                implements IValue
+                func Get public (int:x) → int
+                  !
+                  return x
             """;
-        var negative = positive.Replace("§CL{c1:Outer:pub}", "§CL{c3:Outer:pub}<T>")
+        var negative = positive.Replace("class Outer public", "class Outer<T> public")
             .Replace("c2", "c4").Replace("i1", "i2")
-            .Replace("im1", "im2").Replace("mt1", "mt2").Replace("(> ", "(< ");
-        var assembly = Compile("§M{m1:NestedContracts}\n" + Indent(positive)
+            .Replace("im1", "im2").Replace("mt1", "mt2").Replace(" > ", " < ");
+        var assembly = Compile("module NestedContracts NestedContracts block\n" + Indent(positive)
             + "\n" + Indent(negative), verify);
         AssertGuards(assembly.GetType("NestedContracts.Outer+Inner")!, 1, -1);
         AssertGuards(assembly.GetType("NestedContracts.Outer`1+Inner")!.MakeGenericType(typeof(int)),
@@ -230,20 +241,21 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void QualifiedGenericArguments_StayInTheCallersLexicalScope(bool verify)
     {
-        foreach (var contracts in new[] { "§Q (is x U)", "§S (is result U)", "§Q (is x U)\n§S (is result U)" })
+        foreach (var contracts in new[] { "requires x is U", "=> result is U", "requires x is U\n=> result is U" })
         foreach (var outerParameter in new[] { "T", "V" })
         {
             var source = $$"""
-                §M{m1:NestedContracts}
-                  §CL{c1:Outer:pub}<{{outerParameter}}>
-                    §IFACE{i1:IValue}<U>
-                      §MT{im1:Check} (object:x) -> object
+                module NestedContracts NestedContracts block
+                  class Outer<{{outerParameter}}> public
+                    interface IValue<U>
+                      func Check (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
-                  §CL{c2:Impl:pub}<T>
-                    §IMPL{Outer<i32>.IValue<T>}
-                    §MT{mt1:Check:pub} (object:value) -> object
-                      §E{}
-                      §R value
+                  class Impl<T> public
+                    implements Outer<int>.IValue<T>
+                    func Check public (object:value) → object
+                      !
+                      return value
                 """;
             var assembly = Compile(source, verify);
             var type = assembly.GetType("NestedContracts.Impl`1")!.MakeGenericType(typeof(string));
@@ -261,35 +273,36 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void InheritedPredicateTypes_KeepTheDeclaringScope(bool verify)
     {
-        foreach (var contracts in new[] { "§Q (is x Marker)", "§S (is result Marker)", "§Q (is x Marker)\n§S (is result Marker)" })
+        foreach (var contracts in new[] { "requires x is Marker", "=> result is Marker", "requires x is Marker\n=> result is Marker" })
         foreach (var generic in new[] { false, true })
         {
             var source = $$"""
-                §M{m1:NestedContracts}
-                  §CL{c1:Outer:pub}
-                    §CL{c2:Marker:pub}
-                      §MT{mm1:Tag:pub} () -> i32
-                        §E{}
-                        §R INT:1
-                    §IFACE{i1:IValue}
-                      §MT{im1:Check} (object:x) -> object
+                module NestedContracts NestedContracts block
+                  class Outer public
+                    class Marker public
+                      func Tag public () → int
+                        !
+                        return 1
+                    interface IValue
+                      func Check (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
-                  §CL{c3:Marker:pub}
-                    §MT{mm2:Tag:pub} () -> i32
-                      §E{}
-                      §R INT:2
-                  §CL{c4:Impl:pub}
-                    §IMPL{Outer.IValue}
-                    §MT{mt1:Check:pub} (object:value) -> object
-                      §E{}
-                      §R value
+                  class Marker public
+                    func Tag public () → int
+                      !
+                      return 2
+                  class Impl public
+                    implements Outer.IValue
+                    func Check public (object:value) → object
+                      !
+                      return value
                 """;
             if (generic)
             {
-                source = source.Replace("§CL{c1:Outer:pub}", "§CL{c1:Outer:pub}<T>")
-                    .Replace("§CL{c2:Marker:pub}", "§CL{c2:Marker:pub}<T>")
-                    .Replace("Outer.IValue", "Outer<i32>.IValue")
-                    .Replace(" Marker)", " Marker<str>)");
+                source = source.Replace("class Outer public", "class Outer<T> public")
+                    .Replace("    class Marker public", "    class Marker<T> public")
+                    .Replace("Outer.IValue", "Outer<int>.IValue")
+                    .Replace(" is Marker", " is Marker<string>");
             }
             var assembly = Compile(source, verify);
             var type = assembly.GetType("NestedContracts.Impl")!;
@@ -311,31 +324,32 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void ConstructedPredicateArguments_PreserveNamedTypeScope(bool verify)
     {
-        foreach (var contracts in new[] { "§Q (is x Box<Marker>)", "§S (is result Box<Marker>)", "§Q (is x Box<Marker>)\n§S (is result Box<Marker>)" })
+        foreach (var contracts in new[] { "requires x is Box<Marker>", "=> result is Box<Marker>", "requires x is Box<Marker>\n=> result is Box<Marker>" })
         {
             var source = $$"""
-                §M{m1:NestedContracts}
-                  §CL{c1:Outer:pub}
-                    §CL{c2:Marker:pub}
-                      §MT{mm1:Tag:pub} () -> i32
-                        §E{}
-                        §R INT:1
-                    §CL{c3:Box:pub}<T>
-                      §MT{mm2:Tag:pub} () -> i32
-                        §E{}
-                        §R INT:2
-                    §IFACE{i1:IValue}
-                      §MT{im1:Check} (object:x) -> object
+                module NestedContracts NestedContracts block
+                  class Outer public
+                    class Marker public
+                      func Tag public () → int
+                        !
+                        return 1
+                    class Box<T> public
+                      func Tag public () → int
+                        !
+                        return 2
+                    interface IValue
+                      func Check (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts))))}}
-                  §CL{c4:Marker:pub}
-                    §MT{mm3:Tag:pub} () -> i32
-                      §E{}
-                      §R INT:3
-                  §CL{c5:Impl:pub}
-                    §IMPL{Outer.IValue}
-                    §MT{mt1:Check:pub} (object:value) -> object
-                      §E{}
-                      §R value
+                  class Marker public
+                    func Tag public () → int
+                      !
+                      return 3
+                  class Impl public
+                    implements Outer.IValue
+                    func Check public (object:value) → object
+                      !
+                      return value
                 """;
             var assembly = Compile(source, verify);
             var box = assembly.GetType("NestedContracts.Outer+Box`1")!;
@@ -343,9 +357,9 @@ public sealed class NestedContractInheritanceRuntimeTests
             var invalid = Activator.CreateInstance(box.MakeGenericType(assembly.GetType("NestedContracts.Marker")!));
             AssertObjectGuard(assembly.GetType("NestedContracts.Impl")!, valid, invalid);
 
-            var headerScoped = source.Replace("§CL{c1:Outer:pub}", "§CL{c1:Outer:pub}<V>")
+            var headerScoped = source.Replace("class Outer public", "class Outer<V> public")
                 .Replace("Box<Marker>", "Box<V>")
-                .Replace("§IMPL{Outer.IValue}", "§IMPL{Outer<Marker>.IValue}\n    §CL{c6:Marker:pub}\n      §MT{mm4:Tag:pub} () -> i32\n        §E{}\n        §R INT:4");
+                .Replace("implements Outer.IValue", "implements Outer<Marker>.IValue\n    class Marker public\n      func Tag public () → int\n        !\n        return 4");
             assembly = Compile(headerScoped, verify);
             var outerMarker = assembly.GetType("NestedContracts.Marker")!;
             var innerMarker = assembly.GetType("NestedContracts.Impl+Marker")!;
@@ -361,24 +375,25 @@ public sealed class NestedContractInheritanceRuntimeTests
     [InlineData(true)]
     public void ConstructedPredicateArguments_RespectMethodGenericRenaming(bool verify)
     {
-        foreach (var contracts in new[] { "§Q (is x Box<T>)", "§S (is result Box<T>)", "§Q (is x Box<T>)\n§S (is result Box<T>)" })
+        foreach (var contracts in new[] { "requires x is Box<T>", "=> result is Box<T>", "requires x is Box<T>\n=> result is Box<T>" })
         foreach (var parameter in new[] { "T", "W" })
         {
             var source = $$"""
-                §M{m1:NestedContracts}
-                  §CL{c1:Outer:pub}<T>
-                    §CL{c2:Box:pub}<U>
-                      §MT{mm1:Tag:pub} () -> i32
-                        §E{}
-                        §R INT:1
-                    §IFACE{i1:IValue}
-                      §MT{im1:Check}<{{parameter}}> (object:x) -> object
+                module NestedContracts NestedContracts block
+                  class Outer<T> public
+                    class Box<U> public
+                      func Tag public () → int
+                        !
+                        return 1
+                    interface IValue
+                      func Check<{{parameter}}> (object:x) → object
+                        !
                 {{Indent(Indent(Indent(Indent(contracts.Replace("Box<T>", $"Box<{parameter}>")))))}}
-                  §CL{c3:Impl:pub}
-                    §IMPL{Outer<i32>.IValue}
-                    §MT{mt1:Check:pub}<V> (object:value) -> object
-                      §E{}
-                      §R value
+                  class Impl public
+                    implements Outer<int>.IValue
+                    func Check<V> public (object:value) → object
+                      !
+                      return value
                 """;
             var assembly = Compile(source, verify);
             var type = assembly.GetType("NestedContracts.Impl")!;
@@ -409,39 +424,40 @@ public sealed class NestedContractInheritanceRuntimeTests
     {
         foreach (var depth in new[] { 0, 1, 2 })
         foreach (var path in new[] { "interface", "base", "interface-base" })
-        foreach (var contracts in new[] { "§Q (!= x null)", "§S (!= result null)", "§Q (!= x null)\n§S (!= result null)" })
+        foreach (var contracts in new[] { "requires x != null", "=> result != null", "requires x != null\n=> result != null" })
         foreach (var parameterType in new[] { "Marker", "object" })
         {
             var declarations = """
-                §CL{c1:Marker:pub}
-                  §MT{mm1:Tag:pub} () -> i32
-                    §E{}
-                    §R INT:1
+                class Marker public
+                  func Tag public () → int
+                    !
+                    return 1
                 """;
             if (path != "base")
             {
                 declarations += "\n" + """
-                    §IFACE{i1:IValue}<T>
-                      §MT{im1:Check} (T:x) -> T
+                    interface IValue<T>
+                      func Check (T:x) → T
+                        !
                     """ + "\n" + Indent(Indent(contracts));
             }
             if (path != "interface")
             {
-                declarations += "\n" + "§CL{c2:Base:pub:abs}<T>\n"
-                    + (path == "interface-base" ? "  §IMPL{IValue<T>}\n" : "")
-                    + "  §MT{mt1:Check:pub:abs} (T:x) -> T\n    §E{}"
+                declarations += "\n" + "class Base<T> public abstract\n"
+                    + (path == "interface-base" ? "  implements IValue<T>\n" : "")
+                    + "  func Check public abstract (T:x) → T\n    !"
                     + (path == "base" ? "\n" + Indent(Indent(contracts)) : "");
             }
             declarations += "\n" + $$"""
-                §CL{c3:Impl:pub}
-                  {{(path == "interface" ? $"§IMPL{{IValue<{parameterType}>}}" : $"§EXT{{Base<{parameterType}>}}")}}
-                  §MT{mt2:Check:pub{{(path == "interface" ? "" : ":over")}}} ({{parameterType}}:value) -> {{parameterType}}
-                    §E{}
-                    §R value
+                class Impl public
+                  {{(path == "interface" ? $"implements IValue<{parameterType}>" : $"extends Base<{parameterType}>")}}
+                  func Check public{{(path == "interface" ? "" : " override")}} ({{parameterType}}:value) → {{parameterType}}
+                    !
+                    return value
                 """;
             for (var level = depth - 1; level >= 0; level--)
-                declarations = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(declarations);
-            var assembly = Compile("§M{m1:NestedContracts}\n" + Indent(declarations), verify);
+                declarations = $"class Outer{level} public\n" + Indent(declarations);
+            var assembly = Compile("module NestedContracts NestedContracts block\n" + Indent(declarations), verify);
             var prefix = "NestedContracts." + string.Concat(
                 Enumerable.Range(0, depth).Select(level => $"Outer{level}+"));
             var instance = Activator.CreateInstance(assembly.GetType(prefix + "Marker")!);
@@ -455,16 +471,17 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void SignatureSubstitution_DoesNotCaptureCallerClassParametersAsMethodParameters(bool verify)
     {
         const string source = """
-            §M{m1:NestedContracts}
-              §IFACE{i1:IValue}<U>
-                §MT{im1:Check}<T> (U:x) -> U
-                  §Q (!= x null)
-                  §S (!= result null)
-              §CL{c1:Impl:pub}<T>
-                §IMPL{IValue<T>}
-                §MT{mt1:Check:pub}<V> (T:value) -> T
-                  §E{}
-                  §R value
+            module NestedContracts NestedContracts block
+              interface IValue<U>
+                func Check<T> (U:x) → U
+                  !
+                  requires x != null
+                  => result != null
+              class Impl<T> public
+                implements IValue<T>
+                func Check<V> public (T:value) → T
+                  !
+                  return value
             """;
         var assembly = Compile(source, verify);
         var type = assembly.GetType("NestedContracts.Impl`1")!.MakeGenericType(typeof(string));
@@ -484,40 +501,40 @@ public sealed class NestedContractInheritanceRuntimeTests
         foreach (var path in new[] { "interface", "base", "interface-base" })
         foreach (var mode in new[] { "pre", "post", "both" })
         foreach (var shape in new[] { "[T]", "T[]", "(T,i32)", "(T[,],i32)", "?T",
-                     "Result<T,str>", "Result<(T,i32),str>", "List<T[]>[,]", "List<T>[,]", "List<T[]>[]" })
+                     "List<T[]>[,]", "List<T>[,]", "List<T[]>[]" })
         {
-            var predicate = shape.StartsWith('(') ? "(!= x.Item1 null)"
-                : shape.StartsWith("Result", StringComparison.Ordinal) ? "x.IsOk" : "(!= x null)";
+            var predicate = shape.StartsWith('(') ? "x.Item1 != null" : "x != null";
             var contracts = string.Join("\n", new[]
             {
-                mode != "post" ? "§Q " + predicate : null,
-                mode != "pre" ? "§S " + predicate.Replace("x", "result") : null
+                mode != "post" ? "requires " + predicate : null,
+                mode != "pre" ? "=> " + predicate.Replace("x", "result") : null
             }.Where(line => line != null));
+            var surfaceShape = TypeMapper.ToSurfaceType(shape);
             var declarations = "";
             if (path != "base")
             {
-                declarations = $"§IFACE{{i1:IValue}}\n  §MT{{im1:Check}}<T> ({shape}:x) -> {shape}\n    §WHERE T : class\n"
+                declarations = $"interface IValue\n  func Check<T> ({surfaceShape}:x) → {surfaceShape}\n    !\n    where T : class\n"
                     + Indent(Indent(contracts));
             }
             if (path != "interface")
             {
-                declarations += "\n§CL{c1:Base:pub:abs}\n"
-                    + (path == "interface-base" ? "  §IMPL{IValue}\n" : "")
-                    + $"  §MT{{mt1:Check:pub:abs}}<T> ({shape}:x) -> {shape}\n    §WHERE T : class\n    §E{{}}"
+                declarations += "\nclass Base public abstract\n"
+                    + (path == "interface-base" ? "  implements IValue\n" : "")
+                    + $"  func Check<T> public abstract ({surfaceShape}:x) → {surfaceShape}\n    where T : class\n    !"
                     + (path == "base" ? "\n" + Indent(Indent(contracts)) : "");
             }
-            var implementationShape = shape.Replace("T", "U");
+            var implementationShape = surfaceShape.Replace("T", "U");
             declarations += "\n" + $$"""
-                §CL{c2:Impl:pub}
-                  {{(path == "interface" ? "§IMPL{IValue}" : "§EXT{Base}")}}
-                  §MT{mt2:Check:pub{{(path == "interface" ? "" : ":over")}}}<U> ({{implementationShape}}:value) -> {{implementationShape}}
-                    §WHERE U : class
-                    §E{}
-                    §R value
+                class Impl public
+                  {{(path == "interface" ? "implements IValue" : "extends Base")}}
+                  func Check<U> public{{(path == "interface" ? "" : " override")}} ({{implementationShape}}:value) → {{implementationShape}}
+                    where U : class
+                    !
+                    return value
                 """;
             for (var level = depth - 1; level >= 0; level--)
-                declarations = $"§CL{{outer{level}:Outer{level}:pub}}\n" + Indent(declarations);
-            var assembly = Compile("§M{m1:NestedContracts}\n" + Indent(declarations), verify);
+                declarations = $"class Outer{level} public\n" + Indent(declarations);
+            var assembly = Compile("module NestedContracts NestedContracts block\n" + Indent(declarations), verify);
             var name = "NestedContracts." + string.Concat(
                 Enumerable.Range(0, depth).Select(level => $"Outer{level}+")) + "Impl";
             var type = assembly.GetType(name)!;
@@ -528,8 +545,6 @@ public sealed class NestedContractInheritanceRuntimeTests
                 "(T,i32)" => ("valid", 1),
                 "(T[,],i32)" => (new string[1, 1], 1),
                 "?T" => "valid",
-                "Result<T,str>" => Calor.Runtime.Result<string, string>.Ok("valid"),
-                "Result<(T,i32),str>" => Calor.Runtime.Result<(string, int), string>.Ok(("valid", 1)),
                 "List<T[]>[,]" => new List<string[]>[1, 1],
                 "List<T>[,]" => new List<string>[1, 1],
                 "List<T[]>[]" => new List<string[]>[1],
@@ -539,8 +554,6 @@ public sealed class NestedContractInheritanceRuntimeTests
             {
                 "(T,i32)" => ((string?)null, 1),
                 "(T[,],i32)" => ((string[,]?)null, 1),
-                "Result<T,str>" => Calor.Runtime.Result<string, string>.Err("invalid"),
-                "Result<(T,i32),str>" => Calor.Runtime.Result<(string, int), string>.Err("invalid"),
                 _ => null
             };
             Assert.Equal(valid, method.Invoke(instance, [valid]));
@@ -559,44 +572,47 @@ public sealed class NestedContractInheritanceRuntimeTests
         {
             var namespacePrefix = moduleName == "_global" ? "" : moduleName + ".";
             var source = $$"""
-                §M{m1:{{moduleName}}}
-                  §CL{c1:Outer:pub}
-                    §IFACE{i1:IValue}
-                      §MT{im1:Check} (object:x) -> object
-                        §Q (!= x null)
-                        §S (!= result null)
-                    §CL{c2:Impl:pub}
-                      §IMPL{ {{(global ? "global::" : "")}}{{namespacePrefix}}Outer.IValue }
-                      §MT{mt1:Check:pub} (object:value) -> object
-                        §E{}
-                        §R value
+                module NestedContracts {{(moduleName == "_global" ? "" : moduleName + " block")}}
+                  class Outer public
+                    interface IValue
+                      func Check (object:x) → object
+                        !
+                        requires x != null
+                        => result != null
+                    class Impl public
+                      implements {{(global ? "global::" : "")}}{{namespacePrefix}}Outer.IValue
+                      func Check public (object:value) → object
+                        !
+                        return value
                 """;
             var assembly = Compile(source, verify);
             AssertObjectGuard(assembly.GetType(namespacePrefix + "Outer+Impl")!, "valid", null);
         }
 
         const string shadowed = """
-            §M{m1:Scope}
-              §CL{c1:Outer:pub}
-                §IFACE{i1:IValue}
-                  §MT{im1:Get} (i32:x) -> i32
-                    §Q (> x INT:0)
-              §CL{c2:Container:pub}
-                §CL{c3:Scope:pub}
-                  §CL{c4:Outer:pub}
-                    §IFACE{i2:IValue}
-                      §MT{im2:Get} (i32:x) -> i32
-                        §Q (< x INT:0)
-                §CL{c5:Relative:pub}
-                  §IMPL{Scope.Outer.IValue}
-                  §MT{mt1:Get:pub} (i32:x) -> i32
-                    §E{}
-                    §R x
-                §CL{c6:Absolute:pub}
-                  §IMPL{global::Scope.Outer.IValue}
-                  §MT{mt2:Get:pub} (i32:x) -> i32
-                    §E{}
-                    §R x
+            module Scope Scope block
+              class Outer public
+                interface IValue
+                  func Get (int:x) → int
+                    !
+                    requires x > 0
+              class Container public
+                class Scope public
+                  class Outer public
+                    interface IValue
+                      func Get (int:x) → int
+                        !
+                        requires x < 0
+                class Relative public
+                  implements Scope.Outer.IValue
+                  func Get public (int:x) → int
+                    !
+                    return x
+                class Absolute public
+                  implements global::Scope.Outer.IValue
+                  func Get public (int:x) → int
+                    !
+                    return x
             """;
         var shadowAssembly = Compile(shadowed, verify);
         AssertGuards(shadowAssembly.GetType("Scope.Container+Relative")!, -1, 1);
@@ -611,19 +627,20 @@ public sealed class NestedContractInheritanceRuntimeTests
         foreach (var reference in new[] { "Outer.IValue", "Leaf.Outer.IValue",
                      "Deep.Leaf.Outer.IValue", "N.Deep.Leaf.Outer.IValue",
                      "global::N.Deep.Leaf.Outer.IValue" })
-        foreach (var contract in new[] { "§Q (> x INT:0)", "§S (> result INT:0)" })
+        foreach (var contract in new[] { "requires x > 0", "=> result > 0" })
         {
             var source = $$"""
-                §M{m1:N.Deep.Leaf}
-                  §CL{c1:Outer:pub}
-                    §IFACE{i1:IValue}
-                      §MT{im1:Get} (i32:x) -> i32
+                module NestedContracts N.Deep.Leaf block
+                  class Outer public
+                    interface IValue
+                      func Get (int:x) → int
+                        !
                         {{contract}}
-                    §CL{c2:Impl:pub}
-                      §IMPL{ {{reference}} }
-                      §MT{mt1:Get:pub} (i32:x) -> i32
-                        §E{}
-                        §R x
+                    class Impl public
+                      implements {{reference}}
+                      func Get public (int:x) → int
+                        !
+                        return x
                 """;
             AssertGuards(Compile(source, verify).GetType("N.Deep.Leaf.Outer+Impl")!, 1, -1);
         }
@@ -635,31 +652,32 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void InheritedStaticMemberPredicates_KeepSourceScope(bool verify)
     {
         foreach (var depth in new[] { 0, 1, 2 })
-        foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
+        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
         {
             var implementation = """
-                §CL{c4:Impl:pub}
-                  §IMPL{Outer.IValue}
-                  §MT{mt1:Get:pub} (i32:value) -> i32
-                    §E{}
-                    §R value
+                class Impl public
+                  implements Outer.IValue
+                  func Get public (int:value) → int
+                    !
+                    return value
                 """;
             var typeName = "Scope.";
             for (var level = 0; level < depth; level++)
             {
-                implementation = $"§CL{{c{5 + level}:Container{level}:pub}}\n" + Indent(implementation);
+                implementation = $"class Container{level} public\n" + Indent(implementation);
                 typeName = "Scope." + $"Container{level}+" + typeName["Scope.".Length..];
             }
             var source = $$"""
-                §M{m1:Scope}
-                  §CL{c1:Outer:pub}
-                    §CL{c2:Limits:pub}
-                      §FLD{i32:Min:pub:stat} INT:0
-                    §IFACE{i1:IValue}
-                      §MT{im1:Get} (i32:x) -> i32
+                module Scope Scope block
+                  class Outer public
+                    class Limits public
+                      field int:Min public static = 0
+                    interface IValue
+                      func Get (int:x) → int
+                        !
                         {{contract}}
-                  §CL{c3:Limits:pub}
-                    §FLD{i32:Min:pub:stat} INT:-10
+                  class Limits public
+                    field int:Min public static = -10
                 {{Indent(implementation)}}
                 """;
             AssertGuards(Compile(source, verify).GetType(typeName + "Impl")!, 1, -1, -11);
@@ -668,20 +686,21 @@ public sealed class NestedContractInheritanceRuntimeTests
         foreach (var parameter in new[] { "Limits", "value" })
         {
             var source = $$"""
-                §M{m1:Scope}
-                  §CL{c1:Outer:pub}
-                    §CL{c2:Limits:pub}
-                      §FLD{i32:Min:pub:stat} INT:-10
-                    §IFACE{i1:IValue}
-                      §MT{im1:Check} (Payload:Limits) -> i32
-                        §Q (> Limits.Min INT:0)
-                  §CL{c3:Payload:pub}
-                    §FLD{i32:Min:pub} INT:0
-                  §CL{c4:Impl:pub}
-                    §IMPL{Outer.IValue}
-                    §MT{mt1:Check:pub} (Payload:{{parameter}}) -> i32
-                      §E{}
-                      §R {{parameter}}.Min
+                module Scope Scope block
+                  class Outer public
+                    class Limits public
+                      field int:Min public static = -10
+                    interface IValue
+                      func Check (Payload:Limits) → int
+                        !
+                        requires Limits.Min > 0
+                  class Payload public
+                    field int:Min public = 0
+                  class Impl public
+                    implements Outer.IValue
+                    func Check public (Payload:{{parameter}}) → int
+                      !
+                      return {{parameter}}.Min
                 """;
             var assembly = Compile(source, verify);
             var payload = Activator.CreateInstance(assembly.GetType("Scope.Payload")!)!;
@@ -703,28 +722,29 @@ public sealed class NestedContractInheritanceRuntimeTests
     {
         foreach (var predicate in new[]
                  {
-                     "(? (is x Payload Limits) (> Limits.Min INT:0) BOOL:false)",
-                     "(? (! (is x Payload Limits)) BOOL:false (> Limits.Min INT:0))",
-                     "(-> (is x Payload Limits) (> Limits.Min INT:0))"
+                     "x is Payload Limits ? Limits.Min > 0 : false",
+                     "!(x is Payload Limits) ? false : Limits.Min > 0",
+                     "!(x is Payload Limits) || Limits.Min > 0"
                  })
         foreach (var post in new[] { false, true })
         {
-            var contract = post ? "§S " + predicate.Replace("is x", "is result") : "§Q " + predicate;
+            var contract = post ? "=> " + predicate.Replace("x is", "result is") : "requires " + predicate;
             var source = $$"""
-                §M{m1:Scope}
-                  §CL{c1:Outer:pub}
-                    §CL{c2:Limits:pub}
-                      §FLD{i32:Min:pub:stat} INT:10
-                    §IFACE{i1:IValue}
-                      §MT{im1:Check} (object:x) -> object
+                module Scope Scope block
+                  class Outer public
+                    class Limits public
+                      field int:Min public static = 10
+                    interface IValue
+                      func Check (object:x) → object
+                        !
                         {{contract}}
-                  §CL{c3:Payload:pub}
-                    §FLD{i32:Min:pub} INT:0
-                  §CL{c4:Impl:pub}
-                    §IMPL{Outer.IValue}
-                    §MT{mt1:Check:pub} (object:value) -> object
-                      §E{}
-                      §R value
+                  class Payload public
+                    field int:Min public = 0
+                  class Impl public
+                    implements Outer.IValue
+                    func Check public (object:value) → object
+                      !
+                      return value
                 """;
             var assembly = Compile(source, verify);
             var payloadType = assembly.GetType("Scope.Payload")!;
@@ -742,29 +762,29 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void SourceFieldReceivers_RemainValuesInInheritedGuards(bool verify)
     {
         foreach (var inheritedField in new[] { false, true })
-        foreach (var contract in new[] { "§Q (> Limits.Min INT:0)", "§S (> Limits.Min INT:0)" })
+        foreach (var contract in new[] { "requires Limits.Min > 0", "=> Limits.Min > 0" })
         {
             var source = $$"""
-                §M{m1:Scope}
-                  §CL{c1:Outer:pub}
-                    §CL{c2:Limits:pub}
-                      §FLD{i32:Min:pub:stat} INT:10
-                    §CL{c3:Storage:pub}
-                      §FLD{Payload:Limits:pub}
-                    §CL{c4:Base:pub}
-                      {{(inheritedField ? "§EXT{Storage}" : "§FLD{Payload:Limits:pub}")}}
-                      §MT{mt1:Get:pub:virt} (i32:x) -> i32
-                        §E{}
+                module Scope Scope block
+                  class Outer public
+                    class Limits public
+                      field int:Min public static = 10
+                    class Storage public
+                      field Payload:Limits public
+                    class Base public
+                      {{(inheritedField ? "extends Storage" : "field Payload:Limits public")}}
+                      func Get public virtual (int:x) → int
+                        !
                         {{contract}}
-                        §R x
-                  §CL{c5:Payload:pub}
-                    §FLD{i32:Min:pub} INT:0
-                  §CL{c6:Container:pub}
-                    §CL{c7:Impl:pub}
-                      §EXT{Outer.Base}
-                      §MT{mt2:Get:pub:over} (i32:value) -> i32
-                        §E{}
-                        §R value
+                        return x
+                  class Payload public
+                    field int:Min public = 0
+                  class Container public
+                    class Impl public
+                      extends Outer.Base
+                      func Get public override (int:value) → int
+                        !
+                        return value
                 """;
             var assembly = Compile(source, verify);
             foreach (var typeName in new[] { "Scope.Outer+Base", "Scope.Container+Impl" })
@@ -789,33 +809,33 @@ public sealed class NestedContractInheritanceRuntimeTests
     {
         foreach (var outerField in new[] { false, true })
         foreach (var inheritedType in new[] { false, true })
-        foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
+        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
         {
             const string limits = """
-                §CL{c3:Limits:pub}
-                  §FLD{i32:Min:pub:stat} INT:0
+                class Limits public
+                  field int:Min public static = 0
                 """;
             var declarations = inheritedType
-                ? "§CL{c2:Storage:pub}\n" + Indent(limits) + "\n§CL{c4:Base:pub}\n  §EXT{Storage}"
-                : "§CL{c4:Base:pub}\n" + Indent(limits);
+                ? "class Storage public\n" + Indent(limits) + "\nclass Base public\n  extends Storage"
+                : "class Base public\n" + Indent(limits);
             declarations += "\n" + Indent($$"""
-                §MT{mt1:Get:pub:virt} (i32:x) -> i32
-                  §E{}
+                func Get public virtual (int:x) → int
+                  !
                   {{contract}}
-                  §R x
+                  return x
                 """);
             var source = $$"""
-                §M{m1:Scope}
-                  §CL{c1:Outer:pub}
-                {{(outerField ? "    §FLD{i32:Limits:pub:stat} INT:10\n" : "")}}{{Indent(Indent(declarations))}}
-                  §CL{c5:Container:pub}
-                    §CL{c6:Impl:pub}
-                      §EXT{Outer.Base}
-                      §CL{c7:Limits:pub}
-                        §FLD{i32:Min:pub:stat} INT:-10
-                      §MT{mt2:Get:pub:over} (i32:value) -> i32
-                        §E{}
-                        §R value
+                module Scope Scope block
+                  class Outer public
+                {{(outerField ? "    field int:Limits public static = 10\n" : "")}}{{Indent(Indent(declarations))}}
+                  class Container public
+                    class Impl public
+                      extends Outer.Base
+                      class Limits public
+                        field int:Min public static = -10
+                      func Get public override (int:value) → int
+                        !
+                        return value
                 """;
             var assembly = Compile(source, verify);
             AssertGuards(assembly.GetType("Scope.Outer+Base")!, 1, -1, -11);
@@ -830,42 +850,42 @@ public sealed class NestedContractInheritanceRuntimeTests
     {
         foreach (var inheritedShadow in new[] { "none", "parameter", "private-type" })
         foreach (var nestedName in new[] { "Limits", "Other" })
-        foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
+        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
         {
             var source = $$"""
-                §M{m1:Scope}
-                  §CL{c1:Limits:pub}
-                    §FLD{i32:Min:pub:stat} INT:-10
-                  §CL{c2:Payload:pub}
-                    §FLD{i32:Min:pub} INT:0
-                  §CL{c3:Outer:pub}
-                    §FLD{Payload:Limits:pub:stat}
-                    §CL{c7:Storage:pub}<{{(inheritedShadow == "parameter" ? nestedName : "T")}}>
-                      §MT{mt4:Tag:pub} () -> i32
-                        §E{}
-                        §R INT:1
-                {{(inheritedShadow == "private-type" ? $"      §CL{{c8:{nestedName}:pri}}\n        §FLD{{i32:Min:pub:stat}} INT:-20" : "")}}
-                    §CL{c4:Base:pub}
-                      §EXT{Storage<i32>}
-                      §CL{c5:{{nestedName}}:pub}<T>
-                        §MT{mt1:Tag:pub} () -> i32
-                          §E{}
-                          §R INT:1
-                      §MT{mt2:Get:pub:virt} (i32:x) -> i32
-                        §E{}
+                module Scope Scope block
+                  class Limits public
+                    field int:Min public static = -10
+                  class Payload public
+                    field int:Min public = 0
+                  class Outer public
+                    field Payload:Limits public static
+                    class Storage<{{(inheritedShadow == "parameter" ? nestedName : "T")}}> public
+                      func Tag public () → int
+                        !
+                        return 1
+                {{(inheritedShadow == "private-type" ? $"      class {nestedName} private\n        field int:Min public static = -20" : "")}}
+                    class Base public
+                      extends Storage<int>
+                      class {{nestedName}}<T> public
+                        func Tag public () → int
+                          !
+                          return 1
+                      func Get public virtual (int:x) → int
+                        !
                         {{contract}}
-                        §R x
-                    §CL{c6:Impl:pub}
-                      §EXT{Base}
-                      §MT{mt3:Get:pub:over} (i32:value) -> i32
-                        §E{}
-                        §R value
-                  §CL{c9:Container:pub}
-                    §CL{c10:Impl:pub}
-                      §EXT{Outer.Base}
-                      §MT{mt5:Get:pub:over} (i32:value) -> i32
-                        §E{}
-                        §R value
+                        return x
+                    class Impl public
+                      extends Base
+                      func Get public override (int:value) → int
+                        !
+                        return value
+                  class Container public
+                    class Impl public
+                      extends Outer.Base
+                      func Get public override (int:value) → int
+                        !
+                        return value
                 """;
             var assembly = Compile(source, verify);
             assembly.GetType("Scope.Outer")!.GetField("Limits")!.SetValue(null,
@@ -882,31 +902,71 @@ public sealed class NestedContractInheritanceRuntimeTests
     public void InaccessibleInheritedTypes_DoNotHideLexicalTypes(bool verify)
     {
         foreach (var privateName in new[] { "Limits", "Other" })
-        foreach (var contract in new[] { "§Q (> x Limits.Min)", "§S (> result Limits.Min)" })
+        foreach (var contract in new[] { "requires x > Limits.Min", "=> result > Limits.Min" })
         {
             var source = $$"""
-                §M{m1:Scope}
-                  §CL{c1:Limits:pub}
-                    §FLD{i32:Min:pub:stat} INT:0
-                  §CL{c2:Storage:pub}
-                    §CL{c3:{{privateName}}:pri}
-                      §FLD{i32:Min:pub:stat} INT:-10
-                  §CL{c4:Outer:pub}
-                    §CL{c5:Base:pub}
-                      §EXT{Storage}
-                      §MT{mt1:Get:pub:virt} (i32:x) -> i32
-                        §E{}
+                module Scope Scope block
+                  class Limits public
+                    field int:Min public static = 0
+                  class Storage public
+                    class {{privateName}} private
+                      field int:Min public static = -10
+                  class Outer public
+                    class Base public
+                      extends Storage
+                      func Get public virtual (int:x) → int
+                        !
                         {{contract}}
-                        §R x
-                    §CL{c6:Impl:pub}
-                      §EXT{Base}
-                      §MT{mt2:Get:pub:over} (i32:value) -> i32
-                        §E{}
-                        §R value
+                        return x
+                    class Impl public
+                      extends Base
+                      func Get public override (int:value) → int
+                        !
+                        return value
                 """;
             var assembly = Compile(source, verify);
             AssertGuards(assembly.GetType("Scope.Outer+Base")!, 1, -1);
             AssertGuards(assembly.GetType("Scope.Outer+Impl")!, 1, -1);
+        }
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("", true)]
+    [InlineData("N.Deep", false)]
+    [InlineData("N.Deep", true)]
+    public void NativeNamespaceIdentity_IsIndependentOfTheModuleLabel(string ns, bool verify)
+    {
+        var prefix = ns.Length == 0 ? "" : ns + ".";
+        var source = $$"""
+            module Wrapper{{(ns.Length == 0 ? "" : " " + ns + " block")}}
+              class Outer public
+                interface IValue
+                  func Get (int:x) → int
+                    !
+                    requires x > 0
+                    => result > 0
+                class Impl public
+                  implements global::{{prefix}}Outer.IValue
+                  func Get public (int:value) → int
+                    !
+                    return value == 13 ? -1 : value
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var implementation = Assert.Single(Assert.Single(module.Classes).NestedClasses);
+        var method = Assert.Single(implementation.Methods);
+        Assert.NotNull(method.Effects);
+        Assert.Empty(method.Effects.Effects);
+        Assert.Null(method.Output!.Row);
+        foreach (var input in new[] { source, new CalorEmitter().Emit(module) })
+        {
+            var assembly = Compile(input, verify);
+            var type = assembly.GetType(prefix + "Outer+Impl")!;
+            Assert.Equal(assembly.GetType(prefix + "Outer+IValue"), Assert.Single(type.GetInterfaces()));
+            AssertGuards(type, 1, -1, 13);
+            Assert.Null(assembly.GetType("Wrapper.Outer"));
         }
     }
 
@@ -949,10 +1009,11 @@ public sealed class NestedContractInheritanceRuntimeTests
     private static string Indent(string source) =>
         string.Join("\n", source.Split('\n').Select(line => "  " + line));
 
-    private const string PositiveInterface = """
-        §IFACE{i1:IPositive}
-          §MT{im1:Get} (i32:x) -> i32
-            §Q (> x INT:0)
-            §S (> result INT:0)
+    private const string NativePositiveInterface = """
+        interface IPositive
+          func Get (int:x) → int
+            !
+            requires x > 0
+            => result > 0
         """;
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Commands;
 using Xunit;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
@@ -39,11 +40,11 @@ namespace Calor.Compiler.Tests;
 /// recomputed here — reads that E2, E3 and E4 all shipped; the own-goal flag
 /// requires an <c>ownGoalArtifact</c> that exists.</para>
 ///
-/// <para>Regenerate with <c>CALOR_REGENERATE_PPE1_LEDGER=1 dotnet test
-/// --filter EffectRowsProbeLedger</c> — and only in the PR that names what
-/// moved. The failure message below says the same thing, because the one
-/// mistake A-1.11.1 was written to correct was a baseline quietly regenerated
-/// to whatever the compiler happened to emit.</para>
+/// <para>The exact historical pin runs the original test and compiler from the
+/// recorded commit in an isolated source archive. Current-compiler semantic
+/// replay uses separate active fixtures; it must never assemble translated
+/// measurements under the historical compiler identity. See
+/// <c>scripts/ppe1_historical_replay.py</c>. Regeneration is forbidden.</para>
 /// </summary>
 public sealed class EffectRowsProbeLedgerTests
 {
@@ -117,59 +118,14 @@ public sealed class EffectRowsProbeLedgerTests
     /// recorded (booleans re-derived), verdict derived — see the class summary.
     /// </summary>
     [Fact]
-    public void PpE1LedgerMatchesRecomputation()
+    [Trait("Category", "HistoricalReplay")]
+    public async Task PpE1LedgerMatchesRecomputation()
     {
-        var measurement = Measure();
-
-        if (Regenerate())
-        {
-            // Recorded judgement fields survive a regeneration; a fresh ledger
-            // starts with none of them set.
-            var previous = File.Exists(LedgerPath())
-                ? JsonSerializer.Deserialize<PpE1Ledger>(File.ReadAllText(LedgerPath()), JsonOptions)
-                : null;
-            var regenerated = Assemble(measurement, HeadSha(), AnalysisPath(),
-                previous?.Routes.D.Fires ?? false, previous?.Routes.D.CutCitation,
-                previous?.Routes.OwnGoal ?? false, previous?.Routes.OwnGoalArtifact);
-            File.WriteAllText(LedgerPath(), Serialize(regenerated));
-            AssertRecordedFieldsAreNotFree(regenerated);
-            return;
-        }
-
-        Assert.True(File.Exists(LedgerPath()),
-            $"PP-E1 ledger missing: {LedgerPath()}. It is the instrument annex A-1.11 registers; "
-            + $"generate it in a PR that says so with {RegenerateEnvVar}=1.");
-
-        var actualText = File.ReadAllText(LedgerPath()).Replace("\r\n", "\n", StringComparison.Ordinal);
-        var recorded = JsonSerializer.Deserialize<PpE1Ledger>(actualText, JsonOptions);
-        Assert.NotNull(recorded);
-
-        AssertCommitSha(recorded!.MeasuredCommit);
-        var recomputed = Assemble(measurement, recorded.MeasuredCommit, AnalysisPath(),
-            recorded.Routes.D.Fires, recorded.Routes.D.CutCitation,
-            recorded.Routes.OwnGoal, recorded.Routes.OwnGoalArtifact);
-        var expectedText = Serialize(recomputed);
-
-        // The named cause first (review round 2, minor e): a leg-B boolean the
-        // numbers do not imply, or a free route (d), is what the adjudicator
-        // must read — not the generic first-differing-line diff.
-        AssertRecordedFieldsAreNotFree(recomputed);
-
-        var moved = DescribeWhatMoved(recorded, recomputed);
-        if (expectedText != actualText)
-        {
-            var (lineNumber, expectedLine, actualLine) = FirstDifferingLine(expectedText, actualText);
-            moved.Add($"first differing line {lineNumber}:\n      ledger:      {actualLine}\n      recomputed:  {expectedLine}");
-        }
-
-        Assert.True(moved.Count == 0,
-            "PP-E1's ledger (bench/phase0-agent-native/effect-rows-probe-ledger.json) no longer "
-            + "matches its recomputation. Something moved:\n  " + string.Join("\n  ", moved)
-            + "\nThis ledger is the instrument annex A-1.11 registers, adjudicated at the 0.15.0 "
-            + "release commit. Do NOT regenerate it silently: a cell that stopped detecting, a "
-            + "control that drew a new diagnostic, or a verdict that changed is a finding to be "
-            + "published with the change that caused it. Regenerate only in a PR that names what "
-            + $"moved and why ({RegenerateEnvVar}=1 dotnet test --filter EffectRowsProbeLedger).");
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "ppe1_historical_replay.py")],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Pinned historical PP-E1 replay failed (exit {result.ExitCode}).\n{result.Output}");
     }
 
     /// <summary>
@@ -615,53 +571,6 @@ public sealed class EffectRowsProbeLedgerTests
         }
 
         return new Measurement(controls, mutants);
-    }
-
-    // --------------------------------------------------------------- assembly
-
-    private static PpE1Ledger Assemble(Measurement m, string measuredCommit, string analysisPath,
-        bool recordedRouteDFires, PpE1CutCitation? recordedCutCitation,
-        bool recordedOwnGoal, string? recordedOwnGoalArtifact)
-    {
-        var control = AssembleControl(m);
-        var (rampFired, rampVerdict) = ReadRamp();
-        var legA = AssembleLegA(m, rampFired, rampVerdict);
-        var legB = ReadLegB(analysisPath);
-        var routes = AssembleRoutes(m, legA, legB, recordedRouteDFires, recordedCutCitation,
-            recordedOwnGoal, recordedOwnGoalArtifact);
-        var (verdict, reason) = ComputeVerdict(control.Clean, legA, routes, legB);
-
-        return new PpE1Ledger(
-            SchemaVersion,
-            "PP-E1",
-            "docs/plans/agent-native-gates.md §A.2 row PP-E1 + §A.3 entry A-1.11 (2026-08-25); "
-            + "leg-A negative control re-frozen by sub-entry A-1.11.1 (2026-08-26)",
-            measuredCommit,
-            "dotnet <calor.dll> -i <source> -o <scratch>; no flags (--permissive-effects and any "
-            + "manifest outside the built-in set are forbidden); diagnostics sorted by "
-            + "(line, column, code, severity, text) under LC_ALL=C",
-            "leg A recomputed by EffectRowsProbeLedgerTests.PpE1LedgerMatchesRecomputation (each "
-            + "frozen diff re-applied to the frozen fixture, compiled with the pinned invocation, codes "
-            + "and declarations compared); negative control, routes (a)/(b) and the ramp state recomputed; "
-            + "leg B recorded, with only its arithmetic recomputed by bench/phase0-agent-native/ppe1-analyze.py "
-            + "from the archived per-run result.json files, and its fails/underpowered booleans re-derived "
-            + "here from the recorded point/bound/CV; route (d) and the own-goal flag recorded, but bound to "
-            + "a cut citation / an artifact and to the recomputed mechanical evidence; verdict derived from "
-            + "the frozen outcome map",
-            "a cell is detected iff the registered code appears at the registered declaration; "
-            + "L6-MAP/L6-MATCH must name the laundered effect 'cw' and L6-MID must name the "
-            + "instantiation; L7 requires Calor0425 specifically, rising above the unmutated fixture's "
-            + "count at that declaration; a different code at the registered declaration counts as "
-            + "detected-with-code-drift only if it is in the drift set, and is published by name",
-            DriftSet,
-            NeverDetection,
-            control,
-            legA,
-            routes,
-            legB,
-            "NOT-ADJUDICATED > MISS > UNDERPOWERED > HIT",
-            verdict,
-            reason);
     }
 
     private static PpE1Control AssembleControl(Measurement m)

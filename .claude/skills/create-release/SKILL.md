@@ -3,9 +3,10 @@ name: create-release
 description: >-
     Prepare and hand off a Calor release: bump the version in Directory.Build.props (and the
     website's version pins), write the `## [X.Y.Z]` CHANGELOG section, open and merge the release
-    PR, then have the maintainer dispatch publish-nuget.yml from main, first with dry_run: true
-    and then for real. The workflow, not this skill, pushes the packages, creates the tag and the
-    GitHub release, and dispatches the website. Afterwards, confirm both packages on nuget.org.
+    PR, then have the maintainer dispatch publish-nuget.yml once from main, review its immutable
+    candidate summary, and approve promotion in nuget-release. The workflow pushes the validated
+    packages, creates the tag and GitHub release, and deploys the validated site. Afterwards,
+    confirm both packages on nuget.org.
     Use when the user asks to "cut a release", "create a release", "ship a version",
     "release vX.Y.Z", or "do a release".
 allowed-tools: Bash, Read, Write, Edit
@@ -25,7 +26,7 @@ What this skill does, and what it does not:
 - It bumps the version, writes the CHANGELOG section, and opens and merges the release PR.
 - It does **not** create the tag or the GitHub release, and it never runs `gh release create`.
   `publish-nuget.yml` creates both, after the packages are on nuget.org and the installed tool
-  passed its check. A release made by hand publishes nothing. `release-audit.yml` runs when a
+  passed its check. The site is deployed from the same immutable bundle. A release made by hand publishes nothing. `release-audit.yml` runs when a
   release is created or published by a person (releases that `publish-nuget.yml` creates with
   `GITHUB_TOKEN` raise no event) and fails unless the tag commit is on `main` and nuget.org already serves both
   packages at that version; it cannot tell who created the release or check its notes.
@@ -105,82 +106,73 @@ git checkout main && git pull
 Merging publishes nothing. The commit that `main` points at when the maintainer dispatches is the
 release candidate. Anything merged after that is not in the release.
 
-## 4. The maintainer dispatches publish-nuget.yml
+## 4. Dispatch once, review the candidate, then approve promotion
 
-`publish-nuget.yml` has two inputs, and only `workflow_dispatch` triggers it:
-
-| Input | Type | Meaning |
-|---|---|---|
-| `version` | string, required | Must equal `<Version>` in `Directory.Build.props` on `main`. It is checked, never used as an override. |
-| `dry_run` | boolean, default `false` | Run every check and pack, then stop before the `publish` job. |
-
-There is no `--prerelease` input or flag. The workflow derives it: a `0.x` version or a `-suffix`
-version becomes a prerelease.
-
-**First a dry run**, then, if it is green, the real run:
+Only the maintainer dispatches, and only with explicit authorization in this session:
 
 ```bash
-gh workflow run publish-nuget.yml --ref main -f version=X.Y.Z -f dry_run=true
-# after the dry run passes:
 gh workflow run publish-nuget.yml --ref main -f version=X.Y.Z
 ```
 
-`--ref` must be `main`. Any other ref fails in the first step.
+`version` must equal `Directory.Build.props`; it never overrides it. The dispatch SHA, not a
+later `main` tip, fixes the candidate. A `0.x` or `-suffix` version becomes a prerelease.
+**Do not run a dry dispatch followed by a real dispatch.** One workflow now validates, pauses
+for environment approval, and promotes that run's exact bytes.
+
+Before using this path, a maintainer must configure `nuget-release` with required reviewers,
+prevent self-review, disable admin bypass, and admit only branch `main` (not tags). The workflow
+reads and enforces these settings; it never creates or changes them. A 403, missing setting, or
+environment without reviewers blocks promotion. `main` must be protected. The nuget.org
+Trusted Publishing policy must still name this repository, workflow, and environment.
 
 ### Jobs, in order
 
-1. **`preflight`**: refuses any ref but `main`. Checks out `main` at full depth and runs
-   `release_checks.py preflight`. The version must equal `Directory.Build.props`, CHANGELOG must
-   hold exactly one non-empty `## [X.Y.Z]` section, and a tag `vX.Y.Z` must be absent or already
-   at this commit. Outputs the candidate commit, the tag, and the prerelease flag.
-2. In parallel, all on the candidate commit:
-   - **`test`**: 13 test projects, one runner each, with the manifest drift check, the
-     `check_trx.py` inventory, and the no-Z3-skip guard.
-   - **`sdk-consumer`**: the Calor.Sdk consumer check on 5 RIDs (linux-x64, linux-arm64,
-     osx-arm64, win-x64, win-arm64).
-   - **`release-quality`**: script self-tests, `check_test_quality.py`, sample IDs, coverage,
-     mutation, performance and flake ratchets, the round-trip harness, and the scorecard.
-   - **`site`**: builds the website, checks it uses only self-hosted fonts, and runs the wording
-     scan over `website/out`.
-3. **`package`** (no environment, no `id-token`): packs `calor` and `Calor.Sdk`
-   (`CalorSdkRequireAllRids=true`). Then it inspects the SDK package on all RIDs, checks the
-   packed Z3 against the pins, writes the SBOM and metadata, and renders the notes from
-   CHANGELOG. It runs the wording scan over the notes, packages, and metadata, and compares any
-   version nuget.org already serves, entry by entry. It uploads the `release-bundle` artifact.
-   **A dry run ends here.**
-4. **`publish`** (skipped when `dry_run` is true; runs in the `nuget-release` environment, which
-   admits only `main`): exchanges the GitHub OIDC token for a one-hour NuGet key
-   (`NuGet/login`), and fails if the key is empty. It verifies the bundle against the package
-   job's `SHA256SUMS` hash and attests the packages. It repeats the existing-version compare,
-   this time always blocking, then pushes both packages. Finally it polls nuget.org (60 attempts,
-   30 seconds apart, per package, one package after the other) and compares the served packages
-   entry by entry.
-5. **`install-check`**: calls `verify-release.yml`. It installs `calor` from nuget.org on
-   linux-x64, osx-arm64, and win-x64 (30 attempts, a minute apart), and requires
-   `calor verify samples/Verification/proven-contracts.calr` to print `Proven: 14` and
-   `Skipped: 0`.
-6. **`release`**: verifies the bundle again. The remote tag must be absent or at the candidate.
-   Creates the tag and the GitHub release `vX.Y.Z` (title `vX.Y.Z`, body = the rendered notes,
-   `--prerelease` when derived). Attaches the release metadata without overwriting.
-7. **`website`**: dispatches `nextjs-gh-pages.yml` from `main` with `tag=vX.Y.Z` and
-   `commit=<candidate>`. That workflow checks that the tag names that commit, then rebuilds the
-   site, rescans it, and deploys it.
+1. **`preflight`** checks out the dispatch SHA at full depth, verifies the version and non-empty
+   CHANGELOG section, and refuses a tag already at another commit. A fresh real dispatch also
+   refuses a version for which nuget.org already serves either package: resume the original
+   run instead of rebuilding a partially published version. Unknown registry responses fail.
+2. **`test`**, **`sdk-consumer`**, **`release-quality`**, and **`site`** run the complete release
+   validation once, on that candidate: all 13 test projects and inventory/no-Z3-skip guards,
+   5 consumer RIDs, coverage/mutation/performance/100 flake trials, corpus round trips and
+   scorecard, and the site's build/font/wording checks. Required PR checks are unchanged; PR
+   results are not reused as evidence for a potentially different squash-merge commit.
+3. **`package`**, with no publishing credentials, packs both packages, inspects all SDK RIDs,
+   verifies Z3 pins, creates SBOM/provenance and notes, scans wording and compares existing
+   registry content. It includes the validated site tar, verified against the site job's hash.
+   `release-bundle` is a v4 immutable artifact with 90-day retention. The approval summary
+   records candidate SHA, version, artifact ID, and archive digest. `SHA256SUMS` binds every file.
+4. **`promotion-check`**, also without publishing credentials, verifies trusted repository,
+   workflow and same-run identity, all six successful prerequisite results, exact SHA/version,
+   protected-main and approval settings, immutable artifact ID/run/SHA/expiry/digest, downloaded
+   archive bytes and the complete bundle inventory. Missing, unreadable, expired, wrong or
+   tampered input blocks entry to `publish`.
+5. **`publish`** waits in `nuget-release`. Review the run summary and successful gates, then
+   approve **this run's deployment** in GitHub. After admission, only this job obtains a NuGet
+   OIDC key. It rechecks the boundary and contents, attests packages and metadata, repeats the
+   blocking existing-version comparison, pushes with `--skip-duplicate`, and polls/compares
+   both served packages (60 attempts, 30 seconds apart, per package).
+6. **`install-check`** installs from nuget.org on linux-x64, osx-arm64 and win-x64 (30 attempts,
+   a minute apart). The candidate sample must produce `Proven: 14` and `Skipped: 0`.
+7. **`release`** downloads by immutable artifact ID and checks the recorded inventory again.
+   It retains remote tag/candidate and existing release title/body checks; metadata assets must
+   be identical or absent, never overwritten.
+8. **`website`** verifies the release tag and main ancestry, downloads/checks the same bundle,
+   extracts the validated site, repeats cheap font/wording checks, and uploads a Pages artifact.
+   **`website-deploy`** deploys it in `github-pages`; its Pages-only OIDC permission cannot
+   obtain a NuGet key. There is no second npm build or detached dispatch to wait for.
 
-Every step before the push blocks the push. After the push, the served-package compare and the
-install check block the GitHub release. Inside `release`, the release is created before the
-metadata is attached, so a metadata failure leaves the release in place (re-dispatch to finish
-it). The `website` job only dispatches `nextjs-gh-pages.yml` and does not wait for it; check that
-run separately. The workflow never dispatches benchmark publication.
+The full workflow stays pending until approval and reports website deployment completion.
+Every pre-push check blocks the push; served-package verification and installation block the
+GitHub release. A metadata failure after release creation leaves that release in place:
+**rerun failed jobs of the same run**, not a fresh dispatch. Benchmark publication remains a
+separate `benchmark.yml` dispatch.
 
-### What a dry run proves, and what it cannot
+### Diagnostic dry runs
 
-A dry run runs `preflight`, `test`, `sdk-consumer`, `release-quality`, `site`, and `package`. It
-never enters `nuget-release` and never calls `NuGet/login`, so it cannot test the OIDC exchange or
-the Trusted Publishing policy. `publish`, `install-check`, `release`, and `website` are skipped.
-
-In a dry run, two "already released" findings are warnings, not failures: a tag `vX.Y.Z` at
-another commit, and a different package already on nuget.org. A dry run of the version already
-released therefore still exercises everything else. A real run fails on both.
+`dry_run=true` remains available for diagnostics only. It stops after packaging, with no
+approval or publication. It cannot later be promoted or test OIDC/Trusted Publishing. Existing
+tag/content mismatches are warnings only in that diagnostic mode; real promotion fails on them.
+For an intended release, use the single default dispatch above and approve it after validation.
 
 ## 5. Watch the run and confirm on nuget.org — do not skip
 
@@ -212,6 +204,7 @@ If only one is there, say exactly which.
 | `preflight` | `Directory.Build.props declares [...]` | The input differs from the merged version, or the PR is not merged yet. |
 | `preflight` | `CHANGELOG.md must hold exactly one '## [X.Y.Z]' header` / `section [X.Y.Z] is empty` | Fix CHANGELOG through a PR, then re-dispatch. |
 | `preflight` (real run) | `already released: tag vX.Y.Z already points at ...` | The version was released from another commit. Bump the version; never move a tag. |
+| `preflight` (real run) | `rerun failed jobs of the original run` | Either package is already served. Resume that original run; do not rebuild this version. |
 | `test` | `Enforce test inventory` count mismatch | A test count changed without `eng/test-manifest.json`. Fix on main through a PR. |
 | `test` | `terminate called after throwing 'std::system_error'` | A native (Z3) crash took down the test host. Re-dispatch once; if it repeats, investigate. |
 | any job with `Bootstrap verified Z3 assets` | `download-z3.sh` (or `.ps1`) errors, or the extracted assets fail `.github/z3-binaries-4.15.7.sha256` | The bootstrap downloads the upstream Z3 archives and checks them against `src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256` before extracting. A download error is usually transient: re-dispatch. A checksum mismatch means the upstream bytes changed: stop and investigate. Never update the pins to match unreviewed bytes. |
@@ -219,24 +212,28 @@ If only one is there, say exactly which.
 | `site` / `package` | `forbidden wording` | The notes, package text, metadata, or site claims independent verification or adjudication. Reword through a PR. |
 | `package` / `publish` | `already released: nuget.org serves ... with content other than the package built here` | nuget.org already has a different package at this version. Bump the version. |
 | `publish` | `NuGet/login` fails, or `Trusted Publishing returned no key` | The nuget.org `calor-release` policy or the `nuget-release` environment is wrong. Run `scripts/check_release_credentials.py --live`; settings are a maintainer action. |
-| `publish` | bundle verification fails | The artifact does not match the package job's record. Re-dispatch; do not edit the bundle. |
-| `publish` | `nuget.org does not serve ... after 60 attempts` | Indexing lag longer than the poll (60 attempts per package). Re-dispatch: the push uses `--skip-duplicate` and the compare accepts an identical package. |
+| `promotion-check` / `publish` | promotion refused | Inspect identity, artifact expiry/digest, gate results and environment approval controls. Do not edit the bundle or bypass the check. |
+| `publish` | `nuget.org does not serve ... after 60 attempts` | Indexing lag longer than the poll (60 attempts per package). Rerun failed jobs of the same run: the push uses `--skip-duplicate` and the compare accepts an identical package. |
 | `install-check` | `could not be installed ... after 30 attempts`, or no `Proven: 14` / `Skipped: 0` | A broken package (for example Z3 missing, `Calor0710`). Investigate before anything else; the GitHub release was not created. |
 | `release` | `tag vX.Y.Z already points at ...` / `existing release ... has a body other than these notes` | A tag or release was made by hand. Releases are never edited; the maintainer must resolve it. |
 
 ### Re-running
 
-Fix the cause on `main` and dispatch again with the same `version`. Do not delete tags, edit
-releases, or bump the version just because a run failed. Prefer a fresh dispatch to
-`gh run rerun`: a fresh dispatch takes the current `main`. Once the packages are pushed, a
-re-dispatch is safe. The push skips duplicates, every compare accepts an identical package, an
-existing release is accepted only when its body equals the notes, and metadata is never
-overwritten.
+After a partial publication, use **Re-run failed jobs** (`gh run rerun RUN_ID --failed`, only
+when authorized), retaining the original run ID, candidate, successful gate outputs, artifact ID
+and exact bytes even if `main` advances. Do not rerun all jobs: immutable artifact uploads refuse
+replacement. The environment may require approval again. Existing-version comparisons, duplicate
+pushes, tag/release checks and identical-asset checks make a same-candidate retry idempotent.
 
-Note that a re-dispatch releases whatever `main` holds. If `main` moved on after a push, the
-rebuilt packages usually differ from the ones already on nuget.org, and the existing-version
-compare stops the run. Do not merge unrelated changes between a partial run and its
-re-dispatch.
+A changed candidate requires fresh validation and a fresh dispatch. Never delete tags, edit
+releases, or silently rebuild a partially published version. If the artifact is deleted or
+expires, promotion fails closed. Recover the original verified artifact through a separately
+reviewed maintainer procedure, or use a new version; this workflow offers no rebuild fallback.
+GitHub permits an approval wait for at most 30 days and workflow reruns for a limited period
+(currently 30 days); 90-day artifact retention is not a promise of indefinite retry support.
+
+See [Release Safety Policy](../../../docs/release-policy.md#immutable-candidate-promotion)
+for the trust boundary, intentional duplicate checks and measured baseline versus estimates.
 
 ## Version calculation
 

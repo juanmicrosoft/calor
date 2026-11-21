@@ -45,7 +45,7 @@ public class ParserIndentAcceptanceTests
     public void IndentMode_EmptyModuleNoCloser_Parses()
     {
         // Indent form: no §/M, dedent at EOF terminates the module.
-        var src = "§M{m1:Test}\n";
+        var src = "module Test Test block\n";
         var module = ParseIndentForm(src, out var diag);
 
         Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
@@ -55,12 +55,10 @@ public class ParserIndentAcceptanceTests
     [Fact]
     public void IndentMode_ModuleWithFunction_Parses()
     {
-        var src = "§M{m1:Test}\n" +
-                  "  §F{f1:Add:pub}\n" +
-                  "    §I{i32:a}\n" +
-                  "    §I{i32:b}\n" +
-                  "    §O{i32}\n" +
-                  "    §R (+ a b)\n";
+        var src = "module Test Test block\n" +
+                  "  func Add (int:a, int:b) → int\n" +
+                  "    !\n" +
+                  "    return (a + b)\n";
         var module = ParseIndentForm(src, out var diag);
 
         Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
@@ -72,16 +70,15 @@ public class ParserIndentAcceptanceTests
     [Fact]
     public void IndentMode_NestedIfChain_Parses()
     {
-        var src = "§M{m1:Test}\n" +
-                  "  §F{f1:Sign:pub}\n" +
-                  "    §I{i32:n}\n" +
-                  "    §O{i32}\n" +
-                  "    §IF{i1} (> n 0)\n" +
-                  "      §R 1\n" +
-                  "    §EI (< n 0)\n" +
-                  "      §R -1\n" +
-                  "    §EL\n" +
-                  "      §R 0\n";
+        var src = "module Test Test block\n" +
+                  "  func Sign (int:n) → int\n" +
+                  "    !\n" +
+                  "    if (n > 0)\n" +
+                  "      return 1\n" +
+                  "    else if (n < 0)\n" +
+                  "      return -1\n" +
+                  "    else\n" +
+                  "      return 0\n";
         var module = ParseIndentForm(src, out var diag);
 
         Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
@@ -95,14 +92,14 @@ public class ParserIndentAcceptanceTests
         // emits Calor0830 diagnostics. (Previously accepted additively in
         // Phase 1 — see ParserLegacyCloserRejectionTests for the full
         // rejection contract.)
-        var src = "§M{m1:Test}\n" +
-                  "§F{f1:Add:pub}\n" +
+        var src = "§M{Test}\n" +
+                  "§F{Add:pub}\n" +
                   "§I{i32:a}\n" +
                   "§I{i32:b}\n" +
                   "§O{i32}\n" +
                   "§R (+ a b)\n" +
-                  "§/F{f1}\n" +
-                  "§/M{m1}\n";
+                  "§/F\n" +
+                  "§/M\n";
         _ = ParseCloserForm(src, out var diag);
 
         Assert.True(diag.HasErrors, "Phase 4d: legacy structural closers must be rejected.");
@@ -113,14 +110,14 @@ public class ParserIndentAcceptanceTests
     {
         // Phase 4d: even when fed through indent-aware tokenization, the
         // parser rejects legacy §/F / §/M closers.
-        var src = "§M{m1:Test}\n" +
-                  "  §F{f1:Add:pub}\n" +
+        var src = "§M{Test}\n" +
+                  "  §F{Add:pub}\n" +
                   "    §I{i32:a}\n" +
                   "    §I{i32:b}\n" +
                   "    §O{i32}\n" +
                   "    §R (+ a b)\n" +
-                  "  §/F{f1}\n" +
-                  "§/M{m1}\n";
+                  "  §/F\n" +
+                  "§/M\n";
         _ = ParseIndentForm(src, out var diag);
 
         Assert.True(diag.HasErrors, "Phase 4d: legacy structural closers must be rejected.");
@@ -132,12 +129,10 @@ public class ParserIndentAcceptanceTests
         // E2E pipeline test: Lexer (indent mode) → Parser → CSharpEmitter.
         // Validates that indent-form source flows all the way through the
         // compiler to a runnable C# string, with no explicit closers.
-        var src = "§M{m1:Mathy}\n" +
-                  "  §F{f1:Add:pub}\n" +
-                  "    §I{i32:a}\n" +
-                  "    §I{i32:b}\n" +
-                  "    §O{i32}\n" +
-                  "    §R (+ a b)\n";
+        var src = "module Mathy Mathy block\n" +
+                  "  func Add (int:a, int:b) → int\n" +
+                  "    !\n" +
+                  "    return (a + b)\n";
 
         var module = ParseIndentForm(src, out var diag);
         Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
@@ -154,16 +149,15 @@ public class ParserIndentAcceptanceTests
     public void IndentMode_FullPipelineWithIfChain_Emits()
     {
         // E2E pipeline test on indent-form code with an §IF/§EI/§EL chain.
-        var src = "§M{m1:Sign}\n" +
-                  "  §F{f1:Of:pub}\n" +
-                  "    §I{i32:n}\n" +
-                  "    §O{i32}\n" +
-                  "    §IF{i1} (> n 0)\n" +
-                  "      §R 1\n" +
-                  "    §EI (< n 0)\n" +
-                  "      §R -1\n" +
-                  "    §EL\n" +
-                  "      §R 0\n";
+        var src = "module Sign Sign block\n" +
+                  "  func Of (int:n) → int\n" +
+                  "    !\n" +
+                  "    if (n > 0)\n" +
+                  "      return 1\n" +
+                  "    else if (n < 0)\n" +
+                  "      return -1\n" +
+                  "    else\n" +
+                  "      return 0\n";
 
         var module = ParseIndentForm(src, out var diag);
         Assert.False(diag.HasErrors, string.Join(", ", diag.Errors.Select(d => d.Message)));
@@ -181,15 +175,18 @@ public class ParserIndentAcceptanceTests
     {
         // Phase 4d regression guard: real-world indent-form FizzBuzz parses
         // correctly through the new strict-by-default Parser.
-        var src = "§M{m001:FizzBuzz}\n" +
-                  "  §F{f001:Main:pub}\n" +
-                  "    §O{void}\n" +
-                  "    §E{cw}\n" +
-                  "    §L{for1:i:1:100:1}\n" +
-                  "      §IF{if1} (== (% i 15) 0) → §P \"FizzBuzz\"\n" +
-                  "      §EI (== (% i 3) 0) → §P \"Fizz\"\n" +
-                  "      §EI (== (% i 5) 0) → §P \"Buzz\"\n" +
-                  "      §EL → §P i\n";
+        var src = "module FizzBuzz FizzBuzz block\n" +
+                  "  func Main () → void\n" +
+                  "    ! cw\n" +
+                  "    for i from 1 to 100 step 1\n" +
+                  "      if ((i % 15) == 0)\n" +
+                  "        Console.WriteLine(\"FizzBuzz\")\n" +
+                  "      else if ((i % 3) == 0)\n" +
+                  "        Console.WriteLine(\"Fizz\")\n" +
+                  "      else if ((i % 5) == 0)\n" +
+                  "        Console.WriteLine(\"Buzz\")\n" +
+                  "      else\n" +
+                  "        Console.WriteLine(i)\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(src, diagnostics);

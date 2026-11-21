@@ -1,0 +1,110 @@
+module L3M17 L3M17 block
+  module L3M17Module public
+
+    func l3m17_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 24501)
+      let int:total = ((x * 2) + y)
+      if (total < 24501)
+        return 24501
+      else
+        return total
+
+    func l3m17_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 1)
+      => (x >= 2)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24508)
+        return (acc + 24508)
+      else
+        return ((acc * 2) + 24508)
+
+    func l3m17_fn03 public (int:x, int:y) → int
+      !
+      requires (x > 5)
+      => (x >= 6)
+      let int:acc = ((x * 5) + y)
+      if (acc > 24515)
+        return (acc + 24515)
+      else
+        return ((acc * 2) + 24515)
+
+    func l3m17_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 65)
+
+    func l3m17_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 27)
+
+    func l3m17_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 24522)
+      let int:total = ((x * 2) + y)
+      if (total < 24522)
+        return 24522
+      else
+        return total
+
+    func l3m17_fn07 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 50)
+
+    func l3m17_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 72)
+
+    func l3m17_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24529)
+      if (x >= 24529)
+        return x
+      else
+        return 24529
+
+    func l3m17_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24536)
+      if (x >= 24536)
+        return x
+      else
+        return 24536
+
+    func l3m17_fn11 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24543)
+        return (acc + 24543)
+      else
+        return ((acc * 2) + 24543)
+
+    func l3m17_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 41)
+
+    func l3m17_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 24550)
+      let int:total = ((x * 5) + y)
+      if (total < 24550)
+        return 24550
+      else
+        return total

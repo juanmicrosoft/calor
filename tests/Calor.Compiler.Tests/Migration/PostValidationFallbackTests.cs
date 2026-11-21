@@ -28,9 +28,9 @@ public class PostValidationFallbackTests
         "namespace N { public class Keepme { public int A() => 1; } " +
         "public class Breakme { public int B() => 2; } }";
 
-    // Everything outside §CSHARP{...}§/CSHARP blocks — what a real parser reads as Calor.
+    // Everything outside opaque C# payloads — what a real parser reads as Calor.
     private static string OutsideCSharp(string calor) =>
-        Regex.Replace(calor, @"§CSHARP\{.*?\}§/CSHARP", "", RegexOptions.Singleline);
+        Regex.Replace(Parsing.RawCSharpFrame.MaskForAnalysis(calor), @"§CSHARP\{.*?\}§/CSHARP", "", RegexOptions.Singleline);
 
     private static Func<string, bool> CondemnOutsideCSharp(string marker) =>
         calor => !OutsideCSharp(calor).Contains(marker);
@@ -60,18 +60,22 @@ public class PostValidationFallbackTests
             "fallback output must be valid Calor:\n" + result.CalorSource);
 
         // The offending member is preserved verbatim inside a §CSHARP interop block.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.Contains("class Breakme", result.CalorSource);
         Assert.Equal(1, result.Context!.Stats.InteropBlocksEmitted);
 
         // The other member still converted to a real Calor class (not wrapped).
         Assert.Contains("Keepme", result.CalorSource);
-        Assert.Contains("§CL", result.CalorSource);
+        Assert.Contains("class Keepme", result.CalorSource);
     }
 
     [Fact]
-    public void CrossNamespaceSameNameTypes_RemainNativeAndDistinct()
+    public void CrossNamespaceSameNameTypes_RemainDistinct()
     {
+        // 0.30: default single-file conversion keeps a file with several namespace scopes
+        // as one whole-file C# boundary (namespace-topology; ConvertProject or
+        // `migrate --split-namespaces` converts it natively). The two Foo types must
+        // still come out distinct, each in its own namespace.
         const string src =
             "namespace N1 { public class Foo { public int A() => 1; } } " +
             "namespace N2 { public class Foo { public int B() => 2; } }";
@@ -80,9 +84,9 @@ public class PostValidationFallbackTests
         var result = converter.Convert(src);
 
         Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
-        Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.Equal(2, result.Ast!.Classes.Count);
-        Assert.Contains("§CL", result.CalorSource!);
+        Assert.Equal(1, result.Context!.Stats.InteropBlocksEmitted);
+        Assert.Contains("namespace-topology", result.CalorSource!);
+        Assert.Contains("class Foo", result.CalorSource!);
         var compiled = Program.Compile(result.CalorSource!);
         Assert.False(
             compiled.HasErrors,
@@ -133,7 +137,7 @@ public class PostValidationFallbackTests
         Assert.False(result.Success);
         Assert.NotNull(result.CalorSource);
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
     }
 
     [Fact]
@@ -146,6 +150,6 @@ public class PostValidationFallbackTests
         Assert.True(result.Success);
         Assert.True(ParsesForReal(result.CalorSource!));
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource!);
+        RawFrameAssertions.AssertFramed(result.CalorSource!, present: false);
     }
 }

@@ -14,35 +14,35 @@ namespace Calor.Compiler.Tests;
 /// #1485 -- a block-opening clause owns only the lines indented under it. An
 /// empty clause body (no indented lines) is legal and must not swallow the
 /// next same-column statement, nor the enclosing block's dedent.
+/// Retired layouts keep their original identities as rejection/internal controls,
+/// alongside native counterparts where the current grammar has an equivalent.
 /// </summary>
 public class EmptyClauseBodyTests
 {
-    // The 0.25 R0 witness X-TRYCATCH-01, as the converter emitted it (CLI default).
+    // Native copy of X-TRYCATCH-01. The file label is not Probe's namespace.
     private const string XTryCatch01 = """
-        §M{m001:X-TRYCATCH-01:overflow=unchecked}
-          §U{System}
+        module XTryCatch01 overflow unchecked
+          using System
+          module Probe public
+            field int:counter private static = 0
 
-          §NS{ns_global:_global:global}
-            §CL{c001:Probe:pub:stat}
-              §FLD{i32:counter:priv:stat} = 0
+            func Work public static (bool:fail)
+              ! throw,alloc
+              if fail
+                throw new InvalidOperationException("x")
 
-              §MT{m002:Work:pub:stat} (bool:fail)
-                §E{throw,alloc}
-                §IF{if003} fail
-                  §TH §NEW{InvalidOperationException} §A "x" §/NEW
+            func Step public static (bool:fail)
+              ! throw,alloc
+              try
+                Work(fail)
+              catch InvalidOperationException
+              set counter counter + 1
 
-              §MT{m004:Step:pub:stat} (bool:fail)
-                §E{throw,alloc}
-                §TR{try005}
-                  §C{Work} fail
-                §CA{InvalidOperationException:}
-                §ASSIGN counter (+ counter 1)
-
-              §MT{m006:Run:pub:stat} () -> str
-                §E{throw,alloc}
-                §C{Step} false
-                §C{Step} true
-                §R (str counter)
+            func Run public static () → string
+              ! throw,alloc
+              Step(false)
+              Step(true)
+              return counter.ToString()
         """;
 
     private const string XTryCatch01CSharp = """
@@ -89,15 +89,15 @@ public class EmptyClauseBodyTests
     public void EmptyCatch_SameColumnStatement_FollowsTheTry()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
-                §E{throw}
-                §B{~n:i32} 0
-                §TR{t1}
-                  §ASSIGN n (/ 10 x)
-                §CA{DivideByZeroException:}
-                §ASSIGN n (+ n 1)
-                §R n
+            module T
+              func Step public (int:x) → int
+                ! throw
+                var int:n = 0
+                try
+                  set n 10 / x
+                catch DivideByZeroException
+                set n n + 1
+                return n
             """);
 
         Assert.Equal(4, body.Count);
@@ -111,15 +111,15 @@ public class EmptyClauseBodyTests
     public void EmptyFinally_SameColumnStatement_FollowsTheTry()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
-                §E{throw}
-                §B{~n:i32} 0
-                §TR{t1}
-                  §ASSIGN n x
-                §FI
-                §ASSIGN n (+ n 1)
-                §R n
+            module T
+              func Step public (int:x) → int
+                ! throw
+                var int:n = 0
+                try
+                  set n x
+                finally
+                set n n + 1
+                return n
             """);
 
         Assert.Equal(4, body.Count);
@@ -133,17 +133,17 @@ public class EmptyClauseBodyTests
     public void MultipleCatches_FirstEmpty_SecondKeepsItsBody_StatementFollows()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
-                §E{throw}
-                §B{~n:i32} 0
-                §TR{t1}
-                  §ASSIGN n (/ 10 x)
-                §CA{DivideByZeroException:}
-                §CA{Exception:e}
-                  §ASSIGN n -1
-                §ASSIGN n (+ n 100)
-                §R n
+            module T
+              func Step public (int:x) → int
+                ! throw
+                var int:n = 0
+                try
+                  set n 10 / x
+                catch DivideByZeroException
+                catch Exception:e
+                  set n -1
+                set n n + 100
+                return n
             """);
 
         Assert.Equal(4, body.Count);
@@ -158,17 +158,17 @@ public class EmptyClauseBodyTests
     public void NestedTry_EmptyInnerCatch_DoesNotStealOuterCatch()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
-                §E{throw}
-                §B{~n:i32} 0
-                §TR{t1}
-                  §TR{t2}
-                    §ASSIGN n (/ 10 x)
-                  §CA{DivideByZeroException:}
-                §CA{Exception:}
-                  §ASSIGN n -1
-                §R n
+            module T
+              func Step public (int:x) → int
+                ! throw
+                var int:n = 0
+                try
+                  try
+                    set n 10 / x
+                  catch DivideByZeroException
+                catch Exception
+                  set n -1
+                return n
             """);
 
         Assert.Equal(3, body.Count);
@@ -184,18 +184,18 @@ public class EmptyClauseBodyTests
     public void NestedTry_EmptyInnerCatch_SiblingInOuterTryBody()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
-                §E{throw}
-                §B{~n:i32} 0
-                §TR{t1}
-                  §TR{t2}
-                    §ASSIGN n (/ 10 x)
-                  §CA{DivideByZeroException:}
-                  §ASSIGN n (+ n 1)
-                §CA{Exception:}
-                  §ASSIGN n -1
-                §R n
+            module T
+              func Step public (int:x) → int
+                ! throw
+                var int:n = 0
+                try
+                  try
+                    set n 10 / x
+                  catch DivideByZeroException
+                  set n n + 1
+                catch Exception
+                  set n -1
+                return n
             """);
 
         var outer = Assert.IsType<TryStatementNode>(body[1]);
@@ -210,15 +210,15 @@ public class EmptyClauseBodyTests
     public void EmptyCatch_AtEndOfMethod_LeavesNextFunctionIntact()
     {
         var module = Parse("""
-            §M{m1:T}
-              §F{f1:A:pub} (i32:x) -> void
-                §E{throw}
-                §TR{t1}
-                  §B{y:i32} (/ 10 x)
-                §CA{DivideByZeroException:}
-              §F{f2:B:pub} () -> i32
-                §E{}
-                §R 2
+            module T
+              func A public (int:x) → void
+                ! throw
+                try
+                  let int:y = 10 / x
+                catch DivideByZeroException
+              func B public () → int
+                !
+                return 2
             """);
 
         Assert.Equal(2, module.Functions.Count);
@@ -230,19 +230,20 @@ public class EmptyClauseBodyTests
     public void EmptyClauses_ExecuteWithCorrectStructure()
     {
         var type = Compile("""
-            §M{m1:T}
-              §F{f1:Step:pub} (i32:x) -> i32
-                §E{throw}
-                §B{~n:i32} 0
-                §TR{t1}
-                  §ASSIGN n (/ 10 x)
-                §CA{DivideByZeroException:}
-                §ASSIGN n (+ n 1)
-                §TR{t2}
-                  §ASSIGN n (+ n 10)
-                §FI
-                §ASSIGN n (+ n 100)
-                §R n
+            module EmptyClause T
+              module TModule public
+                func Step public (int:x) → int
+                  ! throw
+                  var int:n = 0
+                  try
+                    set n 10 / x
+                  catch DivideByZeroException
+                  set n n + 1
+                  try
+                    set n n + 10
+                  finally
+                  set n n + 100
+                  return n
             """, "T.TModule");
 
         Assert.Equal(111, Invoke(type, "Step", 0));
@@ -253,12 +254,14 @@ public class EmptyClauseBodyTests
     public void XTryCatch01_ReturnsTwo()
     {
         var module = Parse(XTryCatch01);
+        Assert.Equal("", Assert.Single(module.NamespaceScopes).FullName);
         var probe = module.Classes.Single(c => c.Name == "Probe");
         var step = probe.Methods.Single(m => m.Name == "Step");
         Assert.Equal(2, step.Body.Count);
         Assert.Empty(Assert.IsType<TryStatementNode>(step.Body[0]).CatchClauses[0].Body);
 
         var type = Compile(XTryCatch01, "Probe");
+        Assert.Equal("Probe", type.FullName);
         Assert.Equal("2", Invoke(type, "Run"));
     }
 
@@ -279,42 +282,66 @@ public class EmptyClauseBodyTests
 
     public static IEnumerable<object[]> EmptyClauseCases() => new[]
     {
-        new object[] { "if-then", "§IF{i1} b" },
-        new object[] { "elseif", "§IF{i1} b\n      §B{a:i32} 1\n    §EI (== n 2)" },
-        new object[] { "else", "§IF{i1} b\n      §B{a:i32} 1\n    §EL" },
-        new object[] { "arrow-if-else", "§IF{i1} b → §B{a:i32} 1\n    §EL" },
-        new object[] { "for", "§L{l1:i:0:3:1}" },
-        new object[] { "while", "§WH{w1} b" },
-        new object[] { "foreach", "§EACH{e1:x:i32} xs" },
-        new object[] { "eachkv", "§EACHKV{k1:k:v} d" },
-        new object[] { "using", "§USE{u1:s:MemoryStream} §NEW{MemoryStream} §/NEW" },
-        new object[] { "sync", "§SYNC{s1} (o)" },
-        new object[] { "unsafe", "§UNSAFE{s1}" },
-        new object[] { "fixed", "§FIXED{fx1:p:i32*:xs}" },
+        new object[] { "if-then", "§IF b" },
+        new object[] { "elseif", "§IF b\n      §B{a:i32} 1\n    §EI (== n 2)" },
+        new object[] { "else", "§IF b\n      §B{a:i32} 1\n    §EL" },
+        new object[] { "block-if-else", "§IF b\n      §B{a:i32} 1\n    §EL" },
+        new object[] { "for", "§L{i:0:3:1}" },
+        new object[] { "while", "§WH b" },
+        new object[] { "foreach", "§EACH{x:i32} xs" },
+        new object[] { "eachkv", "§EACHKV{k:v} d" },
+        new object[] { "using", "§USE{s:MemoryStream} §NEW{MemoryStream} §/NEW" },
+        new object[] { "sync", "§SYNC (o)" },
+        new object[] { "unsafe", "§UNSAFE" },
+        new object[] { "fixed", "§FIXED{p:i32*:xs}" },
         new object[] { "preprocessor", "§PP{DEBUG}" },
-        new object[] { "try-empty-catch", "§TR{t1}\n      §B{a:i32} 1\n    §CA{Exception:}" },
-        new object[] { "try-empty-finally", "§TR{t1}\n      §B{a:i32} 1\n    §FI" },
-        new object[] { "match-last-case", "§W{m1} n\n      §K 1\n        §B{a:i32} 1\n      §K _" },
+        new object[] { "try-empty-catch", "§TR\n      §B{a:i32} 1\n    §CA{Exception:}" },
+        new object[] { "try-empty-finally", "§TR\n      §B{a:i32} 1\n    §FI" },
+        new object[] { "match-last-case", "§W n\n      §K 1\n        §B{a:i32} 1\n      §K _" },
+    };
+
+    // The provider above is the frozen logical-subject/xUnit identity, not source admission.
+    // Each native recipe is explicit; no retired source is translated or executed.
+    private static string NativeClause(string name) => name switch
+    {
+        "if-then" => "if b",
+        "elseif" => "if b\n      let int:a = 1\n    else if n == 2",
+        "else" => "if b\n      let int:a = 1\n    else",
+        "block-if-else" => "if b\n      let int:a = 1\n    else",
+        "for" => "for i from 0 to 3 step 1",
+        "while" => "while b",
+        "foreach" => "each int:x in xs",
+        "eachkv" => "each k, v in d",
+        "using" => "using MemoryStream:s = new MemoryStream()",
+        "sync" => "lock (o)",
+        "unsafe" => "unsafe",
+        "fixed" => "fixed int*:p = xs",
+        "preprocessor" => "pp DEBUG",
+        "try-empty-catch" => "try\n      let int:a = 1\n    catch Exception",
+        "try-empty-finally" => "try\n      let int:a = 1\n    finally",
+        "match-last-case" => "match n\n      case 1\n        let int:a = 1\n      case _",
+        _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
     };
 
     [Theory]
     [MemberData(nameof(EmptyClauseCases))]
     public void EmptyClause_DoesNotSwallowSameColumnSibling(string name, string clause)
     {
-        _ = name;
-        var source = "§M{m1:T}\n"
-            + "  §F{f1:A:pub} (bool:b, i32:n, [i32]:xs, Dict<str, i32>:d, object:o) -> i32\n"
-            + "    §E{}\n"
-            + "    " + clause + "\n"
-            + "    §R 7\n"
-            + "  §F{f2:B:pub} () -> i32\n"
-            + "    §E{}\n"
-            + "    §R 8\n";
+        AssertRetiredClauseRejected(name, clause);
+        var source = "module T\n"
+            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n    !\n"
+            + "    !\n"
+            + "    " + NativeClause(name) + "\n"
+            + "    return 7\n"
+            + "  func B public () → int\n    !\n"
+            + "    !\n"
+            + "    return 8\n";
         var module = Parse(source);
 
         Assert.Equal(2, module.Functions.Count);
         var body = module.Functions[0].Body;
         Assert.Equal(2, body.Count);
+        AssertEmptyClause(name, body[0]);
         Assert.IsType<ReturnStatementNode>(body[1]);
         Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions[1].Body));
     }
@@ -323,21 +350,22 @@ public class EmptyClauseBodyTests
     [MemberData(nameof(EmptyClauseCases))]
     public void EmptyClause_AtEndOfEnclosingBlock_DoesNotStealItsDedent(string name, string clause)
     {
-        _ = name;
+        AssertRetiredClauseRejected(name, clause);
         // The empty clause is the last statement of a loop body; the
         // statement after it is at the loop's column, so it follows the loop.
-        var source = "§M{m1:T}\n"
-            + "  §F{f1:A:pub} (bool:b, i32:n, [i32]:xs, Dict<str, i32>:d, object:o) -> i32\n"
-            + "    §E{}\n"
-            + "    §L{outer:j:0:1:1}\n"
-            + "      " + clause.Replace("\n    ", "\n      ") + "\n"
-            + "    §R 7\n";
+        var source = "module T\n"
+            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n    !\n"
+            + "    !\n"
+            + "    for j from 0 to 1 step 1\n"
+            + "      " + NativeClause(name).Replace("\n    ", "\n      ") + "\n"
+            + "    return 7\n";
         var module = Parse(source);
 
         var body = Assert.Single(module.Functions).Body;
         Assert.Equal(2, body.Count);
         var loop = Assert.IsType<ForStatementNode>(body[0]);
         Assert.Single(loop.Body);
+        AssertEmptyClause(name, loop.Body[0]);
         Assert.IsType<ReturnStatementNode>(body[1]);
     }
 
@@ -345,14 +373,14 @@ public class EmptyClauseBodyTests
     public void EmptyThen_InsideOuterIf_DoesNotStealOuterElse()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (bool:a, bool:b) -> i32
-                §E{}
-                §IF{i1} a
-                  §IF{i2} b
-                §EL
-                  §R 2
-                §R 1
+            module T
+              func A public (bool:a, bool:b) → int
+                !
+                if a
+                  if b
+                else
+                  return 2
+                return 1
             """);
 
         Assert.Equal(2, body.Count);
@@ -366,26 +394,27 @@ public class EmptyClauseBodyTests
     public void EmptyClauses_RunWithCorrectControlFlow()
     {
         var type = Compile("""
-            §M{m1:T}
-              §F{f1:A:pub} (i32:x) -> i32
-                §E{}
-                §B{~n:i32} 0
-                §IF{i1} (> x 100)
-                §ASSIGN n (+ n 1)
-                §L{l1:i:0:3:1}
-                §ASSIGN n (+ n 10)
-                §WH{w1} false
-                §ASSIGN n (+ n 100)
-                §IF{i2} (> x 0)
-                  §ASSIGN n (+ n 1000)
-                §EL
-                §ASSIGN n (+ n 10000)
-                §W{m1} x
-                  §K 1
-                    §ASSIGN n (+ n 100000)
-                  §K _
-                §ASSIGN n (+ n 1000000)
-                §R n
+            module EmptyClause T
+              module TModule public
+                func A public (int:x) → int
+                  !
+                  var int:n = 0
+                  if x > 100
+                  set n n + 1
+                  for i from 0 to 3 step 1
+                  set n n + 10
+                  while false
+                  set n n + 100
+                  if x > 0
+                    set n n + 1000
+                  else
+                  set n n + 10000
+                  match x
+                    case 1
+                      set n n + 100000
+                    case _
+                  set n n + 1000000
+                  return n
             """, "T.TModule");
 
         Assert.Equal(1111111, Invoke(type, "A", 1));
@@ -396,11 +425,11 @@ public class EmptyClauseBodyTests
     public void EmptyPreprocessorBlock_DoesNotSwallowSameColumnSibling()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
-                §E{}
-                §PP{DEBUG}
-                §R 7
+            module T
+              func A public () → int
+                !
+                pp DEBUG
+                return 7
             """);
 
         Assert.Equal(2, body.Count);
@@ -412,14 +441,14 @@ public class EmptyClauseBodyTests
     public void EmptyPreprocessorBlock_InsideIf_DoesNotStealOuterElse()
     {
         var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (bool:b) -> i32
-                §E{}
-                §IF{i1} b
-                  §PP{DEBUG}
-                §EL
-                  §R 2
-                §R 1
+            module T
+              func A public (bool:b) → int
+                !
+                if b
+                  pp DEBUG
+                else
+                  return 2
+                return 1
             """);
 
         Assert.Equal(2, body.Count);
@@ -431,32 +460,40 @@ public class EmptyClauseBodyTests
     [Fact]
     public void BlockLambda_WithoutCloser_DoesNotSwallowFollowingStatements()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
-                §B{a:Action} §LAM{lam1}
+                §B{a:Action} §LAM{}
                 §R 7
             """);
-
-        Assert.Equal(2, body.Count);
-        Assert.IsType<BindStatementNode>(body[0]);
-        Assert.IsType<ReturnStatementNode>(body[1]);
+        var native = ParseSingleFunctionBody("""
+            module T
+              func A public () → int
+                !
+                let Action:a = () =>
+                  return
+                return 7
+            """);
+        Assert.Equal(2, native.Count);
+        Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.IsType<LambdaExpressionNode>(
+            Assert.IsType<BindStatementNode>(native[0]).Initializer).StatementBody!));
+        Assert.IsType<ReturnStatementNode>(native[1]);
     }
 
     [Fact]
     public void EmptyGetter_DoesNotStealPropertyDedent()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:C:pub}
-                §PROP{p1:P:i32:pub}
-                  §GET
-                  §SET
-                §MT{m1:B:pub} () -> i32
-                  §E{}
-                  §R 7
-              §CL{c2:D:pub}
+            module T
+              class C public
+                property int:P public
+                  get
+                  set
+                func B public () → int
+                  !
+                  return 7
+              class D public
             """);
 
         Assert.Equal(2, module.Classes.Count);
@@ -467,46 +504,73 @@ public class EmptyClauseBodyTests
     [Fact]
     public void MultilineHeader_BodyOnHeaderLastLine_StaysInBody()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (bool:b) -> void
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} (bool:b) -> void
                 §E{cw}
-                §IF{i1} (==
+                §IF (==
                   1 2
                 ) §P "then"
                 §P "after"
             """);
+        var native = ParseSingleFunctionBody("""
+            module T
+              func A public (bool:b) → void
+                ! cw
+                if (
+                  1 == 2
+                ) Console.WriteLine("then")
+                Console.WriteLine("after")
+            """);
 
-        Assert.Equal(2, body.Count);
-        Assert.IsType<PrintStatementNode>(Assert.Single(Assert.IsType<IfStatementNode>(body[0]).ThenBody));
-        Assert.IsType<PrintStatementNode>(body[1]);
+        Assert.Equal(2, native.Count);
+        Assert.IsType<ExpressionStatementNode>(Assert.Single(Assert.IsType<IfStatementNode>(native[0]).ThenBody));
+        Assert.IsType<ExpressionStatementNode>(native[1]);
     }
 
     [Fact]
     public void MultilineFunctionHeader_BodyOnHeaderLastLine_StaysInBody()
     {
-        var module = Parse("§M{m:T}\n  §F{f1:A:pub} (\n    bool:x\n  ) -> i32 §R 1\n");
+        AssertRetiredSourceRejected("§M{T}\n  §F{A:pub} (\n    bool:x\n  ) -> i32 §R 1\n");
+        const string source = "module T\n  func A public (\n    bool:x\n  ) → int return 1\n";
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
 
+        // Ownership survives recovery; the public header still lacks its required budget.
+        Assert.Equal(DiagnosticCode.MissingBoundaryEffectRow, Assert.Single(diagnostics.Errors).Code);
         Assert.IsType<ReturnStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
     }
 
     [Fact]
     public void BracedLambda_OuterElseAfterEmptyInnerIf_BelongsToOuterIf()
     {
-        // Inside braces the lexer emits no Dedent; the §EL column decides.
-        var type = Compile("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
                 §B{~n:i32} 0
                 §B{a:Action} () → {
-                  §IF{outer} false
-                    §IF{inner} true
+                  §IF false
+                    §IF true
                   §EL
                     §ASSIGN n 1
                 }
                 §C{a.Invoke}
                 §R n
+            """);
+        var type = Compile("""
+            module EmptyClause T
+              module TModule public
+                func A public () → int
+                  !
+                  var int:n = 0
+                  let Action:a = () =>
+                    if false
+                      if true
+                    else
+                      set n 1
+                  a.Invoke()
+                  return n
             """, "T.TModule");
 
         Assert.Equal(1, Invoke(type, "A"));
@@ -515,21 +579,37 @@ public class EmptyClauseBodyTests
     [Fact]
     public void BracedLambda_OuterCaseAfterInnerMatch_BelongsToOuterMatch()
     {
-        var type = Compile("""
-            §M{m:T}
-              §F{f:A:pub} (i32:x) -> i32
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} (i32:x) -> i32
                 §E{}
                 §B{~n:i32} 0
                 §B{a:Action} () → {
-                  §W{outer} x
+                  §W x
                     §K 1
-                      §W{inner} x
+                      §W x
                         §K 2
                     §K _
                       §ASSIGN n 7
                 }
                 §C{a.Invoke}
                 §R n
+            """);
+        var type = Compile("""
+            module EmptyClause T
+              module TModule public
+                func A public (int:x) → int
+                  !
+                  var int:n = 0
+                  let Action:a = () =>
+                    match x
+                      case 1
+                        match x
+                          case 2
+                      case _
+                        set n 7
+                  a.Invoke()
+                  return n
             """, "T.TModule");
 
         Assert.Equal(7, Invoke(type, "A", 3));
@@ -539,56 +619,87 @@ public class EmptyClauseBodyTests
     [Fact]
     public void FlatCloserScan_IgnoresBracketContinuationLines()
     {
-        var body = ParseSingleFunctionBody("§M{m:T}\n  §F{f:A:pub} () -> void\n    §E{cw}\n"
-            + "    §UNSAFE{u1}\n    §P \"first\"\n    §B{x:i32} (+\n1 2\n    )\n    §/UNSAFE{u1}\n    §P \"after\"\n");
-
-        Assert.Equal(2, body.Count);
-        Assert.Equal(2, Assert.IsType<UnsafeBlockNode>(body[0]).Body.Count);
+        AssertRetiredSourceRejected("§M{T}\n  §F{A:pub} () -> void\n    §E{cw}\n"
+            + "    §UNSAFE\n    §P \"first\"\n    §B{x:i32} (+\n1 2\n    )\n    §/UNSAFE\n    §P \"after\"\n");
+        var native = ParseSingleFunctionBody("""
+            module T
+              func A public () → void
+                ! cw
+                unsafe
+                  Console.WriteLine("first")
+                  let int:x = (
+            1 + 2
+                  )
+                Console.WriteLine("after")
+            """);
+        Assert.Equal(2, native.Count);
+        Assert.Equal(2, Assert.IsType<UnsafeBlockNode>(native[0]).Body.Count);
     }
 
     [Fact]
     public void BlockLambda_WithoutCloser_DoesNotTakeNextLineAsExpressionBody()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> i32
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} () -> i32
                 §E{}
                 §B{~n:i32} 0
-                §B{a:Func<i32>} §LAM{lam1}
-                (inc n)
+                §B{a:Func<i32>} §LAM{}
+                (+ n 1)
                 §R n
             """);
-
-        Assert.Equal(4, body.Count);
-        Assert.IsType<ExpressionStatementNode>(body[2]);
-        Assert.IsType<ReturnStatementNode>(body[3]);
+        const string nativeSource = """
+            module T
+              func A public () → int
+                !
+                var int:n = 0
+                let Func<int>:a = () => 0
+                (n + 1)
+                return n
+            """;
+        var nativeDiagnostics = new DiagnosticBag();
+        var nativeTokens = new Lexer(nativeSource, nativeDiagnostics).TokenizeAllForParser();
+        Assert.False(nativeDiagnostics.HasErrors, string.Join("\n", nativeDiagnostics));
+        new Parser(nativeTokens, nativeDiagnostics).Parse();
+        var nativeError = Assert.Single(nativeDiagnostics.Errors);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, nativeError.Code);
+        Assert.Equal("(n + 1)", nativeSource.Substring(nativeError.Span.Start, nativeError.Span.Length));
+        Assert.Equal("A native expression statement must be an invocation or object creation.", nativeError.Message);
     }
 
     [Fact]
     public void FlatCloserScan_TracksNestedOpenerOnHeaderLine()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (object:a, object:b) -> void
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} (object:a, object:b) -> void
                 §E{cw}
-                §SYNC{s1} (a) §SYNC{s2} (b) §P "inside"
-                §/SYNC{s2}
+                §SYNC (a) §SYNC (b) §P "inside"
+                §/SYNC
                 §P "after"
             """);
-
-        Assert.Equal(2, body.Count);
-        var outer = Assert.IsType<SyncBlockNode>(body[0]);
-        Assert.IsType<SyncBlockNode>(Assert.Single(outer.Body));
-        Assert.IsType<PrintStatementNode>(body[1]);
+        var native = ParseSingleFunctionBody("""
+            module T
+              func A public (object:a, object:b) → void
+                ! cw
+                lock (a)
+                  lock (b)
+                    Console.WriteLine("inside")
+                Console.WriteLine("after")
+            """);
+        Assert.Equal(2, native.Count);
+        Assert.IsType<SyncBlockNode>(Assert.Single(Assert.IsType<SyncBlockNode>(native[0]).Body));
+        Assert.IsType<ExpressionStatementNode>(native[1]);
     }
 
     [Fact]
     public void ManyEmptyBlocksWithoutClosers_ParseWithoutErrors()
     {
-        var lines = string.Join("\n", Enumerable.Range(0, 3000).Select(i => $"    §UNSAFE{{u{i}}}"));
-        var module = Parse("§M{m1:T}\n  §F{f1:A:pub} () -> void\n    §E{}\n" + lines + "\n");
+        var lines = string.Join("\n", Enumerable.Repeat("    unsafe", 3000));
+        var module = Parse("module T\n  func A public () → void\n    !\n" + lines + "\n");
 
         Assert.Equal(3000, Assert.Single(module.Functions).Body.Count);
+        Assert.All(module.Functions[0].Body, statement => Assert.Empty(Assert.IsType<UnsafeBlockNode>(statement).Body));
     }
 
     // ------------------------------------------------------------------
@@ -599,12 +710,12 @@ public class EmptyClauseBodyTests
     public void EmptyClass_DoesNotAdoptSameColumnSiblingClass()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:K:pub}
-              §CL{c2:L:pub}
-                §MT{m1:B:pub} () -> i32
-                  §E{}
-                  §R 2
+            module T
+              class K public
+              class L public
+                func B public () → int
+                  !
+                  return 2
             """);
 
         Assert.Equal(2, module.Classes.Count);
@@ -617,12 +728,12 @@ public class EmptyClauseBodyTests
     public void EmptyNestedClass_DoesNotAdoptFollowingMethod()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:Outer:pub}
-                §CL{c2:Inner:pub}
-                §MT{m1:B:pub} () -> i32
-                  §E{}
-                  §R 2
+            module T
+              class Outer public
+                class Inner public
+                func B public () → int
+                  !
+                  return 2
             """);
 
         var outer = Assert.Single(module.Classes);
@@ -635,11 +746,12 @@ public class EmptyClauseBodyTests
     public void EmptyFunction_DoesNotSwallowSiblingFunction()
     {
         var module = Parse("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> void
-              §F{f2:B:pub} () -> i32
-                §E{}
-                §R 2
+            module T
+              func A public () → void
+                !
+              func B public () → int
+                !
+                return 2
             """);
 
         Assert.Equal(2, module.Functions.Count);
@@ -651,12 +763,12 @@ public class EmptyClauseBodyTests
     public void EmptyMemberPreprocessorBlock_DoesNotSwallowSiblingMethod()
     {
         var module = Parse("""
-            §M{m1:T}
-              §CL{c1:C:pub}
-                §PP{DEBUG}
-                §MT{m1:A:pub:stat} () -> i32
-                  §E{}
-                  §R 7
+            module T
+              class C public
+                pp DEBUG
+                func A public static () → int
+                  !
+                  return 7
             """);
 
         var cls = Assert.Single(module.Classes);
@@ -667,12 +779,12 @@ public class EmptyClauseBodyTests
     public void EmptyTypePreprocessorBlock_DoesNotSwallowSiblingClass()
     {
         var module = Parse("""
-            §M{m1:T}
-              §PP{DEBUG}
-              §CL{c1:C:pub}
-                §MT{m1:A:pub:stat} () -> i32
-                  §E{}
-                  §R 7
+            module T
+              pp DEBUG
+              class C public
+                func A public static () → int
+                  !
+                  return 7
             """);
 
         Assert.Equal("C", Assert.Single(module.Classes).Name);
@@ -681,55 +793,51 @@ public class EmptyClauseBodyTests
     [Fact]
     public void EmptyEnumExtension_DoesNotAdoptSiblingFunction()
     {
-        var module = Parse("""
-            §M{m:T}
-              §EN{e:Color}
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §EN{Color}
                 Red
-              §EEXT{x:Color}
-              §F{f:A:pub} (Color:self) -> i32
+              §EEXT{Color}
+              §F{A:pub} (Color:self) -> i32
                 §E{}
                 §R 1
             """);
-
-        Assert.Empty(Assert.Single(module.EnumExtensions).Methods);
-        Assert.Equal("A", Assert.Single(module.Functions).Name);
+        // The internal enum-extension production went with the § syntax (0.30); no native form exists.
     }
 
     [Fact]
-    public void EmptyDecision_DoesNotSwallowSiblingFunction()
+    public void Documentation_DoesNotSwallowSiblingFunction()
     {
         var module = Parse("""
-            §M{m:T}
-              §DC{d1} "empty"
-              §F{f1:A:pub} () -> i32
-                §E{}
-                §R 1
-              §F{f2:B:pub} () -> i32
-                §E{}
-                §R 2
+            module T
+              /// First function.
+              func A public () → int
+                !
+                return 1
+              func B public () → int
+                !
+                return 2
             """);
 
-        Assert.Single(module.Decisions);
+        Assert.Empty(module.Decisions);
+        Assert.Equal("First function.", module.Functions[0].DocComment);
+        Assert.Null(module.Functions[1].DocComment);
         Assert.Equal(new[] { "A", "B" }, module.Functions.Select(f => f.Name));
     }
 
     [Fact]
-    public void EmptyContextSection_DoesNotAdoptSiblingSectionFiles()
+    public void Documentation_DoesNotCreateContextMetadata()
     {
         var module = Parse("""
-            §M{m:T}
-              §CT{partial}
-                §VS
-                §HD
-                  §FILE{Secret.calr}
-              §F{f1:A:pub} () -> i32
-                §E{}
-                §R 1
+            /// Partial view; Secret.calr is not loaded.
+            module T
+              func A public () → int
+                !
+                return 1
             """);
 
-        Assert.NotNull(module.Context);
-        Assert.Empty(module.Context!.VisibleFiles);
-        Assert.Equal("Secret.calr", Assert.Single(module.Context.HiddenFiles).FilePath);
+        Assert.Null(module.Context);
+        Assert.Equal("Partial view; Secret.calr is not loaded.", module.DocComment);
         Assert.Single(module.Functions);
     }
 
@@ -737,9 +845,9 @@ public class EmptyClauseBodyTests
     public void EmptyEnum_DoesNotSwallowSiblingEnum()
     {
         var module = Parse("""
-            §M{m1:T}
-              §EN{e1:Color}
-              §EN{e2:Size}
+            module T
+              enum Color
+              enum Size
                 Small
                 Large
             """);
@@ -750,100 +858,148 @@ public class EmptyClauseBodyTests
     }
 
     // ------------------------------------------------------------------
-    // Flat closer form keeps its meaning
+    // Retired layouts: exact lexer rejection, internal parser recovery, and native counterparts
     // ------------------------------------------------------------------
 
     [Fact]
     public void FlatCloserForm_TryBodyAtOpenerColumn_StillOwnedUntilCloser()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:Test}
-              §F{f1:SafeDivide:pub}
+        AssertRetiredSourceRejected("""
+            §M{Test}
+              §F{SafeDivide:pub}
                 §I{i32:a}
                 §I{i32:b}
                 §O{i32}
-                §TR{t1}
+                §TR
                 §R (/ a b)
                 §CA{DivideByZeroException:ex}
                 §R 0
-                §/TR{t1}
+                §/TR
                 §R 5
             """);
-
-        Assert.Equal(2, body.Count);
-        var tryStmt = Assert.IsType<TryStatementNode>(body[0]);
-        Assert.Single(tryStmt.TryBody);
-        Assert.Single(Assert.Single(tryStmt.CatchClauses).Body);
+        var native = ParseSingleFunctionBody("""
+            module Test
+              func SafeDivide public (int:a, int:b) → int
+                !
+                try
+                  return a / b
+                catch DivideByZeroException:ex
+                  return 0
+                return 5
+            """);
+        Assert.Equal(2, native.Count);
+        var nativeTry = Assert.IsType<TryStatementNode>(native[0]);
+        Assert.Single(nativeTry.TryBody);
+        Assert.Single(Assert.Single(nativeTry.CatchClauses).Body);
     }
 
     [Fact]
     public void LegacyFlatLayout_FunctionBodiesAtModuleColumn_StillParse()
     {
-        // Every line at column 1 and no closers: the function body sits at the
-        // §F's own column. It ends at the next sibling declaration.
-        var module = Parse("§M{m001:Test}\n§F{f001:A:pub}\n§O{i32}\n§R 1\n§F{f002:B:pub}\n§O{i32}\n§R 2\n");
+        AssertRetiredSourceRejected("§M{Test}\n§F{A:pub}\n§O{i32}\n§R 1\n§F{B:pub}\n§O{i32}\n§R 2\n");
+        // Internal module-column ownership control, not recommended/native indented source.
+        var module = ParseInternal(
+            "module Test\nfunc A public () → int\n!\n__return__ 1\nfunc B public () → int\n!\n__return__ 2\n",
+            ("__return__", TokenKind.Return));
 
         Assert.Equal(2, module.Functions.Count);
         Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions[0].Body));
         Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions[1].Body));
+        var native = Parse("""
+            module Test
+              func A public () → int
+                !
+                return 1
+              func B public () → int
+                !
+                return 2
+            """);
+        Assert.Equal(2, native.Functions.Count);
+        Assert.IsType<ReturnStatementNode>(Assert.Single(native.Functions[0].Body));
+        Assert.IsType<ReturnStatementNode>(Assert.Single(native.Functions[1].Body));
     }
 
     [Fact]
     public void FlatCloserForm_BodyStartingOnOpenerLine_ContinuesUntilCloser()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> void
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} () -> void
                 §E{cw}
-                §SYNC{s1} (this) §P "first"
+                §SYNC (this) §P "first"
                 §P "second"
-                §/SYNC{s1}
+                §/SYNC
                 §P "after"
             """);
-
-        Assert.Equal(2, body.Count);
-        Assert.Equal(2, Assert.IsType<SyncBlockNode>(body[0]).Body.Count);
+        var native = ParseSingleFunctionBody("""
+            module T
+              func A public () → void
+                ! cw
+                lock (this)
+                  Console.WriteLine("first")
+                  Console.WriteLine("second")
+                Console.WriteLine("after")
+            """);
+        Assert.Equal(2, native.Count);
+        Assert.Equal(2, Assert.IsType<SyncBlockNode>(native[0]).Body.Count);
     }
 
     [Fact]
     public void EmptyBlock_FollowedByNestedSameKindBlockWithIdlessCloser_IsNotFlat()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} () -> void
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} () -> void
                 §E{cw}
-                §UNSAFE{u1}
-                §UNSAFE{u2}
+                §UNSAFE
+                §UNSAFE
                   §P "inner"
                 §/UNSAFE
                 §P "after"
             """);
-
-        Assert.Equal(3, body.Count);
-        Assert.Empty(Assert.IsType<UnsafeBlockNode>(body[0]).Body);
-        Assert.Single(Assert.IsType<UnsafeBlockNode>(body[1]).Body);
-        Assert.IsType<PrintStatementNode>(body[2]);
+        var native = ParseSingleFunctionBody("""
+            module T
+              func A public () → void
+                ! cw
+                unsafe
+                unsafe
+                  Console.WriteLine("inner")
+                Console.WriteLine("after")
+            """);
+        Assert.Equal(3, native.Count);
+        Assert.Empty(Assert.IsType<UnsafeBlockNode>(native[0]).Body);
+        Assert.Single(Assert.IsType<UnsafeBlockNode>(native[1]).Body);
+        Assert.IsType<ExpressionStatementNode>(native[2]);
     }
 
     [Fact]
     public void ExplicitCloserAfterEmptyIndentedCatch_KeepsCloserFormMeaning()
     {
-        var body = ParseSingleFunctionBody("""
-            §M{m1:T}
-              §F{f1:A:pub} (i32:x) -> i32
+        AssertRetiredSourceRejected("""
+            §M{T}
+              §F{A:pub} (i32:x) -> i32
                 §E{throw}
                 §B{~n:i32} 0
-                §TR{t1}
+                §TR
                   §ASSIGN n (/ 10 x)
                 §CA{DivideByZeroException:}
                 §ASSIGN n -1
-                §/TR{t1}
+                §/TR
                 §R n
             """);
-
-        Assert.Equal(3, body.Count);
-        var tryStmt = Assert.IsType<TryStatementNode>(body[1]);
-        Assert.Single(Assert.Single(tryStmt.CatchClauses).Body);
+        var native = ParseSingleFunctionBody("""
+            module T
+              func A public (int:x) → int
+                ! throw
+                var int:n = 0
+                try
+                  set n 10 / x
+                catch DivideByZeroException
+                  set n -1
+                return n
+            """);
+        Assert.Equal(3, native.Count);
+        Assert.Single(Assert.Single(Assert.IsType<TryStatementNode>(native[1]).CatchClauses).Body);
     }
 
     // ------------------------------------------------------------------
@@ -855,10 +1011,100 @@ public class EmptyClauseBodyTests
 
     private static ModuleNode Parse(string source)
     {
+        Assert.DoesNotContain("§", source);
         var diagnostics = new DiagnosticBag();
-        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics.Errors));
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, source + "\n" + string.Join(Environment.NewLine, diagnostics.Errors));
+        var module = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, source + "\n" + string.Join(Environment.NewLine, diagnostics.Errors));
         return module;
+    }
+
+    private static void AssertRetiredClauseRejected(string name, string clause)
+    {
+        Assert.Equal(clause, Assert.Single(EmptyClauseCases(), row => (string)row[0] == name)[1]);
+        AssertRetiredSourceRejected("module T\n"
+            + "  func A public (bool:b, int:n, int[]:xs, Dictionary<string,int>:d, object:o) → int\n    !\n"
+            + "    !\n    " + clause + "\n    return 7\n");
+    }
+
+    private static void AssertRetiredSourceRejected(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        var markers = tokens.Where(token => token.Text.StartsWith('§')).ToArray();
+        Assert.NotEmpty(markers);
+        foreach (var token in markers)
+        {
+            Assert.Equal(TokenKind.Error, token.Kind);
+            Assert.Equal(token.Text, source.Substring(token.Span.Start, token.Span.Length));
+            Assert.Contains(diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.UnknownSectionMarker && diagnostic.Span.Equals(token.Span));
+        }
+        Assert.DoesNotContain(tokens, token => token.Kind is TokenKind.RawCSharpExpression or TokenKind.CSharpInterop);
+    }
+
+    private static List<Token> InternalTokens(string source, (string Marker, TokenKind Kind)[] replacements)
+    {
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        Assert.False(diagnostics.HasErrors, source + "\n" + string.Join("\n", diagnostics));
+        foreach (var (marker, kind) in replacements)
+        {
+            Assert.Contains(tokens, token => token.Text == marker);
+            for (var index = 0; index < tokens.Count; index++)
+            {
+                var token = tokens[index];
+                if (token.Text == marker)
+                    tokens[index] = new Token(kind, token.Text, token.Span, token.Value)
+                    {
+                        IndentationDepth = token.IndentationDepth,
+                        DocComment = token.DocComment,
+                    };
+            }
+        }
+        return tokens;
+    }
+
+    private static ModuleNode ParseInternal(string source, params (string Marker, TokenKind Kind)[] replacements)
+    {
+        var tokens = InternalTokens(source, replacements);
+        if (replacements.Any(replacement => replacement.Kind == TokenKind.EndLambda))
+        {
+            var start = Assert.Single(tokens, token => token.Kind == TokenKind.Lambda).Span.Start;
+            var end = Assert.Single(tokens, token => token.Kind == TokenKind.EndLambda).Span.Start;
+            Assert.DoesNotContain(tokens, token => token.Span.Start > start && token.Span.Start < end
+                && token.Kind is TokenKind.Indent or TokenKind.Dedent);
+        }
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(tokens, diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, "Internal token/API control:\n" + source + "\n" + string.Join("\n", diagnostics));
+        return module;
+    }
+
+    private static void AssertEmptyClause(string name, StatementNode statement)
+    {
+        IReadOnlyList<StatementNode> body = name switch
+        {
+            "if-then" => Assert.IsType<IfStatementNode>(statement).ThenBody,
+            "elseif" => Assert.Single(Assert.IsType<IfStatementNode>(statement).ElseIfClauses).Body,
+            "else" or "block-if-else" => Assert.IsType<IfStatementNode>(statement).ElseBody!,
+            "for" => Assert.IsType<ForStatementNode>(statement).Body,
+            "while" => Assert.IsType<WhileStatementNode>(statement).Body,
+            "foreach" => Assert.IsType<ForeachStatementNode>(statement).Body,
+            "eachkv" => Assert.IsType<DictionaryForeachNode>(statement).Body,
+            "using" => Assert.IsType<UsingStatementNode>(statement).Body,
+            "sync" => Assert.IsType<SyncBlockNode>(statement).Body,
+            "unsafe" => Assert.IsType<UnsafeBlockNode>(statement).Body,
+            "fixed" => Assert.IsType<FixedStatementNode>(statement).Body,
+            "preprocessor" => Assert.IsType<PreprocessorDirectiveNode>(statement).Body,
+            "try-empty-catch" => Assert.Single(Assert.IsType<TryStatementNode>(statement).CatchClauses).Body,
+            "try-empty-finally" => Assert.IsType<TryStatementNode>(statement).FinallyBody!,
+            "match-last-case" => Assert.IsType<MatchStatementNode>(statement).Cases.Last().Body,
+            _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
+        };
+        Assert.NotNull(body);
+        Assert.Empty(body);
     }
 
     private static object? Invoke(Type type, string name, params object?[] args) =>
@@ -866,6 +1112,7 @@ public class EmptyClauseBodyTests
 
     private static Type Compile(string source, string typeName)
     {
+        Parse(source);
         var result = Program.Compile(source, "empty-clause.calr", new CompilationOptions
         {
             EnableTypeChecking = true,
@@ -873,14 +1120,19 @@ public class EmptyClauseBodyTests
             StatusWriter = TextWriter.Null
         });
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        return EmitAndLoad(result.GeneratedCode!, typeName);
+    }
+
+    private static Type EmitAndLoad(string generatedCode, string typeName)
+    {
         var compilation = CSharpCompilation.Create("EmptyClause_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode)],
+            [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + generatedCode)],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
         var emission = compilation.Emit(stream);
         Assert.True(emission.Success,
-            string.Join(Environment.NewLine, emission.Diagnostics) + Environment.NewLine + result.GeneratedCode);
+            string.Join(Environment.NewLine, emission.Diagnostics) + Environment.NewLine + generatedCode);
         var assembly = Assembly.Load(stream.ToArray());
         return assembly.GetType(typeName, throwOnError: false)
                ?? Assert.Single(assembly.GetTypes(), t => t.Name == typeName);

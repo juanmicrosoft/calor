@@ -1,0 +1,15 @@
+module MatrixMultiply MatrixMultiply
+  module MatrixMultiplyModule
+    func DotProduct public (int:a1, int:b1, int:a2, int:b2) → int
+      !
+      return (a1 * b1) + (a2 * b2)
+
+    func ValidDimensions public (int:aCols, int:bRows) → bool
+      !
+      return aCols == bRows
+
+    func ResultSize public (int:aRows, int:bCols) → int
+      !
+      requires aRows > 0
+      requires bCols > 0
+      return aRows * bCols

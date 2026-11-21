@@ -1,0 +1,21 @@
+module Trie Trie
+  module TrieModule
+    func CharIndex public (int:charCode) → int
+      !
+      requires charCode >= 97
+      requires charCode <= 122
+      => result >= 0
+      => result < 26
+      return charCode - 97
+
+    func IsValidChar public (int:charCode) → bool
+      !
+      return charCode >= 97 && charCode <= 122
+
+    func IsEndOfWord public (bool:flag) → bool
+      !
+      return flag
+
+    func AlphabetSize public () → int
+      !
+      return 26

@@ -1,0 +1,14 @@
+module UnsafeService UnsafeService
+  module UnsafeServiceModule
+    func SilentLog public (string:message) → void
+      ! cw
+      System.Console.WriteLine(message)
+
+    func UndeclaredWrite public (string:path, string:content) → void
+      ! cw
+      System.Console.WriteLine(path)
+      System.Console.WriteLine(content)
+
+    func HiddenNetwork public (string:url) → string
+      !
+      return url

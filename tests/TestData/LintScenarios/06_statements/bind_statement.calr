@@ -1,9 +1,9 @@
-§M{m1:Bind}
-  §F{f1:Main:pub} () -> i32
-    §B{a} 10
-    §B{b} 20
-    §B{sum} (+ a b)
-    §B{~counter} 0
-    §B{~counter} (+ counter 1)
-    §R sum
-
+module Bind Bind block
+  func Main () → int
+    !
+    let a = 10
+    let b = 20
+    let sum = (a + b)
+    var counter = 0
+    var counter = (counter + 1)
+    return sum

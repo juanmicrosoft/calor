@@ -18,31 +18,29 @@ public class ComprehensionProportionalTests
 
         // Simple program: 1 function, no contracts
         var simpleContext = CreateContext(
-            calor: "§M{m001:Simple} §F{f001:Add:pub} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)",
+            calor: "module Simple Simple block\n  func Add (int:a, int:b) → int\n    !\n    return (a + b)",
             csharp: "namespace Simple { public class M { public int Add(int a, int b) { return a + b; } } }");
 
         // Complex program: multiple functions, contracts, effects
         var complexContext = CreateContext(
-            calor: @"§M{m001:Complex}
-  §F{f001:Divide:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §S (== result (/ a b))
-      §E{cw}
-      §R (/ a b)
-  §F{f002:Abs:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x -2147483648)
-      §S (>= result 0)
-      §R x
-  §F{f003:Max:pub}
-      §I{i32:a} §I{i32:b}
-      §O{i32}
-      §S (>= result a)
-      §S (>= result b)
-      §R a",
+            calor: @"module Complex Complex block
+  func Divide (int:a, int:b) → int
+    ! cw
+    requires (b != 0)
+    => (result == (a / b))
+    return (a / b)
+
+  func Abs (int:x) → int
+    !
+    requires (x >= -2147483648)
+    => (result >= 0)
+    return x
+
+  func Max (int:a, int:b) → int
+    !
+    => (result >= a)
+    => (result >= b)
+    return a",
             csharp: @"namespace Complex { public class M {
     public int Divide(int a, int b) { return a / b; }
     public int Abs(int x) { return x; }
@@ -63,12 +61,12 @@ public class ComprehensionProportionalTests
 
         // Simple C# with no documentation
         var simpleContext = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §O{i32} §R 1",
+            calor: "module T T block\n  func F () → int\n    !\n    return 1",
             csharp: "class T { int F() { return 1; } }");
 
         // C# with documentation, contracts, multiple return types
         var richContext = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §O{i32} §R 1",
+            calor: "module T T block\n  func F () → int\n    !\n    return 1",
             csharp: @"namespace Rich {
     /// <summary>First method</summary>
     /// <param name=""x"">The input</param>
@@ -111,12 +109,12 @@ public class ComprehensionProportionalTests
 
         // Pre-only
         var preOnlyContext = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §I{i32:x} §O{i32} §Q (> x 0) §R x",
+            calor: "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    return x",
             csharp: "class T { int F(int x) { return x; } }");
 
         // Pre + Post (contract completeness bonus)
         var bothContext = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §I{i32:x} §O{i32} §Q (> x 0) §S (>= result 0) §R x",
+            calor: "module T T block\n  func F (int:x) → int\n    !\n    requires (x > 0)\n    => (result >= 0)\n    return x",
             csharp: "class T { int F(int x) { return x; } }");
 
         var preOnly = await calculator.CalculateAsync(preOnlyContext);
@@ -133,7 +131,7 @@ public class ComprehensionProportionalTests
 
         // Matched pairs (open == close)
         var matchedContext = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §O{i32} §R 1",
+            calor: "module T T block\n  func F () → int\n    !\n    return 1",
             csharp: "class T { int F() { return 1; } }");
 
         var result = await calculator.CalculateAsync(matchedContext);
@@ -154,10 +152,23 @@ public class ComprehensionProportionalTests
 
         // Maximally rich Calor program
         var richContext = CreateContext(
-            calor: @"§M{m001:T}
-  §F{f001:A:pub} §I{i32:x} §I{i32:y} §O{i32} §Q (> x 0) §Q (> y 0) §S (> result 0) §E{cw,db:rw} §R (+ x y) §/F{f001}
-  §F{f002:B:pub} §I{i32:x} §O{i32} §Q (>= x 0) §S (>= result 0) §E{fs:rw} §R x §/F{f002}
-  §F{f003:C:pub} §I{i32:a} §I{i32:b} §O{i32} §Q (!= b 0) §S (== result (/ a b)) §R (/ a b)",
+            calor: @"module T T block
+  func A public (int:x, int:y) → int
+    ! cw,db:rw
+    requires x > 0
+    requires y > 0
+    => result > 0
+    return x + y
+  func B public (int:x) → int
+    ! fs:rw
+    requires x >= 0
+    => result >= 0
+    return x
+  func C public (int:a, int:b) → int
+    !
+    requires b != 0
+    => result == a / b
+    return a / b",
             csharp: @"namespace T {
     /// <summary>A</summary>
     /// <param name=""x"">x</param>
@@ -185,9 +196,16 @@ public class ComprehensionProportionalTests
         var calculator = new ComprehensionCalculator();
 
         var context = CreateContext(
-            calor: @"§M{m001:T}
-  §F{f001:A:pub} §I{i32:x} §O{i32} §Q (> x 0) §S (>= result 0) §R x §/F{f001}
-  §F{f002:B:pub} §I{i32:y} §O{i32} §Q (> y 0) §R y",
+            calor: @"module T T block
+  func A public (int:x) → int
+    !
+    requires x > 0
+    => result >= 0
+    return x
+  func B public (int:y) → int
+    !
+    requires y > 0
+    return y",
             csharp: "namespace T { public class M { public int A(int x) { return x; } public int B(int y) { return y; } } }");
 
         var result = await calculator.CalculateAsync(context);
@@ -213,7 +231,7 @@ public class ComprehensionProportionalTests
         var calculator = new ComprehensionCalculator();
 
         var context = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §O{i32} §R 1",
+            calor: "module T T block\n  func F () → int\n    !\n    return 1",
             csharp: @"namespace T {
     /// <summary>First</summary>
     /// <summary>Second</summary>
@@ -241,7 +259,7 @@ public class ComprehensionProportionalTests
     {
         var calculator = new ComprehensionCalculator();
         var context = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §O{i32} §R 1",
+            calor: "module T T block\n  func F () → int\n    !\n    return 1",
             csharp: "class T { int F() { return 1; } }");
 
         var questions = new List<ComprehensionQuestion>
@@ -272,7 +290,7 @@ public class ComprehensionProportionalTests
     {
         var calculator = new ComprehensionCalculator();
         var context = CreateContext(
-            calor: "§M{m001:T} §F{f001:F:pub} §O{i32} §R 1",
+            calor: "module T T block\n  func F () → int\n    !\n    return 1",
             csharp: "class T { int F() { return 1; } }");
 
         var questions = new List<ComprehensionQuestion>

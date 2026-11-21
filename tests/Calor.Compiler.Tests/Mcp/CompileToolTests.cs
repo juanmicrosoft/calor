@@ -9,6 +9,29 @@ public class CompileToolTests
 {
     private readonly CompileTool _tool = new();
 
+    [Theory]
+    [InlineData("module Gate\n  func Run () → void\n    !\n    ", "statement", "return;")]
+    [InlineData("module Gate\n  class Host\n    ", "member", "public int Value => 7;")]
+    [InlineData("module _global\n  ", "unit", "public class Kept { }")]
+    [InlineData("module Gate\n  func Run () → void\n    !\n    ", "member:unresolved-feature:Other:reason", "return;")]
+    [InlineData("module Gate\n  class Host\n    ", "member:unresolved-feature:Other:reason", "public int Value => 7;")]
+    [InlineData("module _global\n  ", "unit:unresolved-feature:Other:reason", "public class Kept { }")]
+    public async Task InteropReasonGate_McpRejectsUnmarkedWhenEffectsAreDisabled(
+        string prefix, string marker, string payload)
+    {
+        var source = $"{prefix}raw {marker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n";
+        var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(new
+        {
+            source, options = new { enforceEffects = false }
+        }));
+        Assert.True(result.IsError);
+        Assert.Contains("Calor1012", result.Content[0].Text);
+        Assert.Contains("calor convert", result.Content[0].Text);
+        using var output = JsonDocument.Parse(result.Content[0].Text!);
+        Assert.False(output.RootElement.GetProperty("success").GetBoolean());
+        Assert.False(output.RootElement.TryGetProperty("generatedCode", out _));
+    }
+
     [Fact]
     public void Name_ReturnsCalorCompile()
     {
@@ -36,8 +59,8 @@ public class CompileToolTests
     // v0.15 (PR #1088): the MCP compile tool inherits default-on elision and must
     // expose the same opt-out the CLI has (`keepProvenGuards` ⇔ --keep-proven-guards).
     private const string ProvenSquareSource =
-        "§M{m001:Test}\n  §CL{c001:Calc:pub}\n    §MT{mt001:Square:pub}\n      §I{i32:x}\n      §O{i32}\n" +
-        "      §Q (>= x 0)\n      §Q (<= x 46340)\n      §S (>= result 0)\n      §R (* x x)\n";
+        "module Test Test\n  class Calc public\n    func Square public (int:x) → int\n      !\n" +
+        "      requires x >= 0\n      requires x <= 46340\n      => result >= 0\n      return x * x\n";
 
     private async Task<string> CompileProvenSquare(string options)
     {
@@ -87,7 +110,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                "source": "module Test Test\n  module TestModule public\n    func Add public (int:a, int:b) → int\n      !\n      return a + b\n"
             }
             """).RootElement;
 
@@ -108,7 +131,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Main:pub}\n§O{void}\n§P \"undeclared console write\"\n"
+                "source": "module Test Test\n  module TestModule public\n    func Main public () → void\n      !\n      System.Console.WriteLine(\"undeclared console write\")\n"
             }
             """).RootElement;
 
@@ -124,7 +147,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Bad} invalid syntax"
+                "source": "§M{Test}\n§F{Bad} invalid syntax"
             }
             """).RootElement;
 
@@ -176,7 +199,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
+                "source": "module Test Test\n  module TestModule public\n    func Div public (int:a, int:b) → int\n      !\n      requires b != 0\n      return a / b\n",
                 "options": {
                     "contractMode": "off"
                 }
@@ -195,7 +218,7 @@ public class CompileToolTests
     {
         var args = JsonDocument.Parse("""
             {
-                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n",
+                "source": "module Test Test\n  module TestModule public\n    func Div public (int:a, int:b) → int\n      !\n      requires b != 0\n      return a / b\n",
                 "options": {
                     "contractMode": "release"
                 }

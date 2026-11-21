@@ -1,0 +1,5 @@
+module UnsafeMath UnsafeMath
+  module UnsafeMathModule
+    func Divide public (int:a, int:b) → int
+      !
+      return a / b

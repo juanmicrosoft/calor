@@ -1,0 +1,23 @@
+module Graph Graph
+  module GraphModule
+    func IsConnected public (int:edgeCount) → bool
+      !
+      return edgeCount > 0
+
+    func Degree public (int:neighborCount) → int
+      !
+      => result >= 0
+      return neighborCount
+
+    func HasEdge public (int:@from, int:@to, int:nodeCount) → bool
+      !
+      requires @from >= 0
+      requires @to >= 0
+      requires @from < nodeCount
+      requires @to < nodeCount
+      return @from != @to
+
+    func NodeCount public (int:count) → int
+      !
+      => result >= 0
+      return count

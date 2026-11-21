@@ -1,0 +1,7 @@
+module Fixture Fixture overflow unchecked
+  module SurrogateValues
+    func Verify () → int
+      !
+      let char:high = '\ud800'
+      let char:low = '\udfff'
+      return ((((int)high) * 2) + ((int)low))

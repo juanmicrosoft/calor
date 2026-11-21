@@ -1,0 +1,10 @@
+module MaxTwo MaxTwo
+  module MaxTwoModule
+    func Max public (int:a, int:b) → int
+      !
+      => result >= a
+      => result >= b
+      if a > b
+        return a
+      else
+        return b

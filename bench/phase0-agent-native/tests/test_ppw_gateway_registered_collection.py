@@ -82,7 +82,7 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
     def test_synthetic_source_bound_collector_output_reaches_registered_adjudicator(self):
         self.collect()
         before = analysis.inventory(self.epoch, analysis.module("readonly_collector", "ppw-instrument.py"))
-        with self.assertRaisesRegex(ValueError, "analysis artifact changed: ppw-budget-gateway.py"):
+        with self.assertRaisesRegex(ValueError, r"analysis artifact changed: (harness-capture|ppw-budget-gateway)\.py"):
             analysis.validate_analysis_registration()
         with patch("subprocess.run", side_effect=AssertionError("adjudication must remain read-only")):
             report = self.adjudicate(self.epochs)

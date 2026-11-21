@@ -1,7 +1,4 @@
-§M{m1:Unterminated}
-§F{f1:Main:pub}
-§O{void}
-§E{cw}
-§P "this string never ends
-§/F{f1}
-§/M{m1}
+§M{Unterminated}
+  §F{Main:pub} () -> void
+    §E{cw}
+    §P "this string never ends

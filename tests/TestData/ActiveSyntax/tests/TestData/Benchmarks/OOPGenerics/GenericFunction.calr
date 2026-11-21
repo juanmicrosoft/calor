@@ -1,0 +1,13 @@
+module GenericFunction GenericFunction
+  module GenericFunctionModule
+    func Identity public (int:value) → int
+      !
+      return value
+
+    func AreEqual public (int:a, int:b) → bool
+      !
+      return a == b
+
+    func DefaultValue public () → int
+      !
+      return 0

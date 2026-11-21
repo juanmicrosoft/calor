@@ -1,0 +1,27 @@
+module TypeSystem TypeSystem block
+  module TypeSystemModule
+    func Main () → void
+      ! cw, alloc, throw
+      Console.WriteLine("Testing nullable values and exceptions...")
+      TestPresent()
+      TestMissing()
+      TestSuccess()
+      TestFailure()
+
+    func TestPresent private () → void
+      let int?:value = 42
+      Console.WriteLine(value ?? 0)
+
+    func TestMissing private () → void
+      let int?:value = null
+      Console.WriteLine(value ?? -1)
+
+    func TestSuccess private () → void
+      let int:value = 100
+      Console.WriteLine(value)
+
+    func TestFailure private () → void
+      try
+        throw new InvalidOperationException("Something went wrong")
+      catch InvalidOperationException:error
+        Console.WriteLine(error.Message)

@@ -6,6 +6,7 @@ using Calor.Compiler.Effects;
 using Calor.Compiler.Incremental;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Verification.Z3;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Calor.Compiler.Migration.Project;
 
@@ -51,6 +52,29 @@ public sealed class ProjectMigrator
     /// </summary>
     public async Task<MigrationReport> ExecuteAsync(MigrationPlan plan, bool dryRun = false, IProgress<MigrationProgress>? progress = null, CancellationToken cancellationToken = default)
     {
+        var generations = new System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration>(
+            BuildStateCache.GetPathComparer());
+        using var validationGate = new SemaphoreSlim(1, 1);
+        try
+        {
+            return await ExecuteCoreAsync(plan, dryRun, progress, generations, validationGate, cancellationToken);
+        }
+        finally
+        {
+            foreach (var generation in generations.Values)
+                generation.Dispose();
+        }
+    }
+
+    private async Task<MigrationReport> ExecuteCoreAsync(
+        MigrationPlan plan, bool dryRun, IProgress<MigrationProgress>? progress,
+        System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
+        SemaphoreSlim validationGate,
+        CancellationToken cancellationToken)
+    {
+        if (_options.SplitNamespaces && (_options.Fidelity != ConversionFidelity.Lossless
+            || _options.PreprocessorMode != PreprocessorConversionMode.PreserveAllBranches))
+            throw new InvalidOperationException("Namespace splitting requires lossless, all-branches project migration.");
         _manifestProjectDirectory = ResolveManifestProjectDirectory(plan);
         var projectFilePath = plan.ProjectFilePath
             ?? (File.Exists(plan.ProjectPath)
@@ -100,23 +124,94 @@ public sealed class ProjectMigrator
             .SetDirection(plan.Direction)
             .IncludeBenchmark(_options.IncludeBenchmark);
 
-        var collisionPaths = new HashSet<string>(
-            BuildStateCache.GetPathComparer());
-        foreach (var collision in plan.Entries
-                     .Where(entry =>
-                         entry.Convertibility
-                             != FileConvertibility.Skip)
-                     .GroupBy(
-                         entry => Path.GetFullPath(
-                             entry.OutputPath),
-                         BuildStateCache.GetPathComparer())
+        var collisionPaths = new HashSet<string>(BuildStateCache.GetPathComparer());
+        var executionEntries = new List<MigrationPlanEntry>();
+        foreach (var entry in plan.Entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_options.SplitNamespaces || plan.Direction != MigrationDirection.CSharpToCalor
+                || entry.Convertibility == FileConvertibility.Skip || !File.Exists(entry.SourcePath))
+            {
+                executionEntries.Add(entry);
+                continue;
+            }
+            var source = await CSharpToCalorConverter.ReadSourceFileAsync(entry.SourcePath, cancellationToken);
+            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                source, cancellationToken: cancellationToken).GetCompilationUnitRoot(cancellationToken);
+            var namespaces = CSharpToCalorConverter.GetSplittableNamespaces(root);
+            var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(entry.OutputPath))!;
+            var prefix = Path.GetFileNameWithoutExtension(entry.OutputPath) + ".namespace";
+            var expectedOutputs = Enumerable.Range(0, namespaces.Count)
+                .SelectMany(index => new[]
+                {
+                    Path.GetFullPath(CSharpToCalorConverter.GetNamespaceOutputPath(entry.OutputPath, index)),
+                    Path.GetFullPath(CSharpToCalorConverter.GetNamespaceOutputPath(entry.OutputPath, index)) + ".conversion.json"
+                }).ToHashSet(BuildStateCache.GetPathComparer());
+            if (Directory.Exists(outputDirectory) && Directory.EnumerateFiles(outputDirectory)
+                .Any(path => Path.GetFileName(path).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                    && (path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase)
+                        || path.EndsWith(".calr.conversion.json", StringComparison.OrdinalIgnoreCase))
+                    && !expectedOutputs.Contains(path)))
+            {
+                collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                reportBuilder.AddFileResult(new FileMigrationResult
+                {
+                    SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                    Issues = [new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                        Message = "An existing namespace output is outside the new output set. Retain it and choose a fresh destination."
+                    }]
+                });
+                continue;
+            }
+            if (namespaces.Count == 0)
+                executionEntries.Add(entry);
+            else
+            {
+                if (File.Exists(entry.OutputPath) || Directory.Exists(entry.OutputPath)
+                    || File.Exists(entry.OutputPath + ".conversion.json"))
+                {
+                    collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                    reportBuilder.AddFileResult(new FileMigrationResult
+                    {
+                        SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                        Issues = [new ConversionIssue
+                        {
+                            Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                            Message = "An existing single-output destination cannot coexist with native split outputs. Choose a fresh destination."
+                        }]
+                    });
+                    continue;
+                }
+                for (var index = 0; index < namespaces.Count; index++)
+                    executionEntries.Add(new MigrationPlanEntry
+                    {
+                        SourcePath = entry.SourcePath,
+                        OutputPath = CSharpToCalorConverter.GetNamespaceOutputPath(entry.OutputPath, index),
+                        NamespaceIndex = index,
+                        Convertibility = entry.Convertibility,
+                        AnalysisScore = entry.AnalysisScore,
+                        FileSizeBytes = entry.FileSizeBytes
+                    });
+            }
+        }
+        var outputArtifacts = executionEntries
+                     .Where(entry => entry.Convertibility != FileConvertibility.Skip)
+                     .SelectMany(entry => (_options.SplitNamespaces
+                             ? new[] { entry.OutputPath, entry.OutputPath + ".conversion.json", entry.OutputPath + ".conversion.lock" }
+                             : [entry.OutputPath])
+                         .Select(path => (Entry: entry, Path: CanonicalPath.Resolve(path))))
+                     .ToArray();
+        foreach (var collision in outputArtifacts
+                     .GroupBy(item => item.Path, BuildStateCache.GetPathComparer())
                      .Where(group => group.Count() > 1))
         {
             var sources = collision
-                .Select(entry => entry.SourcePath)
+                .Select(item => item.Entry.SourcePath)
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .ToArray();
-            foreach (var entry in collision)
+            foreach (var entry in collision.Select(item => item.Entry).Distinct())
             {
                 collisionPaths.Add(
                     Path.GetFullPath(entry.SourcePath));
@@ -144,7 +239,55 @@ public sealed class ProjectMigrator
             }
         }
 
-        var entriesToProcess = plan.Entries
+        if (_options.SplitNamespaces)
+        {
+            var inputPaths = plan.Entries.Select(entry => CanonicalPath.Resolve(entry.SourcePath))
+                .ToHashSet(BuildStateCache.GetPathComparer());
+            foreach (var entry in executionEntries.Where(entry => new[]
+                         { entry.OutputPath, entry.OutputPath + ".conversion.json", entry.OutputPath + ".conversion.lock" }
+                     .Any(path => inputPaths.Contains(CanonicalPath.Resolve(path)))))
+            {
+                collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                reportBuilder.AddFileResult(new FileMigrationResult
+                {
+                    SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                    Issues = [new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                        Message = $"Conversion artifacts for '{entry.OutputPath}' would overwrite an original input."
+                    }]
+                });
+            }
+            var artifactLookup = outputArtifacts.ToLookup(item => item.Path, BuildStateCache.GetPathComparer());
+            foreach (var artifact in outputArtifacts)
+            {
+                var directory = Path.GetDirectoryName(artifact.Path);
+                while (!string.IsNullOrEmpty(directory))
+                {
+                    var ancestors = artifactLookup[directory].Select(item => item.Entry).ToArray();
+                    if (ancestors.Length != 0 || inputPaths.Contains(directory))
+                    {
+                        foreach (var entry in ancestors.Append(artifact.Entry).Distinct())
+                        {
+                            collisionPaths.Add(Path.GetFullPath(entry.SourcePath));
+                            reportBuilder.AddFileResult(new FileMigrationResult
+                            {
+                                SourcePath = entry.SourcePath, OutputPath = null, Status = FileMigrationStatus.Failed,
+                                Issues = [new ConversionIssue
+                                {
+                                    Severity = ConversionIssueSeverity.Error, Feature = "migration-output-collision",
+                                    Message = $"Conversion artifact '{artifact.Path}' requires file destination '{directory}' to be a directory."
+                                }]
+                            });
+                        }
+                        break;
+                    }
+                    directory = Path.GetDirectoryName(directory);
+                }
+            }
+        }
+
+        var entriesToProcess = executionEntries
             .Where(e => e.Convertibility != FileConvertibility.Skip)
             .Where(entry => !collisionPaths.Contains(
                 Path.GetFullPath(entry.SourcePath)))
@@ -169,7 +312,7 @@ public sealed class ProjectMigrator
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var result = await ProcessEntryAsync(
-                        entry, plan.Direction, dryRun, crossModuleMap, cancellationToken);
+                        entry, plan.Direction, dryRun, crossModuleMap, generations, validationGate, cancellationToken);
 
                     var newCount = Interlocked.Increment(ref processedCount);
                     progress?.Report(new MigrationProgress
@@ -198,7 +341,7 @@ public sealed class ProjectMigrator
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var result = await ProcessEntryAsync(
-                    entry, plan.Direction, dryRun, crossModuleMap, cancellationToken);
+                    entry, plan.Direction, dryRun, crossModuleMap, generations, validationGate, cancellationToken);
                 reportBuilder.AddFileResult(result);
 
                 processedCount++;
@@ -213,7 +356,7 @@ public sealed class ProjectMigrator
         }
 
         // Add skipped files
-        foreach (var entry in plan.Entries.Where(e => e.Convertibility == FileConvertibility.Skip))
+        foreach (var entry in executionEntries.Where(e => e.Convertibility == FileConvertibility.Skip))
         {
             reportBuilder.AddFileResult(new FileMigrationResult
             {
@@ -241,6 +384,7 @@ public sealed class ProjectMigrator
                 report,
                 projectFilePath,
                 dryRun,
+                generations,
                 cancellationToken);
             RefreshSummary(report);
         }
@@ -367,6 +511,8 @@ public sealed class ProjectMigrator
         MigrationDirection direction,
         bool dryRun,
         IReadOnlyDictionary<string, CrossModuleFunctionTarget>? crossModuleMap,
+        System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
+        SemaphoreSlim validationGate,
         CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.UtcNow;
@@ -384,7 +530,7 @@ public sealed class ProjectMigrator
         {
             if (direction == MigrationDirection.CSharpToCalor)
             {
-                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime, cts.Token);
+                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime, generations, validationGate, cts.Token);
             }
             else
             {
@@ -431,21 +577,23 @@ public sealed class ProjectMigrator
         MigrationPlanEntry entry,
         bool dryRun,
         DateTime startTime,
+        System.Collections.Concurrent.ConcurrentDictionary<string, ConversionGeneration> generations,
+        SemaphoreSlim validationGate,
         CancellationToken cancellationToken)
     {
         var conversionOptions = new ConversionOptions
         {
+            IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing,
             IncludeBenchmark = _options.IncludeBenchmark,
             Fidelity = _options.Fidelity,
             PreprocessorMode = _options.PreprocessorMode,
             ValidateRoundTripCSharp = false,
             PassthroughOnError = _options.PassthroughOnError,
-            UseImplicitCallCloser = _options.UseImplicitCallCloser,
             Configuration = _options.Configuration,
             TargetFramework = _options.TargetFramework
         };
         var (projectInput, selectionError) = SelectProjectInput(entry.SourcePath);
-        if (selectionError != null)
+        if (selectionError != null && projectInput == null)
         {
             var excluded = selectionError.StartsWith(
                 "Excluded from evaluated Compile items:",
@@ -473,6 +621,8 @@ public sealed class ProjectMigrator
         }
         if (projectInput != null)
         {
+            conversionOptions.IncludeImplicitSystemUsing =
+                _options.IncludeImplicitSystemUsing && projectInput.IncludeImplicitSystemUsing;
             conversionOptions.ParseOptions =
                 new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
                     _options.LanguageVersion ?? projectInput.LanguageVersion,
@@ -535,7 +685,30 @@ public sealed class ProjectMigrator
 
         var converter = new CSharpToCalorConverter(conversionOptions);
 
-        var result = await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
+        ConversionGeneration? generation = null;
+        if (_options.Fidelity == ConversionFidelity.Lossless)
+        {
+            generation = converter.CreateGeneration(entry.SourcePath, entry.OutputPath, dryRun, entry.NamespaceIndex,
+                projectConversion: _options.SplitNamespaces);
+            if (!generations.TryAdd(Path.GetFullPath(entry.OutputPath), generation))
+            {
+                generation.Dispose();
+                throw new IOException($"Duplicate output generation: {entry.OutputPath}");
+            }
+        }
+        var result = generation != null
+            ? await generation.ConvertAsync(cancellationToken)
+            : await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
+        if (selectionError != null && entry.NamespaceIndex.HasValue)
+            result.Context.AddError(selectionError, "namespace-split-project-selection");
+        if (selectionError != null && !entry.NamespaceIndex.HasValue && _options.Fidelity == ConversionFidelity.Lossless)
+            result = generation!.PreserveOriginal(cancellationToken,
+                [new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Warning,
+                    Feature = "preprocessor-project-selection",
+                    Message = selectionError + " Original C# is preserved for validation under every target framework."
+                }]);
 
         // Tag partial classes with source file for merging
         if (result.Success && result.Ast != null && _options.MergePartialClasses)
@@ -551,9 +724,15 @@ public sealed class ProjectMigrator
         {
             var originalSource = await File.ReadAllTextAsync(entry.SourcePath, cancellationToken);
             metrics = BenchmarkIntegration.CalculateMetrics(originalSource, result.CalorSource);
+            if (entry.NamespaceIndex is > 0)
+            {
+                metrics.OriginalLines = 0;
+                metrics.OriginalTokens = 0;
+                metrics.OriginalCharacters = 0;
+            }
         }
 
-        var status = GetMigrationStatus(result);
+        var status = result.HasErrors ? FileMigrationStatus.Failed : GetMigrationStatus(result);
 
         // Validate: parse and compile the generated Calor to catch false-positive "success"
         var issues = result.Issues.ToList();
@@ -561,9 +740,8 @@ public sealed class ProjectMigrator
         if (result.Success &&
             result.CalorSource != null)
         {
-            var compileResult = Program.Compile(
+            var compileResult = await CompileStagedAsync(
                 result.CalorSource,
-                entry.OutputPath,
                 new CompilationOptions
                 {
                     EnforceEffects = false,
@@ -573,17 +751,34 @@ public sealed class ProjectMigrator
                 });
             if (compileResult.HasErrors)
             {
-                status = FileMigrationStatus.Failed;
-                issues.AddRange(compileResult.Diagnostics.Errors.Select(diagnostic => new ConversionIssue
+                var failures = compileResult.Diagnostics.Errors.Select(diagnostic => new ConversionIssue
                 {
                     Severity = ConversionIssueSeverity.Error,
                     Feature = "roundtrip-calor-validation",
                     Message = $"Generated Calor failed compilation: {diagnostic.Message}",
                     Line = diagnostic.Span.Line,
                     Column = diagnostic.Span.Column
-                }));
+                }).ToList();
+                if (_options.Fidelity == ConversionFidelity.Lossless && !entry.NamespaceIndex.HasValue)
+                {
+                    result = generation!.PreserveOriginal(cancellationToken, failures);
+                    status = GetMigrationStatus(result);
+                    issues = result.Issues.ToList();
+                    compileResult = await CompileStagedAsync(
+                        result.CalorSource!,
+                        new CompilationOptions
+                        {
+                            DeferGeneratedOutputValidation = true,
+                            CancellationToken = cancellationToken
+                        });
+                }
+                if (!result.Success || compileResult.HasErrors)
+                {
+                    status = FileMigrationStatus.Failed;
+                    issues.AddRange(failures);
+                }
             }
-            else
+            if (!compileResult.HasErrors)
             {
                 generatedCSharp = compileResult.GeneratedCode;
             }
@@ -616,7 +811,7 @@ public sealed class ProjectMigrator
                         DeferGeneratedOutputValidation = true,
                         CancellationToken = cancellationToken
                     };
-                    var compileResult = Program.Compile(result.CalorSource, entry.OutputPath, compileOptions);
+                    var compileResult = await CompileStagedAsync(result.CalorSource, compileOptions);
                     if (compileResult.HasErrors)
                     {
                         status = FileMigrationStatus.Failed;
@@ -662,6 +857,7 @@ public sealed class ProjectMigrator
 
         return new FileMigrationResult
         {
+            NamespaceIndex = entry.NamespaceIndex,
             SourcePath = entry.SourcePath,
             OutputPath = status is FileMigrationStatus.Success or FileMigrationStatus.Partial
                 ? entry.OutputPath
@@ -677,6 +873,16 @@ public sealed class ProjectMigrator
             ConvertedSource = result.CalorSource,
             GeneratedCSharp = generatedCSharp
         };
+
+        async Task<CompilationResult> CompileStagedAsync(string source, CompilationOptions options)
+        {
+            if (_options.Fidelity != ConversionFidelity.Lossless)
+                return Program.Compile(source, entry.OutputPath, options);
+            // Unchanged registered outputs synchronize a shared identity store during compilation.
+            await validationGate.WaitAsync(cancellationToken);
+            try { return Program.Compile(source, entry.OutputPath, options); }
+            finally { validationGate.Release(); }
+        }
     }
 
     internal static FileMigrationStatus GetMigrationStatus(ConversionResult result)
@@ -690,26 +896,18 @@ public sealed class ProjectMigrator
         MigrationReport report,
         string? projectFilePath,
         bool dryRun,
+        IReadOnlyDictionary<string, ConversionGeneration> generations,
         CancellationToken cancellationToken)
     {
         var converted = report.FileResults
             .Where(result => result.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial)
             .ToList();
 
-        if (report.FileResults.Any(result =>
+        if (_options.SplitNamespaces && report.FileResults.Any(result =>
                 result.Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut))
         {
-            foreach (var result in converted)
-            {
-                result.Status = FileMigrationStatus.Failed;
-                result.OutputPath = null;
-                result.Issues.Add(new ConversionIssue
-                {
-                    Severity = ConversionIssueSeverity.Error,
-                    Feature = "project-validation",
-                    Message = "Project migration was not written because another file failed conversion."
-                });
-            }
+            MarkProjectValidationFailure(converted,
+                "Namespace-split project was not written because another output failed.");
             return;
         }
 
@@ -782,6 +980,7 @@ public sealed class ProjectMigrator
                 Features = _options.ParseFeatures,
                 PreprocessorSymbols = EffectivePreprocessorSymbols(inputs),
                 IncludeImplicitGlobalUsings = inputs.IncludeImplicitGlobalUsings,
+                IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing && inputs.IncludeImplicitSystemUsing,
                 AnalyzerPaths = inputs.AnalyzerPaths,
                 AdditionalFilePaths = inputs.AdditionalFilePaths,
                 NullableContextOptions = inputs.NullableContextOptions,
@@ -838,22 +1037,104 @@ public sealed class ProjectMigrator
         }).ToList();
         if (errors.Count > 0)
         {
+            if (converted.Any(result => result.NamespaceIndex.HasValue))
+            {
+                MarkProjectValidationFailure(converted, errors.Take(20).Select(error =>
+                    $"Namespace-split project C# validation failed ({error.Id}): {error.GetMessage()}").ToArray());
+                return;
+            }
+            if (_options.Fidelity == ConversionFidelity.Lossless)
+            {
+                var failingPaths = errors
+                    .Select(error => error.Location.SourceTree?.FilePath)
+                    .Where(path => path != null)
+                    .ToHashSet(BuildStateCache.GetPathComparer());
+                var candidates = converted.Where(result =>
+                    result.Losses.All(loss => loss.Feature != "whole-file-preservation")
+                    && failingPaths.Contains(
+                        Path.ChangeExtension(result.OutputPath ?? result.SourcePath, ".g.cs")))
+                    .ToList();
+                if (candidates.Count == 0)
+                    candidates = converted.Where(result =>
+                        result.Losses.All(loss => loss.Feature != "whole-file-preservation")).ToList();
+                foreach (var result in candidates)
+                {
+                    var generation = generations[Path.GetFullPath(result.OutputPath!)];
+                    var preserved = generation.PreserveOriginal(cancellationToken,
+                        errors.Select(error => new ConversionIssue
+                        {
+                            Severity = ConversionIssueSeverity.Error,
+                            Feature = "roundtrip-csharp-validation",
+                            Message = $"Project C# validation failed ({error.Id}): {error.GetMessage()}"
+                        }));
+                    if (!preserved.Success)
+                    {
+                        result.Issues.AddRange(preserved.Issues);
+                        result.Status = FileMigrationStatus.Failed;
+                        result.OutputPath = null;
+                        result.Losses = preserved.Losses;
+                        result.ConversionPaths = (preserved.Paths with
+                        {
+                            RoundTrip = ConversionRoundTrip.Failed
+                        }).WithSuccess(false);
+                        continue;
+                    }
+                    result.ConvertedSource = preserved.CalorSource;
+                    result.GeneratedCSharp = preserved.Context.OriginalSource;
+                    result.Losses = preserved.Losses;
+                    result.Issues = preserved.Issues.ToList();
+                    result.ConversionPaths = preserved.Paths;
+                    result.Status = FileMigrationStatus.Partial;
+                    if (_options.IncludeBenchmark)
+                        result.Metrics = BenchmarkIntegration.CalculateMetrics(preserved.Context.OriginalSource!, preserved.CalorSource!);
+                }
+                if (candidates.Count > 0)
+                {
+                    await FinalizeLosslessProjectAsync(report, projectFilePath, dryRun, generations, cancellationToken);
+                    return;
+                }
+            }
             foreach (var result in converted)
             {
-                result.Status = FileMigrationStatus.Failed;
-                result.OutputPath = null;
+                var exact = string.Equals(result.GeneratedCSharp,
+                    _options.Fidelity == ConversionFidelity.Lossless
+                        ? generations[Path.GetFullPath(result.OutputPath!)].Result.Context.OriginalSource
+                        : await CSharpToCalorConverter.ReadSourceFileAsync(result.SourcePath, cancellationToken),
+                    StringComparison.Ordinal);
+                if (!exact)
+                {
+                    result.Status = FileMigrationStatus.Failed;
+                    result.OutputPath = null;
+                }
+                else
+                {
+                    result.Status = FileMigrationStatus.Partial;
+                }
+                if (result.ConversionPaths != null)
+                    result.ConversionPaths = (result.ConversionPaths with
+                    {
+                        RoundTrip = ConversionRoundTrip.Failed
+                    }).WithSuccess(result.OutputPath != null);
                 foreach (var error in errors.Take(20))
                 {
                     result.Issues.Add(new ConversionIssue
                     {
-                        Severity = ConversionIssueSeverity.Error,
+                        Severity = result.OutputPath == null
+                            ? ConversionIssueSeverity.Error : ConversionIssueSeverity.Warning,
                         Feature = "roundtrip-csharp-validation",
                         Message = $"Lossless project C# validation failed ({error.Id}): {error.GetMessage()}"
                     });
                 }
             }
 
-            return;
+        }
+        else
+        {
+            foreach (var result in converted.Where(result => result.ConversionPaths != null))
+                result.ConversionPaths = (result.ConversionPaths! with
+                {
+                    RoundTrip = ConversionRoundTrip.Verified
+                }).WithSuccess(true);
         }
 
         if (dryRun)
@@ -861,18 +1142,89 @@ public sealed class ProjectMigrator
             return;
         }
 
-        foreach (var result in converted)
+        if (converted.Any(result => result.NamespaceIndex.HasValue)
+            && converted.Any(result => result.OutputPath != null && Directory.Exists(result.OutputPath)))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (result.OutputPath != null && result.ConvertedSource != null)
+            MarkProjectValidationFailure(converted, "Namespace-split destination is a directory; no outputs were written.");
+            return;
+        }
+        foreach (var result in converted.Where(result => result.OutputPath != null))
+            if (Directory.Exists(result.OutputPath))
             {
-                await ConversionFileWriter.WriteAtomicAsync(
-                    result.OutputPath,
-                    result.ConvertedSource,
-                    new System.Text.UTF8Encoding(
-                        encoderShouldEmitUTF8Identifier: false,
-                        throwOnInvalidBytes: false),
-                    cancellationToken: cancellationToken);
+                result.Status = FileMigrationStatus.Failed;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-write-failure",
+                    Message = $"Destination is a directory: {result.OutputPath}"
+                });
+                result.OutputPath = null;
+            }
+        var outputs = converted.Where(result => result.OutputPath != null && result.ConvertedSource != null).ToArray();
+        if (outputs.Length == 0) return;
+        var receipts = new Dictionary<FileMigrationResult, ConversionReceipt>();
+        try
+        {
+            if (_options.Fidelity == ConversionFidelity.Lossless)
+                foreach (var result in outputs)
+                {
+                    if (!generations.TryGetValue(Path.GetFullPath(result.OutputPath!), out var generation))
+                        throw new IOException($"Missing original generation context: {result.SourcePath}");
+                    receipts.Add(result, await generation.PrepareReceiptAsync(result.ConvertedSource, cancellationToken));
+                }
+            foreach (var result in outputs.Where(receipts.ContainsKey))
+                await generations[Path.GetFullPath(result.OutputPath!)]
+                    .VerifyPreparedAsync(receipts[result], cancellationToken);
+            var identityRoot = Incremental.BuildStateCache.ComputeCommonDirectory(
+                outputs.Select(result => new FileInfo(result.OutputPath!)).ToArray());
+            var identityStore = new Ids.DeclarationIdentityStore(identityRoot);
+            identityStore.Sync(outputs.Select(result => result.OutputPath!).Where(File.Exists));
+            var identityChanges = new List<Ids.DeclarationIdentityStore.SourceChange>();
+            foreach (var result in outputs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var before = _options.Fidelity == ConversionFidelity.Lossless
+                    ? generations[Path.GetFullPath(result.OutputPath!)].Before
+                    : File.Exists(result.OutputPath!)
+                        ? await File.ReadAllTextAsync(result.OutputPath!, cancellationToken) : null;
+                identityChanges.Add(new(result.OutputPath!, before, result.ConvertedSource));
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            identityStore.Apply(identityChanges);
+            foreach (var result in outputs.Where(receipts.ContainsKey))
+                result.OutputWritten = true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            foreach (var result in outputs)
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.OutputPath = null;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-write-failure",
+                    Message = $"Identity-managed output write failed: {ex.Message}"
+                });
+            }
+            return;
+        }
+
+        foreach (var result in outputs.Where(receipts.ContainsKey))
+        {
+            try
+            {
+                await generations[Path.GetFullPath(result.OutputPath!)].FinalizeReceiptAsync(receipts[result]);
+            }
+            catch (IOException ex)
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "migration-receipt-failure",
+                    Message = ex.Message
+                });
             }
         }
 
@@ -971,6 +1323,7 @@ public sealed class ProjectMigrator
                             _options.LanguageVersion ?? inputs.LanguageVersion,
                         PreprocessorSymbols = EffectivePreprocessorSymbols(inputs),
                         IncludeImplicitGlobalUsings = inputs.IncludeImplicitGlobalUsings,
+                        IncludeImplicitSystemUsing = _options.IncludeImplicitSystemUsing && inputs.IncludeImplicitSystemUsing,
                         AnalyzerPaths = inputs.AnalyzerPaths,
                         AdditionalFilePaths = inputs.AdditionalFilePaths,
                         NullableContextOptions = inputs.NullableContextOptions,
@@ -1039,6 +1392,8 @@ public sealed class ProjectMigrator
     private static void RefreshSummary(MigrationReport report)
     {
         var summary = report.Summary;
+        summary.SourceFiles = report.FileResults.Select(result => Path.GetFullPath(result.SourcePath))
+            .Distinct(BuildStateCache.GetPathComparer()).Count();
         var allIssues = report.FileResults.SelectMany(result => result.Issues).ToList();
 
         summary.SuccessfulFiles = report.FileResults.Count(result => result.Status == FileMigrationStatus.Success);
@@ -1108,7 +1463,7 @@ public sealed class ProjectMigrator
             .ToList();
         if (configurations.Count != 1)
         {
-            return (null,
+            return (_options.Fidelity == ConversionFidelity.Lossless ? candidates[0] : null,
                 $"Conditional-compilation configuration for '{sourcePath}' is ambiguous across "
                 + $"{candidates.Count} target frameworks ({string.Join(", ", candidates.Select(input => input.TargetFramework ?? "<default>"))}). "
                 + "Specify a target framework explicitly; symbols are never unioned across frameworks.");
@@ -1166,17 +1521,10 @@ public sealed class ProjectMigrator
                 parseOptions,
                 path))
             .ToList();
-        if (inputs.IncludeImplicitGlobalUsings)
-        {
-            trees.Insert(
-                0,
-                Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
-                    GeneratedCSharpCompiler.GlobalUsingsPreamble,
-                    parseOptions,
-                    path: "<implicit-global-usings>"));
-        }
-
-        return trees;
+        return GeneratedCSharpCompiler.AddImplicitUsings(
+            trees,
+            _options.IncludeImplicitSystemUsing && inputs.IncludeImplicitSystemUsing,
+            inputs.IncludeImplicitGlobalUsings);
     }
 
 
@@ -1195,7 +1543,8 @@ public sealed class ProjectMigrator
         IReadOnlyList<string> AdditionalFilePaths,
         Microsoft.CodeAnalysis.NullableContextOptions NullableContextOptions,
         bool TreatWarningsAsErrors,
-        string? AnalyzerConfigPath);
+        string? AnalyzerConfigPath,
+        bool IncludeImplicitSystemUsing = true);
 
     internal static async Task<IReadOnlyList<ProjectCompilationInputs>> ResolveProjectCompilationInputsAsync(
         string projectPath,
@@ -1212,7 +1561,7 @@ public sealed class ProjectMigrator
                 [], [], true,
                 Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary,
                 Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default,
-                [], true, [], [],
+                [], false, [], [],
                 Microsoft.CodeAnalysis.NullableContextOptions.Disable,
                 false, null)];
         }
@@ -1262,11 +1611,11 @@ public sealed class ProjectMigrator
         startInfo.ArgumentList.Add("msbuild");
         startInfo.ArgumentList.Add(projectFile);
         startInfo.ArgumentList.Add(
-            "-t:ResolveAssemblyReferences;GenerateMSBuildEditorConfigFile");
+            "-t:ResolveAssemblyReferences;GenerateGlobalUsings;GenerateMSBuildEditorConfigFile");
         startInfo.ArgumentList.Add(
             "-getItem:ReferencePath,Compile,CalorCompile,Analyzer,AdditionalFiles");
         startInfo.ArgumentList.Add(
-            "-getProperty:AllowUnsafeBlocks,OutputType,DefineConstants,LangVersion,ImplicitUsings,Nullable,TreatWarningsAsErrors,GeneratedMSBuildEditorConfigFile");
+            "-getProperty:AllowUnsafeBlocks,OutputType,DefineConstants,LangVersion,ImplicitUsings,CalorImplicitSystemUsing,Nullable,TreatWarningsAsErrors,GeneratedMSBuildEditorConfigFile");
         if (!string.IsNullOrWhiteSpace(targetFramework))
         {
             startInfo.ArgumentList.Add($"-property:TargetFramework={targetFramework}");
@@ -1336,7 +1685,6 @@ public sealed class ProjectMigrator
         var allowUnsafeText = GetProperty(properties, "AllowUnsafeBlocks");
         var outputType = GetProperty(properties, "OutputType");
         var languageVersionText = GetProperty(properties, "LangVersion");
-        var implicitUsings = GetProperty(properties, "ImplicitUsings");
         var languageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
             languageVersionText, out var parsedLanguageVersion)
             ? parsedLanguageVersion
@@ -1358,8 +1706,7 @@ public sealed class ProjectMigrator
             GetProperty(properties, "DefineConstants").Split(
                 [';', ','],
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-            implicitUsings.Equals("enable", StringComparison.OrdinalIgnoreCase) ||
-                implicitUsings.Equals("true", StringComparison.OrdinalIgnoreCase),
+            false,
             ResolveItems(items, "Analyzer", projectDirectory),
             ResolveItems(items, "AdditionalFiles", projectDirectory),
             ParseNullableContextOptions(GetProperty(properties, "Nullable")),
@@ -1367,7 +1714,9 @@ public sealed class ProjectMigrator
                 .Equals("true", StringComparison.OrdinalIgnoreCase),
             ResolveOptionalPath(
                 GetProperty(properties, "GeneratedMSBuildEditorConfigFile"),
-                projectDirectory));
+                projectDirectory),
+            !GetProperty(properties, "CalorImplicitSystemUsing")
+                .Equals("false", StringComparison.OrdinalIgnoreCase));
 
         static string GetProperty(System.Text.Json.JsonElement properties, string name)
             => properties.TryGetProperty(name, out var property)

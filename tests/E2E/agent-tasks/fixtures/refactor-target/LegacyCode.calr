@@ -1,10 +1,12 @@
-§M{m001:LegacyCode}
-  §F{f001:Double:pub} (i32:x) -> i32
-    §R (* x 2)
+module LegacyCode LegacyCode block
+  func Double (int:x) → int
+    !
+    return (x * 2)
 
-  §F{f002:Square:pub} (i32:x) -> i32
-    §R (* x x)
+  func Square (int:x) → int
+    !
+    return (x * x)
 
-  §F{f003:Increment:pub} (i32:x) -> i32
-    §R (+ x 1)
-
+  func Increment (int:x) → int
+    !
+    return (x + 1)

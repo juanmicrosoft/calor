@@ -11,7 +11,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_InClass_ParsesSuccessfully()
     {
-        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler:pub}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n      ! unknown\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -24,7 +24,8 @@ public class NestedDelegateTests
         Assert.Equal("Foo", cls.Name);
         var del = Assert.Single(cls.NestedDelegates);
         Assert.Equal("MyHandler", del.Name);
-        Assert.Equal("d001", del.Id);
+        Assert.NotEmpty(del.Id);
+        Assert.Null(del.ToolingId);
         Assert.Single(del.Parameters);
         Assert.NotNull(del.Output);
     }
@@ -32,7 +33,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCSharp()
     {
-        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n      ! unknown\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -51,7 +52,7 @@ public class NestedDelegateTests
     [Fact]
     public void NestedDelegate_EmitsCalor()
     {
-        var source = "§M{m001:Test}\n§CL{c001:Foo:pub}\n  §DEL{d001:MyHandler}\n    §I{str:input}\n    §O{bool}\n  §/DEL{d001}\n\n";
+        var source = "module Test\n  class Foo public\n    delegate MyHandler (string:input) → bool\n      ! unknown\n";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
@@ -63,8 +64,13 @@ public class NestedDelegateTests
         var emitter = new CalorEmitter();
         var result = emitter.Emit(module);
 
-        Assert.Contains("DEL{d001:MyHandler}", result);
-        Assert.DoesNotContain("/DEL{d001}", result);
+        Assert.Contains("delegate MyHandler (string:input) → bool", result);
+        Assert.DoesNotContain("§", result);
+        var reparsedDiagnostics = new DiagnosticBag();
+        var reparsed = new Parser(new Lexer(result, reparsedDiagnostics).TokenizeAllForParser(),
+            reparsedDiagnostics).Parse();
+        Assert.Empty(reparsedDiagnostics);
+        Assert.Equal("MyHandler", Assert.Single(Assert.Single(reparsed.Classes).NestedDelegates).Name);
     }
 
     [Fact]
@@ -79,7 +85,7 @@ public class Foo
         var result = converter.Convert(csharp, "Test.cs");
 
         Assert.True(result.Success, string.Join("; ", result.Issues));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.Contains(
             "private delegate bool Handler(string input);",
             result.CalorSource);

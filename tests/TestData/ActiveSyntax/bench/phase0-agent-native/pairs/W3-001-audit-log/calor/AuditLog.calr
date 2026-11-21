@@ -1,0 +1,7 @@
+module AuditLog AuditLog block
+  module AuditLogModule partial
+    func Append (string:path, string:entry) → void
+      ! fs:w
+      File.AppendAllText(path, (entry + "\n"))
+
+

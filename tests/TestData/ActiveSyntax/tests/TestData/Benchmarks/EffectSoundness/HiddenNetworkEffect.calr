@@ -1,0 +1,15 @@
+module OrderService OrderService
+  module OrderServiceModule
+    func SaveOrder public (string:orderId) → void
+      ! cw
+      System.Console.WriteLine(orderId)
+
+    func NotifyCustomer public (string:email, string:message) → void
+      ! cw
+      System.Console.WriteLine(email)
+      System.Console.WriteLine(message)
+
+    func ProcessOrder public (string:orderId, string:email) → void
+      ! cw
+      SaveOrder(orderId)
+      NotifyCustomer(email, "Order shipped")

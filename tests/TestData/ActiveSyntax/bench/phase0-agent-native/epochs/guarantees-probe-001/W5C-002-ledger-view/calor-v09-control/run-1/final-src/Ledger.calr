@@ -1,0 +1,43 @@
+module Ledger Ledger block
+  module LedgerModule public
+    func EntryLine (string:label, int:amount) → string
+      !
+      return (label + ("=" + amount.ToString()))
+
+    func AppendEntry (string:path, string:label, int:amount) → void
+      ! fs:w
+      let string:line = EntryLine(label, amount)
+      let string:@record = (line + ";")
+      File.AppendAllText(path, @record)
+
+    func ReadLedger (string:path) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      return File.ReadAllText(path)
+
+    func ReportOf (string:content) → string
+      !
+      return ("ledger[" + (content.Length.ToString() + "]"))
+
+    func BalanceReport (string:path) → string
+      ! fs:r
+      let string:content = ReadLedger(path)
+      return ReportOf(content)
+
+    func HasEntries (string:path) → bool
+      ! fs:r
+      let string:content = ReadLedger(path)
+      return (content.Length > 0)
+
+    func DescribeLedger (string:path) → string
+      ! fs:r
+      let string:content = ReadLedger(path)
+      let string:report = ReportOf(content)
+      return ("ledger: " + report)
+
+    func LedgerSize (string:path) → int
+      ! fs:r
+      let string:content = ReadLedger(path)
+      return content.Length

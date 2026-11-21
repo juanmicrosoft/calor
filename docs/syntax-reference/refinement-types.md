@@ -1,396 +1,214 @@
 ---
 layout: default
-title: Refinement Types
+title: "Value Constraints"
 parent: Syntax Reference
 nav_order: 6
 ---
 
-# Refinement Types
+# Value Constraints
 
-Refinement types let you constrain values at the type level. A refined type is a base type plus a predicate — the compiler verifies the predicate holds, and erases the refinement in the emitted C#.
+<!-- Generated from website/content/syntax-reference/refinement-types.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
----
+Use ordinary .NET types and `requires` clauses to constrain function inputs.
+Use `=>` postconditions to describe the result. Retired named refinements,
+inline refinement predicates and self-reference syntax are not current source
+forms.
 
-## Quick Reference
+A precondition does **not** create a new nominal type, attach an invariant to
+every local assignment or establish that a verifier proved every caller safe.
+Those are different guarantees.
 
-| Syntax | Purpose | Example |
-|:-------|:--------|:--------|
-| `§RTYPE{id:Name:base} (pred)` | Define a named refinement type | `§RTYPE{r1:NatInt:i32} (>= # INT:0)` |
-| `§ITYPE{id:Name:base:size}` | Define an indexed (size-parameterized) type | `§ITYPE{it1:SizedList:List:n}` |
-| `§ITYPE{id:Name:base:size} (pred)` | Indexed type with size constraint | `§ITYPE{it1:NonEmpty:List:n} (> # INT:0)` |
-| `§I{type:param} \| (pred)` | Inline refinement on a parameter | `§I{i32:age} \| (>= # INT:0)` |
-| `§PROOF{id:desc} (expr)` | Proof obligation (assert a fact) | `§PROOF{p1:positive} (>= x INT:0)` |
-| `#` | Self-reference (the value being refined) | `(>= # INT:0)` |
+## Constraining a parameter
 
----
-
-## Named Refinement Types (`§RTYPE`)
-
-Define a refinement type at module level. The predicate uses `#` to refer to the value being constrained.
-
-### Syntax
-
-```
-§RTYPE{id:Name:baseType} (predicate)
-```
-
-- `id` — unique identifier (e.g., `r1`)
-- `Name` — the refinement type name, used in parameter declarations
-- `baseType` — the underlying type (`i32`, `str`, etc.)
-- `predicate` — a boolean expression using `#` for the value
-
-### Examples
-
-```
-§RTYPE{r1:NatInt:i32} (>= # INT:0)
-§RTYPE{r2:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-§RTYPE{r3:NonEmpty:str} (> (len #) INT:0)
-```
-
-These read as:
-- **NatInt**: an `i32` that is non-negative
-- **Port**: an `i32` between 1 and 65535
-- **NonEmpty**: a `str` with length greater than 0
-
-### Using Named Refinement Types
-
-Once defined, use the name as a parameter type:
-
-```
-§RTYPE{r1:NatInt:i32} (>= # INT:0)
-
-  §F{f001:Process:pub}
-    §I{NatInt:count}
-    §O{void}
-  // count is guaranteed non-negative
-```
-
-The obligation engine creates a verification obligation for `count` — proving the refinement predicate holds given the function's preconditions.
-
-### Each Named Refinement Is Its Own Type
-
-Named refinements are nominal. Two `§RTYPE`s over the same base type are different types, even
-when one predicate implies the other. Binding, passing, returning or assigning a `Pos` where a
-`Nat` is expected is a type error (`Calor0202`):
+This function accepts an `int` port in the inclusive range 1 through 65535.
 
 ```calor
-§M{m001:Ids}
-  §RTYPE{r1:Nat:i32} (>= # INT:0)
-  §RTYPE{r2:Pos:i32} (> # INT:0)
-  §F{f001:ToNat:pub} (i32:v) -> Nat
-    §R v
-  §F{f002:Use:pub} (Pos:p) -> Nat
-    §B{n:Nat} §C{ToNat} §A p §/C
-    §R n
+module PortConstraint
+  func SelectPort (int:port) → int
+    !
+    requires port >= 1 && port <= 65535
+    => result == port
+    return port
+
+  func Main () → int
+    !
+    return SelectPort(443)
 ```
 
-Binding the `Pos` directly is rejected with `Calor0202`:
+`Main()` returns `443`. With runtime contracts enabled, `SelectPort(0)` and
+`SelectPort(65536)` throw `ContractViolationException`.
 
-```calor expect=Calor0202
-§M{m001:Ids}
-  §RTYPE{r1:Nat:i32} (>= # INT:0)
-  §RTYPE{r2:Pos:i32} (> # INT:0)
-  §F{f001:Use:pub} (Pos:p) -> Nat
-    §B{n:Nat} p
-    §R n
+The parameter's type is still `int`. Repeating this precondition in another
+function does not create two distinct port types, nor does it implicitly
+validate every integer binding in the program.
+
+## Non-empty text
+
+State null and length requirements explicitly. `&&` short circuits, so the
+length read does not run when the value is null.
+
+```calor
+module TextConstraint
+  func Length (string:text) → int
+    !
+    requires text != null && text.Length > 0
+    => result > 0
+    return text.Length
+
+  func Main () → int
+    !
+    return Length("calor")
 ```
 
-To convert on purpose, go through the base type: `ToNat` takes
-an `i32` and returns `Nat`, and its return guard checks the value at run time. Operators still
-see a refinement as its base type, so `(+ a p)` is an `i32`. A conditional `(? c a p)` whose arms
-are two different refinements also has the base type.
+`Main()` returns `5`. With runtime contracts enabled, null or empty text fails
+the precondition. A .NET caller can still supply null at runtime despite the
+non-nullable parameter annotation; the runtime guard is a separate check.
 
-A `§W` match is checked arm by arm. When the match is bound, returned or assigned where a `Nat`
-is expected, an arm that produces a `Pos` is `Calor0202`. In an `§ASSIGN` to a `Nat` local, an
-arm that produces a plain `i32` is still accepted and guarded at run time. These checks apply everywhere the type checker looks: function and
-lambda bodies, class members (methods, constructors, property and indexer accessors,
-operators), `§P` arguments, `§ASSIGN` right-hand sides, and the bodies of `§TR`, `§EACH` and the
-other block statements.
+## Relating several parameters
 
-### Locals Inferred From a Refined Value
+A precondition can relate inputs directly. No special predicate self-reference
+is needed.
 
-A `§B` without a type takes the type of its initializer, refinement included. After
-`§B{~x} count` with `count: NatInt`, `x` is a `NatInt`, exactly as if you had written
-`§B{~x:NatInt} count`. Every later write to `x` (`§ASSIGN`, `inc`/`dec`) has a runtime guard
-for `NatInt`. When refinement verification runs, the obligation engine can prove a write safe
-and drop its guard. It drops a guard only with a proof for that same refinement, and it skips
-writes it cannot match to one, such as a name a lambda parameter also uses; those keep their
-guard. Annotate the base type, `§B{~x:i32} count`, when the local should be free to leave the
-refinement. A parameter with only an inline refinement
-(`§I{i32:a} | (pred)`) has its base type, so a local inferred from it is a plain `i32`.
+```calor
+module TransferConstraint
+  func Transfer (int:balance, int:amount) → int
+    !
+    requires balance >= 0
+    requires amount > 0
+    requires balance >= amount
+    => result >= 0
+    return balance - amount
 
-Four related rules keep a refined variable checked:
-
-- A lambda parameter without a type takes its type from the target delegate, also when the
-  lambda is assigned to a delegate variable. If that type is `NatInt`, writes to the parameter
-  are guarded too.
-- A variable with a refinement cannot be passed as a `ref` or `out` argument (`Calor1104`),
-  because the callee's write could not be checked. Pass a base-typed temporary, then assign it
-  back with `§ASSIGN`, which is guarded.
-- A mutable rebind of an existing variable (`§B{~x} p` after `§B{~x} count`) reassigns it, so it
-  keeps the variable's named refinement and cannot change it (`Calor0202`). A parameter with an
-  inline refinement cannot be rebound as a named refinement either.
-- A type pattern cannot name a refinement type: `(is a Pos p)` is `Calor0202`. Refinements erase
-  at run time, so the test could only check the base type.
-
-Inside class members the type checker reports only these refinement errors. Its other checks
-there are left to name binding and the C# compiler, as before, because it does not model
-inherited members, so in a class with a base class a bare call to a method the class does not
-declare is not checked. Members inside a `§PP` block are not type-checked; runtime guards still
-apply there. A write to a refined field or property has no runtime guard yet, so a setter's `value`
-and an indexer's parameters are typed as their base types.
-
----
-
-## Inline Refinements (`|`)
-
-For one-off constraints, attach a predicate directly to a parameter with `|`:
-
-### Syntax
-
-```
-§I{baseType:paramName} | (predicate)
+  func Main () → int
+    !
+    return Transfer(10, 3)
 ```
 
-### Examples
+`Main()` returns `7`. `Transfer(3, 5)` fails its sufficient-funds precondition
+when runtime contracts are enabled. The preconditions together also bound the
+successful subtraction; a successful example execution alone is not a verifier
+proof of that property.
 
-```
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b} | (!= # INT:0)         // b must be non-zero
-  §O{i32}
-  §R (/ a b)
-```
+## Entry conditions are not local invariants
 
-```
-§F{f002:SetPort:pub}
-  §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
-  §O{void}
-  // ...
-```
+A precondition applies at function entry. It does not turn an ordinary mutable
+local into a permanently constrained value.
 
-### Inline Refinements with Default Values
+```calor
+module ConstraintBoundary
+  func Reset (int:count) → int
+    !
+    requires count >= 0
+    var int:remaining = count
+    set remaining -1
+    return remaining
 
-Inline refinements can coexist with default parameter values:
-
-```
-§I{i32:age} | (>= # INT:0) = INT:18
-```
-
----
-
-## Self-Reference (`#`)
-
-The `#` symbol refers to the value being constrained. It is only valid inside refinement predicates:
-
-```
-§RTYPE{r1:Positive:i32} (> # INT:0)     // # = the i32 value
-§I{i32:x} | (>= # INT:0)                // # = x
+  func Main () → int
+    !
+    return Reset(5)
 ```
 
-Using `#` outside a refinement predicate is a compile error (`SelfRefOutsidePredicate`).
+`Main()` returns `-1`, even with runtime contracts enabled. `remaining` is an
+ordinary `int`, not an erased named refinement with a guard on each write.
 
----
+If your API needs distinct domain types, use an ordinary class or record and
+design its construction and mutation rules explicitly. A precondition on one
+function is not a substitute for that type's whole lifecycle.
 
-## Proof Obligations (`§PROOF`)
+## Explicit proof statements
 
-A proof obligation asserts that a condition holds at a specific point in the function body. The obligation engine attempts to prove it using Z3.
+Native `proof condition` states a Boolean obligation at that point in a
+function. It is not a named refinement type or a permanent constraint on a
+mutable local.
 
-### Syntax
-
-```
-§PROOF{id:description} (boolean-expression)
-§PROOF{id} (boolean-expression)
-```
-
-- `id` — unique identifier
-- `description` — optional human-readable label
-
-### Examples
-
-```
-§F{f001:Transfer:pub}
-  §I{i32:balance}
-  §I{i32:amount} | (> # INT:0)
-  §O{i32}
-  §Q (>= balance amount)
-
-  §B{newBalance:i32} (- balance amount)
-  §PROOF{p1:non-negative} (>= newBalance INT:0)
-
-  §R newBalance
+```calor
+module TransferProofAtPoint
+  func Transfer (int:balance, int:amount) → int
+    !
+    requires balance >= 0
+    requires amount > 0
+    proof balance >= amount
+    return balance - amount
 ```
 
-Z3 proves this: given `balance >= amount` and `amount > 0`, then `balance - amount >= 0`.
+`Transfer(10, 3)` returns `7`. Without a discharged verifier obligation, the
+statement emits a runtime check: `Transfer(3, 5)` throws
+`InvalidOperationException`. This is distinct from a failed `requires` guard,
+which throws `ContractViolationException`.
 
-### Proof Obligation Statuses
+The proof-statement check remains even with `--contract-mode off`; that switch
+disables precondition and postcondition guards, not this explicit statement.
+A successful execution is not a static proof. Optional obligation verification
+and its actual status must be inspected separately before claiming discharge
+or guard removal.
 
-| Status | Meaning | C# Output |
-|:-------|:--------|:----------|
-| Discharged | Z3 proved the condition | `// PROVEN: proof obligation [p1]` (default since v0.15); runtime guard kept with `--keep-proven-guards` |
-| Failed | Z3 found a counterexample | Runtime guard (throws on violation) |
-| Timeout | Z3 couldn't decide in time | Runtime guard (configurable by policy) |
-| Boundary | Public API — can't verify callers | Runtime guard (always emitted) |
+### Proofs over parameters
 
----
+This version makes `balance >= amount` an entry precondition:
 
-## Indexed Types (`§ITYPE`)
-
-Indexed types are size-parameterized types — a collection type annotated with a size variable so the compiler can track bounds and prove array/list accesses are safe using Z3.
-
-### Syntax
-
-```
-§ITYPE{id:Name:baseType:sizeParam}                     // no constraint
-§ITYPE{id:Name:baseType:sizeParam} (constraint on #)   // with constraint
-```
-
-- `id` — unique identifier (e.g., `it1`)
-- `Name` — the indexed type name, used in parameter declarations
-- `baseType` — the underlying collection type (`List`, `i32[]`, etc.)
-- `sizeParam` — name of the size variable (becomes a Z3 integer)
-- `constraint` — optional predicate on the size (e.g., `(> # INT:0)` for non-empty)
-
-### Examples
-
-```
-§ITYPE{it1:SizedList:List:n}                            // List with n elements
-§ITYPE{it2:NonEmptyArr:i32[}:n} (> # INT:0)             // array with n > 0 elements
-§ITYPE{it3:BoundedVec:List:n} (&& (> # INT:0) (< # INT:1000))
+```calor
+module TransferProof
+  func Transfer (int:balance, int:amount) → int
+    !
+    requires balance >= 0
+    requires amount > 0 && balance >= amount
+    proof balance - amount >= 0
+    return balance - amount
 ```
 
-### Using Indexed Types
+`Transfer(10, 3)` returns `7`. With contracts enabled, `Transfer(3, 5)` fails
+the precondition with `ContractViolationException`, before reaching the proof.
+With contracts off, the proof still throws `InvalidOperationException`.
+Moving an obligation between an entry contract and a body statement changes
+failure behavior; the two examples are not equivalent.
 
-Declare a parameter with the indexed type name. The size parameter becomes a Z3 variable available in preconditions and postconditions:
+## Runtime checks and verification
 
-```
-§ITYPE{it1:SizedList:List:n}
+The [contracts reference](https://calor.dev/docs/syntax-reference/contracts/) explains enabled and
+off runtime contract modes. Disabling checks does not make invalid calls safe:
+`SelectPort(0)` then returns `0`, and `Transfer(3, 5)` in the
+`TransferConstraint` example returns `-2`. The separate `TransferProofAtPoint`
+example still throws at its explicit proof statement. Empty text has length
+`0`; null text reaches a body `NullReferenceException`.
 
-  §F{f001:Sum:priv}
-    §I{SizedList:items}        // items has n elements
-    §I{i32:n}                  // size parameter as explicit param
-    §I{i32:i}
-    §O{i32}
-    §Q (&& (>= i INT:0) (< i n))
-    §R §IDX items i            // proven safe: 0 <= i < n
-```
+Effect enforcement remains independent of runtime contract mode. A pure row
+does not prove a precondition or prevent ordinary body exceptions.
 
-The obligation engine creates an `IndexBounds` obligation for each `§IDX` on an indexed-typed array. The condition is `(&& (>= index INT:0) (< index sizeParam))`. When the function has preconditions or inline refinements bounding the index, Z3 discharges the obligation automatically.
+Verifier results must be read with their actual status, assumptions and
+supported expression coverage. Unsupported, timed-out, assumption-dependent or
+vacuous results are not clean proofs. Only an eligible proof from the relevant
+compilation can authorize proof-based guard removal; running a program or seeing
+a successful C# build does not do so.
 
-### Erasure
+## Named and indexed types
 
-Indexed type definitions are erased in C#. Parameters with indexed type names are mapped to their base types:
+This page replaces the retired refinement authoring guide. It does not promise
+the old named-type distinction or per-assignment refinement guards.
+Named refinement definitions, inline self-reference predicates and indexed
+type aliases are not native authoring forms. The old erased aliases did not
+become ordinary distinct CLR domain types.
 
-| Calor | Emitted C# |
-|:------|:-----------|
-| `§ITYPE{it1:SizedList:List:n}` | *(nothing — erased)* |
-| `§I{SizedList:items}` | `List items` |
-| `§I{SizedList<i32>:items}` | `List<int> items` |
+Use the real collection type and explicitly relate its length to an index.
+A precondition does not create an indexed type or remove the CLR's bounds
+check by itself:
 
----
-
-## Erasure
-
-Refinement types are a **compile-time construct**. In the emitted C#, they are erased:
-
-| Calor | Emitted C# |
-|:------|:-----------|
-| `§RTYPE{r1:NatInt:i32} (>= # INT:0)` | *(nothing — erased)* |
-| `§I{NatInt:count}` | `int count` |
-| `§I{i32:x} \| (>= # INT:0)` | `int x` |
-| `§PROOF{p1:check} (cond)` (Discharged) | `// PROVEN: proof obligation [p1: check]` (default since v0.15); runtime guard with `--keep-proven-guards` |
-| `§PROOF{p1:check} (cond)` (Failed) | `if (!(cond)) throw new InvalidOperationException(...)` |
-
-The refinement constrains what values are valid. The obligation engine verifies those constraints and emits runtime guards only where verification fails.
-
----
-
-## Obligation Engine
-
-The obligation engine is the verification pipeline for refinement types:
-
-1. **Generation** — Walk the AST and create obligations for every refined parameter and `§PROOF` statement
-2. **Solving** — For each obligation, use Z3's assume-negate-check pattern:
-   - Assume all preconditions (`§Q`)
-   - Negate the obligation condition
-   - If UNSAT → Discharged (proven)
-   - If SAT → Failed (counterexample found)
-   - If UNKNOWN → Timeout
-3. **Guard Discovery** — For failed obligations, discover the simplest guard that would discharge them
-4. **Code Generation** — Emit runtime guards based on obligation status and policy
-
-### Obligation Kinds
-
-| Kind | Source |
-|:-----|:-------|
-| `RefinementEntry` | Parameter with inline or named refinement |
-| `ProofObligation` | `§PROOF` statement |
-| `IndexBounds` | `§IDX` on an indexed-typed array |
-
-### Public vs Private Functions
-
-For **public** functions, caller constraints can't be verified — parameter refinement obligations are marked `Boundary` and always emit runtime guards. For **private** functions, the solver attempts full verification.
-
----
-
-## Obligation Policy
-
-The obligation policy controls what happens for each obligation status. Three built-in policies:
-
-### Default
-
-| Status | Action |
-|:-------|:-------|
-| Discharged | Ignore in diagnostics; the runtime guard is dropped by default (v0.15) and kept with `--keep-proven-guards` |
-| Failed | Error (compilation fails) |
-| Timeout | WarnAndGuard |
-| Boundary | AlwaysGuard |
-| Unsupported | WarnOnly |
-
-### Strict
-
-All non-discharged obligations are compilation errors. Use in CI for maximum safety.
-
-### Permissive
-
-Failed obligations emit warnings and guards instead of errors. Use during development or migration.
-
----
-
-## Complete Example
-
-```
-§M{m001:Banking}
-
-// Named refinement types
-  §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
-    §RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
-
-      §F{f001:Transfer:pub}
-        §I{NonNegBalance:balance}
-        §I{PositiveAmount:amount}
-        §O{i32}
-        §Q (>= balance amount)                  // sufficient funds
-
-        §B{result:i32} (- balance amount)
-        §PROOF{p1:balance-safe} (>= result INT:0)
-
-        §R result
-
+```calor
+module ArrayIndexConstraint
+  func At (int[]:items, int:index) → int
+    !
+    requires index >= 0 && index < items.Length
+    => result == items[index]
+    return items[index]
 ```
 
-The obligation engine:
-1. Creates `Boundary` obligations for `balance` and `amount` (public function)
-2. Creates a `ProofObligation` for `p1`
-3. Z3 proves `p1`: given `balance >= 0`, `amount > 0`, and `balance >= amount`, then `balance - amount >= 0`
-4. Emitted C#: runtime guards for the public boundary parameters; `p1`'s guard is replaced by the
-   proven comment (the default since v0.15 — `--keep-proven-guards` keeps `p1`'s guard too)
+`At(new int[] { 4, 9 }, 1)` returns `9`. With checks enabled, index `2`
+fails the precondition; with guards off, the array access itself throws.
+This is not a replacement guarantee of automatically discharged index-bounds
+obligations on every array operation.
 
----
+## See also
 
-## See Also
-
-- [Dependent Types Tutorial](/calor/guides/dependent-types-tutorial/) — Progressive walkthrough with MCP agent guidance
-- [Contracts](/calor/syntax-reference/contracts/) — Preconditions and postconditions
-- [Static Verification](/calor/philosophy/static-verification/) — Z3-based contract verification
-- [MCP Tools](/calor/cli/mcp/) — Agent guidance tools for refinement types
+- [Contracts](https://calor.dev/docs/syntax-reference/contracts/) — preconditions, postconditions and guard modes
+- [Bindings](https://calor.dev/docs/syntax-reference/binding/) — immutable and mutable locals
+- [Types](https://calor.dev/docs/syntax-reference/types/) — .NET types and nullability
+- [Static verification](https://calor.dev/docs/philosophy/static-verification/) — verifier concepts and limitations

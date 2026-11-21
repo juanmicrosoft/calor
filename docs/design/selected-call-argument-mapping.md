@@ -1,5 +1,55 @@
 # Selected method-argument mapping (#1382)
 
+## Normal-form params overload selection
+
+A `params` declaration accepting an array in normal form has no params penalty.
+The resolver tries normal form first and only considers expansion if that form
+is inapplicable. Nullable array containers retain their normal array target;
+expansion removes only the container annotation when finding the element type.
+The existing expanded-form and omitted-optional scoring remains unchanged.
+
+Among equally scored candidates, a non-generic declaration wins over a generic
+declaration only when their fully substituted parameter types, by-reference
+modifiers, expansion forms and source-ordered effective argument targets agree.
+This handles array forwarding to `params object?[]?` versus a scalar `T` without
+preferring non-generic declarations with different conversions or parameter
+shapes. Conditional declaration alternatives retain all winning symbols and
+their individual argument maps.
+
+This is not a complete implementation of C# better-member ordering. In
+particular, the retained expanded-form penalty can still prefer `Pick<T>(T)` to
+`Pick(params int[])` for one `int`, whereas C# prefers the non-generic expanded
+overload. That broader scoring limitation is separate from normal-array
+forwarding; selected-symbol and effect attribution must not be inferred from
+successful C# emission alone.
+
+## Preserved declarations and incomplete overload sets
+
+The current-class opaque-overload guard covers successful native matches as
+well as ambiguous or inapplicable ones. For a bare or `this.` call, a preserved
+same-name method can compete with the visible native overloads. Its body and
+signature stay in `§CSHARP`; the binder does not claim that a native winner is
+the final C# selection. The structural member-call representation uses the same
+guard when its receiver binds to `BoundThisExpression`; the sentinel
+`<expression-call>` is not used as the member name. Unknown receivers are not
+classified as the current instance. Explicit-interface declarations do not
+compete through these call forms. An explicit generic call filters preserved candidates by
+generic arity, and a resolved local function retains its lexical precedence.
+
+An opaque-overload marker travels through both bound call forms. It prevents
+metadata fallback and prevents the AST call-graph bridge from recovering the
+same native target by name after the binder withheld it. The call stays in
+`UnresolvedCalls`, with no native selected-symbol or parameter-map claim.
+Strict unknown-call effect analysis rejects that unresolved call as `Calor0411`.
+`IsBoundResolutionComplete` still means the binder bridge completed, not that
+every call resolved; it may be true while `UnresolvedCalls` is nonempty.
+
+This conservative guard does not implement preserved-signature applicability,
+nor extend the existing lookup scope to arbitrary explicit receivers, computed
+receivers other than the known current instance, or raw declarations in other
+types. Correct generated C# can select the preserved params overload while
+native analysis honestly remains unresolved.
+
 This is a bounded N3 implementation under #1082, not Stage A/B activation.
 Copilot/GPT-6 Astra context `e9c6935e-da28-4a3b-94d4-0a5bbb596332` accepted the
 slot after E1 adjudication, from `be488238d3aac374995174aa47526c7f3d09fd51`.

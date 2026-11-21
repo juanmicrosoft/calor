@@ -1,0 +1,11 @@
+module Fixture Fixture overflow unchecked
+  module InterpolationToString
+    func Describe (int:count, string:name) → string
+      !
+      return "${name}:${count,4}|${count:D3}"
+
+    func Verify () → int
+      !
+      let string:s = Describe(7, "ab")
+      let string:wrapped = "<${s}>"
+      return (((s == "ab:   7|007") ? 1000 : 0) + wrapped.Length)

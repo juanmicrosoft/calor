@@ -1,0 +1,20 @@
+module PhoneBook PhoneBook
+  module PhoneBookModule
+    func EntryCount public (int:count) → int
+      !
+      => result >= 0
+      return count
+
+    func AddEntry public (int:count) → int
+      !
+      return count + 1
+
+    func RemoveEntry public (int:count) → int
+      !
+      requires count > 0
+      => result >= 0
+      return count - 1
+
+    func IsEmpty public (int:count) → bool
+      !
+      return count == 0

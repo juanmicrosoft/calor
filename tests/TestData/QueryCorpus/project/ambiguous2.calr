@@ -1,7 +1,8 @@
-§M{m004:Alt2}
-  §F{f001:Shared:pub} () -> i32
-    §E{}
-    §R INT:2
-  §F{f002:AsksShared:pub} () -> i32
-    §E{}
-    §R §C{Shared} §/C
+module Alt2 Alt2 block
+  func Shared () → int
+    !
+    return 2
+
+  func AsksShared () → int
+    !
+    return Shared()

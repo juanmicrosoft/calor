@@ -15,13 +15,10 @@ public class BuildIntegrationTests
         {
             var sourceFile = Path.Combine(tempDir, "test.calr");
             var source = @"
-§M{m001:Test}
-  §F{f001:Hello:pub}
-      §O{void}
-      §E{cw}
-      §C{Console.WriteLine}
-        §A ""Hello from test!""
-      §/C
+module Test Test block
+  func Hello () → void
+    ! cw
+    Console.WriteLine(""Hello from test!"")
 ";
             File.WriteAllText(sourceFile, source);
 
@@ -45,8 +42,8 @@ public class BuildIntegrationTests
     {
         // Arrange - Invalid Calor source
         var source = @"
-§M{m001:Test}
-  §F{f001:Hello:pub}
+§M{Test}
+  §F{Hello:pub}
       §O{void}
         §INVALID_SYNTAX
 ";
@@ -63,12 +60,10 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§M{m001:Calculator}
-  §F{f001:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Calculator Calculator block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
 
         // Act
@@ -86,18 +81,14 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§M{m001:Math}
-  §F{f001:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Math Math block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 
-  §F{f002:Subtract:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (- a b)
+  func Subtract (int:a, int:b) → int
+    !
+    return (a - b)
 ";
 
         // Act
@@ -114,13 +105,11 @@ public class BuildIntegrationTests
     {
         // Arrange
         var source = @"
-§M{m001:Safe}
-  §F{f001:Divide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b INT:0)
-      §R (/ a b)
+module Safe Safe block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)
 ";
 
         // Act

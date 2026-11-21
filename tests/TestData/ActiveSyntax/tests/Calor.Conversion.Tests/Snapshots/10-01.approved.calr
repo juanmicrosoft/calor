@@ -1,0 +1,5 @@
+module Test_10_01 Test_10_01 overflow unchecked
+  module SizeTest public
+    func GetSizeOfInt public () → int
+      !
+      return sizeof(int)

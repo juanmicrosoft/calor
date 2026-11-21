@@ -1,0 +1,16 @@
+module ViolationDetected ViolationDetected
+  func BadPostcondition public (int:x) → int
+    !
+    => result > x
+    return x
+
+  func ImpossibleContract public (int:x) → int
+    !
+    => x + 1 > x + 2
+    return x + 1
+
+  func DivisionBug public (int:a, int:b) → int
+    !
+    requires b != 0
+    => a / b > a
+    return a / b

@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Verification.Z3.Cache;
 using System.Runtime.CompilerServices;
@@ -28,6 +29,10 @@ public sealed class ContractVerificationPass
     /// Verifies all contracts in the given module.
     /// </summary>
     public ModuleVerificationResult Verify(ModuleNode module)
+        => Verify(module, null);
+
+    internal ModuleVerificationResult Verify(ModuleNode module,
+        IReadOnlyDictionary<ExpressionNode, BoundCallExpression>? boundCalls)
     {
         // Check if Z3 is available
         if (!Z3ContextFactory.IsAvailable)
@@ -43,18 +48,28 @@ public sealed class ContractVerificationPass
 
         // Call the core verification method which uses Z3 types
         // This is in a separate method to prevent JIT from loading Z3 types when Z3 is unavailable
-        return VerifyCore(module);
+        if (boundCalls == null)
+        {
+            var binder = new Binder(new DiagnosticBag());
+            binder.Bind(module);
+            boundCalls = binder.BoundVerificationCalls;
+        }
+        return VerifyCore(module, boundCalls);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private ModuleVerificationResult VerifyCore(ModuleNode module)
+    private ModuleVerificationResult VerifyCore(ModuleNode module,
+        IReadOnlyDictionary<ExpressionNode, BoundCallExpression> boundCalls)
     {
         var results = new List<FunctionVerificationResult>();
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
 
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(
-            ctx, _options.TimeoutMs, userTypeRegistry, module.ShouldCheckIntegerOverflow());
+            ctx, _options.TimeoutMs, userTypeRegistry, module.ShouldCheckIntegerOverflow())
+        {
+            BoundCalls = boundCalls
+        };
         // #778: the cache key/validity is solver-config-aware — pass the live timeout
         // so a cached Unproven from a smaller budget is not served to a larger one.
         using var cache = new VerificationCache(
@@ -66,12 +81,13 @@ public sealed class ContractVerificationPass
         {
             _options.CancellationToken.ThrowIfCancellationRequested();
 
-            if (!function.HasContracts)
+            var preconditions = ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions);
+            if (preconditions.Count == 0 && function.Postconditions.Count == 0)
                 continue;
 
-            var result = VerifyFunction(verifier, cache, function);
+            var result = VerifyFunction(verifier, cache, function, preconditions, module);
             results.Add(result);
-            ReportDiagnostics(function, result);
+            ReportDiagnostics(function, result, preconditions);
         }
 
         // Report summary if any contracts were verified
@@ -100,18 +116,24 @@ public sealed class ContractVerificationPass
     private FunctionVerificationResult VerifyFunction(
         Z3Verifier verifier,
         VerificationCache cache,
-        FunctionNode function)
+        FunctionNode function,
+        IReadOnlyList<RequiresNode> preconditions,
+        ModuleNode module)
     {
         // Extract parameter information
         var parameters = function.Parameters
             .Select(p => (p.Name, p.TypeName))
             .ToList();
 
-        var outputType = function.Output?.TypeName;
+        var outputType = Analysis.ReturnShape.GetAsyncReturnTypes(
+            function.Output?.TypeName ?? "void", function.IsAsync, module,
+            function.TypeParameters.Select(parameter => parameter.Name)).BodyType;
+        if (Analysis.ReturnShape.IsVoidType(outputType))
+            outputType = null;
 
         // Verify preconditions with cache
         var preconditionResults = new List<ContractVerificationResult>();
-        foreach (var pre in function.Preconditions)
+        foreach (var pre in preconditions)
         {
             // Try cache first
             if (cache.TryGetPreconditionResult(parameters, pre, out var cached))
@@ -132,7 +154,7 @@ public sealed class ContractVerificationPass
         {
             // Try cache first (the key covers the body when the postcondition references
             // `result` — a body edit must never reuse a stale result-bound proof)
-            if (cache.TryGetPostconditionResult(parameters, outputType, function.Preconditions, post, function.Body, out var cached))
+            if (cache.TryGetPostconditionResult(parameters, outputType, preconditions, post, function.Body, out var cached))
             {
                 postconditionResults.Add(cached!);
                 continue;
@@ -142,10 +164,10 @@ public sealed class ContractVerificationPass
             var result = verifier.VerifyPostcondition(
                 parameters,
                 outputType,
-                function.Preconditions,
+                preconditions,
                 post,
                 function.Body);
-            cache.CachePostconditionResult(parameters, outputType, function.Preconditions, post, function.Body, result);
+            cache.CachePostconditionResult(parameters, outputType, preconditions, post, function.Body, result);
             postconditionResults.Add(result);
         }
 
@@ -156,12 +178,13 @@ public sealed class ContractVerificationPass
             postconditionResults);
     }
 
-    private void ReportDiagnostics(FunctionNode function, FunctionVerificationResult result)
+    private void ReportDiagnostics(FunctionNode function, FunctionVerificationResult result,
+        IReadOnlyList<RequiresNode> preconditions)
     {
-        for (int i = 0; i < result.PreconditionResults.Count && i < function.Preconditions.Count; i++)
+        for (int i = 0; i < result.PreconditionResults.Count && i < preconditions.Count; i++)
         {
             ReportContractDiagnostic(
-                function, result.PreconditionResults[i], function.Preconditions[i].Span, isPrecondition: true);
+                function, result.PreconditionResults[i], preconditions[i].Span, isPrecondition: true);
         }
 
         for (int i = 0; i < result.PostconditionResults.Count && i < function.Postconditions.Count; i++)
@@ -329,30 +352,33 @@ public sealed class ContractVerificationPass
     /// are functions with an implicit `this` receiver, but contracts in §Q/§S
     /// reference parameters and `result`, neither of which depends on `this`.
     /// </summary>
-    private static IEnumerable<FunctionNode> EnumerateContractBearers(ModuleNode module)
+    internal static IEnumerable<FunctionNode> EnumerateContractBearers(ModuleNode module)
     {
         foreach (var f in module.Functions)
             yield return f;
+        foreach (var extension in module.EnumExtensions)
+            foreach (var function in extension.Methods)
+                yield return function;
 
         foreach (var cls in module.Classes)
         {
-            foreach (var fn in EnumerateClassMethodsAsFunctions(cls))
+            foreach (var fn in EnumerateClassMethodsAsFunctions(cls, module))
                 yield return fn;
         }
     }
 
-    private static IEnumerable<FunctionNode> EnumerateClassMethodsAsFunctions(ClassDefinitionNode cls)
+    private static IEnumerable<FunctionNode> EnumerateClassMethodsAsFunctions(ClassDefinitionNode cls, ModuleNode module)
     {
         foreach (var m in cls.Methods)
         {
-            if (!m.HasContracts)
+            if (!m.HasContracts && !m.Parameters.Any(parameter => parameter.InlineRefinement != null))
                 continue;
-            yield return AdaptMethodAsFunction(m, cls);
+            yield return AdaptMethodAsFunction(m, cls, module);
         }
 
         foreach (var nested in cls.NestedClasses)
         {
-            foreach (var fn in EnumerateClassMethodsAsFunctions(nested))
+            foreach (var fn in EnumerateClassMethodsAsFunctions(nested, module))
                 yield return fn;
         }
     }
@@ -365,7 +391,7 @@ public sealed class ContractVerificationPass
     /// receiver state, only parameters and `result`. That matches what the
     /// existing free-function verifier already supports.
     /// </summary>
-    private static FunctionNode AdaptMethodAsFunction(MethodNode m, ClassDefinitionNode owner)
+    private static FunctionNode AdaptMethodAsFunction(MethodNode m, ClassDefinitionNode owner, ModuleNode module)
     {
         // Use a synthetic name so cache keys distinguish methods on different classes.
         var qualifiedName = owner.Name + "." + m.Name;
@@ -374,14 +400,29 @@ public sealed class ContractVerificationPass
             m.Id,
             qualifiedName,
             m.Visibility,
-            m.TypeParameters,
+            Analysis.ReturnShape.GetCallableTypeParameters(m, module),
             m.Parameters,
             m.Output,
             m.Effects,
             m.Preconditions,
             m.Postconditions,
             m.Body,
-            m.Attributes);
+            m.Attributes,
+            examples: [],
+            issues: [],
+            uses: null,
+            usedBy: null,
+            assumptions: [],
+            complexity: null,
+            since: null,
+            deprecated: null,
+            breakingChanges: [],
+            properties: [],
+            lockNode: null,
+            author: null,
+            taskRef: null,
+            isAsync: m.IsAsync,
+            identifierSpan: m.IdentifierSpan);
     }
 
     private static ModuleVerificationResult CreateSkippedResult(ModuleNode module)
@@ -390,12 +431,13 @@ public sealed class ContractVerificationPass
 
         foreach (var function in EnumerateContractBearers(module))
         {
-            if (!function.HasContracts)
+            var preconditions = ContractVerifier.EffectivePreconditions(function.Parameters, function.Preconditions);
+            if (preconditions.Count == 0 && function.Postconditions.Count == 0)
                 continue;
 
             var skippedResult = new ContractVerificationResult(ContractVerificationStatus.Skipped);
 
-            var preResults = function.Preconditions
+            var preResults = preconditions
                 .Select(_ => skippedResult)
                 .ToList();
 

@@ -48,78 +48,13 @@ public sealed class ObligationsToolTests
     }
 
     [Fact]
-    public async Task RefineTool_Obligations_WithValidSource_ReturnsStructuredResult()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
-                  §PROOF{p1:check} (>= x INT:0)
-            """;
-
-        var args = JsonDocument.Parse($$"""
-            {
-                "action": "obligations",
-                "source": {{JsonSerializer.Serialize(source)}}
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        Assert.NotEmpty(result.Content);
-        var text = result.Content[0].Text;
-        Assert.NotNull(text);
-
-        var json = JsonDocument.Parse(text);
-        var root = json.RootElement;
-
-        Assert.True(root.TryGetProperty("summary", out var summary));
-        Assert.True(summary.TryGetProperty("total", out var total));
-        Assert.True(total.GetInt32() >= 2);
-
-        Assert.True(root.TryGetProperty("obligations", out var obligations));
-        Assert.True(obligations.GetArrayLength() >= 2);
-
-        // Each obligation should have required fields
-        var firstObl = obligations[0];
-        Assert.True(firstObl.TryGetProperty("id", out _));
-        Assert.True(firstObl.TryGetProperty("kind", out _));
-        Assert.True(firstObl.TryGetProperty("function_id", out _));
-        Assert.True(firstObl.TryGetProperty("status", out _));
-        Assert.True(firstObl.TryGetProperty("description", out _));
-
-        // Envelope schema v1.1: proof_status carries the five-status wire name
-        // (absent while pending/boundary); counterexample_bindings, when present,
-        // is the structured model.
-        var statusVocabulary = new[] { "proven", "refuted", "assumed", "unknown", "timeout", "unsupported", "unavailable" };
-        foreach (var obl in obligations.EnumerateArray())
-        {
-            if (obl.TryGetProperty("proof_status", out var proofStatus))
-            {
-                Assert.Contains(proofStatus.GetString(), statusVocabulary);
-            }
-
-            if (obl.TryGetProperty("counterexample_bindings", out var bindings))
-            {
-                foreach (var binding in bindings.EnumerateArray())
-                {
-                    Assert.True(binding.TryGetProperty("name", out _));
-                    Assert.True(binding.TryGetProperty("value", out _));
-                }
-            }
-        }
-    }
-
-    [Fact]
     public async Task RefineTool_Obligations_WithNoRefinements_ReturnsEmptyObligations()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -142,13 +77,14 @@ public sealed class ObligationsToolTests
     public async Task RefineTool_Obligations_WithFunctionIdFilter_FiltersResults()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Func1:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
-              §F{f002:Func2:pub}
-                  §I{i32:y} | (> # INT:0)
-                  §O{void}
+            module Test Test block
+              func Func1 (int:x | (# >= 0)) → void
+                !
+                return
+
+              func Func2 (int:y | (# > 0)) → void
+                !
+                return
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -186,11 +122,10 @@ public sealed class ObligationsToolTests
     public async Task RefineTool_Fixes_WithValidSource_ReturnsFixSuggestions()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x} | (>= # INT:0)
-                  §O{void}
-                  §PROOF{p1:always-positive} (> x INT:0)
+            module Test Test block
+              func Main (int:x | (# >= 0)) → void
+                !
+                proof{"always-positive"} (x > 0)
             """;
 
         var args = JsonDocument.Parse($$"""

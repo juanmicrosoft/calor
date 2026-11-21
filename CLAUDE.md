@@ -16,7 +16,7 @@ dotnet test --filter "FullyQualifiedName~ClassName"  # Run specific tests
 
 ### Run Tests Locally
 
-Three lanes, ordered fastest to slowest. See the [Corpus Submodules](#corpus-submodules-round-trip-harness)
+The lanes below separate current semantics from historical replay. See the [Corpus Submodules](#corpus-submodules-round-trip-harness)
 section below for **which** projects touch `bench/corpus/`.
 
 **First-time setup (once per clone).** `Calor.Verification.Tests` links
@@ -28,10 +28,10 @@ Any build that touches the compiler project hard-errors with
 src/Calor.Compiler/scripts/download-z3.sh    # or .ps1 on Windows
 ```
 
-**Fast unit-test lane** (seconds; no submodules required):
+**Corpus-independent lane** (no submodules required):
 
 ```bash
-dotnet test tests/Calor.Compiler.Tests/     # lexer/parser/emitter/analysis
+dotnet test tests/Calor.Compiler.Tests/ --filter "Category!=HistoricalReplay&Category!=CorpusRequired"
 dotnet test tests/Calor.Conversion.Tests/   # C# → Calor snapshots
 dotnet test tests/Calor.Semantics.Tests/    # binding/semantic analysis
 dotnet test tests/Calor.Verification.Tests/ # Z3 contract verification
@@ -43,11 +43,98 @@ Other corpus-independent projects are also fast-lane candidates —
 `Calor.ILAnalysis.Tests`, `Calor.Experimental.Tests`, `Calor.Performance.Tests`
 — the five above are the routinely-touched core.
 
-`tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs` will
-silently skip on a bare clone (it uses `Skip.IfNot` when `bench/corpus/`
-is empty); everything else runs green without submodules. To iterate on a
-single class, use the CLAUDE-standard filter:
+Corpus-dependent ratchet cases in `BinderIncompleteRatchetTests` and
+`Calor0425CorpusLedgerTests` report skips on a bare clone.
+`Calor0270CorpusVolumeTests` marks actual-source acceptance with
+`Category=CorpusRequired` and fails explicitly when its inputs are missing.
+The command above excludes that category and historical replay; it is not a
+full compiler-suite result. To iterate on a single class, use:
 `dotnet test --filter "FullyQualifiedName~ClassName"`.
+
+**Historical PP-E1 exact replay** (separate from current-compiler semantics):
+
+```bash
+python3 scripts/test_ppe1_historical_replay.py
+python3 scripts/ppe1_historical_replay.py
+```
+
+Requires Python 3.12+, the .NET 10 SDK, verified Z3 assets from the setup above,
+NuGet restore access (or cached locked packages), and Git history containing
+`72d060f400b5787ba4ec11cb4dd8860c95173da3` (fetch full history on a shallow clone).
+The runner archives that recorded compiler commit into a disposable temporary
+directory, restores its locked dependencies, builds its original compiler and
+test, and requires exactly one passing exact-recomputation result. It checks the
+current frozen fixture, ramp and analysis bytes against that commit, and compares
+the final immutable release ledger without changing its `measuredCommit`.
+Historical demand evidence comes from the same pinned tree, not today's corpus.
+No existing compiler binary, active-syntax copy or regenerated ledger is accepted.
+Missing prerequisites, changed inputs, test failures and skipped/empty runs fail.
+Both nested .NET launches disable node reuse, persistent build servers and shared
+compilation. The outer test uses the shared process capture helper with a 20-minute
+deadline covering root exit and stdout/stderr EOF, including inherited pipes.
+
+The unfiltered compiler suite invokes this runner through
+`PpE1LedgerMatchesRecomputation`; the full compiler CI shards already fetch full
+history and bootstrap verified Z3. The fast command above explicitly excludes
+this historical category, so it is **not** a full compiler-suite result.
+Current-compiler semantic replay uses separate active-syntax fixtures and cannot
+replace this historical check. Neither command reruns paid epochs or token collection.
+
+**Historical ledgers/baselines and current regressions:**
+
+```bash
+python3 scripts/test_registered_ledger_historical_replay.py
+python3 scripts/registered_ledger_historical_replay.py key
+python3 scripts/registered_ledger_historical_replay.py corpus
+python3 scripts/registered_ledger_historical_replay.py demand
+python3 scripts/registered_ledger_historical_replay.py formatter
+python3 scripts/registered_ledger_historical_replay.py binder
+dotnet test tests/Calor.Compiler.Tests/ --filter "FullyQualifiedName~EffectResolverKeyLedgerTests|FullyQualifiedName~Calor0425CorpusLedgerTests|FullyQualifiedName~HigherOrderDemandLedgerTests|FullyQualifiedName~LosslessFormattingTests|FullyQualifiedName~BinderIncompleteRatchetTests"
+```
+
+The five historical checks have the same prerequisites and process deadline as
+PP-E1, plus initialized corpus submodule object stores containing their recorded
+commits. They never fetch missing history. Each runner archives its recorded
+compiler and each recorded submodule commit from Git objects, not from current
+worktree files or active mirrors. It compares the final immutable ledger bytes
+against the original landing commit, then requires exactly one executed passing
+original test. Missing history, submodule objects, native assets or result files,
+attempted regeneration and skipped/empty results fail.
+
+The original test names remain `Category=HistoricalReplay` obligations.
+`CurrentCompiler_*` tests compare today's compiler against ordinary fixtures in
+`tests/TestData/Effects/*-current-expectations.json` and
+`tests/TestData/Formatting/formatter-current-expectations.json`; these have no historical
+`measuredCommit` or provenance seals. Per-subject counts, denominators, named
+exclusions and binding causes are exact, and the original floors still apply.
+The current corpus test executes all 364 CLI module cross-checks on every run
+and compares every CLI field; it does not reuse recorded CLI results.
+Historical shape and gate tests continue to read the original ledgers.
+The demand D-A replay retains the original compiler's exact first-error codes.
+Its separate current fixture pins all 952 logical subjects, the same 52 excluded
+files and their current first errors. Source-ID rejection now precedes the older
+closer/effect errors in 31 intentionally obsolete MCP inputs. Active mirrors do
+not add subjects; no historical ledger is regenerated.
+The formatter replay uses the compiler and active inputs from the baseline's
+original producing commit. Its isolated Git index lists that commit's exact
+tracked paths, not build outputs or today's mirrors. The separate current test
+still checks every transformation's token stream, generated C#, public API,
+comments and idempotence. Its 39 additional successful transformations are 35
+latency L3 modules, three benchmarks using a `base` parameter, and the verbatim
+identifier snapshot. Reserved identifiers now emit with `@` escaping; the
+original 704-success baseline stays unchanged.
+The binder conversion replay uses compiler `7daf2bc99` and preserves both the
+original source-coverage artifact and aggregate baseline. The live conversion
+test retains all 364 exact original source/coverage/loss/success/count records.
+Only serialized diagnostic identities use separate ordinary expectations in
+`tests/TestData/Binding/binder-current-diagnostic-sites.json`: every code, message,
+offset, line, column and actual serialized span text is explicit, for all 2,248
+raw errors and 115 propagated errors. Source-ID removal changes offsets, columns,
+candidate identity URIs and 14 raw span texts; counts and codes do not change.
+Two existing zero-offset recovery spans still slice incidental module-header
+text, not mapped native C# sites. These are pinned as observed, not promoted to
+source-coverage evidence. `CALOR_UPDATE_BINDER_BASELINE` cannot update conversion
+artifacts, and the historical replay rejects it.
 
 **Full-corpus lane** (adds ~500 MB and a few minutes; needed to unskip
 `BinderIncompleteRatchetTests`):
@@ -100,14 +187,15 @@ so `--recursive` is unnecessary here. CI passes it as a safe default.
 The three corpora add ~500 MB to a fresh clone; skip them if you are only
 running the unit-test lane.
 
-**Which tests need submodules?** Only the round-trip harness and
-`BinderIncompleteRatchetTests`
-(`tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs`) read
+**Which tests need submodules?** The round-trip harness, current source
+acceptance in `Calor0270CorpusVolumeTests`, and corpus cases in
+`Calor0425CorpusLedgerTests` and `BinderIncompleteRatchetTests` read
 from `bench/corpus/`. `BinderIncompleteRatchetTests` uses
 `Skip.IfNot(subjects.All(Directory.Exists), "corpus submodules not
-initialized")` to skip cleanly on a bare clone, so running
-`dotnet test tests/Calor.Compiler.Tests/` is safe without submodules —
-you will silently skip that one class. `Calor.Conversion.Tests`,
+initialized")` to skip cleanly on a bare clone.
+The corpus-independent command above excludes required source acceptance.
+The unfiltered compiler suite requires initialized submodules.
+`Calor.Conversion.Tests`,
 `Calor.Semantics.Tests`, `Calor.Verification.Tests`,
 `Calor.Enforcement.Tests`, and `Calor.Evaluation` do not touch
 `bench/corpus/` at all.
@@ -155,7 +243,7 @@ C# Source → Roslyn Parse → SyntaxTree → RoslynSyntaxVisitor → AST → Ca
 
 | File | Lines | Role |
 |------|-------|------|
-| `Parsing/Lexer.cs` | 1,400 | Tokenizer — section markers, typed literals, keywords |
+| `Parsing/Lexer.cs` | 1,400 | Tokenizer — keywords, literals, counted raw frames |
 | `Parsing/Parser.cs` | 8,900 | Recursive descent parser → AST |
 | `Ast/AstNode.cs` | 480 | IAstVisitor / IAstVisitor\<T\> interfaces (~236 methods each) |
 | `Ast/*.cs` | 29 files | AST node classes organized by feature |
@@ -174,46 +262,59 @@ All paths relative to `src/Calor.Compiler/`.
 
 ## Calor Syntax Quick Reference
 
-Block structure is **indentation-only** (2 spaces per level, Python-style). **Never
-write structural closer tags** — the main block closers (`§/M`, `§/F`, `§/L`, `§/I`,
-`§/W`, `§/WH`, `§/CL`, `§/MT`, `§/IFACE`, and others) raise a hard error (`Calor0830`);
-a few remaining closer forms are still tolerated by the parser but always optional.
-The only closers you should ever write are `§/C` (call argument lists) and `§/LAM`
-(block lambdas).
+Block structure is **indentation-only** (2 spaces per level, Python-style).
+Use lowercase keywords, infix expressions with C# precedence, and ordinary calls.
+Section tags, typed-literal prefixes and block/call/lambda closer tags are retired.
 
-```
-§M{id:Name}                Module
-§F{id:name:vis} (T:x) -> R  Function with inline signature
-§B{name:type}              Immutable binding
-§B{~name:type}             Mutable binding
-§L{id:var:from:to:step}    For loop
-§IF{id} (cond)             If (body indented)
-§EI (cond)                  ElseIf (at parent column)
-§EL                         Else (at parent column)
-§C{object.method} §A arg §/C  Method call with argument
-§E{codes}                  Effects (§E{} = pure)
-§Q (expr)                  Precondition
-§S (expr)                  Postcondition
-§IV (expr)                 Invariant
+```calor-fragment
+module Name Namespace                 File label and optional CLR namespace
+func name public (int:x) → int         Function with inline signature
+let int:name = value                  Immutable binding
+var int:name = value                  Mutable binding
+set name value                        Assignment
+for i from 1 to 100 step 1             Counted loop
+if condition                          If (body indented)
+else if condition                     Else-if (at parent column)
+else                                  Else (at parent column)
+object.Method(argument)               Method call
+! cw                                  Declaration effect row (standalone ! = pure)
+requires expression                   Precondition
+=> expression                         Postcondition
+invariant expression                  Invariant
 ```
 
-Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
-` ```calor ` blocks starting with `§M` are parse-checked by `calor self-check docs`):
+The file label is not a CLR namespace or static container. Omit the namespace for
+the global namespace; use a nested `module Name` for a named static container.
+Effect rows and contract headers precede the first body statement.
+Public/protected callable boundaries require an own row (`!` for Pure).
+Private/internal bodies infer theirs and reject own annotations. Callback
+parameter and return types retain explicit rows; `! unknown` is not permission
+to invoke them.
+
+Example (complete fenced `calor` programs starting with `module` are parse-checked
+by `calor self-check docs`):
 
 ```calor
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub} () -> void
-    §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0)
-        §P "FizzBuzz"
-      §EI (== (% i 3) 0)
-        §P "Fizz"
-      §EL
-        §P i
+module FizzBuzz
+  func Main public () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i % 15 == 0
+        System.Console.WriteLine("FizzBuzz")
+      else if i % 3 == 0
+        System.Console.WriteLine("Fizz")
+      else
+        System.Console.WriteLine(i)
 ```
 
-**Typed literals:** `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14`
+**Types and literals:** use C# type spellings (`int`, `string`, `int[]`, `string?`)
+and bare literals (`42`, `"hello"`, `true`, `3.14`). Runtime string holes use
+`${expression}`; escape a literal hole as `\${text}`.
+
+Declaration IDs never appear in active source. Tools maintain them in the
+per-project `.calor/ids.json` sidecar; commit it alongside source. Build and
+project tools synchronize active inputs automatically. Use identity-aware
+rename and move tools; plain-text reconciliation rejects ambiguous matches.
 
 ## Adding New AST Nodes — Checklist
 
@@ -233,17 +334,17 @@ Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
 
 - **`ParseAttributes()`** already splits on `:` into `_pos0`, `_pos1`, etc. — **never re-split** `attrs["_pos0"]` on `:`
 - **`IsExpressionStart()`** must include all new expression token kinds — otherwise binding initializers silently fail to parse
-- **Closing tags with IDs** (e.g. `§/UNSAFE{u1}`) need `ParseAttributes()` after `Advance()` to consume the ID block
+- **Native declarations** use the existing indentation and signature readers; do not introduce section tags or structural closers
 - **`ParseValue()`** handles `*` for pointer types and `[,]` for multi-dimensional array types
 
 ## Key Conventions
 
 - **Visitor pattern everywhere** — every AST node has `Accept` methods; all tree operations implement `IAstVisitor` or `IAstVisitor<T>`
-- **CSharpInteropBlockNode** — when `RoslynSyntaxVisitor` encounters unsupported C# features, it wraps the raw C# in this node (preserves code verbatim with metadata about the unsupported feature)
-- **MemberPreprocessorBlockNode** — wraps class members in conditional `#if` blocks; supports `§PP{CONDITION}` ... `§/PP{CONDITION}` syntax with chained else branches
+- **CSharpInteropBlockNode** — converter-only preservation of unsupported C#, with a reason marker and exact payload bytes; do not teach or handwrite passthrough. Preservation is not native support or effect enforcement
+- **MemberPreprocessorBlockNode** — wraps class members in conditional `#if` blocks; native `pp condition`, `pp elif condition` and `pp else` branches have indented bodies
 - **VariableSymbol.IsParameter** — distinguishes function parameters from locals; used by analysis passes
-- **BoundCallExpression.Target** is a `string` — `NullDereferenceChecker` checks for `.unwrap` suffix
-- **Option\<T\> and Result\<T,E\>** are valid generic types in Calor's type system
+- **BoundCallExpression.Target** is a `string` — call-target names alone are not nullability proof facts
+- **Absence and failure** use existing .NET nullable types (`string?`, `int?`, `null`) and exceptions (`throw`, `try`, `catch`); third-party generic types use ordinary generic type references
 - **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version + contract verification results), 0800–0899 (ID validation), 0900–0999 (dataflow/bug patterns/taint), 1000–1099 (codegen/interop), 1100–1199 (refinements/obligations), 1200–1299 (experimental), 1300–1399 (CLI: lint findings and command-level errors)
 
 ## Project Layout
@@ -284,7 +385,7 @@ thing to avoid, not vocabulary.
 - **Use the standard term** when one exists: binding, parser, AST, diagnostic, type
   checker, submodule, CI. Do not paraphrase it away.
 - **Explain Calor's own vocabulary** briefly on first use — effect rows, `Calor0410`,
-  `§PROP`, the row charge, laundering, a ledger. One clause, not a paragraph.
+  the row charge, laundering, a ledger. One clause, not a paragraph.
 - **Short sentences, active voice, lead with what changed.** Split any sentence carrying
   three subordinate clauses.
 - **Numbers, not adjectives**: "40 of 60 modules" beats "most modules".

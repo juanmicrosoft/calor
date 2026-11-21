@@ -1,0 +1,100 @@
+module L3M24 L3M24 block
+  module L3M24Module public
+
+    func l3m24_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 24949)
+      let int:total = ((x * 3) + y)
+      if (total < 24949)
+        return 24949
+      else
+        return total
+
+    func l3m24_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 38)
+
+    func l3m24_fn03 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24956)
+      if (x >= 24956)
+        return x
+      else
+        return 24956
+
+    func l3m24_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 3)
+
+    func l3m24_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 75)
+
+    func l3m24_fn06 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24963)
+      if (x >= 24963)
+        return x
+      else
+        return 24963
+
+    func l3m24_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 24970)
+      let int:total = ((x * 3) + y)
+      if (total < 24970)
+        return 24970
+      else
+        return total
+
+    func l3m24_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 6)
+      => (x >= 7)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24977)
+        return (acc + 24977)
+      else
+        return ((acc * 2) + 24977)
+
+    func l3m24_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 19)
+
+    func l3m24_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 7)
+      requires (y >= 0)
+      => (result >= 24984)
+      let int:total = ((x * 3) + y)
+      if (total < 24984)
+        return 24984
+      else
+        return total
+
+    func l3m24_fn11 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 22)
+
+    func l3m24_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 86)
+
+    func l3m24_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 87)

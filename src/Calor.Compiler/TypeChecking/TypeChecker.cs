@@ -11,6 +11,15 @@ public sealed class TypeChecker
 {
     private readonly DiagnosticBag _diagnostics;
     private readonly TypeEnvironment _env;
+    private readonly IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? _boundAwaits;
+    private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceEnumConstants;
+    private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundSourceStaticFieldReads;
+    private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundMetadataConstants;
+    private readonly IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? _boundMetadataStaticFieldReads;
+    private readonly IReadOnlySet<TextSpan>? _boundGenericReceivingFailures;
+    private ModuleNode? _module;
+    private Analysis.CallGraphAnalysis.OperatorBindings? _sourceBindings;
+    internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
     private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
     private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
     private readonly HashSet<string> _moduleDeclaredValueTypes = new(StringComparer.OrdinalIgnoreCase);
@@ -58,9 +67,36 @@ public sealed class TypeChecker
     }
 
     public TypeChecker(DiagnosticBag diagnostics)
+        : this(diagnostics, null)
+    {
+    }
+
+    internal TypeChecker(DiagnosticBag diagnostics,
+        IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? boundAwaits,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceEnumConstants = null,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceStaticFieldReads = null,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataConstants = null)
+        : this(diagnostics, boundAwaits, boundSourceEnumConstants,
+            boundSourceStaticFieldReads, boundMetadataConstants, null)
+    {
+    }
+
+    internal TypeChecker(DiagnosticBag diagnostics,
+        IReadOnlyDictionary<AwaitExpressionNode, Binding.BoundStructuralExpression>? boundAwaits,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceEnumConstants,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundSourceStaticFieldReads,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataConstants,
+        IReadOnlySet<TextSpan>? boundGenericReceivingFailures,
+        IReadOnlyDictionary<ExpressionNode, Binding.BoundFieldAccessExpression>? boundMetadataStaticFieldReads = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _env = new TypeEnvironment();
+        _boundAwaits = boundAwaits;
+        _boundSourceEnumConstants = boundSourceEnumConstants;
+        _boundSourceStaticFieldReads = boundSourceStaticFieldReads;
+        _boundMetadataConstants = boundMetadataConstants;
+        _boundMetadataStaticFieldReads = boundMetadataStaticFieldReads;
+        _boundGenericReceivingFailures = boundGenericReceivingFailures;
     }
 
     /// <summary>
@@ -95,6 +131,9 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
+        _module = module;
+        _sourceBindings = null;
+        Verification.ContractVerifier.VerifyNamedRefinementPredicates(module, _diagnostics);
         _hasNamedRefinements = module.RefinementTypes.Count > 0;
         _patternBindingTypes.Clear();
         _moduleDeclaredValueTypes.Clear();
@@ -142,9 +181,10 @@ public sealed class TypeChecker
         }
 
         // Third pass (#1676): class members. Before this the checker never looked inside a
-        // §CL, so inside methods only the runtime refinement guards applied. Only a module with
-        // §RTYPE declarations has named refinements to protect.
-        if (_hasNamedRefinements)
+        // §CL, so inside methods only the runtime refinement guards applied. Only the soundness
+        // errors are kept: refinement errors (in a module with §RTYPE declarations) and numeric
+        // conversions C# rejects between two known types (every module; nested `module`
+        // containers are classes too).
         {
             // A base class is resolved only when its simple name names exactly one non-generic
             // module class; otherwise its members stay unknown to the checker (#1676 review).
@@ -164,8 +204,9 @@ public sealed class TypeChecker
     }
 
     /// <summary>
-    /// Checks a class's members and keeps ONLY the refinement-soundness errors that produces
-    /// (#1676). The checker has no member table: inherited fields, members of an external base
+    /// Checks a class's members and keeps ONLY the soundness errors that produces: refinement
+    /// errors (#1676) and numeric conversions C# rejects between two known types (0.30 i1,
+    /// reported through the same channel). The checker has no member table: inherited fields, members of an external base
     /// class, events, indexers and user-defined operators are all invisible to it, so its other
     /// diagnostics inside class members are mostly about its own model, not the program. The
     /// binder and Roslyn keep owning those, exactly as before this pass existed.
@@ -366,13 +407,14 @@ public sealed class TypeChecker
         => _env.DefineFunction(GetCallableLookupName(func.Name), CreateCandidate(func));
 
     private FunctionCandidate CreateCandidate(FunctionNode func)
-        => CreateCandidate(func.TypeParameters, func.Name, func.Parameters, func.Output);
+        => CreateCandidate(func.TypeParameters, func.Name, func.Parameters, func.Output, func.IsAsync);
 
     private FunctionCandidate CreateCandidate(
         IReadOnlyList<TypeParameterNode> typeParameters,
         string callableName,
         IReadOnlyList<ParameterNode> parameters,
-        OutputNode? output)
+        OutputNode? output,
+        bool isAsync = false)
     {
         _env.EnterScope();
 
@@ -387,13 +429,12 @@ public sealed class TypeChecker
         var paramTypes = new List<CalorType>();
         foreach (var param in parameters)
         {
-            var paramType = ResolveTypeName(param.TypeName, param.Span);
+            var paramType = ResolveParameterType(param);
             paramTypes.Add(paramType);
         }
 
-        var returnType = output != null
-            ? ResolveTypeName(output.TypeName, output.Span)
-            : PrimitiveType.Void;
+        var shape = Analysis.ReturnShape.GetAsyncReturnTypes(output?.TypeName ?? "void", isAsync, _module, AsyncCarrierTypeParameters());
+        var returnType = ResolveTypeName(shape.CallableType, output?.Span ?? default);
 
         _suppressDiagnostics = previousSuppressDiagnostics;
         _env.ExitScope();
@@ -452,11 +493,13 @@ public sealed class TypeChecker
         RegisterTypeParameters(func);
         var previousSuppressDiagnostics = _suppressDiagnostics;
         _suppressDiagnostics = true;
-        var returnType = func.Output != null
-            ? ResolveTypeName(func.Output.TypeName, func.Output.Span)
-            : PrimitiveType.Void;
+        var shape = Analysis.ReturnShape.GetAsyncReturnTypes(func.Output?.TypeName ?? "void", func.IsAsync, _module, AsyncCarrierTypeParameters());
+        var returnType = ResolveTypeName(shape.BodyType, func.Output?.Span ?? func.Span);
         _suppressDiagnostics = previousSuppressDiagnostics;
+        var previousValidateReturnAssignments = _validateReturnAssignments;
+        _validateReturnAssignments = func.IsAsync;
         CheckCallableBody(func.Parameters, returnType, func.Body);
+        _validateReturnAssignments = previousValidateReturnAssignments;
         _env.ExitScope();
     }
 
@@ -481,7 +524,7 @@ public sealed class TypeChecker
         defineExtraVariables?.Invoke();
         foreach (var param in parameters)
         {
-            var paramType = ResolveTypeName(param.TypeName, param.Span);
+            var paramType = ResolveParameterType(param);
             _env.DefineVariable(param.Name, paramType);
             if (param.InlineRefinement != null)
                 _inlineRefinedParameters.Add(param.Name);
@@ -559,7 +602,7 @@ public sealed class TypeChecker
         {
             _env.DefineLocalFunction(
                 GetCallableLookupName(method.Name),
-                CreateCandidate(method.TypeParameters, method.Name, method.Parameters, method.Output));
+                CreateCandidate(method.TypeParameters, method.Name, method.Parameters, method.Output, method.IsAsync));
         }
 
         foreach (var constructor in cls.Constructors)
@@ -568,7 +611,7 @@ public sealed class TypeChecker
         {
             _env.EnterScope();
             RegisterTypeParameters(method.TypeParameters, method.Name);
-            CheckMemberBody(method.Parameters, method.Output, method.Body);
+            CheckMemberBody(method.Parameters, method.Output, method.Body, method.IsAsync);
             _env.ExitScope();
         }
         foreach (var property in cls.Properties)
@@ -614,7 +657,14 @@ public sealed class TypeChecker
     private void DefineClassMemberVariables(ClassDefinitionNode cls)
     {
         foreach (var field in cls.Fields)
-            _env.DefineVariable(field.Name, ResolveTypeName(field.TypeName, field.TypeNameSpan));
+        {
+            var fieldType = ResolveTypeName(field.TypeName, field.TypeNameSpan);
+            // A const field is a constant expression in C#: `byte b = Limit` is valid when the
+            // value fits, so its value (not computed here) must never read as a narrowing.
+            _env.DefineVariable(field.Name, field.Modifiers.HasFlag(MethodModifiers.Const)
+                ? AsIntegerConstant(fieldType, null)
+                : fieldType);
+        }
         foreach (var property in cls.Properties)
             _env.DefineVariable(property.Name, ResolveTypeName(property.TypeName, property.TypeNameSpan));
     }
@@ -622,15 +672,18 @@ public sealed class TypeChecker
     private void CheckMemberBody(
         IReadOnlyList<ParameterNode> parameters,
         OutputNode? output,
-        IReadOnlyList<StatementNode> body)
+        IReadOnlyList<StatementNode> body,
+        bool isAsync = false)
     {
         var previousSuppressDiagnostics = _suppressDiagnostics;
         _suppressDiagnostics = true;
-        var returnType = output != null
-            ? ResolveTypeName(output.TypeName, output.Span)
-            : PrimitiveType.Void;
+        var shape = Analysis.ReturnShape.GetAsyncReturnTypes(output?.TypeName ?? "void", isAsync, _module, AsyncCarrierTypeParameters());
+        var returnType = ResolveTypeName(shape.BodyType, output?.Span ?? default);
         _suppressDiagnostics = previousSuppressDiagnostics;
+        var previousValidateReturnAssignments = _validateReturnAssignments;
+        _validateReturnAssignments = isAsync;
         CheckCallableBody(parameters, returnType, body);
+        _validateReturnAssignments = previousValidateReturnAssignments;
     }
 
     private void CheckAccessors(
@@ -676,6 +729,9 @@ public sealed class TypeChecker
         {
             case CallStatementNode call:
                 CheckCallStatement(call);
+                break;
+            case ExpressionStatementNode expression:
+                _ = InferExpressionType(expression.Expression);
                 break;
             case LocalFunctionStatementNode local:
                 CheckFunction(local.Function);
@@ -747,10 +803,13 @@ public sealed class TypeChecker
                 CheckDictionaryForeachStatement(dictForeach);
                 break;
             case AssignmentStatementNode assignment:
-                CheckRefinedAssignment(assignment);
+                if (_hasNamedRefinements)
+                    CheckRefinedAssignment(assignment);
+                else
+                    CheckNumericAssignment(assignment.Target, assignment.Value, "an assignment");
                 break;
-            case CompoundAssignmentStatementNode compound when _hasNamedRefinements:
-                _ = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
+            case CompoundAssignmentStatementNode compound:
+                CheckCompoundAssignment(compound);
                 break;
             case PreprocessorDirectiveNode preprocessor:
                 CheckPreprocessorDirective(preprocessor);
@@ -890,6 +949,58 @@ public sealed class TypeChecker
     /// local is rejected, and so is one nested in the value (a call passing a Nat where a Pos is
     /// expected). Every other assignment diagnostic stays with the binder and Roslyn, as before.
     /// </summary>
+    /// <summary>
+    /// The declared type of an assignment target the checker can name: a local, a parameter or
+    /// a member of the enclosing class (bare or through <c>this</c>). Null for anything else.
+    /// </summary>
+    private CalorType? LookupAssignmentTargetType(ExpressionNode target) => target switch
+    {
+        ReferenceNode reference when TryGetThisMemberName(reference.Name, out var memberName)
+            => LookupThisMember(memberName),
+        ReferenceNode reference => _env.LookupVariable(reference.Name),
+        FieldAccessNode { Target: ThisExpressionNode or ReferenceNode { Name: "this" } } thisField
+            => LookupThisMember(thisField.FieldName),
+        _ => null,
+    };
+
+    /// <summary>
+    /// An assignment into a numeric local, parameter or member: the right-hand side must convert
+    /// implicitly, as in C#. The checker otherwise leaves assignment right-hand sides to C#, so
+    /// only the numeric-conversion verdict (and nominal-refinement errors) are kept from it.
+    /// </summary>
+    private void CheckNumericAssignment(ExpressionNode target, ExpressionNode value, string position)
+    {
+        if (LookupAssignmentTargetType(target) is not { } targetType
+            || EraseRefinement(targetType) is not PrimitiveType numericTarget
+            || !HasExactNumericType(numericTarget))
+            return;
+        var valueType = InferKeepingOnlyNominalRefinementDiagnostics(value, numericTarget);
+        if (IsRejectedNumericConversion(numericTarget, valueType))
+            ReportNumericConversion(value.Span, numericTarget, valueType, position);
+    }
+
+    /// <summary>
+    /// C# accepts <c>x op= y</c> when <c>y</c> converts implicitly to the type of <c>x</c> (or the
+    /// operator is a shift), even though <c>x op y</c> may be wider (§12.21.4): <c>b += 1</c> on a
+    /// byte is valid, <c>f += someDouble</c> on a float is CS0266.
+    /// </summary>
+    private void CheckCompoundAssignment(CompoundAssignmentStatementNode compound)
+    {
+        if (compound.Operator is not (CompoundAssignmentOperator.LeftShift
+                or CompoundAssignmentOperator.RightShift or CompoundAssignmentOperator.NullCoalesce)
+            && LookupAssignmentTargetType(compound.Target) is { } targetType
+            && EraseRefinement(targetType) is PrimitiveType numericTarget
+            && HasExactNumericType(numericTarget))
+        {
+            var valueType = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
+            if (IsRejectedNumericConversion(numericTarget, valueType))
+                ReportNumericConversion(compound.Value.Span, numericTarget, valueType, "a compound assignment");
+            return;
+        }
+        if (_hasNamedRefinements)
+            _ = InferKeepingOnlyNominalRefinementDiagnostics(compound.Value, null);
+    }
+
     private void CheckRefinedAssignment(AssignmentStatementNode assignment)
     {
         if (!_hasNamedRefinements)
@@ -938,6 +1049,11 @@ public sealed class TypeChecker
             ReportDistinctNamedRefinement(assignment.Span, targetType, valueType,
                 $"assignment to '{targetName}'");
         }
+        else if (targetType != null && IsRejectedNumericConversion(EraseRefinement(targetType), valueType))
+        {
+            ReportNumericConversion(assignment.Value.Span, EraseRefinement(targetType), valueType,
+                "an assignment");
+        }
     }
 
     /// <summary>
@@ -949,24 +1065,34 @@ public sealed class TypeChecker
 
     private void CheckReturnStatement(ReturnStatementNode ret)
     {
+        if (ret.Expression is null && _lambdaBodyDepth > 0 && _validateReturnAssignments
+            && _currentReturnType is { } expected && !expected.Equals(PrimitiveType.Void)
+            && !ContainsInferencePlaceholder(expected))
+        {
+            _lambdaReturnInvalid = true;
+            if (!_suppressContextualDiagnostics)
+                _diagnostics.ReportError(ret.Span, DiagnosticCode.TypeMismatch,
+                    $"A lambda targeting {expected.SurfaceName} must return a value.");
+        }
         if (ret.Expression != null)
         {
             var returnType = InferExpressionType(ret.Expression, _currentReturnType);
             _inferredLambdaReturnTypes?.Add(returnType);
             if (_currentReturnType != null
                 && !_suppressContextualDiagnostics
-                && !(_validateReturnAssignments || ret.Expression is CallExpressionNode)
+                && !(_validateReturnAssignments || ret.Expression is CallExpressionNode or OverflowContextExpressionNode)
                 && IsDistinctNamedRefinement(_currentReturnType, returnType))
             {
                 ReportDistinctNamedRefinement(ret.Expression.Span, _currentReturnType, returnType, "a return");
             }
-            if ((_validateReturnAssignments || ret.Expression is CallExpressionNode)
+            if ((_validateReturnAssignments || ret.Expression is CallExpressionNode or OverflowContextExpressionNode)
                 && _currentReturnType != null
                 && !ContainsInferencePlaceholder(_currentReturnType)
                 && !ContainsInferencePlaceholder(returnType)
                 && !IsAssignable(_currentReturnType, returnType)
                 && !(_lambdaBodyDepth == 0
-                    && IsBinderOwnedNullabilityMismatch(_currentReturnType, returnType)))
+                    && (IsBinderOwnedNullabilityMismatch(_currentReturnType, returnType)
+                        || _boundGenericReceivingFailures?.Contains(ret.Expression.Span) == true)))
             {
                 _lambdaReturnInvalid = true;
                 if (!_suppressContextualDiagnostics)
@@ -974,6 +1100,11 @@ public sealed class TypeChecker
                     if (IsDistinctNamedRefinement(_currentReturnType, returnType))
                     {
                         ReportDistinctNamedRefinement(ret.Expression.Span, _currentReturnType, returnType, "a return");
+                    }
+                    else if (IsRejectedNumericConversion(EraseRefinement(_currentReturnType), returnType))
+                    {
+                        ReportNumericConversion(ret.Expression.Span, EraseRefinement(_currentReturnType),
+                            returnType, "a return");
                     }
                     else
                     {
@@ -983,6 +1114,17 @@ public sealed class TypeChecker
                     }
                 }
             }
+            else if (_currentReturnType != null
+                && !_suppressContextualDiagnostics
+                && !(_validateReturnAssignments || ret.Expression is CallExpressionNode or OverflowContextExpressionNode)
+                && IsRejectedNumericConversion(EraseRefinement(_currentReturnType), returnType))
+            {
+                // Other returns are left to C#, but a numeric conversion between two known types
+                // is decided exactly here, at the Calor expression (`return celsius + 273.15` in a
+                // float function is f64 → f32).
+                ReportNumericConversion(ret.Expression.Span, EraseRefinement(_currentReturnType),
+                    returnType, "a return");
+            }
         }
     }
 
@@ -990,19 +1132,32 @@ public sealed class TypeChecker
     {
         _env.EnterScope();
 
-        // Loop variable is INT
-        _env.DefineVariable(forStmt.VariableName, PrimitiveType.Int);
+        _env.DefineVariable(forStmt.VariableName, ResolveTypeName(forStmt.VariableType, forStmt.VariableSpan));
+
+        if (forStmt.Condition != null && forStmt.Update != null)
+        {
+            InferExpressionType(forStmt.From);
+            var conditionType = InferExpressionType(forStmt.Condition);
+            if (IsDefinitelyNotBool(conditionType))
+                _diagnostics.ReportError(forStmt.Condition.Span, DiagnosticCode.TypeMismatch,
+                    $"For condition must be bool, got {conditionType.SurfaceName}");
+            CheckStatement(forStmt.Update);
+            foreach (var statement in forStmt.Body)
+                CheckStatement(statement);
+            _env.ExitScope();
+            return;
+        }
 
         var fromType = InferExpressionType(forStmt.From);
         var toType = InferExpressionType(forStmt.To);
 
-        if (!IsNumeric(fromType))
+        if (IsDefinitelyNotNumeric(fromType))
         {
             _diagnostics.ReportError(forStmt.From.Span, DiagnosticCode.TypeMismatch,
                 $"FOR 'from' expression must be numeric, got {fromType.SurfaceName}");
         }
 
-        if (!IsNumeric(toType))
+        if (IsDefinitelyNotNumeric(toType))
         {
             _diagnostics.ReportError(forStmt.To.Span, DiagnosticCode.TypeMismatch,
                 $"FOR 'to' expression must be numeric, got {toType.SurfaceName}");
@@ -1011,7 +1166,7 @@ public sealed class TypeChecker
         if (forStmt.Step != null)
         {
             var stepType = InferExpressionType(forStmt.Step);
-            if (!IsNumeric(stepType))
+            if (IsDefinitelyNotNumeric(stepType))
             {
                 _diagnostics.ReportError(forStmt.Step.Span, DiagnosticCode.TypeMismatch,
                     $"FOR 'step' expression must be numeric, got {stepType.SurfaceName}");
@@ -1327,8 +1482,14 @@ public sealed class TypeChecker
                 {
                     ReportDistinctNamedRefinement(bind.Span, varType, initType, $"the binding of '{bind.Name}'");
                 }
+                else if (ClassifyImplicitNumericConversion(EraseRefinement(varType), initType) == false)
+                {
+                    ReportNumericConversion(bind.Initializer.Span, EraseRefinement(varType), initType,
+                        $"the binding of '{bind.Name}'");
+                }
                 else if (!IsAssignable(varType, initType)
-                    && !IsBinderOwnedNullabilityMismatch(varType, initType))
+                    && !IsBinderOwnedNullabilityMismatch(varType, initType)
+                    && _boundGenericReceivingFailures?.Contains(bind.Initializer.Span) != true)
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
                         $"Cannot assign {initType.SurfaceName} to variable of type {varType.SurfaceName}");
@@ -1338,7 +1499,7 @@ public sealed class TypeChecker
             {
                 var initType = InferExpressionType(bind.Initializer);
                 initializerType = initType;
-                varType = initType;
+                varType = WithoutIntegerConstant(initType);
                 // #1529: the inferred local keeps the named refinement; record it so the emitter
                 // and obligation generator guard every later write exactly as for §B{x:Nat}.
                 // Speculative passes are rolled back (BeginSpeculation), so the last committed
@@ -1675,14 +1836,21 @@ public sealed class TypeChecker
             _env.DefineVariable(dictForeach.KeyName, keyType);
             _env.DefineVariable(dictForeach.ValueName, valueType);
         }
-        else if (IsKnownNonCollection(dictType))
+        else if (dictType is not (GenericInstanceType or ArrayType) && IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(dictForeach.Dictionary.Span, DiagnosticCode.TypeMismatch,
-                $"EACHKV requires a Dictionary, got {dictType.SurfaceName}");
+                $"Two-name each requires a deconstructable enumerable, got {dictType.SurfaceName}");
 
             // Define variables with error type to allow body checking to continue
             _env.DefineVariable(dictForeach.KeyName, ErrorType.Instance);
             _env.DefineVariable(dictForeach.ValueName, ErrorType.Instance);
+        }
+        else
+        {
+            // Tuple/custom Deconstruct signatures belong to the generated-C#
+            // validation boundary, just like other external type members.
+            _env.DefineVariable(dictForeach.KeyName, new ExternalType("foreach-deconstruction"));
+            _env.DefineVariable(dictForeach.ValueName, new ExternalType("foreach-deconstruction"));
         }
 
         // Check body statements
@@ -1718,53 +1886,10 @@ public sealed class TypeChecker
                 }
                 break;
 
-            case SomePatternNode somePat:
-                if (expectedType is OptionType optType)
-                {
-                    CheckPattern(somePat.InnerPattern, optType.InnerType, bindVariables);
-                }
-                else
-                {
-                    _diagnostics.ReportError(somePat.Span, DiagnosticCode.TypeMismatch,
-                        $"Some pattern can only match Option types, got {expectedType.SurfaceName}");
-                }
-                break;
-
-            case NonePatternNode nonePat:
-                if (expectedType is not OptionType)
-                {
-                    _diagnostics.ReportError(nonePat.Span, DiagnosticCode.TypeMismatch,
-                        $"None pattern can only match Option types, got {expectedType.SurfaceName}");
-                }
-                break;
-
-            case OkPatternNode okPat:
-                if (expectedType is ResultType resType)
-                {
-                    CheckPattern(okPat.InnerPattern, resType.OkType, bindVariables);
-                }
-                else
-                {
-                    _diagnostics.ReportError(okPat.Span, DiagnosticCode.TypeMismatch,
-                        $"Ok pattern can only match Result types, got {expectedType.SurfaceName}");
-                }
-                break;
-
-            case ErrPatternNode errPat:
-                if (expectedType is ResultType errResType)
-                {
-                    CheckPattern(errPat.InnerPattern, errResType.ErrType, bindVariables);
-                }
-                else
-                {
-                    _diagnostics.ReportError(errPat.Span, DiagnosticCode.TypeMismatch,
-                        $"Err pattern can only match Result types, got {expectedType.SurfaceName}");
-                }
-                break;
             // `§VAR{d}` — the `var d` pattern. Binds like VariablePatternNode; it reached the
             // default arm below and hard-errored, so every switch arm using it was rejected.
             case VarPatternNode varPatNode:
-                if (bindVariables)
+                if (bindVariables && varPatNode.Name != "_")
                 {
                     _env.DefineVariable(varPatNode.Name, expectedType);
                 }
@@ -1783,7 +1908,28 @@ public sealed class TypeChecker
             // Composites: recurse so nested bindings land in scope.
             case AndPatternNode andPat:
                 CheckPattern(andPat.Left, expectedType, bindVariables);
-                CheckPattern(andPat.Right, expectedType, bindVariables);
+                CheckPattern(andPat.Right, andPat.Left is TypePatternNode typed
+                    ? InferTypePatternBindingType(typed.TypeName, typed.TypeNameSpan, typed.Span)
+                    : expectedType, bindVariables);
+                break;
+
+            case PropertyPatternNode property:
+                var receiverType = property.TypeName is { } testedType
+                    ? InferTypePatternBindingType(testedType, property.TypeNameSpan ?? property.Span, property.Span)
+                    : expectedType;
+                foreach (var member in property.Matches)
+                {
+                    if (_module != null && Binding.TypeIdentity.TryResolveNativeInstanceMemberType(
+                        _module, receiverType.SurfaceName, member.PropertyName, out var memberName))
+                    {
+                        CheckPattern(member.Pattern, ResolveTypeName(memberName, member.Span), bindVariables);
+                    }
+                    else
+                    {
+                        _diagnostics.ReportError(member.Span, DiagnosticCode.UndefinedReference,
+                            $"Cannot resolve native property-pattern member '{member.PropertyName}' on type '{receiverType.SurfaceName}'");
+                    }
+                }
                 break;
 
             case OrPatternNode orPat:
@@ -1804,11 +1950,13 @@ public sealed class TypeChecker
                 {
                     CheckPattern(sub, elementType, bindVariables);
                 }
+                if (listPat.SlicePattern != null)
+                    CheckPattern(listPat.SlicePattern, expectedType is ArrayType ? expectedType : ErrorType.Instance,
+                        bindVariables);
                 break;
 
             default:
-                // Silent. `CheckPattern` models 7 of the 19 pattern kinds in the AST, and the rest
-                // — relational, property, positional, constant, is — are simply not implemented
+                // Silent. Some pattern kinds — relational, positional, constant, is — remain unimplemented
                 // here. Reporting "Unsupported pattern type" made the CHECKER's gap the user's
                 // error, and once the checker runs by default that is a hard error on any program
                 // using one. Any name a pattern binds and this arm misses will surface as a normal
@@ -1819,12 +1967,35 @@ public sealed class TypeChecker
 
     private CalorType InferExpressionType(ExpressionNode expr, CalorType? expectedType = null)
     {
+        if (_boundSourceEnumConstants?.TryGetValue(expr, out var constant) == true)
+            return new ExternalType(constant.Type.DisplayString);
+        if (_boundSourceStaticFieldReads?.TryGetValue(expr, out var selectedStaticField) == true)
+        {
+            var fieldType = ResolveTypeName(selectedStaticField.Type.DisplayString, expr.Span);
+            return selectedStaticField.SourceStaticFieldOwner?.Fields.Any(field =>
+                    field.Name == selectedStaticField.FieldName
+                    && field.Modifiers.HasFlag(MethodModifiers.Const)) == true
+                ? AsIntegerConstant(fieldType, null)
+                : fieldType;
+        }
+        if (_boundMetadataConstants?.TryGetValue(expr, out var metadataConstant) == true)
+            return AsIntegerConstant(
+                ResolveTypeName(metadataConstant.Type.DisplayString, expr.Span),
+                metadataConstant.ResolvedMetadataMember is Microsoft.CodeAnalysis.IFieldSymbol
+                    { HasConstantValue: true, ConstantValue: { } constantValue }
+                    ? constantValue
+                    : null);
+        if (_boundMetadataStaticFieldReads?.TryGetValue(expr, out var metadataStaticField) == true)
+            return ResolveTypeName(metadataStaticField.Type.DisplayString, expr.Span);
         return expr switch
         {
-            IntLiteralNode => PrimitiveType.Int,
-            FloatLiteralNode => PrimitiveType.Float,
+            IntLiteralNode literal => IntegerLiteralType(literal),
+            FloatLiteralNode literal => literal.IsDecimal
+                ? PrimitiveType.Decimal
+                : PrimitiveType.ExactNumeric(literal.IsSingle ? "f32" : "f64"),
+            DecimalLiteralNode => PrimitiveType.Decimal,
             BoolLiteralNode => PrimitiveType.Bool,
-            StringLiteralNode => PrimitiveType.String,
+            StringLiteralNode or NameOfExpressionNode => PrimitiveType.String,
             NullCoalesceNode coalesce => InferNullCoalesceType(coalesce),
             ConditionalExpressionNode conditional => InferConditionalExpressionType(conditional),
             ThrowExpressionNode throwExpression => InferThrowExpressionType(throwExpression),
@@ -1837,17 +2008,15 @@ public sealed class TypeChecker
             },
             ReferenceNode refNode => InferReferenceType(refNode),
             UnaryOperationNode unary => InferUnaryOperationType(unary),
+            OverflowContextExpressionNode overflow => InferExpressionType(overflow.Operand, expectedType),
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
-            SomeExpressionNode some => InferSomeType(some),
-            NoneExpressionNode none => InferNoneType(none),
-            OkExpressionNode ok => InferOkType(ok),
-            ErrExpressionNode err => InferErrType(err),
             RecordCreationNode rec => InferRecordCreationType(rec),
             FieldAccessNode field => InferFieldAccessType(field),
             MatchExpressionNode match => InferMatchExpressionType(match, expectedType),
             NewExpressionNode newExpression => InferNewExpressionType(newExpression),
             CallExpressionNode call => InferCallExpressionType(call),
             ExpressionCallNode call => InferExpressionCallType(call),
+            AwaitExpressionNode awaited => InferAwaitType(awaited),
             InterpolatedStringNode interpolated => InferInterpolatedStringType(interpolated),
             LambdaExpressionNode lambda => InferLambdaType(lambda, expectedType),
             ForallExpressionNode forall => InferQuantifierType(forall.BoundVariables, forall.Body),
@@ -1859,10 +2028,78 @@ public sealed class TypeChecker
             CollectionContainsNode contains => InferCollectionContainsType(contains),
             CollectionCountNode count => InferCollectionCountType(count),
             ArrayAccessNode arrayAccess => InferArrayAccessType(arrayAccess),
+            MultiDimArrayAccessNode arrayAccess => InferMultiDimArrayAccessType(arrayAccess),
             TypeOperationNode typeOp => InferTypeOperationType(typeOp),
             IsPatternNode isPattern => InferIsPatternType(isPattern),
             _ => InferUnknownExpressionType(expr)
         };
+    }
+
+    /// <summary>
+    /// An integer literal has the C# type the emitter gives it (an unsuffixed literal outside
+    /// <c>int</c> is emitted with <c>L</c>), and is a constant: <c>let byte:b = 200</c> is the
+    /// implicit constant conversion C# accepts, while <c>let byte:b = 300</c> is CS0031.
+    /// </summary>
+    private static PrimitiveType IntegerLiteralType(IntLiteralNode literal)
+    {
+        var width = literal.IsUnsigned
+            ? literal.IsLong ? "u64" : "u32"
+            : literal.IsLong ? "i64" : "i32";
+        Int128 value = literal.IsUnsigned || literal.Sign == IntegerLiteralSign.Positive
+            ? literal.Magnitude
+            : -(Int128)literal.Magnitude;
+        return PrimitiveType.ExactNumeric(width).AsIntegerConstant(value);
+    }
+
+    /// <summary>
+    /// Marks an integer-typed value as a constant expression. <paramref name="value"/> is the
+    /// constant when known (an integral <see cref="object"/> from metadata), else unknown.
+    /// </summary>
+    private static CalorType AsIntegerConstant(CalorType type, object? value)
+    {
+        if (type is not PrimitiveType primitive || !primitive.Equals(PrimitiveType.Int))
+            return type;
+        Int128? known = value switch
+        {
+            sbyte v => v,
+            byte v => v,
+            short v => v,
+            ushort v => v,
+            int v => v,
+            uint v => v,
+            long v => v,
+            ulong v => v,
+            _ => null,
+        };
+        return primitive.AsIntegerConstant(known);
+    }
+
+    /// <summary>A local initialized by a constant is not itself a constant in the emitted C#.</summary>
+    private static CalorType WithoutIntegerConstant(CalorType type)
+        => type is PrimitiveType primitive ? primitive.WithoutIntegerConstant() : type;
+
+    private IEnumerable<string> AsyncCarrierTypeParameters()
+        => new[] { "Task", "ValueTask" }.Where(name => _env.LookupType(name) is TypeParameterType);
+
+    private CalorType InferAwaitType(AwaitExpressionNode awaited)
+    {
+        var carrier = InferExpressionType(awaited.Awaited);
+        if (_boundAwaits?.TryGetValue(awaited, out var bound) == true
+            && !bound.HasUnknownInferredType
+            && bound.Metadata["GetResult"] is Microsoft.CodeAnalysis.IMethodSymbol)
+            return ResolveTypeName(bound.Type.DisplayString, awaited.Span);
+        if (AttributeHelper.TryGetAsyncResultType(carrier.SurfaceName, _module, out var result))
+            return ResolveTypeName(result, awaited.Span);
+        if (carrier is ErrorType or ExternalType)
+        {
+            if (!_suppressDiagnostics && !_suppressContextualDiagnostics)
+                _diagnostics.ReportWarning(awaited.Span, DiagnosticCode.UndefinedReference,
+                    "The awaited result requires .NET awaiter resolution; generated C# validation checks this expression.");
+            return carrier;
+        }
+        _diagnostics.ReportError(awaited.Span, DiagnosticCode.TypeMismatch,
+            $"Type {carrier.SurfaceName} is not a supported awaitable.");
+        return ErrorType.Instance;
     }
 
     private CalorType InferNullCoalesceType(NullCoalesceNode coalesce)
@@ -1880,13 +2117,7 @@ public sealed class TypeChecker
             return rightType is NeverType ? NeverType.Instance : rightType;
         }
 
-        if (leftType is OptionType)
-        {
-            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
-                $"Null-coalescing does not unwrap runtime {leftType.SurfaceName}; use Option.Unwrap explicitly");
-            return ErrorType.Instance;
-        }
-        if (IsPrimitiveValueType(leftType) || leftType is ResultType
+        if (IsPrimitiveValueType(leftType)
             || leftType.Equals(PrimitiveType.Void) || leftType.Equals(PrimitiveType.Unit))
         {
             _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
@@ -2057,8 +2288,8 @@ public sealed class TypeChecker
         return unary.Operator switch
         {
             UnaryOperator.Not => PrimitiveType.Bool,
-            UnaryOperator.Negate => IsNumericType(operandType) ? operandType : ErrorType.Instance,
-            UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PrimitiveType.Int : ErrorType.Instance,
+            UnaryOperator.Negate => IsNumericType(operandType) ? PromoteUnaryOperand(operandType, negate: true) : ErrorType.Instance,
+            UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PromoteUnaryOperand(operandType, negate: false) : ErrorType.Instance,
             UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
                 or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
                 => IsNumericType(operandType) ? incDecResultType : ErrorType.Instance,
@@ -2077,6 +2308,8 @@ public sealed class TypeChecker
         {
             InferExpressionType(initializer.Value);
         }
+        foreach (var argument in newExpression.CollectionInitializers.SelectMany(entry => entry.Arguments))
+            InferExpressionType(argument);
 
         return _env.LookupType(newExpression.TypeName) ?? new ExternalType(newExpression.TypeName);
     }
@@ -2103,7 +2336,7 @@ public sealed class TypeChecker
         // #943 (RO-DECL-2): `§A{out} _` with no `_` in scope is a discard, typed by the parameter.
         var preliminaryTypes = call.Arguments
             .Select((argument, index) => RequiresTargetType(argument)
-                    || argument is ReferenceNode { Name: "_" }
+                    || argument is ReferenceNode { Name: "_", IsVerbatim: false }
                         && !string.IsNullOrEmpty(call.ArgumentModifiers?.ElementAtOrDefault(index))
                         && _env.LookupVariable("_") == null
                 ? ErrorType.Instance
@@ -2140,6 +2373,8 @@ public sealed class TypeChecker
             _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
                 $"No overload of '{call.Target}' matches the supplied argument names, modifiers, and types");
         }
+        if (!reportedNominal && candidates.Length == 0)
+            ReportNumericArgumentConversions(call, functionCandidates, argumentTypes);
         var bestCandidates = candidates
             .Where(candidate => !candidates.Any(other =>
                 !ReferenceEquals(candidate, other) && IsBetterConversion(other, candidate)))
@@ -2152,16 +2387,70 @@ public sealed class TypeChecker
                 : ErrorType.Instance;
     }
 
+    /// <summary>
+    /// A call to the only function of its name, positional and by value, whose arguments fail
+    /// to convert: each argument C# would reject as a numeric conversion between two known types
+    /// is reported at the argument (<c>Scale(someDouble)</c> into a <c>float</c> parameter). Other
+    /// mismatches, overload sets and generic functions stay with C#, as before.
+    /// </summary>
+    private void ReportNumericArgumentConversions(
+        CallExpressionNode call, IReadOnlyList<FunctionCandidate> functionCandidates, IReadOnlyList<CalorType> argumentTypes)
+    {
+        if (functionCandidates.Count != 1 || _suppressContextualDiagnostics)
+            return;
+        var candidate = functionCandidates[0];
+        var parameterTypes = candidate.Type.ParameterTypes;
+        if (candidate.TypeParameterNames.Count != 0
+            || parameterTypes.Count != call.Arguments.Count
+            || candidate.ParameterModifiers.Any(modifier => modifier != ParameterModifier.None)
+            || call.ArgumentNames?.Any(name => !string.IsNullOrEmpty(name)) == true
+            || call.ArgumentModifiers?.Any(modifier => !string.IsNullOrEmpty(modifier)) == true)
+            return;
+        for (var index = 0; index < parameterTypes.Count; index++)
+        {
+            var parameterType = EraseRefinement(parameterTypes[index]);
+            if (IsRejectedNumericConversion(parameterType, argumentTypes[index]))
+            {
+                ReportNumericConversion(call.Arguments[index].Span, parameterType, argumentTypes[index],
+                    $"argument {index + 1} of '{call.Target}'");
+            }
+        }
+    }
+
     private CalorType InferExpressionCallType(ExpressionCallNode call)
     {
+        if (call.TargetExpression is FieldAccessNode member)
+        {
+            var root = member.Target;
+            while (root is FieldAccessNode field)
+                root = field.Target;
+            // Binding, not capitalization, distinguishes qualified type receivers from missing values.
+            if (root is not ReferenceNode reference
+                || _env.LookupVariable(reference.Name.Split('.')[0]) != null)
+                InferExpressionType(member.Target);
+            for (var index = 0; index < call.Arguments.Count; index++)
+            {
+                var argument = call.Arguments[index];
+                if (argument is ReferenceNode { Name: "_", IsVerbatim: false }
+                    && !string.IsNullOrEmpty(call.ArgumentModifiers?.ElementAtOrDefault(index))
+                    && _env.LookupVariable("_") is null)
+                    continue;
+                InferExpressionType(argument);
+            }
+            // Member overloads remain binder-owned, just as for dotted named calls.
+            return ErrorType.Instance;
+        }
         var targetType = InferExpressionType(call.TargetExpression);
         if (!TryGetDelegateFunctionType(targetType, out var function))
         {
+            foreach (var argument in call.Arguments)
+                InferExpressionType(argument);
             return ErrorType.Instance;
         }
 
-        var argumentTypes = InferDelegateArgumentTypes(function, call.Arguments, null);
-        return ValidateDelegateCall(function, argumentTypes, call.Arguments, null, null, call.Span)
+        var argumentTypes = InferDelegateArgumentTypes(function, call.Arguments, call.ArgumentNames);
+        return ValidateDelegateCall(function, argumentTypes, call.Arguments,
+            call.ArgumentNames, call.ArgumentModifiers, call.Span)
             ? function.ReturnType
             : ErrorType.Instance;
     }
@@ -2279,6 +2568,14 @@ public sealed class TypeChecker
                 }
                 signatureValid = false;
             }
+            if (expectedFunction?.ParameterModifiers is { } modifiers && index < modifiers.Count
+                && (modifiers[index] & (ParameterModifier.Ref | ParameterModifier.Out)) != 0)
+            {
+                if (!_suppressContextualDiagnostics)
+                    _diagnostics.ReportError(parameter.Span, DiagnosticCode.TypeMismatch,
+                        "A lambda parameter without a modifier cannot implement a ref or out delegate parameter.");
+                signatureValid = false;
+            }
             // #1529 review: a parameter typed by the target delegate carries its refinement
             // into the body, so writes to it must be guarded like a declared refined parameter.
             // The last committed inference decides; speculative ones are rolled back.
@@ -2290,6 +2587,20 @@ public sealed class TypeChecker
             return declaredType;
         }).ToArray();
 
+        var callableTarget = expectedFunction;
+        if (lambda.IsAsync && expectedFunction is not null
+            && !expectedFunction.ReturnType.Equals(PrimitiveType.Void))
+        {
+            if (AttributeHelper.TryGetAsyncResultType(expectedFunction.ReturnType.SurfaceName, _module, out var bodyResult))
+                expectedFunction = new FunctionType(expectedFunction.ParameterTypes, ResolveTypeName(bodyResult, lambda.Span));
+            else
+            {
+                if (!_suppressContextualDiagnostics)
+                    _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
+                        $"Async lambda requires an async carrier return type, not {expectedFunction.ReturnType.SurfaceName}.");
+                signatureValid = false;
+            }
+        }
         var previousReturnType = _currentReturnType;
         var previousValidateReturnAssignments = _validateReturnAssignments;
         var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
@@ -2379,7 +2690,7 @@ public sealed class TypeChecker
         }
         _ = parameterTypes;
         _ = returnType;
-        return expectedFunction is not null && signatureValid ? expectedFunction : ErrorType.Instance;
+        return callableTarget is not null && signatureValid ? callableTarget : ErrorType.Instance;
     }
 
     private static bool IsVoidCompatibleLambdaExpression(
@@ -2634,9 +2945,7 @@ public sealed class TypeChecker
             ReferenceNode { Name.Length: >= 3 } reference
                 when TryParseCharacterCase(reference.Name, out var character)
                 => $"char:{(int)character}",
-            ReferenceNode { Name: "null" } => "null",
-            ReferenceNode { Name: "true" } => "bool:True",
-            ReferenceNode { Name: "false" } => "bool:False",
+            ReferenceNode { IsNullLiteral: true } => "null",
             ReferenceNode reference => $"reference:{reference.Name}",
             _ => null
         };
@@ -2667,7 +2976,7 @@ public sealed class TypeChecker
     }
 
     private ControlFlowResult AnalyzeRethrowControlFlow(
-        RethrowStatementNode rethrow,
+        StatementNode rethrow,
         bool insideCatch)
     {
         if (!insideCatch)
@@ -2692,6 +3001,8 @@ public sealed class TypeChecker
         {
             ReturnStatementNode
                 => LocalFlow(ControlFlowOutcome.Return),
+            ThrowStatementNode { Exception: null } rethrow
+                => AnalyzeRethrowControlFlow(rethrow, insideCatch),
             ThrowStatementNode
                 => LocalFlow(ControlFlowOutcome.Throw),
             RethrowStatementNode rethrow => AnalyzeRethrowControlFlow(
@@ -3664,9 +3975,6 @@ public sealed class TypeChecker
             || type switch
             {
                 GenericInstanceType generic => generic.TypeArguments.Any(ContainsInferencePlaceholder),
-                OptionType option => ContainsInferencePlaceholder(option.InnerType),
-                ResultType result => ContainsInferencePlaceholder(result.OkType)
-                    || ContainsInferencePlaceholder(result.ErrType),
                 NullableReferenceType nullable => ContainsInferencePlaceholder(nullable.ReferentType),
                 NullableValueType nullable => ContainsInferencePlaceholder(nullable.UnderlyingType),
                 ArrayType array => ContainsInferencePlaceholder(array.ElementType),
@@ -3736,7 +4044,8 @@ public sealed class TypeChecker
         {
             InferTypeArguments(parameterValue.UnderlyingType, argumentValue.UnderlyingType, substitutions);
         }
-        else if (parameter is ArrayType parameterArray && argument is ArrayType argumentArray)
+        else if (parameter is ArrayType parameterArray && argument is ArrayType argumentArray
+            && parameterArray.Rank == argumentArray.Rank)
         {
             InferTypeArguments(parameterArray.ElementType, argumentArray.ElementType, substitutions);
         }
@@ -3855,7 +4164,12 @@ public sealed class TypeChecker
         _env.ExitScope();
         _inlineRefinedParameters = previousInlineRefinedParameters;
         foreach (var returnType in _inferredLambdaReturnTypes)
-            InferTypeArguments(targetTemplate.ReturnType, returnType, substitutions);
+        {
+            var callableResult = lambda.IsAsync
+                ? new GenericInstanceType("System.Threading.Tasks.Task", [returnType])
+                : returnType;
+            InferTypeArguments(targetTemplate.ReturnType, callableResult, substitutions);
+        }
         _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
         _currentReturnType = previousReturnType;
         _validateReturnAssignments = previousValidateReturnAssignments;
@@ -3953,14 +4267,15 @@ public sealed class TypeChecker
                 => replacement,
             GenericInstanceType generic => new GenericInstanceType(
                 generic.BaseName,
-                generic.TypeArguments.Select(argument => SubstituteTypeParameters(argument, substitutions)).ToArray()),
+                generic.TypeArguments.Select(argument => SubstituteTypeParameters(argument, substitutions)).ToArray())
+                { NativeDeclaration = generic.NativeDeclaration },
             NullableReferenceType nullable => new NullableReferenceType(
                 SubstituteTypeParameters(nullable.ReferentType, substitutions),
                 nullable.RequiresTransitionalAssignmentCheck),
             NullableValueType nullable => new NullableValueType(
                 SubstituteTypeParameters(nullable.UnderlyingType, substitutions)),
             ArrayType array => new ArrayType(
-                SubstituteTypeParameters(array.ElementType, substitutions)),
+                SubstituteTypeParameters(array.ElementType, substitutions), array.Rank),
             FunctionType function => new FunctionType(
                 function.ParameterTypes.Select(parameter => SubstituteTypeParameters(parameter, substitutions)).ToArray(),
                 SubstituteTypeParameters(function.ReturnType, substitutions),
@@ -4213,18 +4528,6 @@ public sealed class TypeChecker
         {
             return new GenericInstanceType(trueGeneric.BaseName,
                 [CommonConditionalType(span, trueGeneric.TypeArguments[0], falseGeneric.TypeArguments[0])]);
-        }
-
-        if (trueType is OptionType trueOption && falseType is OptionType falseOption)
-        {
-            return new OptionType(CommonConditionalType(span, trueOption.InnerType, falseOption.InnerType));
-        }
-
-        if (trueType is ResultType trueResult && falseType is ResultType falseResult)
-        {
-            return new ResultType(
-                CommonConditionalType(span, trueResult.OkType, falseResult.OkType),
-                CommonConditionalType(span, trueResult.ErrType, falseResult.ErrType));
         }
 
         if (TryUnifyNullableReferences(trueType, falseType, out var nullableReference))
@@ -4583,6 +4886,10 @@ public sealed class TypeChecker
         var arrayType = InferExpressionType(arrayAccess.Array);
         var indexType = InferExpressionType(arrayAccess.Index);
 
+        if (arrayAccess.Index is RangeExpressionNode
+            && (arrayType is ArrayType || arrayType.Equals(PrimitiveType.String)))
+            return arrayType;
+
         // Index should be numeric for arrays/lists
         if (!IsNumeric(indexType) && indexType is not ErrorType)
         {
@@ -4619,6 +4926,27 @@ public sealed class TypeChecker
         }
 
         return ErrorType.Instance;
+    }
+
+    private CalorType InferMultiDimArrayAccessType(MultiDimArrayAccessNode access)
+    {
+        var type = InferExpressionType(access.Array);
+        foreach (var index in access.Indices)
+        {
+            var indexType = InferExpressionType(index);
+            if (!IsNumeric(indexType) && indexType is not ErrorType)
+                _diagnostics.ReportError(index.Span, DiagnosticCode.TypeMismatch,
+                    $"Array index must be numeric, got {indexType.SurfaceName}");
+        }
+        if (type is not ArrayType array)
+            return ErrorType.Instance;
+        if (array.Rank != access.Indices.Count)
+        {
+            _diagnostics.ReportError(access.Span, DiagnosticCode.TypeMismatch,
+                $"Array of rank {array.Rank} requires {array.Rank} indices, got {access.Indices.Count}");
+            return ErrorType.Instance;
+        }
+        return array.ElementType;
     }
 
     private CalorType InferTypeOperationType(TypeOperationNode typeOp)
@@ -4661,6 +4989,9 @@ public sealed class TypeChecker
 
     private CalorType InferReferenceType(ReferenceNode refNode)
     {
+        if (refNode.IsNullLiteral)
+            return NullType.Instance;
+
         // `this.x` inside a class member is the member's declared type (#1676).
         if (TryGetThisMemberName(refNode.Name, out var thisMember) && LookupThisMember(thisMember) is { } memberType)
             return memberType;
@@ -4690,12 +5021,7 @@ public sealed class TypeChecker
         // C# expression keywords that reach the checker as bare references. `default` is the one
         // observed (generic code emits `default`); the others are listed because they arrive by
         // the same route and reporting any of them as an undefined VARIABLE is simply wrong.
-        if (refNode.Name == "null")
-        {
-            return NullType.Instance;
-        }
-
-        if (refNode.Name is "default" or "this" or "base" or "value")
+        if (!refNode.IsVerbatim && refNode.Name is ("default" or "this" or "base" or "value"))
         {
             return ErrorType.Instance;
         }
@@ -4732,6 +5058,14 @@ public sealed class TypeChecker
         else
             rightType = InferExpressionType(binOp.Right);
 
+        if (_module is not null)
+        {
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _module, _diagnostics, ProjectionContractMode);
+            if (_sourceBindings.ResultTypes.TryGetValue(binOp, out var operatorResult))
+                return ResolveTypeName(operatorResult, binOp.Span);
+        }
+
         // Operators see a named refinement (§RTYPE) as its base type, as they already see an
         // inline-refined parameter. The result is the base type, never the refinement: `NatInt -
         // NatInt` can be negative. Refinement checks on a result written back into a refined
@@ -4757,6 +5091,10 @@ public sealed class TypeChecker
             }
             return PrimitiveType.Bool;
         }
+
+        if (binOp.Operator is BinaryOperator.BitwiseAnd or BinaryOperator.BitwiseOr or BinaryOperator.BitwiseXor
+            && leftType.Equals(PrimitiveType.Bool) && rightType.Equals(PrimitiveType.Bool))
+            return PrimitiveType.Bool;
 
         // `+` on strings is CONCATENATION, exactly as in the emitted C#. Rejecting it as
         // "requires numeric operands" made the checker refuse a working, documented program —
@@ -4792,9 +5130,16 @@ public sealed class TypeChecker
             return ErrorType.Instance;
         }
 
+        // `**` lowers to Math.Pow, which only exists for double.
+        if (binOp.Operator == BinaryOperator.Power
+            && !leftType.Equals(PrimitiveType.Decimal) && !rightType.Equals(PrimitiveType.Decimal))
+        {
+            return PrimitiveType.ExactNumeric("f64");
+        }
+
         if (leftType.Equals(PrimitiveType.Float) || rightType.Equals(PrimitiveType.Float))
         {
-            return PrimitiveType.Float;
+            return PromoteFloatingOperands(leftType, rightType);
         }
 
         // decimal op (decimal | integer | char) is decimal in C#. Falling through to Int typed
@@ -4811,37 +5156,110 @@ public sealed class TypeChecker
                 : PrimitiveType.Decimal;
         }
 
-        return PrimitiveType.Int;
+        return PromoteIntegerOperands(binOp.Operator, leftType, rightType);
     }
 
-    private CalorType InferSomeType(SomeExpressionNode some)
+    /// <summary>
+    /// C# binary numeric promotion (§12.4.7.3) when a floating operand is involved: double if
+    /// either side is double, otherwise float (every integer type converts to float). An operand
+    /// of unknown width or an unmodeled operand gives the width-less <see cref="PrimitiveType.Float"/>.
+    /// </summary>
+    private static CalorType PromoteFloatingOperands(CalorType left, CalorType right)
     {
-        var innerType = InferExpressionType(some.Value);
-        return new OptionType(innerType);
-    }
-
-    private CalorType InferNoneType(NoneExpressionNode none)
-    {
-        if (none.TypeName != null)
+        var sawUnknown = false;
+        foreach (var operand in new[] { left, right })
         {
-            var innerType = ResolveTypeName(none.TypeName, none.Span);
-            return new OptionType(innerType);
+            if (operand is not PrimitiveType primitive)
+            {
+                sawUnknown = true;
+                continue;
+            }
+            if (!primitive.Equals(PrimitiveType.Float))
+                continue;
+            if (primitive.NumericWidth == "f64")
+                return PrimitiveType.ExactNumeric("f64");
+            if (primitive.NumericWidth == null)
+                sawUnknown = true;
         }
-        // Type inference needed - return a type variable
-        return new OptionType(new TypeVariable());
+        return sawUnknown ? PrimitiveType.Float : PrimitiveType.ExactNumeric("f32");
     }
 
-    private CalorType InferOkType(OkExpressionNode ok)
+    /// <summary>
+    /// C# binary numeric promotion over integer operands (§12.4.7.3), and the shift rule (the
+    /// result is the promoted LEFT operand, §12.11). Gives the width-less
+    /// <see cref="PrimitiveType.Int"/> whenever the C# result depends on what the checker does not
+    /// track: an unknown width, an unmodeled operand, or a constant operand beside <c>uint</c> or
+    /// <c>ulong</c> (C# then converts the constant, so <c>u + 1</c> is <c>uint</c>). Two constant
+    /// operands give a constant of unknown value, which never reports a narrowing.
+    /// </summary>
+    private static CalorType PromoteIntegerOperands(BinaryOperator op, CalorType left, CalorType right)
     {
-        var okType = InferExpressionType(ok.Value);
-        return new ResultType(okType, new TypeVariable());
+        if (left is not PrimitiveType leftPrimitive || right is not PrimitiveType rightPrimitive)
+            return PrimitiveType.Int;
+        var leftWidth = IntegerPromotionWidth(leftPrimitive);
+        var rightWidth = IntegerPromotionWidth(rightPrimitive);
+        if (leftWidth is null || rightWidth is null)
+            return PrimitiveType.Int;
+        var bothConstant = leftPrimitive.IsIntegerConstant && rightPrimitive.IsIntegerConstant;
+
+        string? width;
+        if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift)
+        {
+            width = PromoteUnaryIntegerWidth(leftWidth);
+        }
+        else
+        {
+            var anyConstant = leftPrimitive.IsIntegerConstant || rightPrimitive.IsIntegerConstant;
+            static bool IsSigned(string width) => width is "i8" or "i16" or "i32" or "i64";
+            if (leftWidth == "u64" || rightWidth == "u64")
+                width = anyConstant || IsSigned(leftWidth) || IsSigned(rightWidth) ? null : "u64";
+            else if (leftWidth == "i64" || rightWidth == "i64")
+                width = "i64";
+            else if (leftWidth == "u32" || rightWidth == "u32")
+                width = anyConstant ? null : IsSigned(leftWidth) || IsSigned(rightWidth) ? "i64" : "u32";
+            else
+                width = "i32";
+        }
+
+        if (width is null)
+            return PrimitiveType.Int;
+        var result = PrimitiveType.ExactNumeric(width);
+        return bothConstant ? result.AsIntegerConstant(null) : result;
     }
 
-    private CalorType InferErrType(ErrExpressionNode err)
+    /// <summary>
+    /// The C# result type of unary <c>-</c> or <c>~</c> (§12.9.3, §12.9.5): operands narrower than
+    /// int (char included) promote to int, and <c>-</c> on a uint is a long. A constant operand
+    /// gives a width-less result, which never reports a narrowing (<c>let sbyte:s = -(128)</c>
+    /// is a valid constant conversion the checker does not fold).
+    /// </summary>
+    private static CalorType PromoteUnaryOperand(CalorType operand, bool negate)
     {
-        var errType = InferExpressionType(err.Error);
-        return new ResultType(new TypeVariable(), errType);
+        if (operand is not PrimitiveType primitive)
+            return operand;
+        if (primitive.IsIntegerConstant)
+            return PrimitiveType.Int;
+        if (primitive.Equals(PrimitiveType.Float) || primitive.Equals(PrimitiveType.Decimal))
+            return primitive;
+        if (IntegerPromotionWidth(primitive) is not { } width)
+            return primitive.Equals(PrimitiveType.Int) ? PrimitiveType.Int : primitive;
+        return width switch
+        {
+            "u32" when negate => PrimitiveType.ExactNumeric("i64"),
+            "u64" when negate => PrimitiveType.Int,
+            _ => PrimitiveType.ExactNumeric(PromoteUnaryIntegerWidth(width)),
+        };
     }
+
+    /// <summary>The integer width an operand promotes from: char behaves as ushort.</summary>
+    private static string? IntegerPromotionWidth(PrimitiveType operand)
+        => operand.Equals(PrimitiveType.Char) ? "u16"
+            : operand.Equals(PrimitiveType.Int) ? operand.NumericWidth
+            : null;
+
+    /// <summary>Unary numeric promotion (§12.4.7.2): the types narrower than int become int.</summary>
+    private static string PromoteUnaryIntegerWidth(string width)
+        => width is "i8" or "u8" or "i16" or "u16" ? "i32" : width;
 
     private CalorType InferRecordCreationType(RecordCreationNode rec)
     {
@@ -4883,6 +5301,8 @@ public sealed class TypeChecker
         if (field.Target is ThisExpressionNode or ReferenceNode { Name: "this" } && LookupThisMember(field.FieldName) is { } memberType)
             return memberType;
         var targetType = InferExpressionType(field.Target);
+        if (targetType == PrimitiveType.String && field.FieldName == "Length")
+            return PrimitiveType.Int;
 
         if (targetType is RecordType recordType)
         {
@@ -4894,6 +5314,32 @@ public sealed class TypeChecker
                 return ErrorType.Instance;
             }
             return fieldDef.Type;
+        }
+
+        if (field.FieldName == "Length"
+            && (targetType is ArrayType || targetType.Equals(PrimitiveType.String)))
+            return PrimitiveType.Int;
+
+        // System.Nullable<T>'s two properties; its other members are unmodeled, as for any
+        // external type, and C# resolves them.
+        if (targetType is NullableValueType nullableValue)
+            return field.FieldName switch
+            {
+                "HasValue" => PrimitiveType.Bool,
+                "Value" => nullableValue.UnderlyingType,
+                _ => ErrorType.Instance
+            };
+
+        if (_module != null && Binding.TypeIdentity.TryResolveNativeInstanceMemberType(
+            _module, targetType.SurfaceName, field.FieldName, out var nativeMember))
+            return ResolveTypeName(nativeMember, field.Span);
+
+        if (_module != null && targetType is GenericInstanceType { NativeDeclaration: null })
+        {
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _module, _diagnostics, ProjectionContractMode);
+            if (_sourceBindings.MetadataMemberTypes.TryGetValue(field, out var selected))
+                return ResolveTypeName(selected.ResultType.ToDisplayString(), field.Span);
         }
 
         // Same rule as the bool conditions: only complain when the receiver's type is actually
@@ -5042,8 +5488,68 @@ public sealed class TypeChecker
         return ErrorType.Instance;
     }
 
+    private CalorType ResolveParameterType(ParameterNode parameter)
+    {
+        if (_module is not null)
+        {
+            _sourceBindings ??= Analysis.CallGraphAnalysis.ResolveOperatorCalls(
+                _module, _diagnostics, ProjectionContractMode);
+            if (_sourceBindings.ParameterTypes.TryGetValue(parameter, out var type))
+            {
+                if (type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: not null })
+                {
+                    return ResolveBoundSignatureType(type, parameter.Span);
+                }
+                var resolved = ResolveTypeName(parameter.TypeName, parameter.Span);
+                // A lookalike or shadowing declaration is not the standard CLR delegate.
+                return resolved is FunctionType
+                    || resolved is GenericInstanceType generic && TryGetDelegateFunctionType(generic, out _)
+                    ? new ExternalType(parameter.TypeName) : resolved;
+            }
+        }
+        return ResolveTypeName(parameter.TypeName, parameter.Span);
+    }
+
+    private CalorType ResolveBoundSignatureType(
+        Microsoft.CodeAnalysis.ITypeSymbol type,
+        Parsing.TextSpan span)
+    {
+        var name = type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+        if (type is not Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke } named)
+            return ResolveTypeName(name, span);
+
+        // Keep native refinement annotations, which erase in the C# binding image.
+        if (named.Locations.Any(location => location.IsInSource)
+            && _env.LookupType(name.Replace("global::", "", StringComparison.Ordinal)) is FunctionType native)
+            return native;
+        // Only actual core-library delegates get structural variance, including nested signatures.
+        var standardDelegate = named.Name is "Action" or "Func"
+            && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                named.OriginalDefinition,
+                named.BaseType?.ContainingAssembly.GetTypeByMetadataName($"System.{named.MetadataName}"));
+        CalorType ResolveComponent(Microsoft.CodeAnalysis.ITypeSymbol component)
+            => standardDelegate
+                ? ResolveBoundSignatureType(component, span)
+                : ResolveTypeName(component.ToDisplayString(
+                    Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat), span);
+        return new FunctionType(
+            invoke.Parameters.Select(item => ResolveComponent(item.Type)).ToArray(),
+            ResolveComponent(invoke.ReturnType),
+            invoke.Parameters.Select(item => item.Name).ToArray(),
+            invoke.Parameters.Select(item => item.RefKind switch
+            {
+                Microsoft.CodeAnalysis.RefKind.Ref => ParameterModifier.Ref,
+                Microsoft.CodeAnalysis.RefKind.Out => ParameterModifier.Out,
+                Microsoft.CodeAnalysis.RefKind.In => ParameterModifier.In,
+                _ => ParameterModifier.None
+            }).ToArray(),
+            standardDelegate ? null : $"{named.ContainingAssembly.Identity}:{name}");
+    }
+
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)
     {
+        if (typeName.StartsWith("global::", StringComparison.Ordinal))
+            typeName = typeName[8..];
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referentName))
         {
             var referentSurface = Parsing.AttributeHelper.ToSurfaceSpelling(referentName);
@@ -5056,14 +5562,18 @@ public sealed class TypeChecker
                         ? nominal
                         : null;
             if (supportedReference is null
-                && (referentSurface.EndsWith("[]", StringComparison.Ordinal)
+                && _module != null
+                && Binding.TypeIdentity.ResolveNativeClass(_module, referentSurface) is { IsStruct: false })
+                supportedReference = ResolveTypeName(referentSurface, span);
+            if (supportedReference is null
+                && (Binding.TypeIdentity.TrySplitNativeArray(referentSurface, out _, out _)
                     || referentSurface.Length > 2 && referentSurface[0] == '['
                         && referentSurface[^1] == ']' && !referentSurface.Contains(',')))
                 supportedReference = ResolveTypeName(referentSurface, span) as ArrayType;
             if (supportedReference is not null)
             {
                 return new NullableReferenceType(supportedReference,
-                    typeName.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase));
+                    typeName.StartsWith("NULLABLE[inner=", StringComparison.OrdinalIgnoreCase));
             }
 
             var valueReferent = ResolveNullableValueReferent(referentName);
@@ -5074,16 +5584,16 @@ public sealed class TypeChecker
 
             // Other annotations retain the existing unsupported/unresolved behavior. In
             // particular, this is not permission to model arbitrary nullable payloads as
-            // references or runtime Options.
+            // references.
         }
 
         // Arrays, in BOTH spellings the compiler produces. `T[]` is what the C# converter and
         // §I/§O annotations emit; `[T]` is the collection-literal spelling in the syntax
         // reference. Neither resolved before, so `§I{[str]:args}` — a documented, working
         // declaration — reported "Unknown type '[str]'".
-        if (typeName.EndsWith("[]", StringComparison.Ordinal) && typeName.Length > 2)
+        if (Binding.TypeIdentity.TrySplitNativeArray(typeName, out var arrayElement, out var arrayRank))
         {
-            return new ArrayType(ResolveTypeName(typeName[..^2], span));
+            return new ArrayType(ResolveTypeName(arrayElement, span), arrayRank);
         }
         if (typeName.Length > 2 && typeName[0] == '[' && typeName[^1] == ']'
             && typeName.IndexOf(',') < 0)
@@ -5091,29 +5601,20 @@ public sealed class TypeChecker
             return new ArrayType(ResolveTypeName(typeName[1..^1], span));
         }
 
-        // Handle generic types with bracket syntax: Option[INT] or Result[INT, STRING]
+        // Handle generic types with bracket syntax.
         var bracketIndex = typeName.IndexOf('[');
-        if (bracketIndex > 0 && typeName.EndsWith(']'))
+        if (bracketIndex > 0 && typeName.EndsWith(']')
+            && !typeName.AsSpan(bracketIndex + 1).Contains('='))
         {
             var baseName = typeName[..bracketIndex];
             var argsStr = typeName[(bracketIndex + 1)..^1];
             var args = SplitGenericArgs(argsStr);
 
-            if (Parsing.AttributeHelper.TryUnwrapRuntimeOption(typeName, out var optionReferent))
+            return new GenericInstanceType(AttributeHelper.ResolveAsyncCarrierName(baseName, _module),
+                args.Select(arg => ResolveTypeName(arg, span)).ToList())
             {
-                var innerType = ResolveTypeName(optionReferent, span);
-                return new OptionType(innerType);
-            }
-
-            if (baseName.Equals("Option", StringComparison.OrdinalIgnoreCase) && args.Count == 1)
-                return new OptionType(ResolveTypeName(args[0], span));
-
-            if (baseName.Equals("Result", StringComparison.OrdinalIgnoreCase) && args.Count == 2)
-            {
-                var okType = ResolveTypeName(args[0], span);
-                var errType = ResolveTypeName(args[1], span);
-                return new ResultType(okType, errType);
-            }
+                NativeDeclaration = _module == null ? null : Binding.TypeIdentity.ResolveNativeClass(_module, typeName)
+            };
         }
 
         // Handle generic types with angle bracket syntax: List<T>, Dictionary<K, V>
@@ -5124,29 +5625,17 @@ public sealed class TypeChecker
             var argsStr = typeName[(angleIndex + 1)..^1];
             var args = SplitGenericArgs(argsStr);
 
-            // Handle Option<T> with angle brackets
-            if (Parsing.AttributeHelper.TryUnwrapRuntimeOption(typeName, out var optionReferent))
-            {
-                var innerType = ResolveTypeName(optionReferent, span);
-                return new OptionType(innerType);
-            }
-
-            // Handle Result<T, E> with angle brackets
-            if (baseName.Equals("Result", StringComparison.OrdinalIgnoreCase) && args.Count == 2)
-            {
-                var okType = ResolveTypeName(args[0], span);
-                var errType = ResolveTypeName(args[1], span);
-                return new ResultType(okType, errType);
-            }
-
-            // For other generic types (List<T>, Dictionary<K, V>, etc.),
+            // For generic types (List<T>, Dictionary<K, V>, etc.),
             // resolve the type arguments and create a GenericInstanceType
             var resolvedArgs = new List<CalorType>();
             foreach (var arg in args)
             {
                 resolvedArgs.Add(ResolveTypeName(arg, span));
             }
-            return new GenericInstanceType(baseName, resolvedArgs);
+            return new GenericInstanceType(AttributeHelper.ResolveAsyncCarrierName(baseName, _module), resolvedArgs)
+            {
+                NativeDeclaration = _module == null ? null : Binding.TypeIdentity.ResolveNativeClass(_module, typeName)
+            };
         }
 
         // Try primitive type
@@ -5174,6 +5663,11 @@ public sealed class TypeChecker
         var userType = _env.LookupType(typeName);
         if (userType != null)
             return userType;
+        var carrierName = AttributeHelper.ResolveAsyncCarrierName(typeName, _module);
+        if (carrierName is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
+            return new GenericInstanceType(carrierName, Array.Empty<CalorType>());
+        if (carrierName != typeName && AttributeHelper.TryGetAsyncResultType(carrierName, null, out _))
+            return ResolveTypeName(carrierName, span);
 
         // #741: surface-spell the echoed name. A sized numeric type reaches here as its
         // expanded internal form (e.g. `INT[bits=64][signed=true]`, `FLOAT[bits=32]`),
@@ -5311,6 +5805,10 @@ public sealed class TypeChecker
     private static bool IsNumeric(CalorType type)
         => IsNumericErased(EraseRefinement(type));
 
+    private static bool IsDefinitelyNotNumeric(CalorType type)
+        => EraseRefinement(type) is not (ErrorType or ExternalType or NeverType)
+            && !IsNumeric(type);
+
     private static bool IsNumericErased(CalorType type)
         => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
         || type.Equals(PrimitiveType.Char) || type.Equals(PrimitiveType.Decimal);
@@ -5332,13 +5830,15 @@ public sealed class TypeChecker
             ? sourceNullable.ReferentType : source;
         if (targetReferent is ArrayType targetArray && sourceReferent is ArrayType sourceArray)
             return HaveSameArrayRuntimeType(targetArray, sourceArray);
-        return targetReferent is GenericInstanceType or OptionType
-            && sourceReferent is GenericInstanceType or OptionType
+        return targetReferent is GenericInstanceType
+            && sourceReferent is GenericInstanceType
             && Binding.Scope.HasNullableStringAnnotationDifference(target.SurfaceName, source.SurfaceName);
     }
 
     private static bool IsAssignable(CalorType target, CalorType source)
     {
+        if (ClassifyImplicitNumericConversion(target, source) is { } numericConversion)
+            return numericConversion;
         if (target.Equals(source)) return true;
         if (target is GenericInstanceType targetGeneric && source is GenericInstanceType sourceGeneric
             && Binding.NullabilityChecker.SameGenericDefinition(targetGeneric.BaseName, sourceGeneric.BaseName)
@@ -5362,9 +5862,8 @@ public sealed class TypeChecker
             if (source is NullType)
                 return true;
             if (nullableTarget.ReferentType.Equals(PrimitiveType.Object))
-                return true; // Boxing to object preserves the value; this does not unwrap Option.
-            if (source is OptionType or ResultType
-                || nullableTarget.ReferentType is ExternalType && source is PrimitiveType)
+                return true;
+            if (nullableTarget.ReferentType is ExternalType && source is PrimitiveType)
                 return false;
             return IsAssignable(nullableTarget.ReferentType, source);
         }
@@ -5376,6 +5875,9 @@ public sealed class TypeChecker
         }
         if (TryGetDelegateFunctionType(target, out var targetFunction) && source is FunctionType sourceFunction)
             return targetFunction.Equals(sourceFunction);
+        if (target is GenericInstanceType { BaseName: "System.Threading.Tasks.Task", TypeArguments.Count: 0 }
+            && source is GenericInstanceType { BaseName: "System.Threading.Tasks.Task", TypeArguments.Count: 1 })
+            return true;
         // Nothing is known about an unmodeled external type, in either direction.
         if (target is ExternalType || source is ExternalType) return true;
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;
@@ -5404,8 +5906,165 @@ public sealed class TypeChecker
         return false;
     }
 
+    /// <summary>
+    /// C#'s implicit numeric conversions (§10.2.3) and implicit constant expression conversions
+    /// (§10.2.11) between primitives whose exact widths are known. Returns <c>null</c> when this
+    /// rule does not decide — a width is unknown, or the pair crosses families (int → float,
+    /// float → int, decimal), which <see cref="IsAssignable"/> already decides.
+    /// </summary>
+    /// <remarks>
+    /// Equality collapses every integer width into one <see cref="PrimitiveType.Int"/> and both
+    /// binary floating types into one <see cref="PrimitiveType.Float"/>, so without this rule
+    /// <c>let float:x = someDouble</c> and <c>let int:y = someLong</c> passed the checker and
+    /// failed only as C# CS0266 (and, inside the same function, as an "unresolved" operator
+    /// charged <c>unknown</c>: Calor0410). An unknown width never rejects: the canonical
+    /// <see cref="PrimitiveType.Int"/> and <see cref="PrimitiveType.Float"/> type values whose
+    /// width the checker does not track.
+    /// </remarks>
+    internal static bool? ClassifyImplicitNumericConversion(CalorType target, CalorType source)
+    {
+        if (target is not PrimitiveType targetPrimitive || source is not PrimitiveType sourcePrimitive
+            || targetPrimitive.NumericWidth is not { } targetWidth)
+            return null;
+
+        // char → ushort, int, uint, long, ulong (and the floating and decimal types, decided by
+        // IsAssignable). Not to sbyte, byte or short, and a char constant has no constant
+        // conversion.
+        if (sourcePrimitive.Equals(PrimitiveType.Char))
+            return targetPrimitive.Equals(PrimitiveType.Int)
+                ? targetWidth is "u16" or "i32" or "u32" or "i64" or "u64"
+                : null;
+
+        if (sourcePrimitive.NumericWidth is not { } sourceWidth)
+            return null;
+        var targetIsFloat = targetPrimitive.Equals(PrimitiveType.Float);
+        var sourceIsFloat = sourcePrimitive.Equals(PrimitiveType.Float);
+        if (targetIsFloat && sourceIsFloat)
+            return sourceWidth == "f32" || targetWidth == "f64";
+        if (targetIsFloat || sourceIsFloat)
+            return null;
+
+        if (IsImplicitIntegerConversion(sourceWidth, targetWidth))
+            return true;
+        if (!sourcePrimitive.IsIntegerConstant)
+            return false;
+        // A constant whose value the checker does not compute is left to C#.
+        if (sourcePrimitive.IntegerConstantValue is not { } value)
+            return true;
+        return sourceWidth switch
+        {
+            "i32" => targetWidth is "i8" or "u8" or "i16" or "u16" or "u32" or "u64"
+                && FitsIntegerWidth(value, targetWidth),
+            "i64" => targetWidth == "u64" && value >= 0,
+            _ => false,
+        };
+    }
+
+    private static (bool Signed, int Bits)? IntegerWidthShape(string width) => width switch
+    {
+        "i8" => (true, 8),
+        "u8" => (false, 8),
+        "i16" => (true, 16),
+        "u16" => (false, 16),
+        "i32" => (true, 32),
+        "u32" => (false, 32),
+        "i64" => (true, 64),
+        "u64" => (false, 64),
+        _ => null,
+    };
+
+    /// <summary>
+    /// C# §10.2.3 between integer types: a wider type of the same signedness, or a wider signed
+    /// type for an unsigned source. Never signed → unsigned.
+    /// </summary>
+    private static bool IsImplicitIntegerConversion(string sourceWidth, string targetWidth)
+    {
+        if (sourceWidth == targetWidth)
+            return true;
+        if (IntegerWidthShape(sourceWidth) is not { } source || IntegerWidthShape(targetWidth) is not { } target)
+            return false;
+        if (source.Signed && !target.Signed)
+            return false;
+        return target.Bits > source.Bits;
+    }
+
+    private static bool FitsIntegerWidth(Int128 value, string width) => width switch
+    {
+        "i8" => value >= sbyte.MinValue && value <= sbyte.MaxValue,
+        "u8" => value >= byte.MinValue && value <= byte.MaxValue,
+        "i16" => value >= short.MinValue && value <= short.MaxValue,
+        "u16" => value >= ushort.MinValue && value <= ushort.MaxValue,
+        "i32" => value >= int.MinValue && value <= int.MaxValue,
+        "u32" => value >= uint.MinValue && value <= uint.MaxValue,
+        "i64" => value >= long.MinValue && value <= long.MaxValue,
+        "u64" => value >= ulong.MinValue && value <= ulong.MaxValue,
+        _ => false,
+    };
+
+    /// <summary>
+    /// True when C# rejects the implicit conversion between two numeric primitives whose exact
+    /// types the checker knows: a narrowing (<c>double</c> → <c>float</c>, <c>long</c> →
+    /// <c>int</c>), a floating value into an integer, or <c>decimal</c> ↔ <c>double</c>. Used at
+    /// the positions the checker did not otherwise validate (returns, assignments, compound
+    /// assignments, call arguments): an unknown width or an unmodeled operand never reports.
+    /// </summary>
+    private static bool IsRejectedNumericConversion(CalorType target, CalorType source)
+        => target is PrimitiveType targetPrimitive && source is PrimitiveType sourcePrimitive
+            && HasExactNumericType(targetPrimitive) && HasExactNumericType(sourcePrimitive)
+            && !IsAssignable(targetPrimitive, sourcePrimitive);
+
+    private static bool HasExactNumericType(PrimitiveType type)
+        => type.NumericWidth != null || type.Equals(PrimitiveType.Decimal) || type.Equals(PrimitiveType.Char);
+
+    /// <summary>The C# keyword for a numeric primitive, for the cast in a diagnostic's hint.</summary>
+    private static string NumericCSharpKeyword(PrimitiveType type)
+    {
+        if (type.Equals(PrimitiveType.Decimal)) return "decimal";
+        if (type.Equals(PrimitiveType.Char)) return "char";
+        return type.NumericWidth switch
+        {
+            "i8" => "sbyte",
+            "u8" => "byte",
+            "i16" => "short",
+            "u16" => "ushort",
+            "u32" => "uint",
+            "i64" => "long",
+            "u64" => "ulong",
+            "f32" => "float",
+            "f64" => "double",
+            _ => "int",
+        };
+    }
+
+    /// <summary>
+    /// Reports a numeric conversion C# would reject (CS0266/CS0664), at the Calor expression.
+    /// Kept like a refinement-soundness error: it survives the flow cache of structural
+    /// statements and the class-member pass that keeps only soundness errors, because the
+    /// verdict is exact (both types are known) and C# would reject the program anyway.
+    /// </summary>
+    private void ReportNumericConversion(Parsing.TextSpan span, CalorType target, CalorType source, string position)
+    {
+        var sourcePrimitive = (PrimitiveType)source;
+        var sourceKeyword = NumericCSharpKeyword(sourcePrimitive);
+        var targetKeyword = NumericCSharpKeyword((PrimitiveType)target);
+        var targetWidth = ((PrimitiveType)target).NumericWidth;
+        var reason = sourcePrimitive is { IsIntegerConstant: true, IntegerConstantValue: { } value }
+            && (sourcePrimitive.NumericWidth == "i32"
+                    && targetWidth is "i8" or "u8" or "i16" or "u16" or "u32" or "u64"
+                || sourcePrimitive.NumericWidth == "i64" && targetWidth == "u64")
+                ? $"the constant {value} is outside the range of {targetKeyword}"
+                : ClassifyImplicitNumericConversion(target, source) == false
+                    ? "the conversion narrows and can lose information"
+                    : $"C# has no implicit conversion from {sourceKeyword} to {targetKeyword}";
+        ReportRefinementSoundnessError(span,
+            $"Cannot implicitly convert {sourceKeyword} to {targetKeyword} in {position}: {reason}. "
+            + $"Write an explicit cast, such as ({targetKeyword})value, or change the declared type.");
+    }
+
     private static bool HaveSameArrayRuntimeType(ArrayType target, ArrayType source)
     {
+        if (target.Rank != source.Rank)
+            return false;
         var targetElement = target.ElementType is NullableReferenceType targetNullable
             ? targetNullable.ReferentType
             : target.ElementType;

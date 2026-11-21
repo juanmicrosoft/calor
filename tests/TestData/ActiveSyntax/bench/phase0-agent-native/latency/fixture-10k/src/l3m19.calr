@@ -1,0 +1,102 @@
+module L3M19 L3M19 block
+  module L3M19Module public
+
+    func l3m19_fn01 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 5) + y)
+      if (acc > 24634)
+        return (acc + 24634)
+      else
+        return ((acc * 2) + 24634)
+
+    func l3m19_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 87)
+
+    func l3m19_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24641)
+      let int:total = ((x * 3) + y)
+      if (total > 24641)
+        return 24641
+      return total
+
+    func l3m19_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 83)
+
+    func l3m19_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 1)
+
+    func l3m19_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 3)
+      requires (y >= 0)
+      => (result >= 24648)
+      let int:total = ((x * 2) + y)
+      if (total < 24648)
+        return 24648
+      else
+        return total
+
+    func l3m19_fn07 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24655)
+      if (x >= 24655)
+        return x
+      else
+        return 24655
+
+    func l3m19_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 56)
+
+    func l3m19_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 26)
+
+    func l3m19_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 24662)
+      let int:total = ((x * 5) + y)
+      if (total < 24662)
+        return 24662
+      else
+        return total
+
+    func l3m19_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24669)
+      let int:total = ((x * 5) + y)
+      if (total > 24669)
+        return 24669
+      return total
+
+    func l3m19_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 0)
+      => (x >= 1)
+      let int:acc = ((x * 2) + y)
+      if (acc > 24676)
+        return (acc + 24676)
+      else
+        return ((acc * 2) + 24676)
+
+    func l3m19_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 20)

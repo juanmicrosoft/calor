@@ -60,7 +60,7 @@ public static class CharOpExtensions
     /// </summary>
     public static CharOp? FromString(string? name)
     {
-        return name?.ToLowerInvariant() switch
+        return name switch
         {
             // Literal
             "char-lit" => CharOp.CharLiteral,

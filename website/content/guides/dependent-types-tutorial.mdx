@@ -1,19 +1,20 @@
 ---
-title: "Dependent Types Tutorial"
+title: "Input Contracts Tutorial"
 section: "guides"
 order: 3
 ---
 
-
-This tutorial walks through refinement types in three parts: basic parameter validation, financial proof obligations, and the MCP-guided agent repair loop. Each part shows where Calor's type-level constraints go beyond what plain C# can express.
-
----
+Use ordinary .NET types, explicit input contracts and observable tests to define
+API boundaries. This page replaces the retired dependent/refinement-type
+tutorial. It does not claim that a precondition creates a nominal type, a
+per-assignment invariant or a dependent type.
 
 ## Part 1 — API Parameter Validation
 
 ### The C# Problem
 
-In C#, parameter constraints live in scattered runtime checks:
+An ordinary `int` parameter does not express a port's allowed range. The
+original C# example validates inputs explicitly:
 
 ```csharp
 public void ConfigureServer(int port, string hostname, int maxConnections)
@@ -29,353 +30,192 @@ public void ConfigureServer(int port, string hostname, int maxConnections)
 }
 ```
 
-Every caller must remember to pass valid values. Every callee must remember to validate. Nothing in the type system enforces this — a `port` parameter typed `int` accepts any integer.
+### Calor With Explicit Preconditions
 
-### Calor With Inline Refinements
-
-In Calor, constraints are part of the parameter declaration:
+Write the requirements before the body:
 
 ```calor
-§F{f001:ConfigureServer:pub}
-  §I{i32:port} | (&& (>= # INT:1) (<= # INT:65535))
-  §I{str:hostname} | (> (len #) INT:0)
-  §I{i32:maxConnections} | (> # INT:0)
-  §O{void}
-  // ... actual logic, no validation boilerplate
+module ServerContracts
+  func ConfigureServer (int:port, string:hostname, int:maxConnections) → int
+    !
+    requires port >= 1 && port <= 65535
+    requires hostname != null && hostname.Length > 0
+    requires maxConnections > 0
+    => result == maxConnections
+    return maxConnections
+
+  func Main () → int
+    !
+    return ConfigureServer(443, "localhost", 10)
 ```
 
-### With Named Refinement Types
+`Main()` returns `10`. The short-circuiting null check precedes the length
+read. With runtime contracts enabled, invalid ports, null or empty hostnames,
+and nonpositive connection limits fail at entry.
 
-For reusable constraints, define named refinement types:
+This is a contract example, not a server implementation or an exact conversion
+of the C# function. Its ordinary parameter types remain `int` and `string`.
 
-```calor
-§M{m001:Server}
+### Reusing Constraints
 
-  §RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-    §RTYPE{r2:NonEmpty:str} (> (len #) INT:0)
-      §RTYPE{r3:Positive:i32} (> # INT:0)
-
-        §F{f001:ConfigureServer:pub}
-          §I{Port:port}
-          §I{NonEmpty:hostname}
-          §I{Positive:maxConnections}
-          §O{void}
-  // ...
-
-```
-
-Now `Port`, `NonEmpty`, and `Positive` are reusable across the entire module.
+Another API can repeat the relevant `requires` clauses. That does not introduce
+named `Port`, `NonEmpty` or `Positive` types. If distinct domain types matter,
+design ordinary classes or records with explicit construction and mutation
+rules.
 
 ### What Happens in the Emitted C#
 
-Refinement types are erased — the C# output uses base types with runtime guards for public functions:
+With runtime contract checks enabled, failed requirements throw
+`ContractViolationException`. They do not reproduce the original C# example's
+`ArgumentException` subclasses or parameter-name payloads.
 
-```csharp
-public void ConfigureServer(int port, string hostname, int maxConnections)
-{
-    // Boundary obligation guards (auto-generated)
-    if (!(port >= 1 && port <= 65535))
-        throw new InvalidOperationException("Obligation failed: port must satisfy Port");
-    if (!(hostname.Length > 0))
-        throw new InvalidOperationException("Obligation failed: hostname must satisfy NonEmpty");
-    if (!(maxConnections > 0))
-        throw new InvalidOperationException("Obligation failed: maxConnections must satisfy Positive");
+Turning runtime contracts off removes these checks. It does not make invalid
+inputs valid. A precondition also does not constrain every subsequent assignment
+to an ordinary local variable.
 
-    // ...
-}
-```
-
-The key difference: in Calor the constraint is declared once in the type, and the compiler generates the guards. In C# you write them by hand in every function.
-
----
-
-## Part 2 — Financial Calculations with Proof Obligations
+## Part 2 — Financial Calculations with Input and Output Contracts
 
 ### The Setup
 
-A transfer function where:
-- Amounts must be positive
-- Balances must be non-negative
-- After a transfer, the balance must remain non-negative
-
-This example writes the refinements inline. Named refinement types (`§RTYPE`) also work as
-arithmetic operands: `(- balance amount)` on two `§RTYPE`-typed parameters has the base type
-`i32`, not the refinement, because the difference can break the predicate.
+Require a nonnegative balance, a positive amount and sufficient funds.
+Describe the successful result with a postcondition:
 
 ```calor
-§M{m001:Banking}
-  §F{f001:Transfer:pub}
-    §I{i32:balance} | (>= # INT:0)
-    §I{i32:amount} | (> # INT:0)
-    §O{i32}
-    §Q (>= balance amount)                  // sufficient funds
+module BankingContracts
+  func Transfer (int:balance, int:amount) → int
+    !
+    requires balance >= 0
+    requires amount > 0
+    requires balance >= amount
+    => result >= 0
+    return balance - amount
 
-    §PROOF{p1:balance-safe} (>= (- balance amount) INT:0)
-
-    §R (- balance amount)
+  func Main () → int
+    !
+    return Transfer(100, 30)
 ```
 
-The proof states its condition on the expression itself. The obligation solver does not
-yet track local bindings, so a proof about a `§B` name is reported `Unsupported`.
+`Main()` returns `70`. With runtime contracts enabled, `Transfer(3, 5)` fails
+the sufficient-funds precondition before subtraction.
 
-### Z3 Proves the Obligation
+### Requesting Verification
 
-A default `calor` compile does not run the obligation solver; it keeps every runtime guard.
-The `calor_refine` MCP tool (`action: "obligations"`) runs it.
+Pass the **complete unchanged source** to `calor_verify`. Inspect each contract's
+returned status, assumptions, unsupported expressions and any counterexample.
+Running `Main()` successfully is not a proof over all inputs.
 
-The obligation engine runs this verification:
+The preconditions are assumptions when verifying the body. A proof about
+`Transfer` under those assumptions does not establish that every caller meets
+them. Keep runtime boundary checks unless an eligible proof from the relevant
+compilation authorizes their removal.
 
-1. **Assume**: `balance >= 0` and `amount > 0` (from the parameter refinements), `balance >= amount` (precondition)
-2. **Check**: Is `balance - amount >= 0`?
+### When the Requirement Is Missing
 
-Z3 proves it: given `balance >= amount`, then `balance - amount >= 0`. The proof obligation is **discharged**.
-
-### When Z3 Finds a Counterexample
-
-Remove the precondition:
+This variant deliberately omits sufficient funds:
 
 ```calor
-§F{f002:UnsafeTransfer:pub}
-  §I{i32:balance} | (>= # INT:0)
-  §I{i32:amount} | (> # INT:0)
-  §O{i32}
-  // No §Q — missing sufficient funds check!
+module MissingFundsContract
+  func Transfer (int:balance, int:amount) → int
+    !
+    requires balance >= 0
+    requires amount > 0
+    => result >= 0
+    return balance - amount
 
-  §PROOF{p1:balance-safe} (>= (- balance amount) INT:0)
-
-  §R (- balance amount)
+  func Main () → int
+    !
+    return Transfer(100, 30)
 ```
 
-Z3 finds a counterexample: any `amount` larger than `balance`. The obligation **fails**, and
-`calor_refine` reports the concrete values. With the default policy, it is reported as an error.
+Its shown `Main()` still returns `70`. However, `Transfer(3, 5)` computes `-2`
+and fails the **postcondition** with runtime checks enabled. With checks off,
+the same call returns `-2`. A passing happy-path test did not expose the missing
+entry requirement.
 
 ### The Fix Cycle
 
-The counterexample tells you exactly what's wrong: the function needs `(>= balance amount)` as a precondition. Add it, recompile, and the obligation is discharged.
+Add `requires balance >= amount` when insufficient funds should be rejected at
+entry. Recompile the exact changed program and rerun both valid and invalid
+calls. This is a behavioral contract change; do not silently replace a frozen
+benchmark input or its expected behavior to obtain a better result.
 
----
+No standalone proof statement or retired refinement authoring form is required
+by these examples.
 
 ## Part 3 — The MCP-Guided Agent Repair Loop
 
-This is where refinement types and MCP tools combine. Instead of manually diagnosing obligation failures, an AI agent uses five specialized tools to navigate the repair loop with structured data.
-
 ### Starting Point
 
-An agent has written code with unconstrained parameters:
+Integer division needs more than a nonzero divisor: checked
+`int.MinValue / -1` overflows.
 
 ```calor
-§M{m001:Calculator}
+module DivisionContracts
+  func Divide (int:a, int:b) → int
+    !
+    requires b != 0
+    requires a != -2147483648 || b != -1
+    return a / b
 
-  §F{f001:Divide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (/ a b)
-
+  func Main () → int
+    !
+    return Divide(-7, 3)
 ```
 
-### Step 1: Discover Missing Refinements
+`Main()` returns `-2`, truncating toward zero. With runtime contracts enabled,
+`Divide(1, 0)` and `Divide(-2147483648, -1)` fail their entry requirements.
+With checks off, the body throws `DivideByZeroException` and
+`OverflowException`, respectively.
 
-The agent calls `calor_refine` with `action: "types"`:
+### Step 1: Inspect the Exact Program
 
-```json
-{
-  "source": "§M{m001:Calculator} ..."
-}
-```
+Invoke `calor_check` with `action: "diagnose"` and the complete source. Keep
+actual compiler diagnostics separate from an agent's suggestions.
 
-The responses below were captured from the MCP server for this example. CI does not re-run
-them, so they are labelled as example output.
+### Step 2: Check Contracts and Behavior
 
-Response:
+Invoke `calor_verify` with the same source. Report the actual per-contract
+statuses, not a fabricated success response. Compile and execute positive and
+boundary cases separately; verifier success and runtime execution answer
+different questions.
 
-```json illustrative
-{
-  "success": true,
-  "suggestions": [
-    {
-      "function_id": "f001",
-      "parameter_name": "b",
-      "current_type": "INT",
-      "suggested_predicate": "(!= # INT:0)",
-      "reason": "'b' is used as a divisor without a non-zero constraint",
-      "confidence": "high",
-      "calor_syntax": "§I{INT:b} | (!= # INT:0)"
-    }
-  ]
-}
-```
+### Step 3: Review a Candidate Repair
 
-The tool analyzed the function body and detected that `b` is used as a divisor, so it must be non-zero.
+Use current `requires` clauses when an input restriction matches the API's
+intended behavior. Read suggested edits before applying them. A suggested patch,
+an agent's confidence score or a successful tool transport is not proof that
+the repair is correct.
 
-### Step 2: Add Refinements and Check Obligations
+### Step 4: Recheck the Saved Result
 
-The agent applies the suggestions and calls `calor_refine` with
-`action: "obligations"`:
-
-```json
-{
-  "source": "§M{m001:Calculator}\n  §F{f001:Divide:pub}\n    §I{i32:a}\n    §I{i32:b} | (!= # INT:0)\n    §O{i32}\n    §R (/ a b)\n"
-}
-```
-
-Response:
-
-```json illustrative
-{
-  "success": true,
-  "summary": {
-    "total": 1,
-    "discharged": 0,
-    "failed": 0,
-    "timeout": 0,
-    "assumed": 0,
-    "boundary": 1,
-    "pending": 0,
-    "unsupported": 0
-  },
-  "obligations": [
-    {
-      "id": "obl_0",
-      "kind": "RefinementEntry",
-      "function_id": "f001",
-      "description": "Parameter 'b' must satisfy inline refinement",
-      "status": "Boundary",
-      "line": 4,
-      "column": 5,
-      "suggested_fix": "Add runtime guard: if (!(b satisfies predicate)) throw"
-    }
-  ],
-  "compilationErrors": []
-}
-```
-
-The obligation is `Boundary`: the function is public, so the compiler can't verify what callers pass. A runtime guard is emitted automatically.
-
-### Step 3: Discover Guards for Failed Obligations
-
-If the agent had private functions with failed obligations, it would call
-`calor_refine` with `action: "guards"`:
-
-```json
-{
-  "source": "...",
-  "obligation_id": "obl_0"
-}
-```
-
-Response:
-
-```json illustrative
-{
-  "success": true,
-  "guards": [
-    {
-      "obligation_id": "obl_0",
-      "description": "Add precondition requiring 'b' satisfies the refinement",
-      "calor_expression": "§Q (!= b INT:0)",
-      "insertion_kind": "precondition",
-      "confidence": "high",
-      "validated": true
-    },
-    {
-      "obligation_id": "obl_0",
-      "description": "Add runtime guard at function entry for 'b'",
-      "calor_expression": "§IF{g1} (! (!= b INT:0)) → §R (err \"Refinement violated: b\")",
-      "insertion_kind": "if_guard",
-      "confidence": "medium"
-    }
-  ]
-}
-```
-
-Guards are ranked by confidence. The `validated: true` flag means Z3 confirmed that adding this guard would discharge the obligation.
-
-### Step 4: The All-in-One Repair Tool
-
-For the full repair loop in a single call, the agent uses `calor_refine` with
-`action: "diagnose"`:
-
-```json
-{
-  "source": "...",
-  "policy": "default"
-}
-```
-
-Response:
-
-```json illustrative
-{
-  "success": true,
-  "policy": "default",
-  "summary": {
-    "total": 1,
-    "discharged": 0,
-    "failed": 0,
-    "timeout": 0,
-    "boundary": 1
-  },
-  "patches": [
-    {
-      "obligation_id": "obl_0",
-      "obligation_status": "Boundary",
-      "policy_action": "AlwaysGuard",
-      "patch_kind": "precondition",
-      "calor_code": "§Q (!= b INT:0)",
-      "description": "Add precondition requiring 'b' satisfies the refinement",
-      "confidence": "high",
-      "discharges_obligations": ["obl_0"]
-    },
-    {
-      "obligation_id": "obl_0",
-      "obligation_status": "Boundary",
-      "policy_action": "AlwaysGuard",
-      "patch_kind": "if_guard",
-      "calor_code": "§IF{g1} (! (!= b INT:0)) → §R (err \"Refinement violated: b\")",
-      "description": "Add runtime guard at function entry for 'b'",
-      "confidence": "medium",
-      "discharges_obligations": ["obl_0"]
-    }
-  ],
-  "compilation_errors": []
-}
-```
-
-The `patches` array gives the agent exactly what to insert and where, with obligation IDs showing which problems each patch resolves.
+Compile the exact saved source, rerun relevant tests and request verification
+again. Preserve declaration identities through tooling. Do not copy IDs into
+source headers or disable effect enforcement to make an example pass.
 
 ### Why This Matters for Agent Workflows
 
-The traditional agent approach to fixing a runtime error:
+Compiler tools provide concrete feedback, but the workflow still needs a
+reviewed API contract and independent observations. Unsupported or timed-out
+verification remains unresolved. Preserved C# behavior is not native language
+acceptance.
 
-1. Read error message → guess the fix → try it → compile → read new error → repeat
-
-The MCP-guided approach:
-
-1. `calor_refine` / `types` → identify parameters that may need constraints
-2. `calor_refine` / `obligations` → inspect obligation statuses and counterexamples
-3. `calor_refine` / `guards` → request guard candidates for failed obligations
-4. `calor_refine` / `diagnose` → get the combined repair analysis
-
-The tools **prune the agent's search space**. Instead of guessing, the agent gets structured data about what's wrong and exactly how to fix it.
-
----
+This tutorial does not present an automatic refinement-repair transcript or
+claim that a tool discharged the retired tutorial's obligations.
 
 ## MCP Tool Reference
 
-| Tool | Purpose | When to Use |
-|:-----|:--------|:------------|
-| `calor_refine` / `types` | Detect parameters needing refinements | Before adding refinements |
-| `calor_refine` / `obligations` | Generate and verify obligations | After adding refinements |
-| `calor_refine` / `guards` | Find guards for failed obligations | When obligations fail |
-| `calor_refine` / `fixes` | Get ranked fix strategies | When alternatives are needed |
-| `calor_refine` / `diagnose` | Combined repair analysis | For the full loop |
+| Tool | Purpose | Evidence to inspect |
+|:-----|:--------|:--------------------|
+| `calor_check`, `action: "diagnose"` | Compile and diagnose the exact source | Actual diagnostics and source association |
+| `calor_verify` | Verify contracts | Per-contract statuses, assumptions and counterexamples |
+| `calor_navigate` | Locate declarations and references | Actual file, span and declaration identity |
 
----
+Use [the MCP reference](/docs/cli/mcp/) for schemas. Project instructions and
+client configuration do not establish that any of these calls ran.
 
 ## See Also
 
-- [Refinement Types Reference](/docs/syntax-reference/refinement-types/) — Complete syntax reference
-- [Contracts](/docs/syntax-reference/contracts/) — Preconditions and postconditions
-- [Static Verification](/docs/philosophy/static-verification/) — Z3-based verification
-- [MCP Server](/docs/cli/mcp/) — All MCP tools
+- [Value Constraints](/docs/syntax-reference/refinement-types/) — ordinary types and their guarantee boundaries
+- [Contracts](/docs/syntax-reference/contracts/) — runtime checks and contract modes
+- [Static Verification](/docs/philosophy/static-verification/) — verifier concepts and limitations
+- [MCP Server](/docs/cli/mcp/) — compiler tools

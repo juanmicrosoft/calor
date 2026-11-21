@@ -40,11 +40,11 @@ public class CliTypeCheckDefaultTests : IDisposable
     {
         var path = Path.Combine(_tempDir, "violation.calr");
         File.WriteAllText(path, """
-            §M{m001:Test}
-              §F{f001:Main:pub} () -> void
-                §E{}
-                §B{x:i32} STR:"not an int"
-                §R
+            module Test Test block
+              func Main () → void
+                !
+                let int:x = "not an int"
+                return
             """);
         return path;
     }
@@ -54,15 +54,15 @@ public class CliTypeCheckDefaultTests : IDisposable
     [InlineData(true, false, "0")]
     [InlineData(false, true, "0")]
     [InlineData(false, false, "1")]
-    public void NullableReferenceRepair_DoesNotAllowWarmOptionMismatch(
+    public void NullableReferenceRepair_RejectsRemovedSyntaxAfterWarmBuild(
         bool typeOff, bool transpile, string environmentOptOut)
     {
         var path = Path.Combine(_tempDir, "nullable-reference.calr");
         const string safe = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> ?str
-                §E{alloc}
-                §R "safe"
+            module NullableTyping NullableTyping block
+              func Probe () → string?
+                ! alloc
+                return "safe"
             """;
         File.WriteAllText(path, safe);
         var args = new List<string> { "--input", path, "--cache" };
@@ -72,10 +72,10 @@ public class CliTypeCheckDefaultTests : IDisposable
         var accepted = CliTestHarness.RunCli(_tempDir, environment, args.ToArray());
         Assert.True(accepted.ExitCode == 0, accepted.StdOut + accepted.StdErr);
         Assert.DoesNotContain("Calor0200", accepted.StdOut + accepted.StdErr);
-        File.WriteAllText(path, safe.Replace("§R \"safe\"", "§R §SM \"safe\"", StringComparison.Ordinal));
+        File.WriteAllText(path, safe.Replace("return \"safe\"", "return §SM \"safe\"", StringComparison.Ordinal));
         var rejected = CliTestHarness.RunCli(_tempDir, environment, args.ToArray());
         Assert.NotEqual(0, rejected.ExitCode);
-        Assert.Contains(DiagnosticCode.ReferenceOptionMismatch, rejected.StdOut + rejected.StdErr);
+        Assert.Contains(DiagnosticCode.UnknownSectionMarker, rejected.StdOut + rejected.StdErr);
         Assert.DoesNotContain("Up-to-date (cached)", rejected.StdOut);
     }
 

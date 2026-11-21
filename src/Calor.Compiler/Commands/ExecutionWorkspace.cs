@@ -42,7 +42,8 @@ internal static class ExecutionWorkspace
         bool Verify,
         bool KeepProvenGuards,
         string ContractMode,
-        int TimeoutSeconds)
+        int TimeoutSeconds,
+        bool IncludeImplicitSystemUsing = true)
     {
         public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds);
     }
@@ -106,6 +107,8 @@ internal static class ExecutionWorkspace
         command.AddOption(keepProvenGuardsOption);
         command.AddOption(contractModeOption);
         command.AddOption(timeoutOption);
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system", "Validate standalone without the default System-only project import");
+        command.AddOption(noImplicitSystemOption);
 
         return ctx => new ExecutionSettings(
             Permissive: ctx.ParseResult.GetValueForOption(permissiveOption),
@@ -115,7 +118,8 @@ internal static class ExecutionWorkspace
             Verify: ctx.ParseResult.GetValueForOption(verifyOption),
             KeepProvenGuards: ctx.ParseResult.GetValueForOption(keepProvenGuardsOption),
             ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
-            TimeoutSeconds: ctx.ParseResult.GetValueForOption(timeoutOption));
+            TimeoutSeconds: ctx.ParseResult.GetValueForOption(timeoutOption),
+            IncludeImplicitSystemUsing: !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
     }
 
     internal sealed record PreparedExecution(string Dotnet, List<CompiledUnit> Units);
@@ -243,6 +247,7 @@ internal static class ExecutionWorkspace
             file => new CompilationOptions
             {
                 Verbose = settings.Verbose,
+                IncludeImplicitSystemUsing = settings.IncludeImplicitSystemUsing,
                 EnforceEffects = settings.EnforceEffects,
                 UnknownCallPolicy = policy,
                 VerifyContracts = settings.Verify,
@@ -287,7 +292,8 @@ internal static class ExecutionWorkspace
     /// compiler (works both for repo dev builds, where the ProjectReference copies it
     /// to the compiler output, and for the installed global tool).
     /// </summary>
-    internal static string WriteProject(string projectDir, string projectName, bool executable, IReadOnlyList<CompiledUnit> units)
+    internal static string WriteProject(string projectDir, string projectName, bool executable, IReadOnlyList<CompiledUnit> units,
+        bool includeImplicitSystemUsing = true)
     {
         Directory.CreateDirectory(projectDir);
         foreach (var unit in units)
@@ -313,11 +319,12 @@ internal static class ExecutionWorkspace
               <PropertyGroup>
                 <OutputType>{(executable ? "Exe" : "Library")}</OutputType>
                 <TargetFramework>net10.0</TargetFramework>
-                <ImplicitUsings>enable</ImplicitUsings>
+                <ImplicitUsings>disable</ImplicitUsings>
                 <Nullable>enable</Nullable>
                 <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
                 <AssemblyName>{projectName}</AssemblyName>
               </PropertyGroup>
+              {(includeImplicitSystemUsing ? "<ItemGroup><Using Include=\"System\" /></ItemGroup>" : "")}
 
             {runtimeReference}
 
@@ -517,6 +524,72 @@ internal static class ExecutionWorkspace
         }
 
         return process.ExitCode;
+    }
+
+    internal sealed record ProcessResult(int ExitCode, string Output, bool TimedOut = false);
+
+    internal static async Task<ProcessResult> CaptureProcessAsync(
+        string fileName, IReadOnlyList<string> arguments, string workingDirectory,
+        TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var startInfo = new ProcessStartInfo(fileName)
+        {
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        using var process = new Process { StartInfo = startInfo };
+        try
+        {
+            if (!process.Start())
+                return new ProcessResult(2, $"Failed to start process: {fileName}");
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            return new ProcessResult(2, $"Failed to start process: {fileName}: {ex.Message}");
+        }
+
+        process.StandardInput.Close();
+        using var deadline = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+        var stdout = process.StandardOutput.ReadToEndAsync(linked.Token);
+        var stderr = process.StandardError.ReadToEndAsync(linked.Token);
+        var completion = Task.WhenAll(process.WaitForExitAsync(linked.Token), stdout, stderr);
+        try
+        {
+            // A descendant can retain a pipe after the root exits. The deadline
+            // covers both root exit and stream EOF, not only WaitForExitAsync.
+            await completion.WaitAsync(linked.Token);
+            return new ProcessResult(process.ExitCode, (await stdout) + (await stderr));
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException) when (process.HasExited)
+            {
+                // The process exited between inspection and termination.
+            }
+            process.StandardOutput.BaseStream.Dispose();
+            process.StandardError.BaseStream.Dispose();
+            // Observe read failures without waiting indefinitely for an inherited
+            // handle in an already-orphaned descendant.
+            _ = completion.ContinueWith(
+                task => { _ = task.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ProcessResult(TimeoutExitCode, $"Process timed out after {timeout.TotalSeconds:0}s.", TimedOut: true);
+        }
     }
 
     private static void KillProcessTree(Process process)

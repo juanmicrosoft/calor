@@ -11,30 +11,6 @@ public class IndexerTests
 {
     #region Lexer Tests
 
-    [Fact]
-    public void Lexer_Indexer_TokenizesCorrectly()
-    {
-        var source = "§IXER{ix1:int:pub}";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.Indexer);
-    }
-
-    [Fact]
-    public void Lexer_EndIndexer_TokenizesCorrectly()
-    {
-        var source = "§/IXER{ix1}";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndIndexer);
-    }
-
     #endregion
 
     #region Parser Tests
@@ -43,16 +19,12 @@ public class IndexerTests
     public void Parser_FullFormIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §IXER{ix1:int:pub}
-                §I{int:index}
-                §GET
-                §R INT:0
-                §/GET
-                §SET
-                §/SET
-                §/IXER{ix1}
+            module Test Test block
+              class MyClass
+                this[int:index] → int
+                  get
+                    return 0
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -64,12 +36,13 @@ public class IndexerTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var indexer = Assert.Single(cls.Indexers);
-        Assert.Equal("ix1", indexer.Id);
+        Assert.StartsWith("ix_auto", indexer.LocalId);
+        Assert.Null(indexer.ToolingId);
         Assert.Equal("int", indexer.TypeName);
         Assert.Equal(Visibility.Public, indexer.Visibility);
         Assert.Single(indexer.Parameters);
         Assert.Equal("index", indexer.Parameters[0].Name);
-        Assert.Equal("INT", indexer.Parameters[0].TypeName); // ExpandType maps "int" -> "INT"
+        Assert.Equal("int", indexer.Parameters[0].TypeName);
         Assert.NotNull(indexer.Getter);
         Assert.NotNull(indexer.Setter);
     }
@@ -78,9 +51,11 @@ public class IndexerTests
     public void Parser_CompactAutoIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §IXER{ix1:int:pub:get,set} (int:index)
+            module Test Test block
+              class MyClass
+                this[int:index] → int
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -92,7 +67,8 @@ public class IndexerTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var indexer = Assert.Single(cls.Indexers);
-        Assert.Equal("ix1", indexer.Id);
+        Assert.StartsWith("ix_auto", indexer.LocalId);
+        Assert.Null(indexer.ToolingId);
         Assert.Equal("int", indexer.TypeName);
         Assert.Equal(Visibility.Public, indexer.Visibility);
         Assert.True(indexer.IsAutoIndexer);
@@ -106,9 +82,11 @@ public class IndexerTests
     public void Parser_MultiParameterIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §IXER{ix1:int:pub:get,set} (int:row, int:col)
+            module Test Test block
+              class MyClass
+                this[int:row, int:col] → int
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -129,9 +107,11 @@ public class IndexerTests
     public void Parser_InterfaceIndexer_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §IFACE{i1:IMyCollection}
-                §IXER{ix1:int:pub:get,set} (int:index)
+            module Test Test block
+              interface IMyCollection
+                this[int:index] → int
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -143,7 +123,8 @@ public class IndexerTests
         Assert.Empty(diag);
         var iface = Assert.Single(module.Interfaces);
         var indexer = Assert.Single(iface.Indexers);
-        Assert.Equal("ix1", indexer.Id);
+        Assert.StartsWith("ix_auto", indexer.LocalId);
+        Assert.Null(indexer.ToolingId);
         Assert.Equal("int", indexer.TypeName);
     }
 
@@ -151,9 +132,11 @@ public class IndexerTests
     public void Parser_VirtualIndexer_ParsesModifiers()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §IXER{ix1:int:pub:virt:get,set} (int:index)
+            module Test Test block
+              class MyClass
+                this[int:index] → int virtual
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -171,9 +154,11 @@ public class IndexerTests
     public void Parser_CompactGenericTypeParam_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyDict:pub}
-                §IXER{ix1:List<str>:pub:get,set} (Dictionary<str,i32>:lookup)
+            module Test Test block
+              class MyDict
+                this[Dictionary<string,int>:lookup] → List<string>
+                  get
+                  set
             """;
 
         var diag = new DiagnosticBag();
@@ -184,7 +169,7 @@ public class IndexerTests
 
         Assert.Empty(diag);
         var indexer = Assert.Single(module.Classes[0].Indexers);
-        Assert.Equal("List<str>", indexer.TypeName);
+        Assert.Equal("List<string>", indexer.TypeName);
         Assert.Single(indexer.Parameters);
         Assert.Equal("lookup", indexer.Parameters[0].Name);
         Assert.Contains("Dictionary", indexer.Parameters[0].TypeName);
@@ -452,6 +437,31 @@ public class IndexerTests
     #region Round-Trip Tests
 
     [Fact]
+    public void RoundTrip_IndexerBodies_ReparsePreservesParameters()
+    {
+        const string csharp = """
+            public class Matrix
+            {
+                private int[,] data = new int[2, 2];
+                public int this[int row, int col]
+                {
+                    get { return data[row, col]; }
+                    set { data[row, col] = value; }
+                }
+            }
+            """;
+
+        var result = new CSharpToCalorConverter().Convert(csharp);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Empty(result.Losses);
+
+        var compiled = Program.Compile(result.CalorSource!, "indexer.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains("this[int row, int col]", compiled.GeneratedCode);
+        Assert.True(GeneratedCSharpCompiler.Validate(compiled.GeneratedCode!).CompilationSuccess);
+    }
+
+    [Fact]
     public void RoundTrip_CSharpToCalorToCSharp_PreservesIndexer()
     {
         var csharp = """
@@ -477,9 +487,11 @@ public class IndexerTests
     public void RoundTrip_CalorParseEmitReparse_PreservesIndexer()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §IXER{ix1:int:pub:get,set} (int:index)
+            module Test Test block
+              class MyClass
+                this[int:index] → int
+                  get
+                  set
             """;
 
         // Parse

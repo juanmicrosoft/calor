@@ -1,0 +1,122 @@
+module OrderPipeline OrderPipeline block
+  module OrderPipelineModule public
+    func IsValidOrder (int:qty, int:unitPrice) → bool
+      !
+      return ((qty >= 1) && ((qty <= 1000) && (unitPrice >= 0)))
+
+    func TierDiscountBps (int:tier) → int
+      !
+      if (tier == 1)
+        return 500
+      else if (tier == 2)
+        return 1000
+      else if (tier == 3)
+        return 1500
+      return 0
+
+    func Subtotal (int:qty, int:unitPrice) → int
+      !
+      return (qty * unitPrice)
+
+    func DiscountAmount (int:subtotal, int:tier) → int
+      !
+      let int:bps = TierDiscountBps(tier)
+      return ((subtotal * bps) / 10000)
+
+    func TaxAmount (int:amount, int:taxRateBps) → int
+      !
+      return ((amount * taxRateBps) / 10000)
+
+    func OrderTotal (int:qty, int:unitPrice, int:tier, int:taxRateBps) → int
+      !
+      let bool:valid = IsValidOrder(qty, unitPrice)
+      if (!valid)
+        return 0
+      let int:sub = Subtotal(qty, unitPrice)
+      let int:disc = DiscountAmount(sub, tier)
+      let int:net = (sub - disc)
+      let int:tax = TaxAmount(net, taxRateBps)
+      return (net + tax)
+
+    func CanTransition (int:fromState, int:toState) → bool
+      !
+      if (fromState == 0)
+        return ((toState == 1) || (toState == 4))
+      if (fromState == 1)
+        return ((toState == 2) || (toState == 4))
+      if (fromState == 2)
+        return (toState == 3)
+      if (fromState == 3)
+        return (toState == 5)
+      if (fromState == 5)
+        return (toState == 6)
+      return false
+
+    func ApplyTransition (int:state, int:toState) → int
+      !
+      let bool:allowed = CanTransition(state, toState)
+      if allowed
+        return toState
+      return state
+
+    func RecordOrder (Dictionary<string, int>:totals, string:customer, int:amount) → void
+      ! mut
+      if totals.ContainsKey(customer)
+        set totals[customer] (totals[customer] + amount)
+      else
+        set totals[customer] amount
+
+    func CustomerTotal (Dictionary<string, int>:totals, string:customer) → int
+      !
+      if (!totals.ContainsKey(customer))
+        return 0
+      return totals[customer]
+
+    func GrandTotal (Dictionary<string, int>:totals) → int
+      !
+      var int:total = 0
+      each customer, amount in totals
+        set total (total + amount)
+      return total
+
+    func ActiveCustomers (Dictionary<string, int>:totals) → int
+      !
+      var int:count = 0
+      each customer2, amount2 in totals
+        set count (count + 1)
+      return count
+
+    func ProcessOrder (Dictionary<string, int>:totals, string:customer, int:qty, int:unitPrice, int:tier, int:taxRateBps) → int
+      ! mut
+      let bool:valid = IsValidOrder(qty, unitPrice)
+      if (!valid)
+        return 0
+      let int:total = OrderTotal(qty, unitPrice, tier, taxRateBps)
+      if (total > 0)
+        RecordOrder(totals, customer, total)
+      return total
+
+    func RefundAmount (int:qty, int:unitPrice, int:tier, int:taxRateBps, int:restockFeeBps) → int
+      !
+      let int:total = OrderTotal(qty, unitPrice, tier, taxRateBps)
+      let int:fee = ((total * restockFeeBps) / 10000)
+      return (total - fee)
+
+    func RecordRefund (Dictionary<string, int>:totals, string:customer, int:amount) → void
+      ! mut
+      if totals.ContainsKey(customer)
+        let int:remaining = (totals[customer] - amount)
+        if (remaining <= 0)
+          totals.Remove(customer)
+        else
+          set totals[customer] remaining
+
+    func ProcessReturn (Dictionary<string, int>:totals, string:customer, int:state, int:qty, int:unitPrice, int:tier, int:taxRateBps, int:restockFeeBps) → int
+      ! mut
+      let bool:allowed = CanTransition(state, 5)
+      if (!allowed)
+        return 0
+      let int:refund = RefundAmount(qty, unitPrice, tier, taxRateBps, restockFeeBps)
+      if (refund > 0)
+        RecordRefund(totals, customer, refund)
+      return refund

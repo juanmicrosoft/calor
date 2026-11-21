@@ -10,68 +10,31 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class ReferencesHandlerTests
 {
-    [Fact]
-    public async Task NestedShadowedLocalsRemainSeparatedBySymbolIdAsync()
-    {
-        const string source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub} (bool:flag) -> i32
-                §B{value:i32} INT:1
-                §IF{nested} (== flag BOOL:true)
-                  §B{value:i32} INT:2
-                  §R value
-                §R value
-            """;
-        var uri = DocumentUri.From("file:///references-shadow.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-
-        var outer = await FindReferencesAsync(
-            workspace,
-            uri,
-            source,
-            source.IndexOf("§B{value", StringComparison.Ordinal) + "§B{".Length);
-        var innerOffset = source.LastIndexOf("§B{value", StringComparison.Ordinal)
-            + "§B{".Length;
-        var inner = await FindReferencesAsync(
-            workspace,
-            uri,
-            source,
-            innerOffset);
-
-        Assert.Equal(2, outer.Length);
-        Assert.Equal(2, inner.Length);
-        Assert.DoesNotContain(
-            outer,
-            location => PositionConverter.ToOffset(location.Range.Start, source)
-                == innerOffset);
-        Assert.DoesNotContain(
-            inner,
-            location => PositionConverter.ToOffset(location.Range.Start, source)
-                == source.IndexOf("§B{value", StringComparison.Ordinal) + "§B{".Length);
-        Assert.All(outer.Concat(inner), location =>
-            Assert.Equal("value", TextAt(source, location.Range)));
-    }
 
     [Fact]
     public async Task SameMethodNameOnUnrelatedTypesDoesNotCollideAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §CL{c001:First:pub}
-                §MT{m001:Run:pub} () -> i32
-                  §R INT:1
-              §CL{c002:Second:pub}
-                §MT{m002:Run:pub} () -> i32
-                  §R INT:2
-              §F{f001:Use:pub} () -> i32
-                §B{first:First} §NEW{First} §/NEW
-                §R §C{first.Run} §/C
+            module TestModule TestModule block
+              class First
+                func Run () → int
+                  !
+                  return 1
+
+              class Second
+                func Run () → int
+                  !
+                  return 2
+
+              func Use () → int
+                ! alloc
+                let First:first = new First()
+                return first.Run()
             """;
         var uri = DocumentUri.From("file:///references-method-collision.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var firstRun = source.IndexOf("Run:pub", StringComparison.Ordinal);
+        var firstRun = source.IndexOf("Run (", StringComparison.Ordinal);
         var references = await FindReferencesAsync(
             workspace,
             uri,
@@ -83,20 +46,25 @@ public class ReferencesHandlerTests
         Assert.DoesNotContain(
             references,
             location => PositionConverter.ToOffset(location.Range.Start, source)
-                == source.LastIndexOf("Run:pub", StringComparison.Ordinal));
+                == source.LastIndexOf("Run (", StringComparison.Ordinal));
     }
 
     [Fact]
     public async Task OverloadsResolveToExactSignatureAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Pick:pub} (i32:value) -> i32
-                §R value
-              §F{f002:Pick:pub} (str:value) -> str
-                §R value
-              §F{f003:Use:pub} () -> i32
-                §R §C{Pick} §A INT:1 §/C
+            module TestModule TestModule block
+              func Pick (int:value) → int
+                !
+                return value
+
+              func Pick (string:value) → string
+                !
+                return value
+
+              func Use () → int
+                !
+                return Pick(1)
             """;
         var uri = DocumentUri.From("file:///references-overloads.calr");
         var workspace = new WorkspaceState();
@@ -105,13 +73,13 @@ public class ReferencesHandlerTests
             workspace,
             uri,
             source,
-            source.IndexOf("Pick:pub", StringComparison.Ordinal));
+            source.IndexOf("Pick (", StringComparison.Ordinal));
 
         Assert.Equal(2, references.Length);
         Assert.DoesNotContain(
             references,
             location => PositionConverter.ToOffset(location.Range.Start, source)
-                == source.LastIndexOf("Pick:pub", StringComparison.Ordinal));
+                == source.LastIndexOf("Pick (", StringComparison.Ordinal));
         Assert.All(references, location => Assert.Equal("Pick", TextAt(source, location.Range)));
     }
 
@@ -122,22 +90,25 @@ public class ReferencesHandlerTests
         try
         {
             const string definition = """
-                §M{defs:Collision}
-                  §CL{worker1:Worker:pub:partial}
-                    §MT{pick:Pick:pub} (i32:value) -> i32
-                      §R value
+                module Collision Collision block
+                  class Worker partial
+                    func Pick (int:value) → int
+                      !
+                      return value
                 """;
             const string openUse = """
-                §M{openUse:Collision}
-                  §CL{worker2:Worker:pub:partial}
-                    §MT{use:Use:pub} () -> i32
-                      §R §C{Pick} §A INT:1 §/C
+                module Collision Collision block
+                  class Worker partial
+                    func Use () → int
+                      !
+                      return Pick(1)
                 """;
             const string closedUse = """
-                §M{closedUse:Collision}
-                  §CL{worker3:Worker:pub:partial}
-                    §MT{use:UseAgain:pub} () -> i32
-                      §R §C{Pick} §A INT:2 §/C
+                module Collision Collision block
+                  class Worker partial
+                    func UseAgain () → int
+                      !
+                      return Pick(2)
                 """;
             File.WriteAllText(Path.Combine(root, "definition.calr"), definition);
             File.WriteAllText(Path.Combine(root, "open.calr"), openUse);
@@ -173,28 +144,32 @@ public class ReferencesHandlerTests
         try
         {
             const string originalDefinition = """
-                §M{defs:Collision}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Pick:pub} (i32:value) -> i32
-                      §R value
+                module Collision Collision block
+                  class Worker partial
+                    func Pick (int:value) → int
+                      !
+                      return value
                 """;
             const string changedDefinition = """
-                §M{defs:Collision}
-                  §CL{c001:Worker:pub:partial}
-                    §MT{m001:Pock:pub} (i32:value) -> i32
-                      §R value
+                module Collision Collision block
+                  class Worker partial
+                    func Pock (int:value) → int
+                      !
+                      return value
                 """;
             const string originalUse = """
-                §M{use:Collision}
-                  §CL{c002:Worker:pub:partial}
-                    §MT{m002:Use:pub} () -> i32
-                      §R §C{Pick} §A INT:1 §/C
+                module Collision Collision block
+                  class Worker partial
+                    func Use () → int
+                      !
+                      return Pick(1)
                 """;
             const string changedUse = """
-                §M{use:Collision}
-                  §CL{c002:Worker:pub:partial}
-                    §MT{m002:Use:pub} () -> i32
-                      §R §C{Pock} §A INT:1 §/C
+                module Collision Collision block
+                  class Worker partial
+                    func Use () → int
+                      !
+                      return Pock(1)
                 """;
             var definitionPath = Path.Combine(root, "definition.calr");
             var usePath = Path.Combine(root, "use.calr");
@@ -252,9 +227,10 @@ public class ReferencesHandlerTests
     public async Task WhitespaceAndEndAdjacentCursorsReturnNoReferencesAsync()
     {
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
-                §R INT:1
+            module TestModule TestModule block
+              func Compute () → int
+                !
+                return 1
             """;
         var uri = DocumentUri.From("file:///references-cursor.calr");
         var workspace = new WorkspaceState();

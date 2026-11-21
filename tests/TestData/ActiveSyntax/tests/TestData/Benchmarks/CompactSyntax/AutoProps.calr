@@ -1,0 +1,13 @@
+module AutoProps AutoProps
+  module AutoPropsModule
+    func GetX public (int:x) → int
+      !
+      return x
+
+    func GetY public (int:y) → int
+      !
+      return y
+
+    func Sum public (int:x, int:y) → int
+      !
+      return x + y

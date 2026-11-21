@@ -4,6 +4,304 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Framework manifests no longer treat code they cannot see as harmless.** A framework member that runs your code is charged `unknown`. Examples: resolving a DI service (`GetService`, `GetRequiredService`), reading `IOptions<T>.Value`, building or starting a host, MediatR `Send`, AutoMapper `IMapper.Map`, FluentValidation `Validate` and Polly `Execute`. The framework and ecosystem manifests have no namespace-wide defaults any more, so a member they do not list is `unknown`. `DbContext.Add`, `Attach` and `Update` are now `mut, db:rw`, because tracking an entity can run a key generator that reads a database sequence. Declare `! unknown`, or move the call behind a function whose row you state.
+- **Indexing anything but an array runs its indexer's effects.** Before 0.30 every element access was free. Now `config["key"]` is `env:r`, and a source class's indexer is charged its getter's or setter's row. `List`, `Dictionary` and `string` indexers (including `s[^1]` and `s[a..b]`) stay pure. An indexer the compiler cannot select, or one with no effect contract (for example on `IReadOnlyList<T>`, `Span<T>` or a generic `T`), is `unknown`.
+- **Assemblies passed with `-r` now reach name binding.** Their types resolve in the binder, so the Tier B framework manifests (effect contracts for ASP.NET Core, EF Core, logging and similar libraries) apply to calls on them, from the CLI and from MSBuild alike. Before, those calls were `unknown` even with the reference.
+- **Every step of a dotted chain is effect-checked.** A chain that starts at a type charges each member it reads: `DateTime.Now.Year` needs `time`, and `Outer.Inner.Instance.Size` needs the `alloc` of `Inner`'s static initializer. A dotted name the compiler cannot resolve is charged `unknown` instead of being treated as pure. A match case's `when` guard and a property pattern such as `{ Balance: > 0 }` are now checked too, so a pure (`!`) function can no longer call `Console.ReadLine()` from a guard or read an effectful getter in a pattern. Field reads in patterns stay pure, and reading a source constant through its type (`Holder.Max`) no longer charges the type's static initialization.
+- **Implicit numeric narrowing is a type error.** The type checker rejects the implicit numeric conversions C# rejects, such as `double` to `float`, `long` to `int`, `double` to `int`, `decimal` to or from `double`, and an integer constant that does not fit (`let byte:b = 300`). It reports `Calor0202` at the Calor expression, in bindings, returns, assignments, same-module call arguments and class members. Before, these failed only when the generated C# was compiled (CS0266), or showed up as a confusing `Calor0410`. Widening (`int` to `long`, `float` to `double`), constants that fit and `1.5f` literals still work.
+- **`System.Convert` methods that can run your code are charged `unknown`.** This covers `ToString(object)`, `ToInt32(object)` and the other `ToX(object)` overloads, `ChangeType`, `IsDBNull`, `GetTypeCode`, and the overloads that take an `IFormatProvider`. A function declared pure (`!`) that calls one now reports `Calor0410`. Declare `! unknown`, or convert from a primitive: `Convert.ToString(42)` and the other primitive overloads stay pure. Effect manifests may now use the code `"unknown"` for such members.
+- **Syntax help leads with complete examples.** MCP `calor_help` treats `query`
+  and `feature` as aliases and returns at most two relevant programs from the
+  compiler-checked teaching reference, rather than prose sections. Topics with
+  no executable example say so. Use `overview` for the summary, `reference` for
+  the full reference, and `action=features` for conversion capabilities.
+- **The `http` effect code is removed.** HTTP operations continue to use the
+  existing `net`, `net:r`, `net:w` and `net:rw` codes. Source declarations and
+  effect manifests reject `http`; network effect coverage is unchanged.
+- **Default C# migration preserves instead of refusing.** Failed native conversion
+  falls back to member, type or whole-file C# preservation. This reverses the
+  previous all-or-nothing contract: one failed input no longer blocks valid
+  siblings, and project validation failures do not discard exact original output.
+  The destructive `--lossy` and `--select-active-preprocessor-branch-lossy` options
+  are removed. Invalid input and write failures remain errors.
+- **Section markers have one spelling.** Use `§W`, `§EN`, `§WHERE`, `§PUSH`
+  and `§WHEN`. The aliases `§SW`, `§ENUM`, `§WR`, `§ADD` and lowercase `§when`
+  now produce errors that name the canonical marker. `§/SW` and `§/ENUM` are
+  also rejected; end these blocks by dedenting.
+- **Text diagnostics use `file:line:col code message`.** Each diagnostic stays
+  on one line. Warnings and informational messages keep their severity labels.
+  Common verbose messages have short summaries; MCP `calor_help` explains them
+  by code. JSON and SARIF retain full messages and verification details.
+- **Automatic fixes no longer guess intent.** MCP `calor_check` and
+  `calor_compile` apply only patches marked `isSafeToApply`. Fuzzy matches,
+  inferred contract changes and ambiguous indentation remain suggestions.
+  Explicit `calor format --heal` remains available for reviewed heuristic repair.
+- **`--explicit-call-closers` is removed.** The `calor convert` and `calor migrate`
+  option and the MCP `explicitCallClosers` argument chose between two spellings of
+  the retired `§C` call form. Native calls are always written `name(args)`, so the
+  option had no effect. Remove it from scripts: the CLI now rejects it as unknown.
+- **Static members are charged their type's initialization.** C# runs a static
+  constructor before any static member of its type is used. Calor now checks that:
+  a static method, operator or static property of a class with a static constructor
+  (`ctor stat`) must cover that constructor's effects in its own row. The check
+  sits on the member, not on each call, because method groups and delegates have
+  no call site to charge. Three more reads are charged the type's static
+  initialization: a static field read by its bare name inside its own class (as
+  `Type.Field` already was), a static auto-property, and a static field declared in
+  preserved raw C# (charged `unknown` when its initializer cannot be analyzed).
+  Programs that left these effects out now fail with `Calor0410`.
+
+### Added
+
+- **Constructors can declare an effect row.** A constructor body may always
+  initialize (`mut`, `alloc`). Before, anything else, such as printing, throwing or
+  calling an API with no effect contract, was the error `Calor0422`, and C#
+  conversion kept the whole file as C#. A constructor can now write a row after its
+  header, for example `! throw` or `! unknown`, and the converter writes it for you.
+  Code that calls `new` is still charged what the constructor body really does.
+  Static field initializers use the type's own row, described below.
+- **Property accessors and static initializers can declare an effect row.** Write
+  the row on its own line under `get`, `set` or `init`, for example `! throw`. For a
+  type's static field initializers, write an `!` line directly under `class Name`,
+  before the first member. Without a row, an accessor body may only mutate and
+  allocate (`Calor0423`), and so may static initializers (`Calor0422`); both messages
+  now say where the row goes. Code that reads the property, or first touches the
+  type, is charged the row. Calor does not generate a static constructor for the
+  type row, so C# `beforefieldinit` timing does not change. `calor convert` writes
+  these rows (`! unknown` when it cannot tell) instead of keeping the whole file as
+  C#. Event `add`/`remove` accessors still have no row.
+- **Effect manifests can describe fields.** A new `fields` table gives a contract to
+  one exact field, consulted only when the code reads that field, never for a
+  getter of the same name. `System.String.Empty` is now pure, so
+  `return string.Empty` needs no row. Fields without an entry, such as
+  `EventArgs.Empty`, are still charged `unknown`.
+- **Functions can declare `! unknown`.** A function or method may write
+  `! unknown` as its own effect row when it calls an API with no effect contract.
+  Calls in its body are accepted, and every caller is charged `unknown`, so a
+  caller that claims `!` (pure) or known effects still fails with `Calor0410`.
+  Before, `! unknown` was allowed only on callback and delegate types.
+  `calor convert` now writes this row instead of preserving the whole file as C#:
+  on the 100-file conversion scorecard, one more file converts natively, and all
+  84 native outputs compile with default settings.
+
+- **`nullable oblivious` modules accept oblivious values at non-null boundaries.**
+  An oblivious value is one with no nullability information, like C# code compiled
+  with nullable annotations disabled. Inside a module that declares
+  `nullable oblivious`, such a value can now be passed to a non-null parameter
+  (`dict.ContainsKey(name)`), used as a receiver (`text.Length`) or returned without
+  `Calor0274`, as C# allows. Explicit `?T` values, `null` literals and locals the
+  module may have set to null are still rejected. Other modules are unchanged.
+  `calor convert` emits this header for nullable-disabled C#, so 8 more of the 106
+  scorecard inputs now convert natively: 101 in total, all compiling with default
+  settings (0.29.0: 100 native, 91 of them compiling with default settings).
+
+- **`calor check` builds, tests and verifies one snapshot.** The matching MCP
+  call is `calor_check` with `action: "loop"`. Both return only failures, keeping
+  diagnostic fixes, proof assumptions and counterexamples. Missing tests,
+  inconclusive contracts and timeouts are not success. Tests run with your
+  permissions; this is not a sandbox.
+- **`calor fix --apply` applies safe diagnostic patches.** It accepts a file or
+  directory, supports read-only previews, preserves source encoding, and rejects
+  invalid, overlapping or stale edits. It rechecks patched source and reports
+  remaining errors rather than claiming success.
+- **Clean builds print one status line**, including multi-file and cached builds.
+  Verbose mode still reports per-file progress.
+
+Diagnostic token budgets and before/after iterations-to-green are not measured
+yet. They require the selected Anthropic Claude Opus 5.5 measurement setup;
+no substitute tokenizer or estimated result is reported here.
+
+### Fixed
+
+- `dotnet build` is incremental again for projects with several `.calr` files. Since 0.30's cross-module binding, any edit recompiled every file. The MSBuild task now makes the same skip decision as `calor --cache` and `calor watch`: it recompiles the edited file and every file whose generated C# names another module's declarations, and skips files proven independent. Modules with a namespace header (`module Alpha Alpha block`) can be skipped too; two modules that share a namespace share a partial class, so neither is skipped when the other changes. (#1732)
+- Calls to your own overloaded functions follow C#'s rules for nullable value types (`int` to `int?`, `int` to `long?`) and for constants: a `const int` equal to 1 is accepted by a `byte` parameter. When several overloads apply, Calor picks the one C# picks; when it cannot tell, it leaves the call unresolved and charges its effects `unknown`, never a guess. For conversions Calor does not model itself (boxing to an interface, a user-defined conversion, a user type under `?`), it uses the overload C# selects in the generated code; before, it could check `B(object)` where C# calls `B(FormattableString)` for an interpolated string. Before, `F(C)` with `F(byte)` and `F(long)` could be effect-checked against the wrong overload. A converted C# `const int` local keeps its constant conversions.
+- In a struct's own method, a compound update of one of its fields (`Value += 1`, `Count++`) converts to native Calor instead of raw C#.
+- A type declared in both arms of `#if`/`#else` resolves its own members by its own name, so a record in such a file no longer raises `Calor0422` and converts natively.
+- `calor migrate` with partial-class merging no longer fails when the merged files have no namespace.
+- An inherited precondition that reads native `s.Length` on a `string` gets the "Assumed, not proven" warning (`Calor0819`, naming the string-model assumption) instead of a false `Calor0810` error. Comparing a `string?` parameter with a string literal in an inherited precondition no longer crashes the compiler.
+- `x.Field` means the same as `x . Field`. When the first name is a local, parameter, field or property in scope, or a class of the module followed by one of its members, the parser reads the unspaced form as member access, as C# name lookup does. It gets the same types, effect checks, null checks, contracts and generated C#. A local shadows a type of the same name; `Math.PI` and enum members keep their meaning. `calor convert` and `calor format` print member access without spaces; a longer chain on a type prints as `(Console.Out).NewLine` so its effects are still checked.
+- `calor query`: a call to a .NET library member, such as `Console.WriteLine(s)`, no longer marks the caller's `callees`, `effects` and `impact` answers as partial. Calls that could still reach your own code stay partial: a delegate or computed-value call such as `Pick()(1)`, a receiver that did not bind, or an overridable library member like `o.ToString()`. A computed-value call used to be left out of the index silently.
+- The binder read the C# keyword `float` as double precision. `Scale(1.5f)` against a `float` parameter no longer reports `Calor0208`.
+- Calling `ToString`, `Equals`, `GetHashCode` or `GetType` on a value of one of your interface types no longer fails with `Calor0208`. Their effects are `unknown`, because the runtime type may override them.
+- Calling a sibling module's function by its qualified name with a callback argument, such as `Lib.RunTwice(next)`, no longer marks the caller's effects as assumed (`Calor0419`). The callback is checked against the callee's declared row, as for a bare-name call.
+- Diagnostics and editor hover spell types the way you write them in 0.30: `int`, `string`, `double`, `long`, and `string?` for nullables, not the retired `i32`, `str`, `f64` or the prefix `?string`. `Calor0254` suggests `string[]` instead of `[str]`.
+- C# to Calor conversion no longer drops inactive `#if` branches when it keeps a whole file as C#. FluentValidation's `#if SYNC_ONLY` code, which a source generator reads, survives again.
+- The converter no longer writes C# that fails to compile: lambda arguments stay inline instead of in untyped temporaries (CS8917); `this(...)`/`base(...)` arguments are not hoisted; `x is not IDisposable` stays a type test; `?.Invoke` no longer adds `.Value` on delegates. A target-typed `new(...)` whose type the converter cannot see is kept as C#; it used to become `default`, which is null for a class.
+- Calor's printer no longer writes the retired `§CS{}` marker, and writes `this.X` and `f().X` without spaces.
+- `calor` compiles start about 20% faster: the CLI warms up Roslyn (the C# compiler library Calor uses to look up .NET types) in the background while it reads the command line and parses your file. The tool also runs with .NET's tiered PGO (profile-guided optimization) off, which shortens short runs; long-running `calor` processes may be slightly slower once warm. Output is unchanged.
+- The C# interoperability guide again says that it covers converter support introduced in 0.25.
+- **Signature help works on native calls.** The language server looked for the
+  retired `§C{name}` call form, so it never showed parameter hints in 0.30 code. It
+  now finds the `name(` call around the cursor, skips strings and comments, and
+  highlights the argument the cursor is in. Typing `(` or `,` triggers it.
+- **C# conversion no longer writes `§ASSIGN` for a compound assignment it could not
+  analyze.** When the converter has no semantic model for a statement such as
+  `x += y`, it now writes the native `set x (x + y)`.
+- **More compound assignments convert natively.** `a[i] += v`, `s.X += 1` and
+  `arr[n] *= 3` were kept as raw C# whenever the target was not a plain local or
+  field. They now become `set a[i] (a[i] + v)` when the receiver and index have no
+  side effects, because both forms then evaluate them before the right-hand side.
+  Targets with calls in them still stay C#.
+- **The conversion library handles namespace-local `using` like `calor convert`.**
+  `CSharpToCalorConverter.Convert` kept any file whose single namespace had its own
+  `using` directives as whole-file C#. It now uses the same scoped-import path as
+  the CLI and falls back to whole-file C# only when that path cannot certify the
+  file. The conversion scorecard is back to 100 of 100 snippets (it was 86).
+- **Effects of qualified calls to another module are charged again.** In a
+  multi-file project, a call such as `OrderService.SaveOrder()` lost its receiver in
+  three places: cross-module enforcement through the library API, the cross-module
+  effect registry, and the project index (used by `calor query` and rename). Its
+  effects were never charged, so a caller declaring `!` could pass while the callee
+  wrote to a database. The CLI build was not affected. `calor effects suggest` also
+  printed `<expression>` for these receivers and suggested nothing. It now names the
+  receiver as written and expands short type names such as `Console`.
+- **Contracts that use `Substring` verify again.** Every native `s.Substring(...)`
+  in a contract body came back "unsupported", and so did any body-local string
+  binding. Z3 now checks them as it did for the retired `(substr s a b)` form, with
+  the same UTF-16 length and range rules.
+- **Multi-file builds charge calls between modules precisely again.** Each file is
+  checked against copies of the other modules, and those copies did not qualify calls
+  into a third module. The copy failed to compile, so `a + b` and every module call in
+  the file were charged `unknown`, and a project where one module calls another
+  failed under `!`. The copies now qualify those calls the same way the real build does.
+- **Effect errors no longer hide contract type errors.** A precondition that is not a
+  `bool`, such as `requires Count(x)` where `Count` returns `int`, is now reported
+  even when the same function also has an effect error.
+- **Static field initializers convert natively in more cases.** An implicit static
+  initializer has no effect row, so anything charged `unknown` in it is the error
+  `Calor0422`, and C# conversion kept the whole file as C#. The effect checker now
+  resolves object and collection initializers (`new Point { X = 1 }`), field updates
+  (`++Counter.N`, charged `mut`), and lambdas or method groups (charged `alloc` plus
+  what the target does). Effects beyond `mut` and `alloc` are still rejected.
+  When a field initializer must stay C#, fields still initialize in source order.
+- **More C# converts natively.** These were kept as C#:
+  - a constructor holding one raw C# statement, such as `E += H;`. It now declares
+    `! unknown` and the rest of the file converts.
+  - `value?.Length ?? 0`, and `s.X += f()` on a struct local or by-value parameter.
+  - `int[] a = { Set(out var n) }`. The lowered `n` now starts as `null`.
+  - files that call a referenced assembly or import a namespace from another project
+    file. The converter now checks the generated C# with the project's references
+    and sibling files.
+  - a class in a file converted with a custom module name. Only the failing type is
+    now kept as C#.
+- **The converter parses its own two-word accessor visibility.** Properties with
+  `set protected internal` or `get private protected` failed parse validation.
+- **Generated C# imports `System.Linq` for native member calls** such as
+  `items.Any(...)`. Before, Roslyn rejected the output with CS1061.
+- **A `using` on the last line of a file with no trailing newline** no longer
+  reports `Calor0100`.
+- **Nullability fix hints use the current spelling.** `Calor0272`–`Calor0274`
+  suggest `string?` instead of the removed `?string`.
+- **Inferred lambda parameters keep the element's nullability.** In
+  `values.Select((value) ! => value.Length)` over `IEnumerable<string>`, `value` is
+  now non-null, so `Calor0274` no longer fires. It still fires for `string?` elements.
+- **`calor_help` no longer matches on a single shared word.** A query such as
+  `unknown_feature_xyz` used to return the `! unknown` effect row.
+- **`calor index` and `calor query` skip the contract `result` placeholder.** It was
+  listed as a parameter of every function, so a query for a symbol named `result`
+  was ambiguous.
+- **Editor fixes.** Go-to-definition and find-references work on the method name in a
+  native member call such as `worker.Pick(1)`. In a module with a namespace, using a
+  function as a value (`let x = Helper`) reports `Calor0202` with a quick fix to call
+  it, instead of "Undefined variable".
+- **Effects docs describe `Calor0417` correctly.** It fires for an exported `internal`
+  function with no row. A `public` function without a row is the error `Calor0124`.
+- **Multi-file builds and project indexing attach declaration identities once per
+  project.** Declaration identities are the stable IDs that `calor ids` stores for
+  refactoring tools. Attaching them used to re-parse every registered source once per
+  file, so the cost grew with the square of the file count. On a 106-file project that
+  step drops from about 15 s to 0.3 s.
+- **Binding time is linear in module size again.** A 50-function module binds in
+  about 90 ms instead of 20 s. Binding had started building a full C# compilation even
+  when every parameter had a scalar type. Three lookups were also quadratic: finding the
+  Calor expression behind each C# operation, finding source types on every variable
+  reference, and naming for-loop temporaries. Indexing a 106-file project drops from
+  about 48 s to 26 s; 0.29 took under a second, so that work continues. No diagnostics
+  or effect results change.
+- **Project indexing scales with project size again.** Each module used to compile
+  its own C# image of the whole project, so `calor index build`, `calor query` and
+  multi-file builds slowed down with the square of the file count. One image per
+  build is now shared, and each module's effect summary is built once. On a
+  106-file project the index build drops from about 24 s to about 4 s with
+  identical output.
+- **One C# error no longer hides operator proofs in other functions.** Calor
+  proves the effects of `+` and other operators on the generated C#. One error
+  anywhere in a module used to void every proof, so a single ill-typed function
+  (for example one returning a `double` from a `float` function) gave every other
+  function a false `Calor0410` and hid the real C# error. An error inside one
+  function's body now voids only that function's proofs. Errors in signatures,
+  initializers or parsing still void the whole module.
+- **`x.Field` binds like `x . Field`.** When `x` is a variable, the unspaced form
+  now reads the member for nullable and non-nullable user classes, including
+  chains such as `x.Next.Value`. Before, it reported "Undefined variable" and a
+  false `Calor0900` under `--analyze`.
+- **`new object()` needs only `alloc`.** Constructor effects are now looked up by
+  the CLR type name (`System.Object`, ``System.Lazy`1``), so keyword spellings and
+  generic types reach their manifest entries. Messages about constructors with no
+  contract print that name.
+- **Paid evaluation cost estimates account for prompt caching.** Claude cache
+  reads no longer reduce the separate uncached-input charge, and five-minute
+  cache writes include their surcharge. Reported input totals include cached
+  tokens. Reusing a local saved response incurs no new API cost. These estimates
+  are not provider invoices. Models without configured prices are rejected
+  before a paid request instead of using a guessed fallback price.
+- **Task-run preflight estimates use the selected model and full prompts.**
+  They include system instructions and match generation's local-cache keys.
+  Category estimates exclude saved responses, just like the total. Estimates
+  remain approximate, not a hard spending cap.
+- **Declaration identity uses less memory.** Symbol IDs share their prefixes,
+  and source fingerprints stream into the hash instead of building large
+  intermediate strings. Serialized IDs and fingerprint values stay unchanged.
+- **C# conversion preserves indexer parameters and generic array element types.**
+  Both cases now survive the full C# → Calor → C# pipeline. Record declarations
+  still use preserved C#, not native conversion.
+- **Pure scalar local self-recursion converts through existing lambdas.**
+  Conversion declares and initializes a typed mutable delegate at the original
+  declaration. It proves the complete body uses only built-in scalar operations
+  and direct self-calls, preserving overflow behavior. Captures, mutual recursion
+  and other unproved shapes remain preserved C#; no new syntax is introduced.
+- **Generic member references map Calor type aliases correctly.**
+  `ImmutableDictionary<str, i32>.Empty` now emits
+  `ImmutableDictionary<string, int>.Empty`. Namespace, member and generic-method
+  names stay unchanged. Strict effect checks still apply.
+- **Built-in C# unary `+` converts natively.** Numeric promotion uses a cast,
+  preserving nullable lifting and one evaluation of the operand. User-defined,
+  dynamic and unresolved operators remain preserved as C#.
+- **Generic C# `ref T` methods convert natively.** Calls pass the caller's storage,
+  including aliased variables and array elements, rather than a copy. Generic
+  `out`/`in` and nullable-type-parameter `ref T?` declarations remain preserved.
+- **Whole-file namespace preservation keeps the original C# compilation unit.**
+  It no longer adds a generated preamble, and passthrough payloads ending with a
+  newline no longer acquire indentation before their terminator. EOF line
+  comments, including delimiter text, survive without an injected newline.
+  UTF-8 BOMs and CRLF line endings are retained. UTF-16 and UTF-32 inputs retain
+  source text but generate UTF-8; their original encoding and bytes are not retained.
+
+### Test and CI health
+
+- **`dotnet build` recompiles every Calor file after any edit.** Since each file's
+  content became part of the cross-module fingerprint, the MSBuild task can no
+  longer prove that an unedited file is unaffected. Results are correct; builds are
+  less incremental than in 0.29. `calor build` still skips files it can prove
+  independent, but only modules without a namespace header. Restoring incremental
+  MSBuild builds is tracked as follow-up work.
+- **The null-dereference benchmark seeds its bugs on a user class.** Since 0.30,
+  dereferencing a `string?` without a check is the hard error `Calor0274`, which
+  stops compilation before bug-pattern analysis runs. The benchmark keeps its 3
+  seeded bugs and 5 safe controls, now on a user-defined nullable class.
+- **Corpus tests count refused files.** The corpus measurements now pin, by name
+  and cause, the 160 of 364 corpus files that the strict conversion legs refuse,
+  instead of skipping them silently.
+
+- **Default migration has a separate corpus report.** CI reports failed,
+  converted-but-blocked, written and fully native written files for pinned
+  MediatR, Serilog and FluentValidation source copies. Build and test results
+  remain separate; writing a file is not reported as proof that it builds.
+  The report fails CI if any discovered file is not written, after saving the
+  complete per-project results.
+
 ## [0.29.0] - 2026-10-29
 
 Calor 0.29 fixes nullable-reference and shift analysis, receiver taint tracking, and

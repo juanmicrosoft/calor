@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Calor.Evaluation.Core;
 using Calor.Evaluation.LlmTasks;
 using Calor.Evaluation.LlmTasks.Caching;
@@ -116,14 +117,11 @@ public class CorrectnessCalculator : IMetricCalculator
             ["calorFactors"] = new Dictionary<string, object>
             {
                 ["compiles"] = context.CalorCompilation.Success,
-                ["hasPreconditions"] = source.Contains("§Q") || source.Contains("§REQ"),
-                ["hasPostconditions"] = source.Contains("§S ") || source.Contains("§S(") ||
-                                       source.Contains("§ENS"),
-                ["hasOptionHandling"] = source.Contains("Option<") || source.Contains("§SM") ||
-                                        source.Contains("§NN") || source.Contains("is_some") ||
-                                        source.Contains("is_none") || source.Contains("unwrap_or"),
+                ["hasPreconditions"] = CalorSyntax.Requires.IsMatch(source),
+                ["hasPostconditions"] = CalorSyntax.Ensures.IsMatch(source),
+                ["hasOptionHandling"] = HasOptionHandling(source),
                 ["hasBoundsChecks"] = HasCalorBoundsChecks(source),
-                ["hasConditionalReturns"] = source.Contains("→ §R") || source.Contains("§EL"),
+                ["hasConditionalReturns"] = HasConditionalReturns(source),
                 ["hasAnalysisSignal"] = context.CalorCompilation.EdgeCaseCoverage?.CoverageScore > 0
             },
             ["csharpFactors"] = new Dictionary<string, object>
@@ -157,25 +155,23 @@ public class CorrectnessCalculator : IMetricCalculator
         var source = context.CalorSource;
 
         // Preconditions indicate input validation
-        if (source.Contains("§Q") || source.Contains("§REQ"))
+        if (CalorSyntax.Requires.IsMatch(source))
             score += 0.15;
 
         // Postconditions indicate output validation
-        // Use "§S " (with trailing space) to avoid matching §SM, §SB, §SET, etc.
-        if (source.Contains("§S ") || source.Contains("§S(") || source.Contains("§ENS"))
+        if (CalorSyntax.Ensures.IsMatch(source))
             score += 0.10;
 
         // Option type handling (Calor uses Option<T>/Some/None, not null)
-        if (source.Contains("Option<") || source.Contains("§SM") || source.Contains("§NN") ||
-            source.Contains("is_some") || source.Contains("is_none") || source.Contains("unwrap_or"))
+        if (HasOptionHandling(source))
             score += 0.10;
 
         // Bounds checking — support both infix (>=, <) and lisp-style ((<=, (>=, (==)
         if (HasCalorBoundsChecks(source))
             score += 0.10;
 
-        // Edge case returns — conditional returns (→ §R) and else branches (§EL)
-        if (source.Contains("→ §R") || source.Contains("§EL"))
+        // Edge case returns — a return inside a conditional, or an else branch
+        if (HasConditionalReturns(source))
             score += 0.05;
 
         // Analysis signal — AST analyzer detected defensive programming patterns
@@ -200,6 +196,18 @@ public class CorrectnessCalculator : IMetricCalculator
 
         return false;
     }
+
+    private static bool HasOptionHandling(string source) =>
+        source.Contains("Option<") || source.Contains("Some(") || source.Contains("is_some") ||
+        source.Contains("is_none") || source.Contains("unwrap_or");
+
+    // A return directly under an `if`, or any else / else-if branch.
+    private static readonly Regex ReturnUnderIf = new(@"^([ \t]*)if\b[^\n]*\n\1[ \t]+return\b",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    private static bool HasConditionalReturns(string source) =>
+        CalorSyntax.Else.IsMatch(source) || CalorSyntax.ElseIf.IsMatch(source) ||
+        ReturnUnderIf.IsMatch(source.Replace("\r\n", "\n"));
 
     private static double EstimateCSharpCorrectnessScore(EvaluationContext context)
     {

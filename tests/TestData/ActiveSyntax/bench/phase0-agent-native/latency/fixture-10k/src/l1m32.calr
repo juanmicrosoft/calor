@@ -1,0 +1,108 @@
+module L1M32 L1M32 block
+  module L1M32Module public
+
+    func l1m32_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21666)
+      let int:total = ((x * 5) + y)
+      if (total > 21666)
+        return 21666
+      return total
+
+    func l1m32_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M06.L2M06Module.l2m06_fn06(x, 23)
+      return (v1 + y)
+
+    func l1m32_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M33.L2M33Module.l2m33_fn08(x, 72)
+      return (v1 + y)
+
+    func l1m32_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 1)
+      requires (y >= 0)
+      => (result >= 21673)
+      let int:total = ((x * 3) + y)
+      if (total < 21673)
+        return 21673
+      else
+        return total
+
+    func l1m32_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M15.L2M15Module.l2m15_fn11(x, 65)
+      return (v1 + y)
+
+    func l1m32_fn06 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21680)
+      if (x >= 21680)
+        return x
+      else
+        return 21680
+
+    func l1m32_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M09.L2M09Module.l2m09_fn02(x, 8)
+      let int:v2 = L2M10.L2M10Module.l2m10_fn02(x, 31)
+      return ((v1 + v2) + y)
+
+    func l1m32_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 6)
+      => (x >= 7)
+      let int:acc = ((x * 5) + y)
+      if (acc > 21687)
+        return (acc + 21687)
+      else
+        return ((acc * 2) + 21687)
+
+    func l1m32_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21694)
+      if (x >= 21694)
+        return x
+      else
+        return 21694
+
+    func l1m32_fn10 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 21701)
+        return (acc + 21701)
+      else
+        return ((acc * 2) + 21701)
+
+    func l1m32_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21708)
+      let int:total = ((x * 5) + y)
+      if (total > 21708)
+        return 21708
+      return total
+
+    func l1m32_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M09.L2M09Module.l2m09_fn06(x, 7)
+      let int:v2 = L2M10.L2M10Module.l2m10_fn02(x, 38)
+      return ((v1 + v2) + y)
+
+    func l1m32_fn13 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21715)
+      if (x >= 21715)
+        return x
+      else
+        return 21715

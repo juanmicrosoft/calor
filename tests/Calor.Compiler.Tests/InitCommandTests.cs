@@ -18,6 +18,22 @@ public class InitCommandTests : IDisposable
     private ClaudeInitializer CreateInitializer() =>
         new() { ClaudeJsonPathOverride = _claudeJsonPath };
 
+    [Theory]
+    [InlineData("codex", new[] { "AGENTS.md", ".codex/config.toml", ".codex/hooks.json" })]
+    [InlineData("gemini", new[] { "GEMINI.md", ".gemini/settings.json" })]
+    [InlineData("github", new[] { ".github/copilot-instructions.md", ".vscode/mcp.json" })]
+    public async Task Initializer_CreatesDocumentedArtifactsWithoutInstallingSkills(
+        string agent, string[] expectedPaths)
+    {
+        var result = await AiInitializerFactory.Create(agent).InitializeAsync(_testDirectory, force: false);
+        Assert.True(result.Success, string.Join("\n", result.Messages));
+        var expected = expectedPaths.Select(path => Path.Combine(_testDirectory, path)).ToArray();
+        Assert.Equal(expected.Order(StringComparer.Ordinal),
+            result.CreatedFiles.Concat(result.UpdatedFiles).Order(StringComparer.Ordinal));
+        Assert.All(expected, path => Assert.True(File.Exists(path), path));
+        Assert.Empty(Directory.EnumerateFiles(_testDirectory, "SKILL.md", SearchOption.AllDirectories));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_testDirectory))

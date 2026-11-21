@@ -1,39 +1,32 @@
-§M{m001:Collections}
-  §F{f001:Main:pub} () -> void
-    §E{cw,mut,alloc}
-    §C{Console.WriteLine} "=== Calor Collections Demo ==="
-    §C{Console.WriteLine} ""
-    §C{Console.WriteLine} "--- List Operations ---"
-    §LIST{numbers:i32}
-      10
-      20
-      30
-    §C{Console.WriteLine} "Created list: [10, 20, 30]"
-    §PUSH{numbers} 40
-    §C{Console.WriteLine} "After push(40): [10, 20, 30, 40]"
-    §INS{numbers} 0 5
-    §C{Console.WriteLine} "After insert(0, 5): [5, 10, 20, 30, 40]"
-    §SETIDX{numbers} 2 25
-    §C{Console.WriteLine} "After setIndex(2, 25): [5, 10, 25, 30, 40]"
-    §C{Console.WriteLine} ""
-    §C{Console.WriteLine} "--- Dictionary Operations ---"
-    §DICT{scores:str:i32}
-      §KV "Alice" 95
-      §KV "Bob" 87
-    §C{Console.WriteLine} "Created dict: {Alice: 95, Bob: 87}"
-    §PUT{scores} "Charlie" 92
-    §C{Console.WriteLine} "After put(Charlie, 92): {Alice: 95, Bob: 87, Charlie: 92}"
-    §PUT{scores} "Bob" 90
-    §C{Console.WriteLine} "After put(Bob, 90): {Alice: 95, Bob: 90, Charlie: 92}"
-    §C{Console.WriteLine} ""
-    §C{Console.WriteLine} "--- HashSet Operations ---"
-    §HSET{tags:str}
-      "important"
-      "urgent"
-    §C{Console.WriteLine} "Created set: {important, urgent}"
-    §PUSH{tags} "review"
-    §C{Console.WriteLine} "After add(review): {important, urgent, review}"
-    §REM{tags} "urgent"
-    §C{Console.WriteLine} "After remove(urgent): {important, review}"
-    §C{Console.WriteLine} ""
-    §C{Console.WriteLine} "=== Demo Complete ==="
+module Collections Collections
+  func Main public () → void
+    ! cw,mut,alloc
+    Console.WriteLine("=== Calor Collections Demo ===")
+    Console.WriteLine("")
+    Console.WriteLine("--- List Operations ---")
+    let numbers = new List<int> {10, 20, 30}
+    Console.WriteLine("Created list: [10, 20, 30]")
+    numbers.Add(40)
+    Console.WriteLine("After push(40): [10, 20, 30, 40]")
+    numbers.Insert(0, 5)
+    Console.WriteLine("After insert(0, 5): [5, 10, 20, 30, 40]")
+    set numbers[2] 25
+    Console.WriteLine("After setIndex(2, 25): [5, 10, 25, 30, 40]")
+    Console.WriteLine("")
+    Console.WriteLine("--- Dictionary Operations ---")
+    let scores = new Dictionary<string,int> {{"Alice", 95}, {"Bob", 87}}
+    Console.WriteLine("Created dict: {Alice: 95, Bob: 87}")
+    set scores["Charlie"] 92
+    Console.WriteLine("After put(Charlie, 92): {Alice: 95, Bob: 87, Charlie: 92}")
+    set scores["Bob"] 90
+    Console.WriteLine("After put(Bob, 90): {Alice: 95, Bob: 90, Charlie: 92}")
+    Console.WriteLine("")
+    Console.WriteLine("--- HashSet Operations ---")
+    let tags = new HashSet<string> {"important", "urgent"}
+    Console.WriteLine("Created set: {important, urgent}")
+    tags.Add("review")
+    Console.WriteLine("After add(review): {important, urgent, review}")
+    tags.Remove("urgent")
+    Console.WriteLine("After remove(urgent): {important, review}")
+    Console.WriteLine("")
+    Console.WriteLine("=== Demo Complete ===")

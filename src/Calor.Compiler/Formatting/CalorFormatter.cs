@@ -33,7 +33,13 @@ public sealed class CalorFormatter
     public string Format(ModuleNode module)
     {
         ArgumentNullException.ThrowIfNull(module);
-        return new CalorEmitter().Emit(module).TrimEnd('\r', '\n');
+        var emitted = new CalorEmitter().Emit(module);
+        var trimmed = emitted.TrimEnd('\r', '\n');
+        var payloadEnd = RawCSharpFrame.ReadTokens(emitted)
+            .Where(t => t.Value is RawCSharpFrame)
+            .Select(t => t.Span.End)
+            .DefaultIfEmpty(0).Max();
+        return emitted[..Math.Max(trimmed.Length, payloadEnd)];
     }
 
     /// <summary>
@@ -118,7 +124,11 @@ public sealed class CalorFormatter
             DeferGeneratedOutputValidation = true
         };
         var originalCompilation = Program.Compile(original, filePath, structuralOptions);
-        var formattedCompilation = Program.Compile(formatted, filePath, structuralOptions);
+        // Program.Compile is deterministic in its inputs, so text the formatter left unchanged
+        // (an already-canonical file) has the same compilation; it is not compiled twice.
+        var formattedCompilation = string.Equals(original, formatted, StringComparison.Ordinal)
+            ? originalCompilation
+            : Program.Compile(formatted, filePath, structuralOptions);
         if (originalCompilation.HasErrors != formattedCompilation.HasErrors)
         {
             return SourceValidationResult.Failed(
@@ -406,16 +416,84 @@ internal sealed class LosslessSourceDocument
     /// and is therefore removable by <see cref="Format"/>.
     /// </summary>
     internal static IReadOnlySet<int> GetTrimmableTrailingWhitespaceLines(string source)
+        => Parse(source).FindTrimmableTrailingWhitespaceLines(source, out _);
+
+    internal static DiagnosticBag DiagnoseTrailingWhitespace(string source, string filePath)
     {
         var document = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(filePath);
+        var lines = document.FindTrimmableTrailingWhitespaceLines(source, out var lexicalErrors);
+        if (lexicalErrors)
+            return diagnostics;
+        foreach (var lineNumber in lines.Order())
+        {
+            var line = document._lines[lineNumber - 1];
+            var trimmedLength = line.Content.TrimEnd(' ', '\t').Length;
+            diagnostics.ReportWarningWithFix(
+                new TextSpan(line.Start + trimmedLength, line.Content.Length - trimmedLength,
+                    lineNumber, trimmedLength + 1),
+                DiagnosticCode.LintTrailingWhitespace,
+                "Line has trailing whitespace",
+                new SuggestedFix("Remove trailing whitespace",
+                    TextEdit.Replace(filePath, lineNumber, trimmedLength + 1,
+                        lineNumber, line.Content.Length + 1, ""),
+                    isSafeToApply: true));
+        }
+        return diagnostics;
+    }
+
+    internal static DiagnosticBag DiagnoseCanonicalUsage(string source, string filePath, ModuleNode ast)
+    {
+        var document = Parse(source);
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(filePath);
+        foreach (var branch in IfStatementNode.GetCanonicalLiteralReturns(ast).Keys.OrderBy(node => node.Span.Start))
+        {
+            if (branch.ThenBody[0].Span.Line != branch.Span.Line + 1
+                || branch.ElseBody is not [ReturnStatementNode { Expression: { } last }]
+                || branch.Span.Line < 1 || last.Span.Line > document._lines.Length
+                || last.Span.End > source.Length)
+                continue;
+
+            var firstLine = document._lines[branch.Span.Line - 1];
+            var lastLine = document._lines[last.Span.Line - 1];
+            var header = firstLine.Content[(branch.Span.Column - 1)..];
+            if (!header.StartsWith("if ", StringComparison.Ordinal)
+                || document._lines.Skip(branch.Span.Line - 1)
+                    .Take(last.Span.Line - branch.Span.Line + 1)
+                    .Any(line => FindLineCommentStart(line.Content) >= 0))
+                continue;
+
+            var whenTrue = ((ReturnStatementNode)branch.ThenBody[0]).Expression!;
+            var replacement = $"return ({header[3..].Trim()}) ? "
+                + $"{source[whenTrue.Span.Start..whenTrue.Span.End]} : "
+                + source[last.Span.Start..last.Span.End];
+            // Keep later #line mappings identical to the validated input.
+            replacement += string.Concat(Enumerable.Repeat("\n", last.Span.Line - branch.Span.Line));
+            diagnostics.ReportWarningWithFix(
+                new TextSpan(branch.Span.Start, 2, branch.Span.Line, branch.Span.Column),
+                DiagnosticCode.LintConditionalReturn,
+                "Use a conditional expression for a literal return choice",
+                new SuggestedFix("Replace the two literal return branches with one conditional return",
+                    TextEdit.Replace(filePath, branch.Span.Line, branch.Span.Column,
+                        last.Span.Line, last.Span.End - lastLine.Start + 1, replacement),
+                    isSafeToApply: true));
+        }
+        return diagnostics;
+    }
+
+    private IReadOnlySet<int> FindTrimmableTrailingWhitespaceLines(string source, out bool lexicalErrors)
+    {
         var result = new HashSet<int>();
         var diagnostics = new DiagnosticBag();
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
-        var protections = document.GetLineProtections(tokens);
+        lexicalErrors = diagnostics.HasErrors;
+        var protections = GetLineProtections(tokens);
 
-        for (var i = 0; i < document._lines.Length; i++)
+        for (var i = 0; i < _lines.Length; i++)
         {
-            var content = document._lines[i].Content;
+            var content = _lines[i].Content;
             var trimmedStart = content.TrimStart(' ', '\t');
             var protectedTrailing = protections.TryGetValue(i + 1, out var protection)
                 && protection.Trailing;

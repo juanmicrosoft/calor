@@ -11,12 +11,10 @@ namespace Calor.Compiler.Tests;
 /// rollback used to copy both module-wide maps at every loop, which made
 /// binding quadratic in module size (Binding_MediumModule_Under500ms). It now
 /// undoes only what discovery added. These tests pin the observable result:
-/// the same symbol ids, in the same order, with no "duplicate:" suffixes.
+/// the same snapshot-local symbol ids, in the same order, without leaked discovery symbols.
 /// </summary>
 public sealed class LoopDiscoveryRollbackTests
 {
-    private const string Prefix = "calor://source/%3Cmemory%3E/module/m1/";
-
     private static BoundModule Bind(string source)
     {
         var diagnostics = new DiagnosticBag();
@@ -28,81 +26,58 @@ public sealed class LoopDiscoveryRollbackTests
         return bound;
     }
 
-    [Fact]
-    public void SymbolsById_KeepsDeclarationOrderAcrossLoopDiscovery()
+    private static string Snapshot(BoundModule module)
     {
-        var bound = Bind("""
-            §M{m1:Order}
-              §F{f1:Run:pub} (i32:n) -> i32
-                §B{~total:i32} 0
-                §L{l1:i:0:n:1}
-                  §B{step:i32} (+ i 1)
-                  §B{dup:i32} step
-                  §ASSIGN total (+ total step)
-                §WH{w1} (< total 10)
-                  §B{inner:i32} 1
-                  §ASSIGN total (+ total inner)
-                §B{after:i32} total
-                §R after
-              §F{f2:Other:pub} () -> i32
-                §B{x:i32} 1
-                §R x
-            """);
-
-        // Recorded from the binder before the rollback change (full-copy restore).
-        string[] expected =
-        [
-            "function/ast%3Af1/parameter/name%3An",
-            "function/ast%3Af1",
-            "function/ast%3Af2",
-            "function/ast%3Af1/local/name%3Atotal",
-            "function/ast%3Af1/for/name%3Ai",
-            "function/ast%3Af1/local/name%3Astep",
-            "function/ast%3Af1/local/name%3Adup",
-            "function/ast%3Af1/local/name%3Ainner",
-            "function/ast%3Af1/local/name%3Aafter",
-            "function/ast%3Af2/local/name%3Ax",
-        ];
-        Assert.Equal(
-            expected.Select(suffix => Prefix + suffix),
-            bound.SymbolsById.Keys.Select(id => id.Value));
+        var id = Assert.Single(module.SymbolsById, entry => entry.Value.Name == "total").Key.Value;
+        var snapshot = id.Split("/snapshot/", StringSplitOptions.None)[1].Split('/')[0];
+        Assert.Matches("^[A-F0-9]{64}$", snapshot);
+        return snapshot;
     }
+
+    private static string Local(string owner, string snapshot, string kind, string name, int start) =>
+        owner + "/snapshot/" + snapshot + "/" + kind + "/" + Uri.EscapeDataString("name:" +
+            System.Text.Json.JsonSerializer.Serialize(new { name, typeName = "int", Start = start }));
 
     [Fact]
     public void NestedLoops_DoNotLeakDiscoveryDeclarationIds()
     {
-        var bound = Bind("""
-            §M{m1:Nested}
-              §F{f1:Run:pub} (i32:n) -> i32
-                §B{~total:i32} 0
-                §L{l1:i:0:n:1}
-                  §B{a:i32} i
-                  §L{l2:j:0:n:1}
-                    §B{a2:i32} (+ a j)
-                    §ASSIGN total (+ total a2)
-                §L{l3:k:0:n:1}
-                  §B{a:i32} k
-                  §ASSIGN total (+ total a)
-                §R total
-            """);
+        const string source = """
+            module Nested Nested block
+              func Run (int:n) → int
+                !
+                var int:total = 0
+                for i from 0 to n step 1
+                  let int:a = i
+                  for j from 0 to n step 1
+                    let int:a2 = (a + j)
+                    set total (total + a2)
+                for k from 0 to n step 1
+                  let int:a = k
+                  set total (total + a)
+                return total
+            """;
+        var bound = Bind(source);
 
-        // Recorded from the binder before the rollback change. The second block
-        // local `a` legitimately takes duplicate ordinal 1; discovery of the
-        // three loop bodies must not consume any further ordinals.
+        // Distinct source offsets distinguish the two locals named `a`.
+        // Discovery must not register extra instances or duplicate suffixes.
+        var run = Assert.Single(bound.Functions).Symbol.Id.Value;
+        var snapshot = Snapshot(bound);
         string[] expected =
         [
-            "function/ast%3Af1/parameter/name%3An",
-            "function/ast%3Af1",
-            "function/ast%3Af1/local/name%3Atotal",
-            "function/ast%3Af1/for/name%3Ai",
-            "function/ast%3Af1/local/name%3Aa",
-            "function/ast%3Af1/for/name%3Aj",
-            "function/ast%3Af1/local/name%3Aa2",
-            "function/ast%3Af1/for/name%3Ak",
-            "function/ast%3Af1/local/name%3Aa/duplicate%3A1",
+            run + "/parameter/name%3An",
+            run,
+            // 0.30 binds the postcondition `result` pseudo-variable for every function.
+            run + "/snapshot/" + snapshot + "/contract-result/" + Uri.EscapeDataString("name:" +
+                System.Text.Json.JsonSerializer.Serialize(new { name = "result", typeName = "int", Start = 0 })),
+            Local(run, snapshot, "local", "total", source.IndexOf("total", StringComparison.Ordinal)),
+            Local(run, snapshot, "for", "i", source.IndexOf("i from", StringComparison.Ordinal)),
+            Local(run, snapshot, "local", "a", source.IndexOf("a = i", StringComparison.Ordinal)),
+            Local(run, snapshot, "for", "j", source.IndexOf("j from", StringComparison.Ordinal)),
+            Local(run, snapshot, "local", "a2", source.IndexOf("a2", StringComparison.Ordinal)),
+            Local(run, snapshot, "for", "k", source.IndexOf("k from", StringComparison.Ordinal)),
+            Local(run, snapshot, "local", "a", source.IndexOf("a = k", StringComparison.Ordinal)),
         ];
-        Assert.Equal(
-            expected.Select(suffix => Prefix + suffix),
-            bound.SymbolsById.Keys.Select(id => id.Value));
+        Assert.True(expected.SequenceEqual(bound.SymbolsById.Keys.Select(id => id.Value)),
+            string.Join("\n", bound.SymbolsById.Keys.Select(id => id.Value)));
     }
 }

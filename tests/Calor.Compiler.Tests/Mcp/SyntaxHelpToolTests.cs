@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler.Mcp.Tools;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Telemetry;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Channel;
@@ -35,6 +36,47 @@ public class SyntaxHelpToolTests
         Assert.Equal(JsonValueKind.Object, schema.ValueKind);
         Assert.True(schema.TryGetProperty("properties", out var props));
         Assert.True(props.TryGetProperty("feature", out _));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FeatureCatalog_PreservesCapabilitiesWithoutTeachingRetiredSpellings()
+    {
+        foreach (var feature in FeatureSupport.GetAllFeatures())
+        {
+            var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+                new { action = "features", feature = feature.Name }));
+            Assert.False(result.IsError);
+            using var json = JsonDocument.Parse(result.Content[0].Text!);
+            var report = json.RootElement;
+            Assert.Equal(feature.Name, report.GetProperty("feature").GetString());
+            Assert.Equal(feature.Support.ToString(), report.GetProperty("support").GetString());
+            Assert.Equal(feature.Description, report.TryGetProperty("description", out var description)
+                ? description.GetString() : null);
+            Assert.Equal(feature.Workaround, report.TryGetProperty("workaround", out var workaround)
+                ? workaround.GetString() : null);
+            Assert.Contains("converter-owned", report.GetProperty("guidance").GetString());
+            Assert.DoesNotContain('§', result.Content[0].Text!);
+        }
+
+        foreach (var level in Enum.GetValues<SupportLevel>())
+        {
+            var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+                new { action = "features", supportLevel = level.ToString() }));
+            Assert.False(result.IsError);
+            using var json = JsonDocument.Parse(result.Content[0].Text!);
+            Assert.Contains("not an authoring grammar", json.RootElement.GetProperty("guidance").GetString());
+            var actual = json.RootElement.GetProperty("features").EnumerateArray()
+                .Select(feature => feature.GetProperty("feature").GetString()).OrderBy(name => name);
+            Assert.Equal(FeatureSupport.GetFeaturesBySupport(level).Select(feature => feature.Name).OrderBy(name => name),
+                actual);
+            Assert.DoesNotContain('§', result.Content[0].Text!);
+        }
+
+        var summary = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(new { action = "features" }));
+        Assert.False(summary.IsError);
+        using var summaryJson = JsonDocument.Parse(summary.Content[0].Text!);
+        Assert.Equal(FeatureSupport.GetAllFeatures().Count(), summaryJson.RootElement.GetProperty("totalFeatures").GetInt32());
+        Assert.Contains("action=syntax", summaryJson.RootElement.GetProperty("guidance").GetString());
     }
 
     [Fact]
@@ -255,7 +297,8 @@ public class SyntaxHelpToolTests
 
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
-        Assert.Contains("RANGE", text);
+        Assert.Contains("range expression", text);
+        Assert.Contains("examples", text);
     }
 
     [Fact]
@@ -369,10 +412,10 @@ public class SyntaxHelpToolTests
         var text = result.Content[0].Text!;
         // Should contain the curated overview — check for section titles and key terms
         Assert.Contains("Calor Language Overview", text);
-        Assert.Contains("Control Flow", text);
+        Assert.Contains("Control flow", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Module", text);
-        Assert.Contains("Indexer", text);
-        Assert.Contains("Property", text);
+        Assert.Contains("Indexer", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Property", text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -385,11 +428,12 @@ public class SyntaxHelpToolTests
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
         // Verify major language areas are covered
-        Assert.Contains("Control Flow", text);
+        Assert.Contains("Control flow", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Contracts", text);
         Assert.Contains("Async", text);
         Assert.Contains("Collections", text);
-        Assert.Contains("Typed Literals", text);
+        Assert.Contains("Literals", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("18.00m", text);
         Assert.Contains("availableFeatures", text);
     }
 
@@ -408,40 +452,35 @@ public class SyntaxHelpToolTests
 
     #endregion
 
-    #region Truncation Tests
+    #region Bounded Example Tests
 
     [Fact]
-    public async Task ExecuteAsync_Functions_ResponseIsTruncatedUnder15KChars()
+    public async Task ExecuteAsync_Functions_ReturnsAtMostTwoCompleteExamplesInsteadOfSections()
     {
-        // MCP Gap 2: "functions" query previously returned 70K+ chars.
-        // With truncation, the serialized response should stay under the budget.
         var args = JsonDocument.Parse("""{"feature": "functions"}""").RootElement;
 
         var result = await _tool.ExecuteAsync(args);
 
         Assert.False(result.IsError);
         var text = result.Content[0].Text!;
-        // The JSON-serialized output should stay well under 25K chars
-        // (15K content budget + JSON overhead + availableFeatures list + tip section)
-        Assert.True(text.Length < 25_000,
-            $"Expected truncated response under 25K chars, got {text.Length}");
+        var json = JsonDocument.Parse(text).RootElement;
+        Assert.InRange(json.GetProperty("examples").GetArrayLength(), 1, 2);
+        Assert.False(json.TryGetProperty("sections", out _));
     }
 
     [Fact]
-    public async Task ExecuteAsync_LargeResult_IncludesOmittedSectionTip()
+    public async Task ExecuteAsync_DefaultLookup_DoesNotTreatUncompiledOverrideAsExamples()
     {
-        // Create a custom skill file with many large sections that will trigger truncation
         var tempFile = Path.GetTempFileName();
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
 
         try
         {
-            // Generate content with 20 sections each ~2K chars, all matching "bigtopic"
             var content = string.Join("\n", Enumerable.Range(1, 20).Select(i =>
-                $"## BigSection {i}\nThis bigtopic section has bigtopic content.\n{new string('x', 2000)}\n"));
+                $"## Functions {i}\nThis bigtopic section has functions content.\n{new string('x', 2000)}\n"));
             File.WriteAllText(tempFile, content);
 
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, tempFile);
             HelpTool.ResetCacheForTesting();
 
             var tool = new HelpTool();
@@ -451,13 +490,23 @@ public class SyntaxHelpToolTests
 
             Assert.False(result.IsError);
             var text = result.Content[0].Text!;
-            // Should include truncation notice
-            Assert.Contains("Truncated", text);
-            Assert.Contains("additional sections available", text);
+            var json = JsonDocument.Parse(text).RootElement;
+            Assert.False(json.GetProperty("found").GetBoolean());
+            Assert.Empty(json.GetProperty("examples").EnumerateArray());
+            Assert.DoesNotContain(new string('x', 100), text);
+
+            var known = await tool.ExecuteAsync(JsonDocument.Parse("""{"feature":"functions"}""").RootElement);
+            Assert.False(known.IsError);
+            var knownJson = JsonDocument.Parse(known.Content[0].Text!).RootElement;
+            Assert.True(knownJson.GetProperty("found").GetBoolean());
+            Assert.InRange(knownJson.GetProperty("examples").GetArrayLength(), 1, 2);
+            Assert.DoesNotContain(new string('x', 100), known.Content[0].Text);
+            Assert.All(knownJson.GetProperty("examples").EnumerateArray(),
+                e => Assert.StartsWith("module ", e.GetProperty("calor").GetString()));
         }
         finally
         {
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
@@ -483,17 +532,17 @@ public class SyntaxHelpToolTests
     #region File Resolution Tests
 
     [Fact]
-    public void SkillFilePathEnvVar_IsDocumented()
+    public void ReferenceFilePathEnvVar_IsDocumented()
     {
         // Verify the environment variable name is accessible
-        Assert.Equal("CALOR_SKILL_FILE", HelpTool.SkillFilePathEnvVar);
+        Assert.Equal("CALOR_REFERENCE_FILE", HelpTool.ReferenceFilePathEnvVar);
     }
 
     [Fact]
     public async Task ExecuteAsync_ContractsFeature_IncludesContractFirstMethodology()
     {
         // This verifies the merged content is being loaded (Contract-First Methodology
-        // was in calor-language-skills.md, not the original calor.md)
+        // was in current-language-reference.md, not the original calor.md)
         var args = JsonDocument.Parse("""
             {
                 "feature": "contracts"
@@ -569,9 +618,8 @@ public class SyntaxHelpToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_StringsFeature_IncludesNullSafetyPattern()
+    public async Task ExecuteAsync_StringsFeature_IncludesCanonicalNativeStringExample()
     {
-        // The merged file includes the null-safety pattern documentation
         var args = JsonDocument.Parse("""
             {
                 "feature": "strings"
@@ -581,32 +629,35 @@ public class SyntaxHelpToolTests
         var result = await _tool.ExecuteAsync(args);
 
         Assert.False(result.IsError);
-        var text = result.Content[0].Text!;
-        // String operations should be present
-        Assert.True(
-            text.Contains("concat") || text.Contains("substr") || text.Contains("(str "),
-            "Expected string operation content in response");
+        using var json = JsonDocument.Parse(result.Content[0].Text!);
+        Assert.True(json.RootElement.GetProperty("found").GetBoolean());
+        Assert.Equal("string operations", json.RootElement.GetProperty("construct").GetString());
+        Assert.Contains("string.Concat(a, b)", json.RootElement.GetProperty("calorSyntax").GetString());
+        Assert.Contains("StringComparison.Ordinal", json.RootElement.GetProperty("calorSyntax").GetString());
+        var example = Assert.Single(json.RootElement.GetProperty("examples").EnumerateArray());
+        Assert.Equal("primer_strings", example.GetProperty("programId").GetString());
+        Assert.StartsWith("module ", example.GetProperty("calor").GetString());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithEnvVarOverride_UsesCustomFile()
+    public async Task ExecuteAsync_ExplicitReference_WithEnvVarOverride_UsesCustomFile()
     {
         // Create a temporary file with custom content
         var tempFile = Path.GetTempFileName();
         var customContent = @"# Custom Skill File
 ## Test Feature
-This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environment variable.
+This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_REFERENCE_FILE environment variable.
 ### Custom Syntax
 - §TEST: Test token for verification
 ";
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
 
         try
         {
             File.WriteAllText(tempFile, customContent);
 
             // Set the environment variable
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, tempFile);
 
             // Reset the cache so the env var is picked up
             HelpTool.ResetCacheForTesting();
@@ -615,7 +666,7 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
 
             var args = JsonDocument.Parse("""
                 {
-                    "feature": "test"
+                    "feature": "reference"
                 }
                 """).RootElement;
 
@@ -630,7 +681,7 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
         finally
         {
             // Restore original environment variable and reset cache
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
 
             // Clean up temp file
@@ -644,59 +695,36 @@ This is CUSTOM_UNIQUE_MARKER content for testing the CALOR_SKILL_FILE environmen
     #region Embedded Resource Fallback Tests
 
     [Fact]
-    public void EmbeddedResource_CalorLanguageSkills_ExistsAndIsNonEmpty()
+    public void EmbeddedResource_CurrentLanguageReference_ExistsAndIsNonEmpty()
     {
         // Verify the embedded resource that serves as the last-resort fallback
         // for NuGet-installed users (where filesystem paths don't exist) is
         // actually bundled in the assembly and contains meaningful content.
         var content = Init.EmbeddedResourceHelper.ReadResource(
-            "Calor.Compiler.Resources.calor-language-skills.md");
+            "Calor.Compiler.Resources.current-language-reference.md");
 
         Assert.False(string.IsNullOrWhiteSpace(content),
-            "Embedded calor-language-skills.md should not be empty");
+            "Embedded current-language-reference.md should not be empty");
         // Verify it has markdown section headers (the format ExtractRelevantSections expects)
         Assert.Contains("## ", content);
     }
 
     [Fact]
-    public async Task ExecuteAsync_EmbeddedFallback_ReturnsContentWhenFilesystemFails()
+    public async Task ExecuteAsync_MissingExplicitOverride_FailsRatherThanServingOtherContent()
     {
-        // Simulate the NuGet-installed scenario: env var points to a nonexistent file,
-        // and no filesystem skill file is reachable. The embedded resource should kick in.
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
-        var originalDir = Directory.GetCurrentDirectory();
-
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
         try
         {
-            // Point env var to nonexistent file (disables path 1)
-            Environment.SetEnvironmentVariable(
-                HelpTool.SkillFilePathEnvVar, "/nonexistent/path/skill.md");
-
-            // Change working directory to temp (no Calor.sln or .git — disables path 2)
-            var tempDir = Path.Combine(Path.GetTempPath(), $"calor-test-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(tempDir);
-            Directory.SetCurrentDirectory(tempDir);
-
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar,
+                "/nonexistent/path/reference.md");
             HelpTool.ResetCacheForTesting();
-
-            var tool = new HelpTool();
-            var args = JsonDocument.Parse("""{"feature": "contracts"}""").RootElement;
-
-            var result = await tool.ExecuteAsync(args);
-
-            Assert.False(result.IsError, "Should not error — embedded fallback should provide content");
-            var text = result.Content[0].Text!;
-            Assert.Contains("feature", text);
-            Assert.Contains("contracts", text.ToLower());
-
-            // Cleanup temp dir (may fail on Windows due to file locks)
-            try { Directory.Delete(tempDir, true); } catch (IOException) when (OperatingSystem.IsWindows()) { }
+            var result = await _tool.ExecuteAsync(JsonDocument.Parse("""{"feature":"reference"}""").RootElement);
+            Assert.True(result.IsError);
+            Assert.Contains("Failed to get syntax help", result.Content[0].Text);
         }
         finally
         {
-            // Restore environment
-            Directory.SetCurrentDirectory(originalDir);
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
         }
     }
@@ -814,10 +842,10 @@ public class SyntaxHelpTelemetryTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ManyResults_CapsMatchedSectionsAtFive()
+    public async Task ExecuteAsync_UncompiledOverride_IsNotASyntaxLookupHit()
     {
         var tempFile = Path.GetTempFileName();
-        var originalValue = Environment.GetEnvironmentVariable(HelpTool.SkillFilePathEnvVar);
+        var originalValue = Environment.GetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar);
         var (telemetry, channel) = CreateTestTelemetry();
         using var _t = CalorTelemetry.SetInstanceForTesting(telemetry);
 
@@ -827,7 +855,7 @@ public class SyntaxHelpTelemetryTests
             var content = string.Join("\n", Enumerable.Range(1, 8).Select(i =>
                 $"## Section {i}\nThis testtopic section has testtopic content number {i}.\n"));
             File.WriteAllText(tempFile, content);
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, tempFile);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, tempFile);
             HelpTool.ResetCacheForTesting();
 
             var tool = new HelpTool();
@@ -837,12 +865,12 @@ public class SyntaxHelpTelemetryTests
 
             var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
                 .Where(e => e.Name == "SyntaxHelpQuery" && e.Metrics["featureLength"] == "testtopic".Length));
-            Assert.Equal(8, evt.Metrics["resultCount"]);
-            Assert.Equal(5, evt.Metrics["matchedSectionCount"]);
+            Assert.Equal(0, evt.Metrics["resultCount"]);
+            Assert.Equal(0, evt.Metrics["matchedSectionCount"]);
         }
         finally
         {
-            Environment.SetEnvironmentVariable(HelpTool.SkillFilePathEnvVar, originalValue);
+            Environment.SetEnvironmentVariable(HelpTool.ReferenceFilePathEnvVar, originalValue);
             HelpTool.ResetCacheForTesting();
             if (File.Exists(tempFile))
                 File.Delete(tempFile);

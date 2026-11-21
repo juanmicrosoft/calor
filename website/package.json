@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test:e2e": "playwright test",
-    "test:onboarding": "node tests/onboarding.mjs"
+    "test:onboarding": "node tests/onboarding.mjs",
+    "test:landing": "node tests/landing-snippets.mjs"
   },
   "dependencies": {
     "@next/third-parties": "^16.1.6",

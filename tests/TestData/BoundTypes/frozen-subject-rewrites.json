@@ -1,0 +1,60 @@
+{
+  "note": "Frozen bound-type subjects (BoundTypeArchitectureTests historical replay, producer a728e0e2a985d5dd11a092f2d463f24e30f4c66c) that were rewritten in place as public native-syntax samples. The replay still runs the producer's frozen bytes. A subject's current file may differ from them only when it is listed here: rewriteCommit is the commit that changed it away from its frozen bytes (its parent holds them), and sha256 pins the current bytes, so any later edit fails until it is registered. 90839fb6d rewrote 8 samples with the legacy-syntax rewriter; 78ba1a37a hand-rewrote Contracts, Generics and TypeSystem. The 8 rewriter outputs were then made byte-identical to their tests/TestData/ActiveSyntax mirrors (the sample sync), which is what sha256 pins.",
+  "rewrites": [
+    {
+      "path": "samples/Collections/collections.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "628748c2ebe4e0d29e4e424ac55a794c321974ec51801f5d3294a4246911ebf4"
+    },
+    {
+      "path": "samples/Contracts/contracts.calr",
+      "rewriteCommit": "78ba1a37a64ffa6ce1ebc14e8b2b9031ee7a67c1",
+      "sha256": "622b0eb6af68e12fc70fd157f072f838824b1c929e16dd39df6769b52426bd2c"
+    },
+    {
+      "path": "samples/FizzBuzz/fizzbuzz.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "a068f302eafa4abbaa5d01779c2af92a733e1b774177f8e78c110a6d292203b1"
+    },
+    {
+      "path": "samples/Generics/generics.calr",
+      "rewriteCommit": "78ba1a37a64ffa6ce1ebc14e8b2b9031ee7a67c1",
+      "sha256": "07c4859c7475bd45a7e40d883bb71b895128d9ba89fc5c5648a74820fb7b6607"
+    },
+    {
+      "path": "samples/HelloWorld/hello.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "4ffad7aab14ec11cd64091c57872e7f605cca4536a981ac384fe0dc4a0b7c4d1"
+    },
+    {
+      "path": "samples/PatternMatching/matching.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "3305a6a5b9addc089b7a62e52ffa476f0a52954d9b374a1f0b4b0d87dc956d0d"
+    },
+    {
+      "path": "samples/SdkSample/program.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "8f0892526727e0655fde519a10267afaf446a303efc54304b29492d6c0e31128"
+    },
+    {
+      "path": "samples/TypeSystem/typesystem.calr",
+      "rewriteCommit": "78ba1a37a64ffa6ce1ebc14e8b2b9031ee7a67c1",
+      "sha256": "02e3e878d236566118d12264beb700ed463d6a1f8b56c8240a49a911386b367c"
+    },
+    {
+      "path": "samples/Verification/mixed-contracts.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "ea20b8639b624bc6a363e9be7b7c19b9b3c656283e04e4d2919a064455805324"
+    },
+    {
+      "path": "samples/Verification/proven-contracts.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "0ef499494fb8756854cd493cd294e4028e957cfe3d63e4506c9d3e2a96719723"
+    },
+    {
+      "path": "samples/Verification/violation-detected.calr",
+      "rewriteCommit": "90839fb6dd0ea66b49ecf41a963af970ce9f60b9",
+      "sha256": "5979abd75c68e2d49e57143c610f2aba22d6c29f67de34cded98524fcb6bfd36"
+    }
+  ]
+}

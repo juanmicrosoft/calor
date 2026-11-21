@@ -6,7 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
 
 namespace TypeSystem
 {
@@ -14,36 +13,54 @@ namespace TypeSystem
     {
         public static void Main()
         {
-            Console.WriteLine("Testing Option and Result types...");
-            TestSome();
-            TestNone();
-            TestOk();
-            TestErr();
+            Console.WriteLine("Testing nullable values and exceptions...");
+
+            TestPresent();
+
+            TestMissing();
+
+            TestSuccess();
+
+            TestFailure();
+
         }
 
-        private static void TestSome()
+        private static void TestPresent()
         {
-            var opt = Calor.Runtime.Option.Some(42);
-            Console.WriteLine("  Created Some(42)");
+            int? value = 42;
+            Console.WriteLine(value ?? 0);
+
         }
 
-        private static void TestNone()
+        private static void TestMissing()
         {
-            var opt = Calor.Runtime.Option<int>.None();
-            Console.WriteLine("  Created None");
+            int? value = null;
+            Console.WriteLine(value ?? -1);
+
         }
 
-        private static void TestOk()
+        private static void TestSuccess()
         {
-            var result = Calor.Runtime.Result.Ok<int, string>(100);
-            Console.WriteLine("  Created Ok(100)");
+            int value = 100;
+            Console.WriteLine(value);
+
         }
 
-        private static void TestErr()
+        private static void TestFailure()
         {
-            var result = Calor.Runtime.Result.Err<object, string>("Something went wrong");
-            Console.WriteLine("  Created Err");
+            try
+            {
+                throw new InvalidOperationException("Something went wrong");
+            }
+            catch (InvalidOperationException error)
+            {
+                Console.WriteLine(error.Message);
+
+            }
+
         }
 
     }
+
 }
+

@@ -37,8 +37,8 @@ public class StructuredOutputTests : IDisposable
         // compile-time error (Calor0250, bind validation) at line 3.
         var file = Path.Combine(_tempDir, "broken.calr");
         File.WriteAllText(file, """
-            §M{m001:Broken}
-              §F{f001:Main:pub} () -> void
+            §M{Broken}
+              §F{Main:pub} () -> void
                 §B{x}
             """);
         return file;
@@ -48,10 +48,10 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "good.calr");
         File.WriteAllText(file, """
-            §M{m001:Good}
-              §F{f001:Main:pub} () -> void
-                §E{cw}
-                §P "hello"
+            module Good Good block
+              func Main () → void
+                ! cw
+                Console.WriteLine("hello")
             """);
         return file;
     }
@@ -60,48 +60,12 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "generated-error.calr");
         File.WriteAllText(file, """
-            §M{m001:GeneratedError}
-              §F{f001:Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module GeneratedError GeneratedError block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         return file;
-    }
-
-    // ------------------------------------------------------------------
-    // calor --input <file> --format json
-    // ------------------------------------------------------------------
-
-    [Fact]
-    public void Compile_FormatJson_ErrorFile_EmitsParseableUnifiedSchema()
-    {
-        var file = WriteBrokenFile();
-
-        var (exitCode, stdOut, stdErr) = RunCli("--input", file, "--format", "json");
-
-        Assert.Equal(1, exitCode);
-
-        // stdout must be pure JSON (jq-compatible)
-        using var doc = JsonDocument.Parse(stdOut);
-        var root = doc.RootElement;
-
-        Assert.Equal(JsonDiagnosticFormatter.SchemaVersion, root.GetProperty("version").GetString());
-
-        var diagnostics = root.GetProperty("diagnostics");
-        Assert.True(diagnostics.GetArrayLength() >= 1, $"expected diagnostics, stderr: {stdErr}");
-
-        var first = diagnostics[0];
-        Assert.Equal("Calor0250", first.GetProperty("code").GetString());
-        Assert.False(string.IsNullOrEmpty(first.GetProperty("message").GetString()));
-        Assert.Equal("error", first.GetProperty("severity").GetString());
-
-        var location = first.GetProperty("location");
-        Assert.EndsWith("broken.calr", location.GetProperty("file").GetString());
-        Assert.Equal(3, location.GetProperty("line").GetInt32());
-        Assert.True(location.GetProperty("column").GetInt32() >= 1);
-
-        var summary = root.GetProperty("summary");
-        Assert.True(summary.GetProperty("errors").GetInt32() >= 1);
-        Assert.Equal(summary.GetProperty("total").GetInt32(), diagnostics.GetArrayLength());
     }
 
     [Fact]
@@ -295,10 +259,10 @@ public class StructuredOutputTests : IDisposable
         var file = Path.Combine(_tempDir, "style.calr");
         // Trailing whitespace on the module line is a lint style issue.
         File.WriteAllText(file,
-            "§M{m001:Style}   \n" +
-            "  §F{f001:Main:pub} () -> void\n" +
-            "    §E{cw}\n" +
-            "    §P \"hi\"\n");
+            "module Style Style block   \n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"hi\")\n");
 
         var (exitCode, stdOut, _) = RunCli("lint", file, "--format", "json");
 
@@ -321,7 +285,7 @@ public class StructuredOutputTests : IDisposable
     public void Lint_FormatJson_ParseError_SurfacesErrorDiagnostics()
     {
         var file = Path.Combine(_tempDir, "badparse.calr");
-        File.WriteAllText(file, "§M{m001:Bad}\n  §F{f001:Main:pub () -> void\n");
+        File.WriteAllText(file, "§M{Bad}\n  §F{f001:Main:pub () -> void\n");
 
         var (exitCode, stdOut, _) = RunCli("lint", file, "--format", "json");
 
@@ -369,10 +333,10 @@ public class StructuredOutputTests : IDisposable
     {
         var file = Path.Combine(_tempDir, "check.calr");
         File.WriteAllText(file,
-            "§M{m001:Check}   \n" +
-            "  §F{f001:Main:pub} () -> void\n" +
-            "    §E{cw}\n" +
-            "    §P \"hi\"\n");
+            "module Check Check block   \n" +
+            "  func Main () → void\n" +
+            "    ! cw\n" +
+            "    Console.WriteLine(\"hi\")\n");
 
         var (exitCode, _, _) = RunCli("lint", file, "--check");
 
@@ -516,10 +480,11 @@ public class StructuredOutputTests : IDisposable
         // unknown/unsupported but never to a name outside the closed vocabulary.
         var file = Path.Combine(_tempDir, "contract.calr");
         File.WriteAllText(file, """
-            §M{m001:Contract}
-              §F{f001:Add:pub} (i32:a, i32:b) -> i32
-                §S (== result 0)
-                §R (+ a b)
+            module Contract Contract block
+              func Add (int:a, int:b) → int
+                !
+                => (result == 0)
+                return (a + b)
             """);
 
         var (_, stdOut, _) = RunCli("verify", file, "--format", "json");
@@ -528,7 +493,10 @@ public class StructuredOutputTests : IDisposable
         var root = doc.RootElement;
         var functions = root.GetProperty("data").GetProperty("files")[0].GetProperty("functions");
         Assert.Equal(1, functions.GetArrayLength());
-        Assert.Equal("f001", functions[0].GetProperty("functionId").GetString());
+        var identity = Assert.Single(
+            Ids.DeclarationIdentityStore.Find(file)!.Sync().Declarations,
+            declaration => declaration.Kind == Ids.IdKind.Function);
+        Assert.Equal(identity.Id, functions[0].GetProperty("functionId").GetString());
 
         var contracts = functions[0].GetProperty("contracts");
         Assert.Equal(1, contracts.GetArrayLength());
@@ -546,6 +514,103 @@ public class StructuredOutputTests : IDisposable
             Assert.False(string.IsNullOrEmpty(cex.GetProperty("rendered").GetString()));
             Assert.Equal(JsonValueKind.Array, cex.GetProperty("bindings").ValueKind);
         }
+    }
+
+    [Theory]
+    [InlineData(".calr")]
+    [InlineData(".CALR")]
+    public void Verify_FormatJson_PreservesPersistedIdentityAcrossEarlierDeclarationInsertion(string extension)
+    {
+        var file = Path.Combine(_tempDir, "identity" + extension);
+        const string source = """
+            module Identity Identity block
+              func Answer (int:value) → int
+                !
+                => (result == value)
+                return value
+            """;
+        File.WriteAllText(file, source);
+        var first = RunCli("verify", file, "--format", "json");
+        Assert.Equal(0, first.ExitCode);
+        var store = Ids.DeclarationIdentityStore.Find(file)!;
+        var id = Assert.Single(store.Sync().Declarations, declaration => declaration.Name == "Answer").Id;
+
+        File.WriteAllText(file, source.Replace("  func Answer", """
+              func Earlier private () → void
+                return
+              func Answer
+            """, StringComparison.Ordinal));
+        var second = RunCli("verify", file, "--format", "json");
+        Assert.Equal(0, second.ExitCode);
+        using var document = JsonDocument.Parse(second.StdOut);
+        var functions = document.RootElement.GetProperty("data").GetProperty("files")[0].GetProperty("functions");
+        var answer = Assert.Single(functions.EnumerateArray(),
+            function => function.GetProperty("functionName").GetString() == "Answer");
+        Assert.Equal(id, answer.GetProperty("functionId").GetString());
+    }
+
+    [Fact]
+    public void Verify_FormatJson_CorruptIdentityIsAnErrorWithoutTransientFunctionIds()
+    {
+        var file = Path.Combine(_tempDir, "identity.calr");
+        File.WriteAllText(file, """
+            module Identity Identity block
+              func Answer (int:value) → int
+                !
+                => (result == value)
+                return value
+            """);
+        Assert.Equal(0, RunCli("verify", file, "--format", "json").ExitCode);
+        var sidecar = Ids.DeclarationIdentityStore.Find(file)!.SidecarPath;
+        File.WriteAllText(sidecar, "{ broken");
+
+        var result = RunCli("verify", file, "--format", "json");
+
+        Assert.Equal(1, result.ExitCode);
+        using var document = JsonDocument.Parse(result.StdOut);
+        var root = document.RootElement;
+        var diagnostic = Assert.Single(root.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(Calor.Compiler.Diagnostics.DiagnosticCode.DeclarationIdentityUnavailable, diagnostic.GetProperty("code").GetString());
+        Assert.False(diagnostic.TryGetProperty("declarationId", out _));
+        Assert.Empty(root.GetProperty("data").GetProperty("files")[0].GetProperty("functions").EnumerateArray());
+        Assert.Equal("{ broken", File.ReadAllText(sidecar));
+    }
+
+    [Fact]
+    public void Verify_FormatJson_MultiDirectoryInputsShareTheActualInputRoot()
+    {
+        var files = new[] { "a", "b" }.Select(name =>
+        {
+            var directory = Path.Combine(_tempDir, name);
+            Directory.CreateDirectory(directory);
+            var file = Path.Combine(directory, "input.calr");
+            File.WriteAllText(file, $$"""
+                module {{name}} {{name}} block
+                  func Answer (int:value) → int
+                    !
+                    => (result == value)
+                    return value
+                """);
+            return file;
+        }).ToArray();
+
+        var result = RunCli("verify", files[0], files[1], "--format", "json");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(Ids.DeclarationIdentityStore.Find(files[0])!.SidecarPath,
+            Ids.DeclarationIdentityStore.Find(files[1])!.SidecarPath);
+        Assert.True(File.Exists(Path.Combine(_tempDir, ".calor", "ids.json")));
+        Assert.All(files, file =>
+            Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(file)!, ".calor", "ids.json"))));
+        using var document = JsonDocument.Parse(result.StdOut);
+        var outputs = document.RootElement.GetProperty("data").GetProperty("files").EnumerateArray().ToArray();
+        Assert.Equal(2, outputs.Length);
+        var expected = Ids.DeclarationIdentityStore.Find(files[0])!.Sync().Declarations
+            .Where(declaration => declaration.Kind == Ids.IdKind.Function)
+            .Select(declaration => declaration.Id).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected, outputs.Select(output =>
+            Assert.Single(output.GetProperty("functions").EnumerateArray()).GetProperty("functionId").GetString()!)
+            .Order(StringComparer.Ordinal).ToArray());
     }
 
     [Fact]

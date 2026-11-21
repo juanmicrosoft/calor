@@ -26,7 +26,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "Initializer",
@@ -34,7 +34,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "Initializer",
@@ -42,7 +42,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       }
     ]
   },
@@ -125,6 +125,32 @@
     "reason": "A ref/out/in operand C# cannot pass by reference would otherwise fail only in generated C# (Calor1002); D1 RO-LV-2/RO-DECL-2."
   },
   {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindFieldAccess::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindFieldAccess",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0200"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindFieldAccess::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.BindFieldAccess",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0200"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception."
+  },
+  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindForStatement::DiagnosticBag.ReportError#01",
     "member": "Calor.Compiler.Binding.Binder.BindForStatement",
     "sink": "DiagnosticBag.ReportError",
@@ -162,6 +188,45 @@
     "disposition": "AnalysisOnly",
     "owningIssue": 1396,
     "reason": "Parser owns the user-facing missing-type error; binder recovery is not a new activation."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindNewExpression::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.BindNewExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0202"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1397,
+    "reason": "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindNewExpression::DiagnosticBag.ReportError#03",
+    "member": "Calor.Compiler.Binding.Binder.BindNewExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0208"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Failed internal overload selection is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindNewExpression::DiagnosticBag.ReportError#04",
+    "member": "Calor.Compiler.Binding.Binder.BindNewExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0202"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1397,
+    "reason": "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindParameters::DiagnosticBag.ReportDuplicateDefinitionWithFix#01",
@@ -230,6 +295,19 @@
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportError#03",
+    "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0200"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportError#04",
     "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
     "sink": "DiagnosticBag.ReportError",
     "helperPath": "DiagnosticBag.ReportError",
@@ -307,7 +385,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "NativeReturn",
@@ -315,7 +393,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "NativeReturn",
@@ -323,7 +401,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       }
     ]
   },
@@ -367,7 +445,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "Initializer",
@@ -375,7 +453,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "Initializer",
@@ -383,22 +461,48 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       }
     ]
   },
   {
-    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.CheckReferenceOptionRepresentation::DiagnosticBag.ReportError#01",
-    "member": "Calor.Compiler.Binding.Binder.CheckReferenceOptionRepresentation",
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.CheckGeneratedModuleNameCollisions::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.CheckGeneratedModuleNameCollisions",
     "sink": "DiagnosticBag.ReportError",
     "helperPath": "DiagnosticBag.ReportError",
     "possibleCodes": [
-      "Calor0275"
+      "Calor0201"
     ],
     "severity": "Error",
     "disposition": "CompilationError",
-    "owningIssue": 1397,
-    "reason": "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation."
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.CheckMetadataArrayToCollection::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.CheckMetadataArrayToCollection",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0254"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Array-to-concrete-collection mismatches are already compilation errors; native calls use selected metadata."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.Declare::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.Declare",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.DeclareParameters::DiagnosticBag.ReportDuplicateDefinitionWithFix#01",
@@ -445,12 +549,64 @@
     "sink": "DiagnosticBag.ReportError",
     "helperPath": "DiagnosticBag.ReportError",
     "possibleCodes": [
+      "Calor0203"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1619,
+    "reason": "Invalid module instance shapes and extension declaration containers must fail before C# emission."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#03",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
       "Calor0201"
     ],
     "severity": "Error",
     "disposition": "CompilationError",
     "owningIssue": 1396,
     "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#04",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#05",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#06",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0203"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1619,
+    "reason": "Invalid module instance shapes and extension declaration containers must fail before C# emission."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ReportDuplicateSignature::DiagnosticBag.ReportError#01",
@@ -476,7 +632,7 @@
     "severity": "Error",
     "disposition": "CompilationError",
     "owningIssue": 1550,
-    "reason": "A write to an immutable §B binding or §L loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1."
+    "reason": "A write to an immutable let binding or a counted-loop variable would otherwise compile silently (the C# local is not readonly); D1 RO-LV-1."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ReportRowOnNonFunctionType::DiagnosticBag.ReportError#01",
@@ -510,6 +666,19 @@
     "sink": "DiagnosticBag.ReportError",
     "helperPath": "DiagnosticBag.ReportError",
     "possibleCodes": [
+      "Calor0208"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Failed internal overload selection is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveCall::DiagnosticBag.ReportError#03",
+    "member": "Calor.Compiler.Binding.Binder.ResolveCall",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
       "Calor0207"
     ],
     "severity": "Error",
@@ -523,12 +692,51 @@
     "sink": "DiagnosticBag.ReportError",
     "helperPath": "DiagnosticBag.ReportError",
     "possibleCodes": [
+      "Calor0200"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveCallReceiver::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.ResolveCallReceiver",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
       "Calor0261"
     ],
     "severity": "Error",
     "disposition": "CompilationError",
     "owningIssue": 1396,
     "reason": "Illegal static-context member access is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveSourceEnumExtension::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.ResolveSourceEnumExtension",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0208"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Failed internal overload selection is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveSourceEnumExtension::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.ResolveSourceEnumExtension",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0207"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Ambiguous internal overload selection is already a compilation error."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.TryBindMember::DiagnosticBag.ReportError#01",
@@ -570,7 +778,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "MethodArgument",
@@ -578,7 +786,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "MethodArgument",
@@ -586,7 +794,7 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1402,
-        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+        "reason": "Bounded receiving policy: Stage B shapes plus the deliberate closed source-reference generic extension."
       },
       {
         "boundary": "MethodArgument",
@@ -597,6 +805,19 @@
         "reason": "A resolved native scalar STRING input replaces an actual prior overload rejection; other nullable inputs await Stage A."
       }
     ]
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ValidateCallableEffectRows::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.ValidateCallableEffectRows",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0407"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "0.30 decision D2: an omitted callback parameter or return row is a hard error before the effect pass; '! unknown' is the explicit spelling."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs::Metadata.MetadataBinderResult.ToDiagnostics::Diagnostic..ctor#01",

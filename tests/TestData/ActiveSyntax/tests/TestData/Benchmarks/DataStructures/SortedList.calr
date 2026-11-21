@@ -1,0 +1,14 @@
+module SortedList SortedList
+  module SortedListModule
+    func FindInsertPos public (int:value, int:existingValue) → bool
+      !
+      return value <= existingValue
+
+    func IsInOrder public (int:a, int:b) → bool
+      !
+      return a <= b
+
+    func SizeAfterInsert public (int:currentSize) → int
+      !
+      => result > currentSize
+      return currentSize + 1

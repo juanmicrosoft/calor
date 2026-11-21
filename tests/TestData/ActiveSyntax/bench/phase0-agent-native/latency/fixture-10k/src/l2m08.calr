@@ -1,0 +1,102 @@
+module L2M08 L2M08 block
+  module L2M08Module public
+
+    func l2m08_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22191)
+      let int:total = ((x * 5) + y)
+      if (total > 22191)
+        return 22191
+      return total
+
+    func l2m08_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M06.L3M06Module.l3m06_fn06(x, 41)
+      let int:v2 = L3M33.L3M33Module.l3m33_fn01(x, 48)
+      return ((v1 + v2) + y)
+
+    func l2m08_fn03 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22198)
+      if (x >= 22198)
+        return x
+      else
+        return 22198
+
+    func l2m08_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22205)
+      let int:total = ((x * 5) + y)
+      if (total > 22205)
+        return 22205
+      return total
+
+    func l2m08_fn05 public (int:x, int:y) → int
+      !
+      requires (x > 0)
+      => (x >= 1)
+      let int:acc = ((x * 3) + y)
+      if (acc > 22212)
+        return (acc + 22212)
+      else
+        return ((acc * 2) + 22212)
+
+    func l2m08_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M19.L3M19Module.l3m19_fn02(x, 89)
+      let int:v2 = L3M12.L3M12Module.l3m12_fn09(x, 49)
+      return ((v1 + v2) + y)
+
+    func l2m08_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M19.L3M19Module.l3m19_fn08(x, 76)
+      return (v1 + y)
+
+    func l2m08_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M01.L3M01Module.l3m01_fn10(x, 54)
+      let int:v2 = L3M14.L3M14Module.l3m14_fn07(x, 74)
+      return ((v1 + v2) + y)
+
+    func l2m08_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 2)
+      requires (y >= 0)
+      => (result >= 22219)
+      let int:total = ((x * 2) + y)
+      if (total < 22219)
+        return 22219
+      else
+        return total
+
+    func l2m08_fn10 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M33.L3M33Module.l3m33_fn11(x, 73)
+      let int:v2 = L3M12.L3M12Module.l3m12_fn13(x, 67)
+      return ((v1 + v2) + y)
+
+    func l2m08_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M03.L3M03Module.l3m03_fn13(x, 32)
+      let int:v2 = L3M03.L3M03Module.l3m03_fn11(x, 75)
+      return ((v1 + v2) + y)
+
+    func l2m08_fn12 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22226)
+      if (x >= 22226)
+        return x
+      else
+        return 22226
+
+    func l2m08_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M23.L3M23Module.l3m23_fn03(x, 23)
+      let int:v2 = L3M28.L3M28Module.l3m28_fn02(x, 59)
+      return ((v1 + v2) + y)

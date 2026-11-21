@@ -1,11 +1,13 @@
 ---
 layout: default
-title: Effects
+title: "Effects"
 parent: Syntax Reference
 nav_order: 6
 ---
 
 # Effects
+
+<!-- Generated from website/content/syntax-reference/effects.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
 Effects declare the side effects a function may have. This is unique to Calor - traditional languages leave side effects implicit.
 
@@ -13,19 +15,17 @@ Effects declare the side effects a function may have. This is unique to Calor - 
 
 ## Why Declare Effects?
 
-In traditional code, you must read the entire implementation to know if a function:
+In traditional languages, you must read the entire implementation to know if a function:
 - Writes to console
 - Reads files
 - Makes network calls
 - Modifies a database
 
-Calor requires explicit declaration:
+Calor requires explicit effect declarations:
 
-```
-§F{f001:SaveUser:pub}
-  §I{User:user}
-  §O{bool}
-  §E{db:rw,net:rw}        // Declares: database and network operations
+```calor
+func SaveUser (User:user) → bool
+  ! db:rw,net:rw           // Declares: database and network operations
   // ...
 ```
 
@@ -35,176 +35,393 @@ Now an agent knows immediately what side effects to expect.
 
 ## Effect Syntax
 
-```
-§E{code1,code2,...}
-§E{}                      // No effects (pure function)
+```calor
+! cw,fs:w                 // Console write and filesystem write
+!                         // No effects (pure function)
 ```
 
-Place the effect declaration after the output type:
+Place the effect declaration on its own indented line after the signature.
+One `!` starts the row; separate effect codes with commas. A second bang
+on the same row, as in `! !cw` or `! alloc, !e`, reports `Calor0403`
+(unknown effect). It cannot start another row.
+This is a template, not a complete function:
 
-```
-§F{id:name:vis}
-  §I{...}
-  §O{...}
-  §E{effects}             // Here
-  §Q ...
-  §S ...
+```calor
+func Name (Type:parameter) → ReturnType
+  ! effects               // Here
+  requires condition
+  => condition
   // body
 ```
 
-**The line matters.** A `§E{...}` on its **own line**, as above, is the function's own
-effect declaration. A `§E{...}` written on the **same line** as a type belongs to that
-type instead — see *Effect rows* below.
+---
+
+## Inferred Non-public Effects
+
+Private and internal function and method bodies must omit their own effect row.
+The compiler infers it from their bodies, including recursive calls. Callers
+still need to cover those effects at public boundaries. An unknown inferred row
+still fails strict checking; inference does not turn it into Pure.
+
+A non-public virtual method's inferred body is not a contract for every possible
+override. Open dispatch and method groups without a declared slot contract remain
+Unknown. Writing an own row on a private/internal body reports `Calor0125`.
+This does not remove rows from callback types in its signature.
+
+Public/protected functions and methods, public operators, interface and abstract methods, extern
+methods, and delegate declarations require an explicit own row. A missing row
+reports `Calor0124`; write `!` for Pure. A constructor's
+body may always initialize (`mut`, `alloc`); anything more is `Calor0422` unless
+the constructor declares an optional own row after its header (for example
+`! throw` or `! unknown`), which then admits those effects too. Callers of `new`
+are charged what the constructor body actually does either way.
+
+Accessors work the same way since 0.30. A `get`, `set` or `init` body may always
+mutate and allocate; anything more is `Calor0423` unless the accessor declares an
+optional own row on its own line under the keyword. Readers and writers of the
+property are charged what the body does plus the declared row. An auto-implemented
+accessor has no body and takes no row. Event `add`/`remove` bodies still have no
+row and keep the intrinsic contract.
+
+```calor
+module Accessors
+  class Account
+    field int:balance private
+    property int:Balance
+      get
+        ! throw
+        if balance < 0
+          throw new InvalidOperationException("corrupt")
+        return balance
+```
+
+A type's static field initializers can have their own row too; see
+[Static initialization](#static-initialization).
+
+The C# converter omits synthesized own rows on private/internal bodies. Callback
+parameter and return rows stay explicit, as do existing abstract/extern contracts.
+Public callers still declare every reachable effect. A private or internal body
+may write `! unknown` as its own row; see
+[Declaring Unknown on a Function](#declaring-unknown-on-a-function).
+
+## Effect Rows for Callbacks
+
+When a function accepts another function — a callback, handler, predicate, or
+transform — an effect row says what that callback is allowed to do.
+Callback parameter and return types require an explicit row (`Calor0407` when
+missing), including on inferred private/internal bodies. Write `! unknown` when
+no invocation contract is known. A declared callback may remain unused, but its
+Unknown row cannot authorize a strict invocation.
+
+**The line matters.** An `!` row on its **own line** is the containing
+function's effect declaration. An `!` row on the **same line** as a function
+type belongs to that callback, binding, field, property, or return value.
+
+```calor
+module Callbacks
+  func Apply (Func<int,int>:transform ! cw, int:value) → int
+    ! cw
+    return transform(value)
+```
+
+The `! cw` beside `transform` belongs to the callback type. The `! cw` on
+its own line belongs to `Apply`. Calling `transform` charges its `cw` effect to
+`Apply`, so both rows are required here.
+
+For a delegate value, `transform.Invoke(value)` charges the same row as
+`transform(value)`. The compiler uses the delegate's declaration, not just the
+method name `Invoke`. A missing callback row still follows the unknown-effect
+rules; `.Invoke()` does not make it pure.
+
+A callback parameter or local binding shadows a same-named module function.
+Its invocation charges the callback's row, not the module function's row.
+Argument expressions still contribute their own effects. An ordinary class
+method named `Invoke` remains a method call with its selected declaration's row.
+
+Rows are part of the type. `Func<int,int> !` and
+`Func<int,int> ! cw` have the same inputs and output, but different effect
+permissions.
+
+For callback parameters, returned callbacks and delegate declarations, a row
+is required. Write `! unknown` to state Unknown explicitly,
+or an empty `!` to promise Pure. Unknown is not a wildcard permission:
+invoking an Unknown callback fails strict effect checking, even if the caller
+declares every known effect. Merely accepting an unused Unknown callback does
+not invoke it. Passing or returning one can still produce `Calor0425` when the
+compiler cannot prove that the source row fits the destination.
+
+The marker is case-sensitive and stands alone. It is not an effect code, so
+do not combine it with `cw` or use it as a binding row, a field row, a property
+row or a lambda row. A function's own declaration may use it; see
+[Declaring Unknown on a Function](#declaring-unknown-on-a-function). An existing effect placeholder
+named `unknown` keeps its normal binding identity; it is not the marker.
+These callback contracts do not change intrinsic constructor or accessor
+mutation/allocation contracts.
+An omitted binding or lambda row can retain a known row inferred from its
+initializer or body; it does not automatically mean Pure.
+
+Inline lambda arguments use the selected delegate's actual signature, including
+non-generic `Action` and `System.Action`. A void block lambda contains statements
+without returning a value. Named arguments keep their selected parameter mapping,
+and different named delegate types do not become interchangeable just because
+their signatures match. Aliases refer to the declaration they resolve to.
+
+CLR signature compatibility does not grant effect permissions. Passing a lambda
+to a Pure callback parameter still requires a Pure row, including for named
+arguments and overloaded source functions. Existing delegate values use the
+same signature and row checks as inline lambdas.
+
+If the temporary C# used for binding cannot lower an expression, compilation
+reports the lowering diagnostic instead of throwing or treating partial output
+as a signature or effect proof. It uses the selected runtime contract mode;
+turning runtime contracts off does not disable callback signature or row checks.
+
+### Where a row can appear
+
+```calor
+module Rows
+  func Use (Func<int,int>:callback ! cw, int:value) → Func<int,int> ! cw
+    ! cw
+    let Func<int,int>:saved ! cw = callback
+    let local = (int:x) ! cw =>
+      Console.WriteLine(x)
+      return x
+    return callback
+
+  delegate Handler (int:value) → void
+    ! cw
+
+  class Callbacks
+    field Action<int>:onChange private ! cw
+    property Action<int>:Current ! cw
+      get
+      set
+```
+
+Rows are supported on:
+
+- function and method declarations,
+- constructors and property/indexer accessors (their own row, on its own line),
+- a type's implicit static initialization (a header line before its first member),
+- lambdas and delegates,
+- parameters in inline signatures,
+- return types after `→`,
+- bindings, fields, and properties.
+
+A type carries one row. Put multiple permissions in that row
+(`! cw,fs:w`), rather than writing multiple `!` rows.
+
+### Effect placeholders
+
+A higher-order helper often needs to have exactly the effects of the callback
+passed to it. Declare an effect placeholder with `<! e>` and use it in the
+callback and function rows:
+
+```calor
+module HigherOrder
+  func Twice<! e> (Func<int,int>:callback ! e, int:value) → int
+    ! e
+    let int:first = callback(value)
+    return callback(first)
+```
+
+`Twice` is pure when `callback` is pure and carries `cw` when the callback may
+write to the console. The compiler resolves `e` at each call site.
+
+Effect placeholders can be declared on functions and methods, including
+interface methods. They can be used in that declaration's own row and its
+parameter rows. A placeholder cannot use the name of a real effect code such
+as `cw`.
+
+### What the compiler checks
+
+The compiler checks a row whenever a function value moves:
+
+- binding or reassigning it,
+- passing it as an argument,
+- returning it,
+- overriding a method,
+- implementing an interface member.
+
+A callback whose effects exceed the destination row is `Calor0424`, always an
+error. If one side has no row and the compiler cannot decide, it reports
+`Calor0425`; strict mode promotes that warning and permissive mode waives it.
+
+Lambda rows are promises too. If a lambda body does more than its row allows,
+the compiler reports the mismatch. If the lambda has no written row, the
+compiler infers one from the body when it can.
+
+### Common row mistakes
+
+`Calor0405` means a row is attached to something that cannot carry one, is on
+the wrong line, or duplicates another row:
+
+```calor
+field int:count private
+! cw // Wrong: count is not a function value, and this is a separate line.
+```
+
+`Calor0404` means an effect placeholder is declared or used somewhere it is
+not allowed, or is named after a real effect code.
+
+### Current limitations
+
+Effect rows do not yet fully verify callbacks reached through reflection or
+`dynamic`, event-handler `+=`, or delegates returned by .NET libraries.
+Unresolved cases fail closed: the caller is charged `unknown`, and an
+under-declared caller fails the build. These boundaries are never silently
+treated as verified. Permissive effects explicitly waive that fail-closed
+behavior for unknown calls. Async rows remain limited; consult the diagnostics
+and the [project index](https://calor.dev/docs/cli/query/) before relying on a higher-order
+boundary.
 
 ---
 
-## Effect Rows
+## Declaring Unknown on a Function
 
-*New in v0.15.*
+Since 0.30 a function or method may write `! unknown` as its own row. Use it
+when the body calls an API that has no effect contract, so the compiler cannot
+name the effects it performs.
 
-If a function takes another function as a parameter — a callback, a handler, a
-comparison — you can now say what that inner function is allowed to do. Write the same
-`§E{...}` tag on the **same line** as the type it describes:
-
-```
-§F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-```
-
-That says: *`transform` may write to the console.* Before this, there was no way to say
-it, so calling `transform` at all was an error.
-
-The rule is just the line. A `§E{...}` on the same line as a type is that type's row; a
-`§E{...}` on its own line is the function's effect declaration, exactly as it always was.
-Almost everyone already writes the second form, so almost nothing changes.
-
-### The nine places you can write one
-
-```
-§F{f001:F:pub} () -> void
-  §E{cw}                                    // 1. the function's own declaration
-
-§B{f} §LAM{lam1:x:i32} §E{cw} ... §/LAM{lam1} // 2. a lambda
-
-§DEL{d001:Handler}
-  §I{i32:x}
-  §O{void}
-  §E{cw}                                    // 3. a delegate
-
-§I{Func<i32,i32>:f} §E{cw}                  // 4. a parameter, tag form
-(Func<i32,i32>:f §E{cw}, i32:v)             // 5. a parameter, inline form
-§O{Func<i32>} §E{cw}                        // 6. a return type
-() -> Func<i32> §E{cw}                      //    …or the arrow spelling
-§B{f:Func<i32,i32>} §E{cw} <initializer>    // 7. a binding
-§FLD{Action<i32>:onChange:pri} §E{cw}       // 8. a field
-§PROP{p1:OnChange:Action<i32>:pub:get,set} §E{cw}  // 9. a property (0.17)
+```calor
+module Encoding
+  func Encode public (string?:text) → string?
+    ! unknown
+    return System.Web.HttpUtility.UrlEncode(text)
 ```
 
-A type carries **one** row. To allow several effects, put them in the one row —
-`§E{cw, net}` — not in two tags side by side.
+- Calls in the body to APIs without a contract are accepted. `Calor0411` is not
+  reported for them.
+- Every caller is charged `unknown`. A caller that declares `!` or known codes
+  reports `Calor0410`. It must declare `! unknown` as well, or the API needs a
+  contract in a `.calor-effects.json` manifest.
+- `! unknown` stands alone. `! unknown, cw` is rejected, because Unknown already
+  admits every effect.
+- Private and internal bodies infer their effects, and an inferred row cannot be
+  Unknown. `! unknown` is the one own row such a body may write.
+- `calor convert` writes `! unknown` on a converted function whose effects it
+  cannot resolve, instead of preserving the whole file as raw C#.
 
-### Placeholder effects (`eff`)
+Prefer a manifest entry when you know what the API does. A known row keeps
+every caller's effects precise; `! unknown` only records that nobody checked.
 
-Sometimes a function should be allowed to do *whatever the caller's function does*, no
-more and no less. Write a placeholder in the type-parameter list with `eff`, then use its
-name in the rows:
+## Static initialization
 
-```
-§F{f001:Twice:pub}<eff e> (Func<i32,i32>:f §E{e}, i32:v) -> i32
-  §E{e}
-  §R INT:0
-```
+Reading a native static field charges initialization of its entire declaring
+type, including sibling field and property initializers and its static
+constructor.
 
-`Twice` is pure when `f` is pure, and writes to the console when `f` does. One definition
-serves both callers.
+**The static-initialization row.** A type without an explicit static constructor
+runs its static field and property initializers as an implicit type initializer.
+Those initializers may always mutate and allocate; anything more is `Calor0422`
+unless the type declares a row for them. Write the row as a header clause: an `!`
+line under the type's header, before its first member, next to `extends`,
+`implements` and `where`.
 
-A placeholder can only be declared on a function or a method — including a method inside
-an interface — and can only be used in that declaration's own row and in its parameters'
-rows. It may not be named after a real effect code such as `cw`, because then that code
-could not be written inside the declaration.
+```calor
+module Settings
+  class Defaults
+    ! fs:r
+    field string:Text static = Load()
 
-### When it goes wrong
+    func Load private static () → string
+      return System.IO.File.ReadAllText("settings.txt")
 
-**Calor0405** — the row is somewhere a row cannot go. Most often the row is on the wrong
-line:
-
-```
-§FLD{i32:x:pri}
-§E{cw}            // Calor0405: move it onto the end of the 'x' field line
-```
-
-It also fires if you write two rows on one type. The message always names both repairs.
-
-**Calor0404** — a placeholder is declared where it cannot be (on a class or an interface
-rather than on a member), used somewhere it cannot be (a return type, a binding, a
-lambda), or named after a real effect code.
-
-### What is checked today
-
-**A row is now checked where a function value moves.** When a function value is bound,
-re-assigned, passed as an argument, returned, or used to override/implement a member, the
-compiler compares the value's row with the row of the place it is going: a row that is too
-wide is **Calor0424** (always an error), a row the compiler cannot determine is **Calor0425**
-(a warning; `--permissive-effects` waives only this one). A row on something that is provably
-not a function (`i32`, `str`, an array) is **Calor0405**; a row on a type the compiler does not
-know is accepted, not refused.
-
-**Calling a callback charges its row.** Invoking a function value — a parameter, a `§B`, a
-field, or the result of a call — charges the value's row to the function doing the calling,
-exactly as calling a named function charges its `§E`. A lambda's body is compared with its
-declared row, and a lambda bound to a row-less `§B` gives the `§B` the body's row:
-
-```
-§F{f001:Apply:pub} (Func<i32,i32>:transform §E{cw}, i32:value) -> i32
-  §E{cw}
-  §R §C{transform} §A value §/C     // charges cw to Apply; Apply declares it — clean
+  func Show public () → string
+    ! fs:r
+    return Defaults.Text
 ```
 
-Narrow `Apply`'s own row to `§E{}` and you get a **Calor0410** that says where the effect
-came from: `Effect row: charged by invoking 'transform' (row: cw)`. Invoke a value that
-carries **no** row and the compiler cannot tell what it does: that is **Calor0425** at the
-call, and the caller is charged an unknown effect so the program fails closed — the same
-answer an unknown external call gets. `--permissive-effects` silences that Calor0425 and
-charges nothing for it; it never silences a row the compiler *does* know. **Calor0418** is now
-reported for one thing only: invoking a value whose type is provably not a function (`i32`,
-`str`, an array).
+The row admits its effects in the initializers, and `! unknown` admits any effect.
+Whatever triggers the initialization (below) is charged the initializers' effects
+plus the row, so `Show` must declare `fs:r`. Calor does not synthesize a static
+constructor for this row. Adding one would drop the C# `beforefieldinit` flag and
+change when the initializers run. A type that has an explicit static constructor
+(`ctor stat`) declares the row on that constructor instead; a type row next to it
+is `Calor0405`. A type declared in several parts carries the row on each part.
 
-### Asking the index
+**What triggers initialization.** The rules follow the C# specification
+(ECMA-334, "Static field initialization" and "Static constructors"):
 
-The project index records, for every function and method, the row it **declares**, the row
-the compiler **inferred** for its body, and the **verdict** between them — the same answer
-`calor build` reaches, read off the same pass, never re-inferred. Ask for it by name:
+- A type with an explicit static constructor runs it, after its static field
+  initializers, before the first instance is created or any static member is
+  referenced. Calor charges the initialization at `new`, at every static field
+  read or write, and inside every static method, operator and static property
+  accessor of the type. A public static method of such a type must therefore
+  declare the static constructor's effects in its own row.
+- A type without one is `beforefieldinit`: its initializers run at some point
+  before the first static field access. Calor charges them at static field reads
+  and writes, including the hidden backing field of a static auto-property. Its
+  static methods are not charged; a method that reads a static field is charged
+  through that read.
+- A static field declared in a preserved raw C# member counts too. Reading it
+  charges the type's initialization, which is `unknown` when the preserved
+  initializer cannot be analyzed. Reading a raw property or other raw member that
+  native code cannot see is `unknown`.
 
-```
-calor query effects Leaky
-  app.calr:11:11 function Leaky
-    declared: [pure]
-    inferred: cw
-    verdict:  does not fit — Calor0410 fires (undeclared: cw)
-```
+A direct, zero-argument CLR `System.Object()` initializer can use
+the existing constructor effect contract after successful C# projection and
+selection of that exact CLR constructor. This bounded proof requires an
+error-free projection with no preprocessor condition symbols.
+Allocation still requires `alloc`;
+the constructor's Pure contract does not make allocation pure.
 
-The verdict is one of `fits`, `does not fit`, or `cannot tell` (the body calls something
-the compiler knows nothing about; Calor0410 still fires, because enforcement fails closed).
-When the inferred row is only *assumed* — the body contains interop the compiler cannot
-see through — the answer lists why. A parameter or return that carries its own `§E{…}` is
-listed after the declaration's row. `--json` returns the same rows as a document.
+This is not general initializer binding. Other nonprimitive initializers,
+unproved operations, failed projections, partial or conditional owners, and
+opaque members that may initialize the type remain Unknown. A source type
+named `Object` does not gain CLR constructor authority. This initializer proof
+does not expand operation analysis of generated method bodies.
 
-To see what a change to a row would break, ask for the blast radius. It walks every function
-that calls the one you name, directly or through others, and checks whether the row you
-propose still fits each caller's declared row:
+Selected metadata constants such as `decimal.One` and `double.NaN` do not run
+a type initializer. Their reads retain the declared CLR type; a `float`
+constant does not become a `double`. Other metadata fields are not property
+getters and cannot borrow a getter's effect contract. A read of such a field is
+charged only from a manifest `fields` entry for that exact field, and the entry
+must cover the declaring type's initialization. The built-in manifest declares
+`System.String.Empty` pure, so `return string.Empty` needs no effect row. Fields
+without an entry, such as `System.EventArgs.Empty`, remain Unknown.
 
-```
-calor query impact Log --effects --row fs:w
-  app.calr:11:11 function Leaky — declares [pure]: does-not-fit
-  app.calr:14:11 function Relay — declares cw: does-not-fit
-  app.calr:17:11 function Fan — declares cw: does-not-fit
-impact: 3 of 3 affected declaration(s) would stop fitting a row of fs:w on app.calr:8:11 function Log
-```
+## Generic construction
 
-Leave off `--row` to use the declaration's current row; `--row ""` asks about a pure one.
+`where T : new` permits `new T()`; it does not prove that the selected runtime
+constructor is pure. A foreign constructor can mutate state, write to the
+console, or throw. `class, new` and `struct` constraints do not establish an
+effect contract either: a value type can define a parameterless constructor.
 
----
+Open generic construction is therefore Unknown under strict effect checking,
+including parameters declared on enclosing classes and construction inside lambdas.
+Declaring `alloc`, or every known effect, cannot authorize Unknown.
+This closes an unsafe allocation-only exemption; it adds no constructor-effect
+row syntax or new permission. A same-spelled source type or manifest entry
+cannot supply the generic parameter's missing constructor contract.
+
+Known concrete constructors retain their existing source or metadata rules.
+A metadata constructor is looked up by its CLR name, so `new object()` uses the
+`System.Object()` contract and needs only `alloc`.
+Source constructors still permit only intrinsic initialization mutation and
+allocation. Allocation, argument evaluation, and initializers keep their own
+effects. Arrays and primitive `default(int)` do not invoke an open generic
+constructor. Native `default(T)` for a type parameter remains unsupported by the
+parser; this change does not extend that syntax. Permissive effects retain their
+existing explicit waiver, not a proof of constructor effects.
 
 ## Effect Codes
+
+Metadata property reads charge the getter's effect row whether the receiver is
+fully qualified, imported, or aliased. Reading
+`System.Environment.CurrentDirectory`, for example, requires `env:r`; spelling
+the type's full name does not make the read pure.
+
+Static field access also accounts for declaring-type initialization (see
+[Static initialization](#static-initialization)). A
+preserved ordinary method alone does not run during that initialization;
+calling it still requires its own effect proof. Preserved initializers,
+attributed methods, and unproven member shapes remain unknown boundaries.
+
+An array's `.Length` read is pure when the binder has established an array
+receiver, including an inferred local or its alias. Creating the array still
+requires `alloc`. Other getters named `Length` keep their own effect rows:
+`System.IO.FileInfo.Length`, for example, requires `fs:r`.
 
 | Code | Effect | Description | C# Examples |
 |:-----|:-------|:------------|:------------|
@@ -213,27 +430,29 @@ Leave off `--row` to use the declaration's current row; `--row ""` asks about a 
 | `fs:r` | Filesystem read | Read from filesystem | `File.ReadAllText()` |
 | `fs:w` | Filesystem write | Write to filesystem | `File.WriteAllText()` |
 | `fs:rw` | Filesystem read/write | Read and write filesystem | `File.Copy()` |
-| `net` | Network | Unspecified network access | `Socket` operations |
+| `net` | Network | Unspecified network access | Socket operations |
 | `net:r` | Network read | HTTP GET, etc. | `HttpClient.GetStringAsync()` |
 | `net:w` | Network write | HTTP POST, etc. | `HttpClient.PostAsync()` |
 | `net:rw` | Network read/write | HTTP operations | `HttpClient.SendAsync()` |
-| `http` | HTTP | HTTP client operations | `HttpClient` usage |
 | `db` | Database | Unspecified database access | Connection setup |
 | `db:r` | Database read | Database queries | `SELECT` queries |
 | `db:w` | Database write | Database mutations | `INSERT/UPDATE/DELETE` |
 | `db:rw` | Database read/write | Database operations | ORM calls |
-| `env` | Environment | Unspecified environment access | `Environment` usage |
+| `env` | Environment | Unspecified environment access | Environment operations |
 | `env:r` | Environment read | Read environment variables | `Environment.GetEnvironmentVariable()` |
 | `env:w` | Environment write | Write environment variables | `Environment.SetEnvironmentVariable()` |
-| `env:rw` | Environment read/write | Environment operations | Read-modify-write of env vars |
+| `env:rw` | Environment read/write | Read and write environment | Read-modify-write of environment variables |
 | `proc` | Process | Spawn or control processes | `Process.Start()` |
-| `mut` | Mutation | Writes to heap state (fields, collections) | `list.Add()`, field assignment |
-| `mut:col` | Collection mutation | Mutates a collection | `dict[key] = value` |
-| `alloc` | Allocation | Allocates an object or buffer | `new`, `stackalloc`, unsafe buffers |
-| `unsafe` | Unsafe memory | Uses unsafe memory operations | pointer/fixed operations |
-| `time` | Time | Reads the clock (nondeterministic) | `DateTime.Now` |
-| `rand` | Randomness | Random number generation (nondeterministic) | `Random.Next()` |
-| `throw` | Exception | Intentionally throws exceptions | `throw` statements |
+| `mut` | Mutation | Write shared or caller-owned state | Fields, collections, `ref`/`out` parameters |
+| `mut:col` | Collection mutation | Mutate a collection | Indexed dictionary update |
+| `alloc` | Allocation | Allocate an object or buffer | `new`, array allocation |
+| `unsafe` | Unsafe memory | Use unsafe memory operations | Pointer and fixed operations |
+| `time` | Time | Read a nondeterministic clock | `DateTime.Now` |
+| `rand` | Randomness | Generate random values | `Random.Next()` |
+| `throw` | Exception | Intentionally throw an exception | `throw` statements |
+
+Writing a `ref` or `out` parameter requires `mut` because it changes the caller's
+storage. Reassigning an ordinary value parameter or a local does not.
 
 ---
 
@@ -241,74 +460,60 @@ Leave off `--row` to use the declaration's current row; `--row ""` asks about a 
 
 ### Pure Function (No Effects)
 
-```
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  // No §E means pure - no side effects
-  §R (+ a b)
+```calor
+func Add (int:a, int:b) → int
+  // No ! row declares this function pure; an effectful body would be an error.
+  return a + b
 ```
 
 Or explicitly:
 
-```
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §E{}                    // Explicitly no effects
-  §R (+ a b)
+```calor
+func Add (int:a, int:b) → int
+  !                       // Explicitly no effects
+  return a + b
 ```
 
 ### Console Output
 
-```
-§F{f001:Greet:pub}
-  §I{str:name}
-  §O{void}
-  §E{cw}                  // Console write
-  §P name
+```calor
+func Greet (string:name) → void
+  ! cw                    // Console write
+  Console.WriteLine(name)
 ```
 
 ### File Operations
 
-```
-§F{f001:CopyFile:pub}
-  §I{str:source}
-  §I{str:dest}
-  §O{bool}
-  §E{fs:rw}               // Filesystem read and write
+```calor
+func CopyFile (string:source, string:dest) → bool
+  ! fs:rw                 // Filesystem read and write
   // ...
 ```
 
 ### Network Call
 
-```
-§F{f001:FetchData:pub}
-  §I{str:url}
-  §O{str!str}
-  §E{net:rw}              // Network operations
-  // ...
+The historical public `FetchData` fragment took a string parameter named `url`
+and returned the retired `str!str` result carrier. There is no approved replacement signature for that
+example here. This fragment preserves only its network effect row; it does not
+claim that the original return type is currently authorable:
+
+```calor
+! net:rw                  // Network operations
 ```
 
 ### Database with Logging
 
-```
-§F{f001:CreateUser:pub}
-  §I{User:user}
-  §O{i32}
-  §E{db:rw,cw}            // Database and console (for logging)
+```calor
+func CreateUser (User:user) → int
+  ! db:rw,cw              // Database and console (for logging)
   // ...
 ```
 
 ### Multiple Effects
 
-```
-§F{f001:ProcessOrder:pub}
-  §I{Order:order}
-  §O{bool}
-  §E{db:rw,net:rw,fs:w,cw} // Database, network, filesystem write, console write
+```calor
+func ProcessOrder (Order:order) → bool
+  ! db:rw,net:rw,fs:w,cw   // Database, network, filesystem write, console write
   // ...
 ```
 
@@ -318,33 +523,31 @@ Or explicitly:
 
 ### Read-Only vs Read-Write
 
-```
+```calor
 // Read-only file operation
-§F{f001:LoadConfig:pub}
-  §I{str:path}
-  §O{Config}
-  §E{fs:r}                // Only filesystem read
+func LoadConfig (string:path) → Config
+  ! fs:r                  // Only filesystem read
   // ...
 
 // Read-write file operation
-§F{f002:UpdateConfig:pub}
-  §I{str:path}
-  §I{Config:config}
-  §O{void}
-  §E{fs:rw}               // Filesystem read and write
+func UpdateConfig (string:path, Config:config) → void
+  ! fs:rw                 // Filesystem read and write
   // ...
 ```
 
 ### Interactive Console
 
+```calor
+func Prompt (string:question) → string
+  ! cw,cr                 // Console write and read
+  Console.WriteLine(question)
+  return Console.ReadLine()
 ```
-§F{f001:Prompt:pub}
-  §I{str:question}
-  §O{str}
-  §E{cw,cr}               // Console write and read
-  §P question
-  §R §C{Console.ReadLine} §/C
-```
+
+This fragment retains the original non-null return signature. `ReadLine()` can
+return null at end of input, so completing it as written reports `Calor0273`.
+Choose the API's null-handling policy before using it as a complete program;
+the effect row alone does not establish a non-null result.
 
 ---
 
@@ -354,16 +557,15 @@ Or explicitly:
 
 "Find all functions that access the database":
 ```
-// Agent searches for §E{..db..}
+// Agent queries for functions whose effect rows include db:r, db:w or db:rw.
 ```
 
 ### 2. Refactoring Safety
 
 "This function should be pure, but it has effects":
-```
-§F{f001:Calculate:pub}
-  §O{i32}
-  §E{cw}                  // Wait, why is Calculate logging?
+```calor
+func Calculate () → int
+  ! cw                    // Wait, why is Calculate logging?
 ```
 
 ### 3. Testing Strategy
@@ -376,111 +578,106 @@ Or explicitly:
 
 ### 4. Composition Analysis
 
-```
+```calor
 // If f1 calls f2, f1's effects must include f2's effects
-§F{f001:ProcessAndSave:pub}
-  §E{db:rw,cw}            // Must include f002's effects
-  §C{f002:Process} ... §/C
+func ProcessAndSave () → void
+  ! db:rw,cw              // Must include Process's effects
+  Process()
 
-§F{f002:Process:pri}
-  §E{cw}                  // Has console write effect
+func Process private () → void
+  ! cw                    // Has console write effect
   // ...
 ```
 
 ---
 
-## Effect Enforcement
+## Effect Checking
 
-**Effect enforcement is enabled by default.** The compiler doesn't just warn - it **rejects** code with undeclared effects.
+Effect enforcement is on by default for compile, build, and watch workflows.
+Two rules drive everything: a function must declare every effect its body has,
+and a caller must declare everything its callees may do. A call the compiler
+cannot look up is never quietly treated as harmless.
 
-### Why Strict Enforcement?
+Collection mutators such as `Add`, `Remove`, `Clear`, `Insert`, `Sort`, and
+`CopyTo` are not on the known-pure list.
 
-In traditional languages, effect annotations are optional hints. Developers forget them, skip them under time pressure, or let them rot as code evolves.
+Reading a property runs its getter, so every read is charged the getter's
+effects. That includes each step of a chain rooted at a type: in
+`DateTime.Now.Year`, the `Now` read is charged `time` and the `Year` read is
+pure. It also includes a property sub-pattern such as `{ Balance: > 0 }`, which
+reads `Balance`. A match case's `when` guard is charged like the case body. A
+dotted name the compiler cannot resolve to a type, member, constant or enum
+member is charged `unknown`, never treated as pure.
 
-Calor takes a different approach: **effects are enforced, not suggested.**
+Indexing anything but an array runs an indexer, so `items[key]` is charged the
+indexer's getter, and `set items[key] value` its setter plus `mut`. A .NET
+indexer is charged its effect manifest entry (`List<T>`, `Dictionary<K,V>` and
+`string` indexers are pure; `config["key"]` on `IConfiguration` is `env:r`). A
+source class's own indexer is charged its accessor's row. An indexer the
+compiler cannot select, or one with no contract, is `unknown`. An array element
+costs nothing beyond its receiver and index.
 
-This is practical because Calor is designed for coding agents, not humans. Agents:
-- Generate effect annotations for free (no annotation burden)
-- Maintain perfect consistency (never forget to update)
-- Don't cut corners under deadline pressure
+### Asking the index
 
-[Learn more: Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/)
+`calor query effects Name` reports a callable's declared row, inferred body
+row and verdict: `fits`, `does not fit`, or `cannot tell`. The index reads the
+same analysis used by compilation; it does not independently infer a more
+optimistic answer. Assumed effects disclose their reasons. Use `--json` for
+structured results.
 
-### Compile-Time Errors
+`calor query impact Log --effects --row fs:w` asks which direct and transitive
+callers would no longer fit if `Log` acquired that row. Omit `--row` to use
+the current row, or use `--row ""` to ask about a pure replacement. A query
+does not edit a declaration or discharge an unknown call.
 
-```
-error Calor0410: Function 'f001' uses effect 'console_write' but does not declare it
-  Call chain: f001 → f002 → Console.WriteLine
-```
+### What the Compiler Reports
 
-The compiler provides:
-1. **Exact violation** - Which effect is missing
-2. **Call chain** - How the effect propagates through your code
-3. **Function ID** - Precise reference for agents to fix
+| Code | Level | What it means |
+|:-----|:------|:--------------|
+| `Calor0410` | Error | A function does something its `!` row does not list. The message often shows the chain of calls that got there. |
+| `Calor0411` | Warning | The compiler cannot look up what an outside call does. Add the method to a `.calor-effects.json` manifest. `--strict-effects` makes it an error. |
+| `Calor0417` | Warning | An exported `internal` function has no `!` row, so callers in other files have nothing to check against. Raised by the cross-module pass, so it only appears when you compile more than one file together. A `public` function without a row is the `Calor0124` error instead. |
+| `Calor0419` | Warning | The effects are assumed rather than checked — the body holds raw C# interop, or something the compiler does not recognise, or a call to a function whose own effects are assumed. `--strict-effects` makes it an error. |
+| `Calor0420` | Error | An override declares **more** effects than the method it overrides. Declaring fewer is fine. |
+| `Calor0421` | Error | An interface implementation declares **more** effects than the interface method. Declaring fewer is fine. |
+| `Calor0424` | Error | A callback's effects do not fit where it is being bound, passed, or returned. |
+| `Calor0425` | Warning | The compiler cannot decide whether a callback fits, because one side carries no `!` row. `--strict-effects` makes it an error. |
+| `Calor0418` | Error | You invoked something that is provably not a function — an `int`, a string, an array — so there is no effect list to charge. |
+| `Calor0406` | Error | Effect checking stopped before it finished. New in 0.16; see below. |
 
-### Interprocedural Analysis
+Calling a function value — a callback parameter, a lambda you bound to a name,
+a callback field — is not an error. Since 0.15 the compiler reads the
+callback's own `!` row and charges it to whoever calls it. `Calor0418` is left
+for the one case where the thing being invoked is not a function at all.
 
-The compiler doesn't just check individual functions. It performs **interprocedural analysis** using Strongly Connected Components (SCC) to trace effects through any depth of calls.
+### When Effect Checking Gives Up: Calor0406
 
-You cannot hide an effect by burying it in helper functions.
+New in 0.16. Effect checking runs two loops, and each has a safety limit so
+that a tangle of functions calling each other cannot make the compiler spin
+forever:
 
-```
-§F{f001:Helper:pri}
-  §C{Console.WriteLine} "hidden"   // Has cw effect
+- Working out the effects of a group of functions that all call each other.
+  The limit is 100 rounds. From 100 functions upward the limit is instead one
+  round per function in the group, plus one more round to confirm nothing
+  changed — so a big but ordinary group never trips it.
+- Carrying the real value of an effect placeholder up through a chain of
+  callers. The limit is 10,000 steps.
 
-§F{f002:Main:pub}
-  §O{void}
-  // No §E declaration
-  §C{f001:Helper}                  // ERROR: cw effect leaks through
-```
+If either loop reaches its limit while the answer is still changing, the
+compiler reports `Calor0406`, naming which loop stopped, the limit, and the
+functions involved. It is always an error and no flag waives it: a check the
+compiler did not finish must not be handed back as a clean build.
 
-### Soundness Diagnostics (v0.11 strictness batch)
+Before 0.16 the first loop reported `Calor0600` — a code that belongs to a
+different family — and the second stopped without saying anything at all.
 
-Effect enforcement is fail-closed. The diagnostics on the enforcement surface:
+### Turning the Checks Down
 
-- **Calor0410** — a function uses an effect it does not declare (with call chain).
-- **Calor0411** — an unknown external call; add the callee to a `.calor-effects.json` manifest. Unknown calls contribute worst-case effects, so under the default policy they fail loud rather than being assumed pure.
-- **Calor0403** — an unknown or misspelled source effect code. Source declarations and manifests use the same authoritative taxonomy; unknown codes are rejected.
-- **Calor0418** — invocation of a value whose type is provably not a function type (`i32`, `str`, an array). Since v0.15 (E4) a function-typed value — a parameter, binding, field, or call result — is **charged through its effect row** when invoked, so this code no longer fires for it: a row the compiler knows is charged silently (and shows up in Calor0410's `Effect row: charged by invoking …` line if the caller under-declares), an assumed row is charged and reported once as Calor0425, and a row the compiler cannot determine is Calor0425 at the call plus an unknown-effect charge that fails closed. Calor0418 is an **error** under every policy; `--permissive-effects` does not demote it.
-- **Calor0419** — the effects of a function are **assumed**, not verified: it contains raw C# interop (`§CSHARP`/`§CS`), an unrecognized construct, or calls a function whose effects are assumed. The assumption propagates to callers through the interprocedural pass. Warning by default; error under `--strict-effects`.
-- **Calor0420** — an override declares effects not covered by its base method's declared `§E` (override `§E` must be a subset of base `§E`). Broader override effects would launder through dynamic dispatch.
-- **Calor0421** — an interface implementation declares effects not covered by the interface method's declared `§E`.
-- **Calor0422** — a constructor body performs effects beyond intrinsic initialization mutation/allocation (`mut`, `alloc`). Constructor syntax currently has no `§E` surface, so other effects fail closed; move effectful work to a declared method.
-- **Calor0423** — a custom property or event accessor body performs effects beyond intrinsic accessor mutation. Accessors currently have no `§E` surface, so such bodies fail closed.
-- **Calor0406** — effect inference **stopped before it finished**. Two loops in the pass have a safety cap: the fixpoint over a group of mutually recursive functions (100 rounds, or one more than the group's size if that is larger — it is the group's size that sets how many rounds a well-behaved group can need, so at the default cap this only fires for an inference that misbehaves) and the worklist that carries a placeholder's instantiated effects up through a chain of callers (10 000 steps). If either cap is reached while the effect sets are still changing, the effects computed for the functions named in the message may be incomplete, so any Calor0410 the compiler did *not* report for them cannot be trusted. **Always an error, and no flag waives it** — this is not "we cannot tell" about one value, it is the compiler refusing to vouch for a result it did not finish. The message names which loop stopped, the cap, and the functions involved; for the first loop, splitting the recursive group is the usual fix. Neither cap has ever been reached on the corpus. Since v0.16; before that the first loop reported the API-strictness code Calor0600 and the second stopped silently.
-- **Calor0424** — an effect **row** does not fit where the value is going: a function value with a wider row is assigned to a binding, passed as an argument, or returned into a position whose row is narrower. **Always an error, and no flag waives it** — not even `--permissive-effects`. The message names both rows and the extra effect(s), so the fix is either to widen the destination's `§E{…}` or to pass a function whose row fits.
-- **Calor0425** — an effect **row** cannot be decided at one of those same places, because one side (or both) carries no row and so is Unknown, or because it fits only under an assumption. Warning by default; error under `--strict-effects`; **suppressed** by `--permissive-effects`. Add `§E{…}` on the same line as the type to say what may be passed.
+`--no-enforce-effects` switches effect checking off. Use it only as a
+deliberate migration waiver.
 
-The two are the same question asked twice: Calor0424 is *we know it does not fit*, Calor0425 is *we cannot tell*. `--permissive-effects` waives only the second — a waiver for "we do not know" is honest, a waiver for "we know it is wrong" is not. That is also why **`--permissive-effects` no longer softens Calor0420 or Calor0421**: an override or implementation that broadens its base's effect set is an error under every flag as of v0.15.
-
-Calls through a receiver whose static type is an in-module interface or class charge the static type's *declared* `§E` — sound because Calor0420/Calor0421 pin every override and implementation to a subset of that declared set, **including implementations inherited from in-module base classes**. Overrides of **external C# base classes**, and interface implementations satisfied by members inherited from external bases, cannot be variance-checked and are surfaced through the Calor0419 assumption channel instead.
-
-Calls, constructors, object-initializer setters, event accessors, and disposal are
-resolved using receiver/constructed type plus inferred argument types. A manifest
-signature may therefore distinguish overloads. No production purity decision is
-made from a bare method name: unresolved receivers, extensions, constructors, or
-`Dispose` calls remain unknown under the strict policy. Every `§NEW` also charges
-`alloc`; object initializers and event subscriptions charge `mut` in addition to
-resolved accessor effects.
-
-### Disabling Enforcement (Not Recommended)
-
-For migration scenarios, you can disable enforcement:
-
-```bash
-calor --input myprogram.calr --no-enforce-effects
-```
-
-Or in MSBuild:
-
-```xml
-<PropertyGroup>
-  <CalorEnforceEffects>false</CalorEnforceEffects>
-</PropertyGroup>
-```
-
-A gentler step for converted code keeps enforcement on but relaxes what the compiler
-assumes about calls it cannot resolve — the CLI's `--permissive-effects`, or in MSBuild:
+`--permissive-effects` is the gentler step. It keeps checking on but assumes a
+call the compiler cannot look up does nothing. In a project file:
 
 ```xml
 <PropertyGroup>
@@ -488,19 +685,34 @@ assumes about calls it cannot resolve — the CLI's `--permissive-effects`, or i
 </PropertyGroup>
 ```
 
-The default is `false` (strict). Under the permissive policy unknown calls are assumed pure,
-so `Calor0411` (unknown external call) and `Calor0425` ("cannot be decided") are suppressed,
-and `Calor0410` — "uses effect X but does not declare it" — is reported as a warning, in the
-per-file pass and in the cross-module pass alike.
+What it waives:
 
-It does **not** waive a row the code states and then contradicts: `Calor0424` (a row that
-does not fit) and `Calor0420` / `Calor0421` (an override or interface implementation that
-**broadens** the effects it inherited; narrowing is legal) remain errors under every flag.
+- `Calor0411` and `Calor0425` — the two "I cannot tell what this does"
+  messages — are not reported at all.
+- `Calor0410`, "this function does something it never said it would", is
+  reported as a warning instead of an error. That holds both inside a single
+  file and across files.
+
+What it never waives — these stay errors under every flag:
+
+- `Calor0424`, a callback whose effects do not fit where it is going.
+- `Calor0420` and `Calor0421`, an override or interface implementation that
+  declares **more** effects than the member it inherits from. Declaring fewer
+  is always allowed.
+- `Calor0418` and `Calor0406`.
+- Three narrower forms of `Calor0410`: the one about a lambda's own `!`
+  line, and two about effect variables.
+
+Waiving "we cannot tell" is honest; waiving "we know this is wrong" is not.
+
+Because unknown calls are counted as doing nothing, permissive mode gives up
+the effect guarantee. [Review packets](https://calor.dev/docs/cli/review-packet/) disclose that
+waiver on their first line.
 
 ---
 
 ## Next
 
-- [Effects & Contracts Enforcement](/calor/philosophy/effects-contracts-enforcement/) - Why this matters
-- [Contracts](/calor/syntax-reference/contracts/) - Preconditions and postconditions
-- [Benchmarking](/calor/benchmarking/) - See how effects help comprehension
+- [Effect manifests and package import](/guides/effect-manifests/) - External call coverage
+- [calor query](https://calor.dev/docs/cli/query/) - Ask what a function declares, what it really does, and what a change would break
+- [Adoption Playbook](/guides/adoption-playbook/) - Applying effects in an existing solution

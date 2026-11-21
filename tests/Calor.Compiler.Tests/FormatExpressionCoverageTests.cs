@@ -35,10 +35,10 @@ public class FormatExpressionCoverageTests
     public void Format_ConditionalExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{i32}
-                §R (? true 1 0)
+            module Test Test block
+              func Foo () → int
+                !
+                return (true ? 1 : 0)
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ConditionalExpressionNode */", result);
@@ -49,14 +49,15 @@ public class FormatExpressionCoverageTests
     public void Format_DecimalLiteral_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{void}
-                §B{x} DEC:3.14
+            module Test Test block
+              func Foo () → void
+                !
+                let x = 3.14m
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* DecimalLiteralNode */", result);
-        Assert.Contains("DEC:", result);
+        Assert.Contains("3.14m", result);
+        Assert.DoesNotContain("DEC:", result);
     }
 
     #endregion
@@ -67,11 +68,11 @@ public class FormatExpressionCoverageTests
     public void Format_InterpolatedString_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{str}
-                §B{name} "World"
-                §R §INTERP "Hello, " §EXP name "!" §/INTERP
+            module Test Test block
+              func Foo () → string
+                !
+                let name = "World"
+                return "Hello, ${name}!"
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* InterpolatedStringNode */", result);
@@ -85,10 +86,10 @@ public class FormatExpressionCoverageTests
     public void Format_RangeExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{void}
-                §B{r} §RANGE 1 5
+            module Test Test block
+              func Foo () → void
+                !
+                let r = 1..5
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* RangeExpressionNode */", result);
@@ -96,7 +97,7 @@ public class FormatExpressionCoverageTests
         // renders ranges as the canonical `§RANGE start end` section marker
         // (parser-symmetric with the source form), not the legacy `start..end`
         // pretty-print produced by the old hand-coded formatter.
-        Assert.Contains("§RANGE", result);
+        Assert.Contains("1..5", result);
     }
 
     [Fact]
@@ -133,86 +134,72 @@ public class FormatExpressionCoverageTests
     public void Format_ListCreation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{void}
-                §LIST{l1:i32}
-                  1
-                  2
-                  3
-                §/LIST{l1}
+            module Test Test block
+              func Foo () → void
+                !
+                let List<int>:l1 = new List<int>() { 1, 2, 3 }
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ListCreationNode */", result);
-        Assert.Contains("§LIST", result);
+        Assert.Contains("new List<int>()", result);
     }
 
     [Fact]
     public void Format_DictionaryCreation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{void}
-                §DICT{d1:str:i32}
-                  §KV "one" 1
-                  §KV "two" 2
-                §/DICT{d1}
+            module Test Test block
+              func Foo () → void
+                !
+                let Dictionary<string, int>:d1 = new Dictionary<string, int>() { { "one", 1 }, { "two", 2 } }
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* DictionaryCreationNode */", result);
-        Assert.Contains("§DICT", result);
+        Assert.Contains("new Dictionary<string, int>()", result);
     }
 
     [Fact]
     public void Format_SetCreation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{void}
-                §HSET{s1:str}
-                  "apple"
-                  "banana"
-                §/HSET{s1}
+            module Test Test block
+              func Foo () → void
+                !
+                let HashSet<string>:s1 = new HashSet<string>() { "apple", "banana" }
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* SetCreationNode */", result);
-        Assert.Contains("§HSET", result);
+        Assert.Contains("new HashSet<string>()", result);
     }
 
     [Fact]
     public void Format_CollectionCount_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{i32}
-                §LIST{l1:i32}
-                  1
-                §/LIST{l1}
-                §R §CNT l1
+            module Test Test block
+              func Foo () → int
+                !
+                let List<int>:l1 = new List<int>() { 1 }
+                return l1 . Count
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* CollectionCountNode */", result);
-        Assert.Contains("§CNT", result);
+        Assert.Contains("Count", result);
     }
 
     [Fact]
     public void Format_CollectionContains_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{bool}
-                §LIST{l1:i32}
-                  1
-                §/LIST{l1}
-                §R §HAS{l1} 1
+            module Test Test block
+              func Foo () → bool
+                !
+                let List<int>:l1 = new List<int>() { 1 }
+                return l1.Contains(1)
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* CollectionContainsNode */", result);
-        Assert.Contains("§HAS", result);
+        Assert.Contains("Contains(1)", result);
     }
 
     #endregion
@@ -223,11 +210,11 @@ public class FormatExpressionCoverageTests
     public void Format_ArrayLength_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{i32}
-                §B{arr} §ARR{arr:i32} 1 2 3 §/ARR{arr}
-                §R §LEN arr
+            module Test Test block
+              func Foo () → int
+                !
+                let arr = new int[] { 1, 2, 3 }
+                return arr.Length
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ArrayLengthNode */", result);
@@ -241,45 +228,45 @@ public class FormatExpressionCoverageTests
     public void Format_StringOperation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{str}
-                §B{s} "hello"
-                §R (upper s)
+            module Test Test block
+              func Foo () → string
+                !
+                let s = "hello"
+                return (s).ToUpper()
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* StringOperationNode */", result);
-        Assert.Contains("upper", result);
+        Assert.Contains("ToUpper()", result);
     }
 
     [Fact]
     public void Format_CharOperation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{bool}
-                §B{c} (char-lit "A")
-                §R (is-letter c)
+            module Test Test block
+              func Foo () → bool
+                !
+                let c = 'A'
+                return char.IsLetter(c)
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* CharOperationNode */", result);
-        Assert.Contains("is-letter", result);
+        Assert.Contains("IsLetter(c)", result);
     }
 
     [Fact]
     public void Format_StringBuilderOperation_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{str}
-                §B{sb} (sb-new)
-                §R (sb-tostring sb)
+            module Test Test block
+              func Foo () → string
+                ! alloc
+                let sb = new System.Text.StringBuilder()
+                return sb.ToString()
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* StringBuilderOperationNode */", result);
-        Assert.Contains("sb-tostring", result);
+        Assert.Contains("sb.ToString()", result);
     }
 
     #endregion
@@ -290,12 +277,11 @@ public class FormatExpressionCoverageTests
     public void Format_ForallExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §I{i32:x}
-                §O{i32}
-                §Q (forall ((n i32)) (>= n 0))
-                §R x
+            module Test Test block
+              func Foo (int:x) → int
+                !
+                requires forall int:n in 0..x : n >= 0
+                return x
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ForallExpressionNode */", result);
@@ -306,32 +292,15 @@ public class FormatExpressionCoverageTests
     public void Format_ExistsExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §I{i32:x}
-                §O{i32}
-                §Q (exists ((n i32)) (> n 0))
-                §R x
+            module Test Test block
+              func Foo (int:x) → int
+                !
+                requires exists int:n in 0..x : n > 0
+                return x
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* ExistsExpressionNode */", result);
         Assert.Contains("exists", result);
-    }
-
-    [Fact]
-    public void Format_ImplicationExpression_NoFallbackComment()
-    {
-        var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §I{i32:x}
-                §O{i32}
-                §Q (-> (> x 0) (>= x 1))
-                §R x
-            """;
-        var result = FormatModule(source);
-        Assert.DoesNotContain("/* ImplicationExpressionNode */", result);
-        Assert.Contains("->", result);
     }
 
     #endregion
@@ -342,13 +311,11 @@ public class FormatExpressionCoverageTests
     public void Format_WithExpression_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{void}
-                §B{p} §NEW{Person} §/NEW
-                §B{p2} §WITH p
-                  §SET{Name} "Alice"
-                §/WITH
+            module Test Test block
+              func Foo () → void
+                !
+                let p = new Person()
+                let p2 = p with { Name = "Alice" }
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* WithExpressionNode */", result);
@@ -356,7 +323,7 @@ public class FormatExpressionCoverageTests
         // renders C# `with` expressions as the canonical `§WITH target ... §/WITH`
         // section-marker form (parser-symmetric with the source), not the legacy
         // `target with { ... }` pretty-print produced by the old formatter.
-        Assert.Contains("§WITH", result);
+        Assert.Contains("p with { Name = \"Alice\" }", result);
     }
 
     #endregion
@@ -403,17 +370,14 @@ public class FormatExpressionCoverageTests
     public void Format_AnonymousObject_NoFallbackComment()
     {
         var source = """
-            §M{m1:Test}
-              §F{f1:Foo:pub}
-                §O{void}
-                §B{obj} §ANON
-                  Name = "Alice"
-                  Age = 30
-                §/ANON
+            module Test Test block
+              func Foo () → void
+                !
+                let obj = new { Name = "Alice", Age = 30 }
             """;
         var result = FormatModule(source);
         Assert.DoesNotContain("/* AnonymousObjectCreationNode */", result);
-        Assert.Contains("§ANON", result);
+        Assert.Contains("new { Name = \"Alice\", Age = 30 }", result);
     }
 
     #endregion
@@ -425,14 +389,13 @@ public class FormatExpressionCoverageTests
     {
         // A function using multiple expression types that were previously unhandled
         var source = """
-            §M{m1:Test}
-              §F{f1:Complex:pub}
-                §I{str:input}
-                §O{i32}
-                §B{upper} (upper input)
-                §B{length} (len upper)
-                §B{result} (? (> length 5) 1 0)
-                §R result
+            module Test Test block
+              func Complex (string:input) → int
+                !
+                let upper = (input).ToUpper()
+                let length = upper.Length
+                let result = ((length > 5) ? 1 : 0)
+                return result
             """;
         var result = FormatModule(source);
 

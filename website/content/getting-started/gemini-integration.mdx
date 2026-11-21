@@ -30,7 +30,8 @@ This creates:
 
 ## Calor-First Enforcement
 
-Unlike Codex CLI, **Gemini CLI supports hooks** (since its v0.26 release). This means Calor-first development is **enforced**, not just guided.
+The generated Gemini hooks validate covered file writes. Codex also has
+project hooks; neither integration replaces compilation, tests or code review.
 
 When Gemini tries to create a `.cs` file, the hook blocks the operation and returns:
 
@@ -42,7 +43,8 @@ When Gemini tries to create a `.cs` file, the hook blocks the operation and retu
 }
 ```
 
-Gemini will then automatically retry with an `.calr` file.
+The denial tells the agent to use a `.calr` file. It does not guarantee that the
+agent will retry correctly. Review the next action and compile the result.
 
 ---
 
@@ -59,15 +61,14 @@ The init command also configures an **MCP (Model Context Protocol) server** that
 
 The MCP server is configured in `.gemini/settings.json` alongside hooks:
 
-```json
+```json illustrative
 {
   "mcpServers": {
     "calor": {
       "command": "calor",
       "args": ["mcp", "--stdio"]
     }
-  },
-  "hooks": { ... }
+  }
 }
 ```
 
@@ -83,23 +84,38 @@ calor_query         - Project index: callers, callees, impact, effect rows
 
 ### Example: Contract Verification
 
-Gemini can verify your contracts are correct:
+Ask Gemini to check a complete native program, rather than a detached function
+whose imports and surrounding declarations are unknown:
 
-```
+```text illustrative
 You: Does this function have any contract violations?
-
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §E{}
-  §Q (!= b 0)
-  §R (/ a b)
-
-Gemini: [Uses calor_verify]
-The precondition is satisfiable and excludes b = 0 for valid callers.
-It is assumed while verifying the body; the runtime precondition check remains.
 ```
+
+```calor
+module GeminiDivision
+  func Divide public (int:a, int:b) → int
+    !
+    requires b != 0
+    return a / b
+```
+
+`Divide(9, 2)` returns `4`, and `Divide(9, -2)` returns `-4`. Integer division
+truncates toward zero. With runtime contracts enabled, `Divide(9, 0)` fails its
+precondition; with contracts off, it throws `DivideByZeroException` instead.
+`Divide(int.MinValue, -1)` still throws `OverflowException` in both modes.
+The nonzero-divisor contract does not exclude that overflow case.
+
+An illustrative review might say:
+
+```text illustrative
+The precondition excludes b = 0 for valid callers. It is assumed while
+verifying the body; the runtime precondition check remains. Report the actual
+calor_verify status and any assumptions separately from runtime results.
+```
+
+This is not a recorded Gemini response or a proof that every input is safe.
+An unsupported expression, timeout or unresolved obligation is not a proven
+contract.
 
 ### Available Tools
 
@@ -162,7 +178,7 @@ public class Calculator
 
 ## Best Practices
 
-1. **Trust the enforcement** - Gemini CLI will block `.cs` creation
+1. **Check enforcement coverage** - Inspect the generated hooks and verify that the tools you use run them
 2. **Use explicit instructions** - Be specific about contracts and effects
 3. **Start with skill reference** - Begin prompts with `@calor` or `@calor-convert`
 4. **Review contracts** - Verify generated contracts match your requirements

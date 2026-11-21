@@ -1,0 +1,108 @@
+module L2M19 L2M19 block
+  module L2M19Module public
+
+    func l2m19_fn01 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22681)
+      if (x >= 22681)
+        return x
+      else
+        return 22681
+
+    func l2m19_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 3) + y)
+      if (acc > 22688)
+        return (acc + 22688)
+      else
+        return ((acc * 2) + 22688)
+
+    func l2m19_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 22695)
+      let int:total = ((x * 5) + y)
+      if (total < 22695)
+        return 22695
+      else
+        return total
+
+    func l2m19_fn04 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22702)
+      if (x >= 22702)
+        return x
+      else
+        return 22702
+
+    func l2m19_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 2)
+      requires (y >= 0)
+      => (result >= 22709)
+      let int:total = ((x * 5) + y)
+      if (total < 22709)
+        return 22709
+      else
+        return total
+
+    func l2m19_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22716)
+      let int:total = ((x * 2) + y)
+      if (total > 22716)
+        return 22716
+      return total
+
+    func l2m19_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M14.L3M14Module.l3m14_fn05(x, 3)
+      return (v1 + y)
+
+    func l2m19_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M32.L3M32Module.l3m32_fn05(x, 82)
+      return (v1 + y)
+
+    func l2m19_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22723)
+      if (x >= 22723)
+        return x
+      else
+        return 22723
+
+    func l2m19_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22730)
+      if (x >= 22730)
+        return x
+      else
+        return 22730
+
+    func l2m19_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M17.L3M17Module.l3m17_fn08(x, 78)
+      return (v1 + y)
+
+    func l2m19_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M07.L3M07Module.l3m07_fn07(x, 6)
+      return (v1 + y)
+
+    func l2m19_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M18.L3M18Module.l3m18_fn12(x, 87)
+      return (v1 + y)

@@ -264,20 +264,12 @@ public class GitHubCopilotMcpTests : IDisposable
     // config, then compile against it.
     // ------------------------------------------------------------------
 
-    // Program built purely from the exemplar idioms shipped in
-    // copilot-instructions.md.template: inline §F signature, §E{mut,alloc} for
-    // a mutating body that allocates a list, the empty-list literal, §PUSH
-    // under a loop, §CNT, and §R.
-    private const string ExemplarIdiomProgram =
-        "§M{m001:CopilotSmoke}\n" +
-        "  §F{f001:Collect:pub} (i32:n) -> i32\n" +
-        "    §E{mut,alloc}\n" +
-        "    §LIST{items:i32}\n" +
-        "    §/LIST{items}\n" +
-        "    §L{l001:i:1:n:1}\n" +
-        "      §PUSH{items} i\n" +
-        "    §B{count:i32} §CNT{items}\n" +
-        "    §R count\n";
+    // The smoke program exercises allocation, loop mutation and collection count
+    // from the same reference linked by the generated instructions.
+    private static string ExemplarIdiomProgram =>
+        Assert.Single(Calor.Compiler.SelfCheck.ExemplarCompileChecker.ExtractCompletePrograms(
+            EmbeddedResourceHelper.ReadResource("Calor.Compiler.Resources.current-language-reference.md"))
+            .Where(program => program.Source.StartsWith("module CopilotSmoke\n", StringComparison.Ordinal))).Source;
 
     [Fact]
     public async Task Smoke_GeneratedInstructions_CarryExemplarIdioms()
@@ -291,11 +283,11 @@ public class GitHubCopilotMcpTests : IDisposable
 
         var content = await File.ReadAllTextAsync(instructionsPath);
 
-        // The E1a-hardened exemplar must be present in the shipped artifact.
-        Assert.Contains("Exemplar idioms", content);
-        Assert.Contains("§A", content);                 // call-argument prefix
-        Assert.Contains("§/C", content);                 // call-argument list closer
-        Assert.Contains("returns an ARRAY", content);    // the arrays-vs-lists trap
+        Assert.Contains("calor://primer", content);
+        var primer = Calor.Compiler.Mcp.McpMessageHandler.GetPrimerContentPublic();
+        Assert.Contains("File.ReadAllLines(path)", primer);
+        Assert.Contains("set name expression", primer);
+        Assert.Contains("returns string[], not List<string>", primer);
     }
 
     [Fact]

@@ -1,0 +1,9 @@
+module ArrayOps ArrayOps
+  module ArrayOpsModule
+    func Sum public (int:a, int:b, int:c) → int
+      !
+      return (a + b) + c
+
+    func SumTwo public (int:a, int:b) → int
+      !
+      return a + b

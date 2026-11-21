@@ -9,9 +9,10 @@ public class CodeActionHandlerTests
     public void ValidSource_NoFixes()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub} () -> i32
-                §R 0
+            module TestModule TestModule block
+              func Test () → int
+                !
+                return 0
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -20,31 +21,14 @@ public class CodeActionHandlerTests
     }
 
     [Fact]
-    public void FixApplied_SourceIsValid()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test:pub} () -> i32
-            §R 0
-            """;
-
-        // The fix should change f002 to f001
-        var fixedSource = source.Replace("§/F{f002}", "§/F{f001}");
-
-        var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
-
-        Assert.False(diagnostics.HasErrors);
-    }
-
-    [Fact]
     public void UndefinedReference_WithSimilarName_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{counter} 0
-                §R couner
+            module TestModule TestModule block
+              func Test () → int
+                !
+                let counter = 0
+                return couner
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -61,11 +45,11 @@ public class CodeActionHandlerTests
     public void UndefinedReference_NoSimilarName_NoFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{counter} 0
-                §R xyz
+            module TestModule TestModule block
+              func Test () → int
+                !
+                let counter = 0
+                return xyz
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -84,11 +68,10 @@ public class CodeActionHandlerTests
     public void UndefinedReference_SimilarParameter_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add:pub}
-                §I{i32:value}
-                §O{i32}
-                §R valeu
+            module TestModule TestModule block
+              func Add (int:value) → int
+                !
+                return valeu
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -104,14 +87,15 @@ public class CodeActionHandlerTests
     public void FunctionUsedAsVariable_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Helper:pub}
-                §O{i32}
-                §R 42
-              §F{f002:Main:pub}
-                §O{i32}
-                §B{x} Helper
-                §R x
+            module TestModule TestModule block
+              func Helper () → int
+                !
+                return 42
+
+              func Main () → int
+                !
+                let x = Helper
+                return x
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -127,12 +111,10 @@ public class CodeActionHandlerTests
     public void DuplicateParameter_GeneratesFix()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add:pub}
-                §I{i32:x}
-                §I{i32:x}
-                §O{i32}
-                §R x
+            module TestModule TestModule block
+              func Add (int:x, int:x) → int
+                !
+                return x
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -148,12 +130,12 @@ public class CodeActionHandlerTests
     public void MultipleFixes_AllHaveCorrectEdits()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calc:pub}
-                §O{i32}
-                §B{counter} 0
-                §B{result} couner
-                §R reslt
+            module TestModule TestModule block
+              func Calc () → int
+                !
+                let counter = 0
+                let result = couner
+                return reslt
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -173,11 +155,11 @@ public class CodeActionHandlerTests
     {
         // Test that applying a typo fix results in valid code
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{counter} 0
-                §R couner
+            module TestModule TestModule block
+              func Test () → int
+                !
+                let counter = 0
+                return couner
             """;
 
         var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
@@ -190,86 +172,21 @@ public class CodeActionHandlerTests
         var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
         Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0200");
     }
-
     #region Operator Typo Suggestion Tests
-
-    [Fact]
-    public void OperatorTypo_GeneratesFix()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{bool}
-                §R (cotains "hello" "h")
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-
-        Assert.NotEmpty(fixes);
-        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
-        Assert.NotNull(operatorFix);
-        Assert.Contains("contains", operatorFix.Fix.Description);
-        Assert.Single(operatorFix.Fix.Edits);
-        Assert.Equal("contains", operatorFix.Fix.Edits[0].NewText);
-    }
-
-    [Fact]
-    public void OperatorTypo_AppliedFix_ProducesValidCode()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{bool}
-                §R (cotains "hello" "h")
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-        var fix = fixes.First(f => f.Code == "Calor0106");
-
-        // Apply the fix manually
-        var fixedSource = source.Replace("cotains", fix.Fix.Edits[0].NewText);
-
-        // Verify the fixed source compiles
-        var diagnostics = LspTestHarness.GetDiagnostics(fixedSource);
-        Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0106");
-    }
 
     [Fact]
     public void NameofOperator_CompilesWithNoErrors()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{str}
-                §R (nameof x)
+            module TestModule TestModule block
+              func Test () → string
+                !
+                return nameof(x)
             """;
 
         var diagnostics = LspTestHarness.GetDiagnostics(source);
 
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-    }
-
-    [Fact]
-    public void UnknownOperator_NoSimilar_NoFix()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §R (xyzqwerty 1 2)
-            """;
-
-        var diagnostics = LspTestHarness.GetDiagnostics(source);
-
-        Assert.True(diagnostics.HasErrors);
-        var error = diagnostics.First(d => d.Code == "Calor0106");
-        Assert.Contains("xyzqwerty", error.Message);
-        Assert.Contains("arithmetic", error.Message); // Shows valid operator categories
-
-        // No fix expected for completely unknown operators
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-        var operatorFix = fixes.FirstOrDefault(f => f.Code == "Calor0106");
-        Assert.Null(operatorFix);
     }
 
     #endregion

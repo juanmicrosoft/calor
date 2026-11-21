@@ -136,7 +136,7 @@ public class TupleAssignmentMigrationTests
         if (native)
         {
             Assert.DoesNotContain(conversion.Losses, loss => loss.Feature == "tuple-deconstruction");
-            Assert.Contains("§ASSIGN (", conversion.CalorSource);
+            Assert.Contains("set (", conversion.CalorSource);
         }
         else
         {

@@ -1,0 +1,10 @@
+module AsyncEffect AsyncEffect
+  module AsyncEffectModule
+    func FetchData public async (string:url) → string
+      ! net
+      return url
+
+    func LogAndFetch public async (string:url) → string
+      ! cw
+      System.Console.WriteLine(url)
+      return url

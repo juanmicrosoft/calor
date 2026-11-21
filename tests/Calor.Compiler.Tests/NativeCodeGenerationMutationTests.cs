@@ -1,3 +1,6 @@
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 using Calor.Enforcement.Tests;
 using Xunit;
 
@@ -9,36 +12,42 @@ public class NativeCodeGenerationMutationTests
     public void Arithmetic_PreservesDistinctOperands()
     {
         const string source = """
-            §M{m:Arithmetic}
-              §F{f:Calculate:pub} (i32:left, i32:right) -> i32
-                §E{}
-                §R (+ (* left INT:3) right)
+            module Arithmetic
+              func Calculate public (int:left, int:right) → int
+                !
+                return left * 3 + right
             """;
 
-        var result = TestHarness.Execute(source, "Calculate", [7, 5], new CompilationOptions());
-
-        Assert.Null(result.Exception);
-        Assert.Equal(26, result.ReturnValue);
+        foreach (var candidate in new[] { source, EmitNative(source) })
+        {
+            var result = TestHarness.Execute(candidate, "Calculate", [7, 5], new CompilationOptions());
+            Assert.Null(result.Exception);
+            Assert.Equal(26, result.ReturnValue);
+        }
     }
 
     [Fact]
     public void BinaryOperands_ExecuteOnceInSourceOrder()
     {
         const string source = """
-            §M{m:OperandOrder}
-              §F{r:Record:priv} (List<i32>:trace, i32:value) -> i32
-                §C{trace.Add} §A value §/C
-                §R value
-              §F{f:Calculate:pub} (List<i32>:trace) -> i32
-                §R (- §C{Record} §A trace §A INT:1 §/C §C{Record} §A trace §A INT:2 §/C)
+            module OperandOrder
+              func Record private (System.Collections.Generic.List<int>:trace, int:value) → int
+                trace.Add(value)
+                return value
+              func Calculate public (System.Collections.Generic.List<int>:trace) → int
+                ! mut
+                return Record(trace, 1) - Record(trace, 2)
             """;
-        var trace = new List<int>();
 
-        var result = TestHarness.Execute(source, "Calculate", [trace]);
-
-        Assert.Null(result.Exception);
-        Assert.Equal(-1, result.ReturnValue);
-        Assert.Equal([1, 2], trace);
+        foreach (var candidate in new[] { source, EmitNative(source) })
+        {
+            var trace = new List<int>();
+            var result = TestHarness.Execute(candidate, "Calculate", [trace], new CompilationOptions());
+            Assert.Null(result.Exception);
+            Assert.Equal(-1, result.ReturnValue);
+            Assert.Equal([1, 2], trace);
+            AssertMutationRequired(candidate, "Calculate");
+        }
     }
 
     [Theory]
@@ -47,19 +56,48 @@ public class NativeCodeGenerationMutationTests
     public void Conditional_ExecutesOnlySelectedArm(bool chooseFirst, int expected)
     {
         const string source = """
-            §M{m:ConditionalOrder}
-              §F{r:Record:priv} (List<i32>:trace, i32:value) -> i32
-                §C{trace.Add} §A value §/C
-                §R value
-              §F{f:Choose:pub} (List<i32>:trace, bool:first) -> i32
-                §R (? first §C{Record} §A trace §A INT:11 §/C §C{Record} §A trace §A INT:22 §/C)
+            module ConditionalOrder
+              func Record private (System.Collections.Generic.List<int>:trace, int:value) → int
+                trace.Add(value)
+                return value
+              func Choose public (System.Collections.Generic.List<int>:trace, bool:first) → int
+                ! mut
+                return first ? Record(trace, 11) : Record(trace, 22)
             """;
-        var trace = new List<int>();
 
-        var result = TestHarness.Execute(source, "Choose", [trace, chooseFirst]);
+        foreach (var candidate in new[] { source, EmitNative(source) })
+        {
+            var trace = new List<int>();
+            var result = TestHarness.Execute(candidate, "Choose", [trace, chooseFirst], new CompilationOptions());
+            Assert.Null(result.Exception);
+            Assert.Equal(expected, result.ReturnValue);
+            Assert.Equal([expected], trace);
+            AssertMutationRequired(candidate, "Choose");
+        }
+    }
 
-        Assert.Null(result.Exception);
-        Assert.Equal(expected, result.ReturnValue);
-        Assert.Equal([expected], trace);
+    private static string EmitNative(string source)
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain('§', emitted);
+        Assert.DoesNotContain("raw ", emitted);
+        return emitted;
+    }
+
+    private static void AssertMutationRequired(string source, string caller)
+    {
+        var rejected = Program.Compile(source.Replace("! mut", "!", StringComparison.Ordinal),
+            filePath: null, options: new CompilationOptions());
+        Assert.True(rejected.HasErrors);
+        var errors = rejected.Diagnostics.Errors.ToArray();
+        Assert.All(errors, diagnostic => Assert.Equal(DiagnosticCode.ForbiddenEffect, diagnostic.Code));
+        // Record is private, so it infers its row; only the public caller's declared row is checked.
+        Assert.Equal($"Function '{caller}' uses effect 'mut' but does not declare it",
+            Assert.Single(errors).Message);
+        Assert.DoesNotContain(rejected.Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
     }
 }

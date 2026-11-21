@@ -1,0 +1,21 @@
+module MiddlewareAfter MiddlewareAfter block
+  interface IPipelineBehavior
+    func Handle (int:request, Func<int>:next ! unknown) → int
+      !
+
+  class RetryBehavior
+    implements IPipelineBehavior
+
+    func Handle (int:request, Func<int>:next ! unknown) → int
+      !
+      return MiddlewareAfterModule.RunTwice(next)
+
+
+  module MiddlewareAfterModule partial
+    func RunTwice (Func<int>:g ! unknown) → int
+      !
+      let int:first = g()
+      let int:second = g()
+      return (first + second)
+
+

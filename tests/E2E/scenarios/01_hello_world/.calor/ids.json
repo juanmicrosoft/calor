@@ -1,0 +1,32 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_t2fax0jhssbq",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Hello",
+      "Signature": ""
+    },
+    {
+      "Id": "m_w76r5r1re5hr",
+      "File": "input.calr",
+      "Container": "Hello",
+      "Kind": 0,
+      "Name": "HelloModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_w1bf30mbehz5",
+      "File": "input.calr",
+      "Container": "Hello.HelloModule\u00600",
+      "Kind": 5,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

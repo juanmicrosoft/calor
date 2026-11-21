@@ -1,0 +1,132 @@
+module L2M30 L2M30 block
+  module L2M30Module public
+
+    func l2m30_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 23276)
+      let int:total = ((x * 2) + y)
+      if (total < 23276)
+        return 23276
+      else
+        return total
+
+    func l2m30_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M26.L3M26Module.l3m26_fn08(x, 56)
+      let int:v2 = L3M24.L3M24Module.l3m24_fn12(x, 66)
+      return ((v1 + v2) + y)
+
+    func l2m30_fn03 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 5) + y)
+      if (acc > 23283)
+        return (acc + 23283)
+      else
+        return ((acc * 2) + 23283)
+
+    func l2m30_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 2)
+      requires (y >= 0)
+      => (result >= 23290)
+      let int:total = ((x * 3) + y)
+      if (total < 23290)
+        return 23290
+      else
+        return total
+
+    func l2m30_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 2)
+      requires (y >= 0)
+      => (result >= 23297)
+      let int:total = ((x * 2) + y)
+      if (total < 23297)
+        return 23297
+      else
+        return total
+
+    func l2m30_fn06 public (int:x, int:y) → int
+      !
+      requires (x > 1)
+      => (x >= 2)
+      let int:acc = ((x * 5) + y)
+      if (acc > 23304)
+        return (acc + 23304)
+      else
+        return ((acc * 2) + 23304)
+
+    func l2m30_fn07 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 5) + y)
+      if (acc > 23311)
+        return (acc + 23311)
+      else
+        return ((acc * 2) + 23311)
+
+    func l2m30_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 23318)
+      let int:total = ((x * 2) + y)
+      if (total < 23318)
+        return 23318
+      else
+        return total
+
+    func l2m30_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23325)
+      let int:total = ((x * 5) + y)
+      if (total > 23325)
+        return 23325
+      return total
+
+    func l2m30_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 1)
+      requires (y >= 0)
+      => (result >= 23332)
+      let int:total = ((x * 2) + y)
+      if (total < 23332)
+        return 23332
+      else
+        return total
+
+    func l2m30_fn11 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23339)
+      if (x >= 23339)
+        return x
+      else
+        return 23339
+
+    func l2m30_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 3) + y)
+      if (acc > 23346)
+        return (acc + 23346)
+      else
+        return ((acc * 2) + 23346)
+
+    func l2m30_fn13 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23353)
+      if (x >= 23353)
+        return x
+      else
+        return 23353

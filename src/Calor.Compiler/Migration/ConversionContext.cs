@@ -1,4 +1,8 @@
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Calor.Compiler.Migration;
 
@@ -264,6 +268,7 @@ public sealed record ConversionMetadata
     public string SourceCodeKind { get; init; } = "";
     public string OutputKind { get; init; } = "";
     public string NullableContextOptions { get; init; } = "";
+    public bool IncludeImplicitSystemUsing { get; init; }
     public bool ReferencesAreComplete { get; init; }
     public IReadOnlyList<string> DefinedSymbols { get; init; } = Array.Empty<string>();
     public IReadOnlyDictionary<string, string> Features { get; init; } =
@@ -276,11 +281,246 @@ public sealed record ConversionReference(
     string Path,
     IReadOnlyList<string> Aliases);
 
+// Generation records are context associations and edit bases, not authenticated
+// provenance or permission to compile raw C#. Semantic replay is not implemented.
+internal sealed record ConversionReceipt(
+    int Version,
+    string ConverterIdentity,
+    ConversionSourceSnapshot Original,
+    string GeneratedCalor,
+    ConversionMetadata Metadata,
+    JsonElement Settings,
+    IReadOnlyList<ConversionSourceSnapshot> Siblings,
+    IReadOnlyList<ConversionInputSnapshot> Inputs,
+    IReadOnlyList<ConversionFrameSnapshot> Frames,
+    IReadOnlyList<string> ReplayLimitations)
+{
+    internal const int CurrentVersion = 1;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+    };
+
+    internal static ConversionReceipt Capture(
+        ConversionResult result, ConversionOptions options, IReadOnlyList<ConversionInputSnapshot> inputs)
+    {
+        if (!result.Success || result.CalorSource == null || result.Context.OriginalSource == null
+            || !result.Context.CapturePreservationContext)
+            throw new InvalidOperationException("A successful conversion with original-context capture is required to establish a generation base.");
+        var context = result.Context;
+        var frames = ReadFrames(result.CalorSource);
+        var emissions = context.EmittedPreservations;
+        var ordered = frames.SequenceEqual(emissions.Select(emission => emission.Frame));
+        var associations = frames.Select((frame, index) =>
+        {
+            var boundary = ordered ? emissions[index].Boundary : null;
+            var path = boundary == null ? null : SyntaxPath(boundary, context.OriginalSyntaxTree);
+            return new ConversionFrameSnapshot(frame.ReasonMarker, frame.Code, path,
+                boundary?.RawKind ?? 0, boundary?.SpanStart ?? 0, boundary?.Span.Length ?? 0,
+                path == null
+                    ? "The producer did not supply an exact original boundary; retain original enclosing context and reconvert."
+                    : null);
+        }).ToArray();
+        return new(CurrentVersion, typeof(CSharpToCalorConverter).Assembly.ManifestModule.ModuleVersionId.ToString(),
+            ConversionSourceSnapshot.FromMetadata(context.SourceFile ?? "", context.OriginalSource, result.Metadata),
+            result.CalorSource, result.Metadata, JsonSerializer.SerializeToElement(new
+            {
+                options.Fidelity, options.ModuleName, options.PreserveDocumentationComments,
+                options.AutoGenerateIds, options.GracefulFallback, options.Mode,
+                options.PassthroughOnError, options.RescueUnusableMembers,
+                options.ValidateRoundTripCSharp,
+                options.ProjectDirectory, options.SolutionDirectory,
+                UserManifestRoot = context.UserManifestRoot
+            }),
+            options.AdditionalSemanticSyntaxTrees.Select(ConversionSourceSnapshot.FromTree).ToArray(),
+            inputs, associations,
+            [
+                "Reference hashes observe files, not pinned in-memory metadata images.",
+                "The complete evaluated project, generators and effect-manifest dependency closure is not established.",
+                "Transformed, conditional and rescue producers without an original boundary remain unresolved.",
+                "No native-only conversion query or semantic replay is established by this receipt."
+            ]);
+    }
+
+    internal string Serialize() => JsonSerializer.Serialize(this, JsonOptions);
+
+    internal static ConversionReceipt Deserialize(string json)
+    {
+        ConversionReceipt receipt;
+        try
+        {
+            receipt = JsonSerializer.Deserialize<ConversionReceipt>(json, JsonOptions)
+                ?? throw new InvalidDataException("Empty conversion context. Reconvert the original C#.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException(
+                "Malformed conversion context. Keep the existing output and reconvert the original C# to a new destination.", ex);
+        }
+        if (receipt.Version != CurrentVersion || receipt.Original?.Text == null
+            || receipt.GeneratedCalor == null || receipt.Metadata == null
+            || receipt.Frames == null || receipt.Inputs == null || receipt.Siblings == null
+            || receipt.ReplayLimitations == null || receipt.ReplayLimitations.Count == 0
+            || receipt.Settings.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("Unsupported or incomplete conversion context. Reconvert the original C#.");
+        // Validate the stored frame inventory before it can become an edit base.
+        var frames = ReadFrames(receipt.GeneratedCalor);
+        if (frames.Count != receipt.Frames.Count || receipt.Frames.Where((entry, index) =>
+                entry == null || entry.Marker != frames[index].ReasonMarker || entry.Payload != frames[index].Code).Any())
+            throw new InvalidDataException("Conversion context does not match its generated frames. Reconvert the original C#.");
+        return receipt;
+    }
+
+    internal SyntaxNode ResolveBoundary(int frameIndex, string currentCalor)
+    {
+        VerifyInputs(Inputs);
+        if (!string.Equals(currentCalor, GeneratedCalor, StringComparison.Ordinal))
+            throw new InvalidDataException("Generated Calor was edited. Keep those edits; do not refresh it automatically.");
+        if ((uint)frameIndex >= (uint)Frames.Count)
+            throw new InvalidDataException("Conversion frame index is outside the saved generation.");
+        var frame = Frames[frameIndex];
+        if (frame.BoundaryPath == null)
+            throw new InvalidDataException(frame.Unresolved ?? "Original preservation boundary is unavailable. Reconvert the original C#.");
+        // Parse the COMPLETE saved original tree, with its own options, never the payload.
+        var node = Original.Parse().GetRoot();
+        foreach (var index in frame.BoundaryPath)
+        {
+            var children = node.ChildNodesAndTokens();
+            if ((uint)index >= (uint)children.Count || children[index].AsNode() is not { } child)
+                throw new InvalidDataException("Original preservation boundary path no longer resolves.");
+            node = child;
+        }
+        if (node.RawKind != frame.RawKind || node.SpanStart != frame.Start || node.Span.Length != frame.Length)
+            throw new InvalidDataException("Original preservation boundary kind or span does not match.");
+        return node;
+    }
+
+    internal static IReadOnlyList<ConversionInputSnapshot> CaptureInputs(
+        string sourcePath, IEnumerable<MetadataReference> references, ConversionOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        var paths = new[] { sourcePath }
+            .Concat(references.OfType<PortableExecutableReference>().Select(reference => reference.FilePath)
+                .Where(path => path != null).Select(path => path!))
+            .Concat(options.References.Select(reference => reference.Path))
+            .Concat(options.AdditionalSemanticSyntaxTrees.Select(tree => tree.FilePath)
+                .Where(path => !string.IsNullOrEmpty(path) && File.Exists(path)));
+        return paths.Select(Path.GetFullPath).Distinct(StringComparer.Ordinal)
+            .Select(path => new ConversionInputSnapshot(path, FileHash(path, cancellationToken))).ToArray();
+    }
+
+    internal static void VerifyInputs(IReadOnlyList<ConversionInputSnapshot> inputs,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var input in inputs)
+            if (input == null || !Path.IsPathFullyQualified(input.Path)
+                || !File.Exists(input.Path) || FileHash(input.Path, cancellationToken) != input.Sha256)
+                throw new IOException($"Original conversion input changed or is unavailable: {input?.Path}. Reconvert with its complete original project context.");
+    }
+
+    private static string FileHash(string path, CancellationToken cancellationToken)
+    {
+        using var stream = File.OpenRead(path);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Span<byte> buffer = stackalloc byte[8192];
+        int read;
+        while ((read = stream.Read(buffer)) > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            hash.AppendData(buffer[..read]);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return Convert.ToHexString(hash.GetHashAndReset());
+    }
+
+    private static IReadOnlyList<Parsing.RawCSharpFrame> ReadFrames(string source)
+    {
+        var diagnostics = new Diagnostics.DiagnosticBag();
+        var tokens = new Parsing.Lexer(source, diagnostics).TokenizeAllForParser();
+        if (diagnostics.HasErrors)
+            throw new InvalidDataException("Conversion generation contains malformed raw framing.");
+        return tokens.Select(token => token.Value).OfType<Parsing.RawCSharpFrame>()
+            .Where(frame => !frame.IsCompilerDirective).ToArray();
+    }
+
+    private static int[]? SyntaxPath(SyntaxNode boundary, SyntaxTree? original)
+    {
+        if (!ReferenceEquals(boundary.SyntaxTree, original)) return null;
+        var path = new List<int>();
+        for (var node = boundary; node.Parent is { } parent; node = parent)
+        {
+            var children = parent.ChildNodesAndTokens();
+            var index = 0;
+            while (index < children.Count && !ReferenceEquals(children[index].AsNode(), node))
+                index++;
+            if (index == children.Count) return null;
+            path.Add(index);
+        }
+        path.Reverse();
+        return path.ToArray();
+    }
+}
+
+internal sealed record ConversionInputSnapshot(string Path, string Sha256);
+internal sealed record ConversionFrameSnapshot(
+    string Marker, string Payload, int[]? BoundaryPath, int RawKind, int Start, int Length, string? Unresolved);
+
+internal sealed record ConversionSourceSnapshot(
+    string Path, string Text, string LanguageVersion, string DocumentationMode, string SourceCodeKind,
+    IReadOnlyList<string> Symbols, IReadOnlyDictionary<string, string> Features)
+{
+    internal static ConversionSourceSnapshot FromTree(SyntaxTree tree)
+    {
+        var options = (CSharpParseOptions)tree.Options;
+        return new(tree.FilePath, tree.GetText().ToString(), options.LanguageVersion.ToString(),
+            options.DocumentationMode.ToString(), options.Kind.ToString(),
+            options.PreprocessorSymbolNames.ToArray(), options.Features.ToDictionary(pair => pair.Key, pair => pair.Value));
+    }
+
+    internal static ConversionSourceSnapshot FromMetadata(string path, string text, ConversionMetadata metadata)
+        => new(path, text, metadata.LanguageVersion, metadata.DocumentationMode, metadata.SourceCodeKind,
+            metadata.DefinedSymbols, metadata.Features);
+
+    internal SyntaxTree Parse()
+    {
+        if (!Enum.TryParse<Microsoft.CodeAnalysis.CSharp.LanguageVersion>(LanguageVersion, out var language)
+            || !Enum.TryParse<Microsoft.CodeAnalysis.DocumentationMode>(DocumentationMode, out var documentation)
+            || !Enum.TryParse<Microsoft.CodeAnalysis.SourceCodeKind>(SourceCodeKind, out var kind)
+            || !Enum.IsDefined(language) || !Enum.IsDefined(documentation) || !Enum.IsDefined(kind)
+            || Text == null || Symbols == null || Features == null)
+            throw new InvalidDataException("Original parse context is incomplete. Reconvert the original C#.");
+        return CSharpSyntaxTree.ParseText(Text,
+            new CSharpParseOptions(language, documentation, kind, Symbols).WithFeatures(Features), Path);
+    }
+}
+
 /// <summary>
 /// Shared context for tracking state during C# to Calor conversion.
 /// </summary>
 public sealed class ConversionContext
 {
+    internal bool CapturePreservationContext { get; set; }
+    internal Microsoft.CodeAnalysis.SyntaxTree? OriginalSyntaxTree { get; set; }
+    private readonly Dictionary<Ast.AstNode, Microsoft.CodeAnalysis.SyntaxNode> _preservationOrigins = new();
+    internal List<(Parsing.RawCSharpFrame Frame, Microsoft.CodeAnalysis.SyntaxNode? Boundary)> EmittedPreservations { get; } = [];
+
+    internal T AssociatePreservation<T>(T emitted, Microsoft.CodeAnalysis.SyntaxNode? boundary)
+        where T : Ast.AstNode
+    {
+        if (CapturePreservationContext && boundary != null && ReferenceEquals(boundary.SyntaxTree, OriginalSyntaxTree))
+            _preservationOrigins[emitted] = boundary;
+        return emitted;
+    }
+
+    internal void RecordPreservationEmission(Ast.AstNode node, Parsing.RawCSharpFrame frame)
+    {
+        if (!CapturePreservationContext) return;
+        _preservationOrigins.TryGetValue(node, out var boundary);
+        EmittedPreservations.Add((frame, boundary));
+    }
+
     private readonly List<ConversionIssue> _issues = new();
     private readonly List<ConversionLoss> _losses = new();
     private readonly HashSet<string> _usedFeatures = new();
@@ -368,14 +608,11 @@ public sealed class ConversionContext
     public string RoundTrip { get; set; } = ConversionRoundTrip.NotRun;
 
     /// <summary>
-    /// When true, the emitter elides the trailing <c>§/C</c> on zero-arg
-    /// expression-context <c>§C</c> calls. RFC <c>v0.6-call-closer-elision</c>
-    /// Phase 2. Default <c>true</c> as of v0.6.1; the parser accepts both
-    /// forms regardless, so consumers that want the explicit closer back can
-    /// set this to <c>false</c>. One-arg elision remains gated off pending
-    /// context-aware Lisp-arg-list safety analysis (tracked for a later v0.6.x).
+    /// The most recent round-trip compile of this conversion's Calor. The #717 rewrap gate and
+    /// the lossless round-trip check compile the same source under the same options; the second
+    /// reuses this result when every input in its key is equal. Converter-internal.
     /// </summary>
-    public bool UseImplicitCallCloser { get; set; } = true;
+    internal CSharpToCalorConverter.RoundTripCompile? LastRoundTripCompile { get; set; }
 
     /// <summary>
     /// Whether unsupported constructs should be preserved as C# passthrough blocks.
@@ -482,6 +719,45 @@ public sealed class ConversionContext
             Trigger = trigger,
             EnabledBy = enabledBy
         });
+    }
+
+    /// <summary>
+    /// The file exactly as written, before lossy active-branch selection removed inactive
+    /// <c>#if</c> branches, or null when nothing was selected. Whole compilation-unit
+    /// preservation writes this text, never the selected one: preserved C# must keep every
+    /// preprocessor branch, because a source generator or another build context can still
+    /// read a branch the current context leaves inactive (FluentValidation's
+    /// <c>#if SYNC_ONLY</c> throw, read by Zomp.SyncMethodGenerator).
+    /// </summary>
+    internal string? UnselectedSource { get; private set; }
+    private readonly List<ConversionLoss> _branchSelectionLosses = [];
+
+    /// <summary>Records the losses that lossy active-branch selection made to <paramref name="unselected"/>.</summary>
+    internal void RecordBranchSelection(string unselected, string selected, Action recordLosses)
+    {
+        if (string.Equals(unselected, selected, StringComparison.Ordinal))
+        {
+            recordLosses();
+            return;
+        }
+        UnselectedSource = unselected;
+        var mark = _losses.Count;
+        recordLosses();
+        _branchSelectionLosses.AddRange(_losses.Skip(mark));
+    }
+
+    /// <summary>
+    /// The text a whole compilation-unit preservation must write in place of
+    /// <paramref name="selected"/>. When branch selection changed the file, that is the
+    /// unselected original, and the selection losses are withdrawn because no branch is lost.
+    /// </summary>
+    internal string TakeWholeUnitPreservationSource(string selected)
+    {
+        if (UnselectedSource is not { } unselected)
+            return selected;
+        _losses.RemoveAll(loss => _branchSelectionLosses.Contains(loss));
+        _branchSelectionLosses.Clear();
+        return unselected;
     }
 
     /// <summary>
@@ -867,8 +1143,13 @@ public sealed class ConversionContext
     /// </summary>
     public void Reset()
     {
+        OriginalSyntaxTree = null;
+        _preservationOrigins.Clear();
+        EmittedPreservations.Clear();
         _issues.Clear();
         _losses.Clear();
+        _branchSelectionLosses.Clear();
+        UnselectedSource = null;
         _usedFeatures.Clear();
         _scopeStack.Clear();
         _unsupportedFeatures.Clear();

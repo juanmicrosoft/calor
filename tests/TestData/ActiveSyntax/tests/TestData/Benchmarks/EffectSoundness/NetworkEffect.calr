@@ -1,0 +1,13 @@
+module NetService NetService
+  module NetServiceModule
+    func FetchUrl public (string:url) → string
+      ! net
+      return url
+
+    func PostData public (string:url, string:body) → int
+      ! net
+      return 200
+
+    func BuildUrl public (string:@base, string:path) → string
+      !
+      return @base

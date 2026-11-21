@@ -1,0 +1,97 @@
+module L1M19 L1M19 block
+  module L1M19Module public
+
+    func l1m19_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M15.L2M15Module.l2m15_fn02(x, 4)
+      let int:v2 = L2M16.L2M16Module.l2m16_fn09(x, 29)
+      return ((v1 + v2) + y)
+
+    func l1m19_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M34.L2M34Module.l2m34_fn02(x, 64)
+      let int:v2 = L2M02.L2M02Module.l2m02_fn12(x, 84)
+      return ((v1 + v2) + y)
+
+    func l1m19_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M16.L2M16Module.l2m16_fn13(x, 10)
+      let int:v2 = L2M33.L2M33Module.l2m33_fn12(x, 1)
+      return ((v1 + v2) + y)
+
+    func l1m19_fn04 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 20973)
+      if (x >= 20973)
+        return x
+      else
+        return 20973
+
+    func l1m19_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20980)
+      let int:total = ((x * 2) + y)
+      if (total > 20980)
+        return 20980
+      return total
+
+    func l1m19_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20987)
+      let int:total = ((x * 5) + y)
+      if (total > 20987)
+        return 20987
+      return total
+
+    func l1m19_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M09.L2M09Module.l2m09_fn10(x, 76)
+      return (v1 + y)
+
+    func l1m19_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20994)
+      let int:total = ((x * 5) + y)
+      if (total > 20994)
+        return 20994
+      return total
+
+    func l1m19_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M19.L2M19Module.l2m19_fn11(x, 85)
+      return (v1 + y)
+
+    func l1m19_fn10 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M30.L2M30Module.l2m30_fn02(x, 6)
+      return (v1 + y)
+
+    func l1m19_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21001)
+      let int:total = ((x * 5) + y)
+      if (total > 21001)
+        return 21001
+      return total
+
+    func l1m19_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M25.L2M25Module.l2m25_fn06(x, 3)
+      let int:v2 = L2M06.L2M06Module.l2m06_fn02(x, 42)
+      return ((v1 + v2) + y)
+
+    func l1m19_fn13 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21008)
+      if (x >= 21008)
+        return x
+      else
+        return 21008

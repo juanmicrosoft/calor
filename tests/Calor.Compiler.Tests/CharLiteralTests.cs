@@ -44,11 +44,12 @@ public class CharLiteralTests
         Assert.Equal(expected, Assert.IsType<char>(token.Value));
 
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> char
-                §E{}
-                §B{value:char} {{literal}}
-                §R value
+            module Characters Characters
+              module CharactersModule
+                func Probe public () → char
+                  !
+                  let char:value = {{literal}}
+                  return value
             """;
         foreach (var text in RoundTrip(source))
             Assert.Equal(expected, Invoke(Compile(text), "CharactersModule", "Probe"));
@@ -69,7 +70,7 @@ public class CharLiteralTests
     public void MalformedCharacterLiteral_ReportsDiagnosticAndPreservesNextLine(string literal)
     {
         var diagnostics = new DiagnosticBag();
-        var tokens = new Lexer(literal + "\n§R 1", diagnostics).TokenizeAllForParser();
+        var tokens = new Lexer(literal + "\nreturn 1", diagnostics).TokenizeAllForParser();
         Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.InvalidCharLiteral);
         Assert.Contains(tokens, token => token.Kind == TokenKind.Error);
         Assert.Contains(tokens, token => token.Kind == TokenKind.Return);
@@ -99,21 +100,22 @@ public class CharLiteralTests
     public void NumericPromotionAndPatterns_PreserveCharacterSemantics()
     {
         const string source = """
-            §M{m1:Characters}
-              §F{f1:Offset:pub} (char:c) -> i32
-                §E{}
-                §R (- c '0')
-              §F{f2:Sum:pub} () -> i32
-                §E{}
-                §R (+ '0' '1')
-              §F{f3:IsDigit:pub} (char:c) -> bool
-                §E{}
-                §R (&& (>= c '0') (<= c '9'))
-              §F{f4:Match:pub} (char:c) -> i32
-                §E{}
-                §R §W{w1} c
-                  §K 'x' → 1
-                  §K _ → 2
+            module Characters Characters
+              module CharactersModule
+                func Offset public (char:c) → int
+                  !
+                  return c - '0'
+                func Sum public () → int
+                  !
+                  return '0' + '1'
+                func IsDigit public (char:c) → bool
+                  !
+                  return c >= '0' && c <= '9'
+                func Match public (char:c) → int
+                  !
+                  return match c
+                    case 'x' → 1
+                    case _ → 2
             """;
         foreach (var text in RoundTrip(source))
         {
@@ -131,10 +133,10 @@ public class CharLiteralTests
     public void StringLiteral_RemainsDistinctFromCharacterLiteral()
     {
         var result = Program.Compile("""
-            §M{m1:Characters}
-              §F{f1:Offset:pub} (char:c) -> i32
-                §E{}
-                §R (- c "0")
+            module Characters Characters
+              func Offset public (char:c) → int
+                !
+                return c - "0"
             """, "characters.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch);
     }
@@ -144,11 +146,18 @@ public class CharLiteralTests
     [InlineData("rpad", "700")]
     public void StringPadding_AcceptsCharacterArguments(string operation, string expected)
     {
+        var method = operation switch
+        {
+            "lpad" => "PadLeft",
+            "rpad" => "PadRight",
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unregistered padding operation.")
+        };
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> str
-                §E{}
-                §R ({{operation}} "7" 3 '0')
+            module Characters Characters
+              module CharactersModule
+                func Probe public () → string
+                  !
+                  return "7".{{method}}(3, '0')
             """;
         foreach (var text in RoundTrip(source))
             Assert.Equal(expected, Invoke(Compile(text), "CharactersModule", "Probe"));
@@ -162,11 +171,12 @@ public class CharLiteralTests
     public void CharacterValues_WidenToDecimal(string expression)
     {
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> decimal
-                §E{}
-                §B{value:decimal} {{expression}}
-                §R value
+            module Characters Characters
+              module CharactersModule
+                func Probe public () → decimal
+                  !
+                  let decimal:value = {{CurrentCharacterExpression(expression)}}
+                  return value
             """;
         foreach (var text in RoundTrip(source))
             Assert.Equal(120m, Invoke(Compile(text), "CharactersModule", "Probe"));
@@ -176,8 +186,8 @@ public class CharLiteralTests
     public void EnumInitializers_PreserveCharacterConstantsAndCasts()
     {
         const string source = """
-            §M{m1:Characters}
-              §EN{e1:Letters:pub}
+            module Characters Characters
+              enum Letters public
                 A = 'A'
                 Newline = '\n'
                 Cast = (int)'B'
@@ -200,13 +210,14 @@ public class CharLiteralTests
     public void LoopAttributes_PreserveCharacterBounds(string bound)
     {
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} () -> i32
-                §E{}
-                §B{~sum:i32} 0
-                §L{for1:i:0:{{bound}}:1}
-                  §ASSIGN sum (+ sum i)
-                §R sum
+            module Characters Characters
+              module CharactersModule
+                func Probe public () → int
+                  !
+                  var int:sum = 0
+                  for i from 0 to {{CurrentCharacterExpression(bound)}} step 1
+                    set sum sum + i
+                  return sum
             """;
         foreach (var text in RoundTrip(source))
             Assert.Equal(4950, Invoke(Compile(text), "CharactersModule", "Probe"));
@@ -216,12 +227,11 @@ public class CharLiteralTests
     public void CSharpAttributeArguments_PreserveCharacterType()
     {
         const string source = """
-            §M{m1:Characters}
-              §CL{c1:AttributeCarrier}
-                §MT{mt1:Probe:pub:stat}[@System.ComponentModel.DefaultValue('x')]
-                  §O{char}
-                  §E{}
-                  §R 'x'
+            module Characters Characters
+              class AttributeCarrier
+                func Probe [@System.ComponentModel.DefaultValue('x')] public static () → char
+                  !
+                  return 'x'
             """;
         foreach (var text in RoundTrip(source))
         {
@@ -240,12 +250,13 @@ public class CharLiteralTests
         string whenTrue, string whenFalse, int trueValue, int falseValue)
     {
         var source = $$"""
-            §M{m1:Characters}
-              §F{f1:Probe:pub} (bool:flag) -> i32
-                §E{}
-                §R §W{w1} flag
-                  §K true → {{whenTrue}}
-                  §K _ → {{whenFalse}}
+            module Characters Characters
+              module CharactersModule
+                func Probe public (bool:flag) → int
+                  !
+                  return match flag
+                    case true → {{CurrentCharacterExpression(whenTrue)}}
+                    case _ → {{CurrentCharacterExpression(whenFalse)}}
             """;
         foreach (var text in RoundTrip(source))
         {
@@ -270,7 +281,7 @@ public class CharLiteralTests
             """;
         var conversion = new CSharpToCalorConverter().Convert(source);
         Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
-        Assert.DoesNotContain("§CSHARP", conversion.CalorSource);
+        RawFrameAssertions.AssertFramed(conversion.CalorSource, present: false);
         var utf8 = new UTF8Encoding(false, true);
         var calor = utf8.GetString(utf8.GetBytes(conversion.CalorSource!));
         var assembly = Compile(calor, enforceEffects: false);
@@ -279,6 +290,17 @@ public class CharLiteralTests
         Assert.Equal(3, Invoke(assembly, "CharMigration", "Classify", 'x'));
         Assert.Equal(4, Invoke(assembly, "CharMigration", "Classify", 'y'));
     }
+
+    private static string CurrentCharacterExpression(string expression) => expression switch
+    {
+        "'x'" or "'c'" or "0" => expression,
+        "(char-lit \"x\")" => "'x'",
+        "(char-lit \"c\")" => "'c'",
+        "(char-from-code 120)" => "(char)120",
+        "(char-code (char-lit \"x\"))" => "(int)'x'",
+        "(- 'd' 1)" => "'d' - 1",
+        _ => throw new ArgumentOutOfRangeException(nameof(expression), expression, "Unregistered character expression.")
+    };
 
     private static IEnumerable<string> RoundTrip(string source)
     {

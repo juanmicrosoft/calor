@@ -1,8 +1,8 @@
-§M{m001:Test_07_02:overflow=unchecked}
+§M{Test_07_02:overflow=unchecked}
   §U{System}
 
-  §CL{c001:LambdaDemo:pub}
-    §MT{m002:Test:pub}
-      §B{Func<i32, i32>:doubler} §LAM{lam003:x:i32} (* x 2) §/LAM{lam003}
+  §CL{LambdaDemo:pub}
+    §MT{Test:pub}
+      §B{Func<i32, i32>:doubler} §LAM{x:i32} (* x 2) §/LAM
 
 

@@ -8,7 +8,7 @@ order: 2
 directly?
 
 Calor adds a source language and compiler step to a .NET workflow. You gain
-declared effects, contracts in the syntax, and optional stable editing IDs.
+declared effects, contracts in the syntax, and tool-maintained declaration IDs.
 You also take on an unfamiliar language, another compiler boundary, and
 interop configuration. These mechanisms are not evidence that it reduces total
 cost or defects. [Design Principles](/docs/philosophy/design-principles/)
@@ -20,12 +20,13 @@ explains those choices; this page helps you decide whether they fit your work.
 |:-----------------|:---------------------|
 | Enforce declared effects on supported Calor paths | Try a small module whose external calls have known effect coverage. Review all waivers and manifests. |
 | Check preconditions and postconditions | Compare Calor's runtime modes and supported proof model with ordinary C# validation and tests. |
-| Address edits by stable identity | Try explicit IDs on selected targets, then check that your editing workflow preserves them. |
+| Address edits by stable identity | Synchronize `.calor/ids.json`, then check that identity-aware renames and moves preserve the targets. |
 | Keep familiar source, libraries, and debugging tools | Writing C# directly avoids the translation step and may be simpler. |
 | Prove properties outside Calor's modeled contracts | Evaluate a proof assistant or domain-specific verification tool instead. |
 
-An ID supplies a named target. Whether that improves real editing accuracy
-remains a workload-dependent hypothesis.
+An ID supplies a persistent declaration target without putting identity fields
+in source. Ambiguous plain-text reconciliation fails rather than guessing.
+Whether that improves real editing accuracy remains a workload-dependent hypothesis.
 
 Contracts and effects are not a complete specification. A compiler check
 cannot establish correctness of arbitrary business behavior or external
@@ -40,8 +41,8 @@ as raw C# rather than analyzed as Calor. Inspect generated code and diagnostics
 before expanding adoption. See
 [effect manifests and imports](/docs/guides/effect-manifests-dotnet-ecosystem/).
 
-Human reviewers still need to read the source. Prefix expressions and
-indentation may be unfamiliar, even when an agent writes the file. Try the
+Human reviewers still need to read the source. Typed signatures, declared
+effects, and indentation may be unfamiliar, even when an agent writes the file. Try the
 [account-free first program](/docs/getting-started/hello-world/) and review one
 real change with the people who would maintain it. Provider integration is
 optional; it does not remove correctness ownership.
@@ -54,7 +55,7 @@ tooling. Existing-project setup belongs in the
 ## Measure your own workload
 
 Source size depends on the actual programs and tokenizer. There is no
-universal token premium or saving implied by prefix syntax. Record source
+universal token premium or saving implied by infix syntax. Record source
 versions, tokenizer/version, task inputs, and behavioral equivalence before
 comparing context cost.
 

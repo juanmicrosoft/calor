@@ -1,0 +1,29 @@
+{
+  "contracts": {
+    "component": "FeatureGrid",
+    "code": "requires x >= 0\n=> result >= 0",
+    "before": "module ContractContext\n  func Identity (int:x) → int\n    !\n",
+    "after": "    return x\n",
+    "indent": 4,
+    "inputs": [],
+    "expectedDiagnostics": []
+  },
+  "effects": {
+    "component": "FeatureGrid",
+    "code": "! db:rw,net:rw",
+    "before": "module EffectContext\n  func Process () → void\n",
+    "after": "",
+    "indent": 4,
+    "inputs": [],
+    "expectedDiagnostics": []
+  },
+  "stableId": {
+    "component": "FeatureGrid",
+    "code": "func Process () → void",
+    "before": "module IdContext\n",
+    "after": "    !\n",
+    "indent": 2,
+    "inputs": [],
+    "expectedDiagnostics": []
+  }
+}

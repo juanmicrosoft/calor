@@ -9,6 +9,36 @@ namespace Calor.Compiler.Tests;
 
 public class DictionaryInitializerSemanticsTests
 {
+    [Fact]
+    public void DefaultSemanticReferences_ResolveActualConcurrentDictionaryCountType()
+    {
+        var tree = CSharpSyntaxTree.ParseText("""
+            using CD = System.Collections.Concurrent.ConcurrentDictionary<int, int>;
+            public class Probe
+            {
+                public static string Render()
+                {
+                    var values = new CD { [1] = 2 };
+                    return values.Count.ToString();
+                }
+            }
+            """);
+        var converter = new CSharpToCalorConverter();
+        var compilation = CSharpCompilation.Create(
+            "ConcurrentDictionaryIdentity", [tree], converter.GetSemanticMetadataReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var count = tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax>()
+            .Single(member => member.Name.Identifier.ValueText == "Count");
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(
+            compilation.GetSemanticModel(tree).GetSymbolInfo(count).Symbol);
+        Assert.Equal("ConcurrentDictionary`2", property.ContainingType.MetadataName);
+        Assert.Equal("System.Collections.Concurrent", property.ContainingNamespace.ToDisplayString());
+        Assert.Equal(SpecialType.System_Int32, property.Type.SpecialType);
+    }
+
     [Theory]
     [InlineData("var d = new Dictionary<int, int> { [1] = 2, [1] = 3 }; return d[1].ToString();", "3", true)]
     [InlineData("var d = new Dictionary<int, int> { {1, 2}, {1, 3} }; return d[1].ToString();", "throws:ArgumentException", false)]
@@ -38,42 +68,14 @@ public class DictionaryInitializerSemanticsTests
     }
 
     [Theory]
-    [InlineData("new Dictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<i32, i32>:d}")]
-    [InlineData("new SortedDictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<i32, i32>:d}")]
-    [InlineData("new D { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<i32, i32>:d}")]
-    [InlineData("new SD { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<i32, i32>:d}")]
-    [InlineData("new CD { [1] = 2 }", "§B{System.Collections.Concurrent.ConcurrentDictionary<i32, i32>:d}")]
-    [InlineData("new Dictionary<int, int?> { [1] = 2 }", "§B{d}")]
-    [InlineData("new Dictionary<dynamic, int> { [1] = 2 }", "§B{d}")]
-    [InlineData("new Dictionary<(int, int), int> { [(1, 2)] = 3 }", "§B{d}")]
-    [InlineData("(object)new Dictionary<int, int> { [1] = 2 }", "§B{d}")]
-    public void PreservedDictionaryLocalType_IsBoundedAndSpellable(string initializer, string binding)
+    [InlineData("var d = new Dictionary<int, int>(Capacity()) { [Key()] = Value(), [Key()] = Value() }; return Trace + \":\" + d[1];", "CKVKV:2", true)]
+    [InlineData("var d = new Dictionary<int, int>(Capacity()) { {Key(), Value()}, {Key(), Value()}, {Key(), Value()} }; return Trace;", "throws:ArgumentException:CKVKV", true)]
+    // 0.30: a parameterless creation with Add entries is written natively (`{ { Key(), Value() }, … }`)
+    // and emits the same C# initializer, so the entry order and timing are C#'s own.
+    [InlineData("var d = new Dictionary<int, int> { {Key(), Value()}, {2, Value()} }; return Trace;", "KVV", false)]
+    public void Migration_PreservesConstructorEntryOrderAndExceptionTiming(string body, string expected, bool preserved)
     {
-        var conversion = new CSharpToCalorConverter().Convert($$"""
-            using System.Collections.Generic;
-            using D = System.Collections.Generic.Dictionary<int, int>;
-            using SD = System.Collections.Generic.SortedDictionary<int, int>;
-            using CD = System.Collections.Concurrent.ConcurrentDictionary<int, int>;
-            public class Migrated
-            {
-                public object Probe()
-                {
-                    var d = {{initializer}};
-                    return d;
-                }
-            }
-            """);
-        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
-        Assert.Contains(binding, conversion.CalorSource);
-    }
-
-    [Theory]
-    [InlineData("var d = new Dictionary<int, int>(Capacity()) { [Key()] = Value(), [Key()] = Value() }; return Trace + \":\" + d[1];", "CKVKV:2")]
-    [InlineData("var d = new Dictionary<int, int>(Capacity()) { {Key(), Value()}, {Key(), Value()}, {Key(), Value()} }; return Trace;", "throws:ArgumentException:CKVKV")]
-    [InlineData("var d = new Dictionary<int, int> { {Key(), Value()}, {2, Value()} }; return Trace;", "KVV")]
-    public void Migration_PreservesConstructorEntryOrderAndExceptionTiming(string body, string expected)
-    {
-        AssertEquivalent(body, expected, preserved: true);
+        AssertEquivalent(body, expected, preserved);
     }
 
     [Theory]
@@ -153,7 +155,7 @@ public class DictionaryInitializerSemanticsTests
             Assert.Contains(conversion.Losses, loss =>
                 loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == preservedFeature);
         else
-            Assert.Contains("§DICT", conversion.CalorSource);
+            Assert.Contains("new System.Collections.Generic.Dictionary<int, int>() { {", conversion.CalorSource);
         var compiled = Program.Compile(conversion.CalorSource!, "dictionary.calr", new CompilationOptions
         {
             EnableTypeChecking = true,

@@ -1,0 +1,295 @@
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
+using System.Text.Json.Nodes;
+using Xunit;
+
+namespace Calor.Compiler.Tests;
+
+public class ActiveSyntaxInputTests
+{
+    public static IEnumerable<object[]> RegisteredInputs()
+        => ActiveSyntaxInputs.OriginalPaths.Order(StringComparer.Ordinal)
+            .Select(path => new object[] { path });
+
+    [Fact]
+    public void ExecutableRegistry_IdentifiesEveryScriptAndTranscriptWithoutParsingThemAsCalor()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var activeRoot = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot);
+        var registrations = ActiveSyntaxInputs.ExecutableRegistrations.Values.ToArray();
+        Assert.NotEmpty(registrations);
+        foreach (var extension in new[] { ".py", ".txt" })
+        {
+            var mirrors = Directory.EnumerateFiles(activeRoot, "*" + extension, SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(activeRoot, path).Replace('\\', '/'))
+                .Where(path => !ActiveSyntaxInputs.TypedRegistrations.ContainsKey(path))
+                .Order(StringComparer.Ordinal);
+            var registered = registrations.Select(entry => extension == ".py"
+                ? entry.OriginalPath : entry.TranscriptPath).Order(StringComparer.Ordinal);
+            Assert.Equal(registered, mirrors);
+        }
+
+        foreach (var registration in registrations)
+        {
+            Assert.Equal(".py", Path.GetExtension(registration.OriginalPath));
+            Assert.Equal(
+                Path.Combine(Path.GetDirectoryName(registration.OriginalPath)!, "transcripts",
+                    Path.ChangeExtension(Path.GetFileName(registration.OriginalPath), ".txt")).Replace('\\', '/'),
+                registration.TranscriptPath);
+            Assert.True(File.Exists(Path.Combine(root, registration.OriginalPath)));
+            Assert.True(File.Exists(Path.Combine(root, registration.TranscriptPath)));
+            Assert.DoesNotContain(registration.OriginalPath, ActiveSyntaxInputs.OriginalPaths);
+            var (script, transcript) = ActiveSyntaxInputs.ForCurrentExecutable(root, registration.OriginalPath);
+            Assert.Equal(Path.Combine(activeRoot, registration.OriginalPath), script);
+            Assert.Equal(Path.Combine(activeRoot, registration.TranscriptPath), transcript);
+            Assert.Throws<InvalidDataException>(() =>
+                ActiveSyntaxInputs.ForCurrentCompiler(root, registration.OriginalPath));
+        }
+    }
+
+    [Fact]
+    public void ExecutableResolver_RejectsUnregisteredAndAliasedPaths()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var original = ActiveSyntaxInputs.ExecutableRegistrations.Keys.Order(StringComparer.Ordinal).First();
+        foreach (var path in new[]
+        {
+            "./" + original, Path.Combine(root, original), ActiveSyntaxInputs.RelativeRoot + original,
+            "samples/FizzBuzz/fizzbuzz.calr", "docs/unregistered.py", "../outside.py"
+        })
+        {
+            Assert.Throws<ArgumentException>(() => ActiveSyntaxInputs.ForCurrentExecutable(root, path));
+        }
+    }
+
+    [Fact]
+    public void RequiredExecutableMirrorMissing_DoesNotRunTheHistoricalOriginal()
+    {
+        var root = Path.Combine(CliTestHarness.FindRepoRoot(), "artifacts", $"missing-active-{Guid.NewGuid():N}");
+        var original = ActiveSyntaxInputs.ExecutableRegistrations.Keys.Order(StringComparer.Ordinal).First();
+        var exception = Assert.Throws<FileNotFoundException>(() =>
+            ActiveSyntaxInputs.ForCurrentExecutable(root, original));
+        Assert.Equal(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, original), exception.FileName);
+    }
+
+    [Fact]
+    public void TypedRegistry_IsDisjointExhaustiveAndRequiresEveryMirror()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var activeRoot = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot);
+        var registered = ActiveSyntaxInputs.OriginalPaths
+            .Concat(ActiveSyntaxInputs.TypedRegistrations.Keys)
+            .Concat(ActiveSyntaxInputs.IdentitySidecarPaths)
+            .Concat(ActiveSyntaxInputs.ExecutableRegistrations.Values.SelectMany(entry =>
+                new[] { entry.OriginalPath, entry.TranscriptPath })).ToArray();
+        Assert.Equal(registered.Length, registered.Distinct(StringComparer.Ordinal).Count());
+        var mirrors = ActiveSyntaxInputs.EnumerateMirrorPaths(root);
+        Assert.Equal(registered.Order(StringComparer.Ordinal), mirrors);
+        foreach (var (original, kind) in ActiveSyntaxInputs.TypedRegistrations)
+        {
+            Assert.True(File.Exists(Path.Combine(root, original)));
+            var mirror = ActiveSyntaxInputs.ForCurrentTypedInput(root, original, kind);
+            Assert.Equal(Path.Combine(activeRoot, original), mirror);
+            Assert.Throws<FileNotFoundException>(() => ActiveSyntaxInputs.ForCurrentTypedInput(
+                Path.Combine(root, "artifacts", "missing-" + Guid.NewGuid().ToString("N")), original, kind));
+            Assert.Throws<InvalidDataException>(() => ActiveSyntaxInputs.ForCurrentCompiler(root, original));
+            foreach (var wrongKind in Enum.GetValues<ActiveSyntaxInputs.InputKind>().Where(value => value != kind))
+                Assert.Throws<ArgumentException>(() => ActiveSyntaxInputs.ForCurrentTypedInput(root, original, wrongKind));
+            foreach (var alias in new[] { "./" + original, Path.Combine(root, original), ActiveSyntaxInputs.RelativeRoot + original })
+                Assert.Throws<ArgumentException>(() => ActiveSyntaxInputs.ForCurrentTypedInput(root, alias, kind));
+            if (kind == ActiveSyntaxInputs.InputKind.CalorText)
+            {
+                var diagnostics = new DiagnosticBag();
+                new Parser(new Lexer(File.ReadAllText(mirror), diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+            }
+            else
+                Assert.NotNull(JsonNode.Parse(File.ReadAllText(mirror)));
+        }
+    }
+
+    [Fact]
+    public void Registry_IdentifiesEveryMirrorWithoutAddingCorpusSubjects()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var mirrors = Directory.EnumerateFiles(
+                Path.Combine(root, ActiveSyntaxInputs.RelativeRoot), "*.calr", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(
+                Path.Combine(root, ActiveSyntaxInputs.RelativeRoot), path).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal);
+        Assert.NotEmpty(ActiveSyntaxInputs.OriginalPaths);
+        Assert.Equal(ActiveSyntaxInputs.OriginalPaths.Order(StringComparer.Ordinal), mirrors);
+        foreach (var original in ActiveSyntaxInputs.OriginalPaths)
+        {
+            Assert.True(File.Exists(Path.Combine(root, original)), $"Original input missing: {original}");
+            var active = ActiveSyntaxInputs.ForCurrentCompiler(root, original);
+            Assert.NotEqual(Path.Combine(root, original), active);
+            Assert.True(ActiveSyntaxInputs.IsActiveCopy(Path.GetRelativePath(root, active).Replace('\\', '/')));
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(RegisteredInputs))]
+    public void ActiveInput_ParsesWithTheCurrentCompiler(string original)
+    {
+        var path = ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(), original);
+        var diagnostics = new DiagnosticBag();
+        var lexer = new Lexer(File.ReadAllText(path), diagnostics);
+        new Parser(lexer.TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors,
+            $"{path} is an active semantic input, not a historical raw replay:\n"
+            + string.Join("\n", diagnostics.Errors));
+    }
+
+    [Theory]
+    [InlineData("bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-1/final-src/Inventory.calr")]
+    [InlineData("bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-2/final-src/Inventory.calr")]
+    [InlineData("bench/phase0-agent-native/epochs/guarantees-probe-001/W5A-002-inventory-log/calor-v10-verify/run-3/final-src/Inventory.calr")]
+    [InlineData("bench/phase0-agent-native/epochs/w5-parity-001/N1-001-string-utils/calor+treatment/run-1/final-src/TextUtils.calr")]
+    [InlineData("bench/phase0-agent-native/epochs/w5-parity-001/N1-001-string-utils/calor+treatment/run-2/final-src/TextUtils.calr")]
+    public void MigratedControlFlowInput_CompilesWithoutOptOuts(string original)
+    {
+        var active = ActiveSyntaxInputs.ForCurrentCompiler(CliTestHarness.FindRepoRoot(), original);
+        var result = Program.Compile(File.ReadAllText(active), active, new CompilationOptions());
+        Assert.False(result.HasErrors, $"{active}:\n" + string.Join("\n", result.Diagnostics.Errors));
+    }
+
+    [Fact]
+    public void RequiredMirrorMissing_DoesNotFallBackToHistoricalInput()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"calor-active-input-{Guid.NewGuid():N}");
+        var original = ActiveSyntaxInputs.OriginalPaths.Order(StringComparer.Ordinal).First();
+        var exception = Assert.Throws<FileNotFoundException>(
+            () => ActiveSyntaxInputs.ForCurrentCompiler(root, original));
+        Assert.Equal(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, original), exception.FileName);
+    }
+
+    [Fact]
+    public void OrdinaryActiveSource_IsNotTranslatedOrRemapped()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        const string source = "unregistered/ordinary.calr";
+        Assert.Equal(Path.Combine(root, source), ActiveSyntaxInputs.ForCurrentCompiler(root, source));
+        Assert.Throws<ArgumentException>(() =>
+            ActiveSyntaxInputs.ForCurrentCompiler(root, "../outside.calr"));
+        Assert.Throws<ArgumentException>(() =>
+            ActiveSyntaxInputs.ForCurrentCompiler(root, ActiveSyntaxInputs.RelativeRoot + source));
+    }
+
+    [Fact]
+    public void IdentitySidecars_ValidateWithoutChangingBytesOrAddingHistoricalSubjects()
+    {
+        var root = CliTestHarness.FindRepoRoot();
+        var before = ActiveSyntaxInputs.IdentitySidecarPaths.ToDictionary(path => path,
+            path => File.ReadAllBytes(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, path)));
+        Assert.NotEmpty(before);
+        var mirrors = ActiveSyntaxInputs.EnumerateMirrorPaths(root);
+        foreach (var (path, bytes) in before)
+        {
+            Assert.Contains(path, mirrors);
+            Assert.DoesNotContain(path, ActiveSyntaxInputs.OriginalPaths);
+            Assert.DoesNotContain(path, ActiveSyntaxInputs.TypedRegistrations.Keys);
+            Assert.DoesNotContain(Path.ChangeExtension(path, ".lock"), mirrors);
+            Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, path)));
+            Assert.Throws<InvalidDataException>(() => ActiveSyntaxInputs.ForCurrentCompiler(root, path));
+        }
+    }
+
+    [Theory]
+    [InlineData("missing-sidecar")]
+    [InlineData("missing-source")]
+    [InlineData("unregistered-source")]
+    [InlineData("invalid-schema")]
+    [InlineData("transaction")]
+    public void IdentitySidecars_RejectInvalidOrIncompleteFixtures(string defect)
+    {
+        var root = CopyIdentityFixtures();
+        try
+        {
+            var sidecar = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot,
+                ActiveSyntaxInputs.IdentitySidecarPaths.Order(StringComparer.Ordinal).First());
+            var metadata = JsonNode.Parse(File.ReadAllText(sidecar))!.AsObject();
+            var project = Path.GetDirectoryName(Path.GetDirectoryName(sidecar))!;
+            switch (defect)
+            {
+                case "missing-sidecar":
+                    File.Delete(sidecar);
+                    break;
+                case "missing-source":
+                    File.Delete(Path.Combine(project, metadata["Files"]![0]!.GetValue<string>()));
+                    break;
+                case "unregistered-source":
+                    File.WriteAllText(Path.Combine(project, "unregistered.calr"), "module Unregistered\n");
+                    metadata["Files"] = new JsonArray("unregistered.calr");
+                    metadata["Declarations"] = new JsonArray();
+                    File.WriteAllText(sidecar, metadata.ToJsonString());
+                    break;
+                case "invalid-schema":
+                    metadata["Version"] = 0;
+                    File.WriteAllText(sidecar, metadata.ToJsonString());
+                    break;
+                case "transaction":
+                    File.WriteAllText(Path.Combine(project, ".calor", "ids.transaction.json"), "{}");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(defect));
+            }
+            if (defect == "missing-sidecar")
+                Assert.Throws<FileNotFoundException>(() => ActiveSyntaxInputs.EnumerateMirrorPaths(root));
+            else
+                Assert.Throws<InvalidDataException>(() => ActiveSyntaxInputs.EnumerateMirrorPaths(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(".calor/unrelated.lock")]
+    [InlineData(".calor/unregistered.json")]
+    [InlineData("other-project/.calor/ids.lock")]
+    public void IdentitySidecars_DoNotHideUnregisteredMetadata(string extra)
+    {
+        var root = CopyIdentityFixtures();
+        try
+        {
+            var activeRoot = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot);
+            var sidecar = ActiveSyntaxInputs.IdentitySidecarPaths.Order(StringComparer.Ordinal).First();
+            var project = Path.GetDirectoryName(Path.GetDirectoryName(sidecar))!;
+            var relative = Path.Combine(project, extra).Replace('\\', '/');
+            var path = Path.Combine(activeRoot, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "{}");
+            Assert.Contains(relative, ActiveSyntaxInputs.EnumerateMirrorPaths(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static string CopyIdentityFixtures()
+    {
+        var root = Directory.CreateTempSubdirectory("calor-active-identity-").FullName;
+        var repo = CliTestHarness.FindRepoRoot();
+        foreach (var relative in ActiveSyntaxInputs.IdentitySidecarPaths)
+        {
+            var source = Path.Combine(repo, ActiveSyntaxInputs.RelativeRoot, relative);
+            var destination = Path.Combine(root, ActiveSyntaxInputs.RelativeRoot, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(source, destination);
+            var metadata = JsonNode.Parse(File.ReadAllText(source))!.AsObject();
+            foreach (var entry in metadata["Files"]!.AsArray())
+            {
+                var input = entry!.GetValue<string>();
+                var sourceProject = Path.GetDirectoryName(Path.GetDirectoryName(source))!;
+                var destinationProject = Path.GetDirectoryName(Path.GetDirectoryName(destination))!;
+                var copy = Path.Combine(destinationProject, input);
+                Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
+                File.Copy(Path.Combine(sourceProject, input), copy);
+            }
+        }
+        return root;
+    }
+}

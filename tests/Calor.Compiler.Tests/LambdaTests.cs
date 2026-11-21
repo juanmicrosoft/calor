@@ -224,7 +224,7 @@ public class LambdaTests
     }
 
     [Fact]
-    public void Convert_EventSubscription_CreatesEventSubscribeNode()
+    public void Convert_EventSubscription_PreservesTheStatementAsCSharp()
     {
         var csharpSource = """
             using System;
@@ -252,12 +252,14 @@ public class LambdaTests
         var setupMethod = handlerClass.Methods.FirstOrDefault(m => m.Name == "Setup");
         Assert.NotNull(setupMethod);
 
-        // Should have an event subscribe statement
-        Assert.Contains(setupMethod.Body, s => s is EventSubscribeNode);
+        // 0.30 has no native event-subscription statement: it is preserved as C#.
+        var raw = Assert.IsType<RawCSharpNode>(Assert.Single(setupMethod.Body));
+        Assert.Equal("button.Click += OnClick;", raw.CSharpCode.Trim());
+        Assert.StartsWith("member:event-subscription:", raw.FramingReason);
     }
 
     [Fact]
-    public void Convert_EventUnsubscription_CreatesEventUnsubscribeNode()
+    public void Convert_EventUnsubscription_PreservesTheStatementAsCSharp()
     {
         var csharpSource = """
             using System;
@@ -284,7 +286,10 @@ public class LambdaTests
         var cleanupMethod = handlerClass.Methods.FirstOrDefault(m => m.Name == "Cleanup");
         Assert.NotNull(cleanupMethod);
 
-        Assert.Contains(cleanupMethod.Body, s => s is EventUnsubscribeNode);
+        // 0.30 has no native event-unsubscription statement: it is preserved as C#.
+        var raw = Assert.IsType<RawCSharpNode>(Assert.Single(cleanupMethod.Body));
+        Assert.Equal("button.Click -= OnClick;", raw.CSharpCode.Trim());
+        Assert.StartsWith("member:event-subscription:", raw.FramingReason);
     }
 
     #endregion

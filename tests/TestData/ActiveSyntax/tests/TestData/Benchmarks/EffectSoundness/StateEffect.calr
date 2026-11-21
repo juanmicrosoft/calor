@@ -1,0 +1,13 @@
+module StateService StateService
+  module StateServiceModule
+    func IncrementCounter public (int:counter) → int
+      ! mut
+      return counter + 1
+
+    func ResetCounter public () → int
+      ! mut
+      return 0
+
+    func ReadCounter public (int:counter) → int
+      !
+      return counter

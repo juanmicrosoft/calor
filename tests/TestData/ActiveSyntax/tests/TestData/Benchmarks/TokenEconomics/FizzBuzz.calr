@@ -1,0 +1,13 @@
+module FizzBuzz FizzBuzz
+  module FizzBuzzModule
+    func Run public () → void
+      ! cw
+      for i from 1 to 100 step 1
+        if i % 15 == 0
+          System.Console.WriteLine("FizzBuzz")
+        else if i % 3 == 0
+          System.Console.WriteLine("Fizz")
+        else if i % 5 == 0
+          System.Console.WriteLine("Buzz")
+        else
+          System.Console.WriteLine(i)

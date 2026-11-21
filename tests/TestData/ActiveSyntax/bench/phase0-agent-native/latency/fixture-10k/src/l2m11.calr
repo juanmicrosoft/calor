@@ -1,0 +1,114 @@
+module L2M11 L2M11 block
+  module L2M11Module public
+
+    func l2m11_fn01 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22324)
+        return (acc + 22324)
+      else
+        return ((acc * 2) + 22324)
+
+    func l2m11_fn02 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 22331)
+      let int:total = ((x * 2) + y)
+      if (total < 22331)
+        return 22331
+      else
+        return total
+
+    func l2m11_fn03 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22338)
+      if (x >= 22338)
+        return x
+      else
+        return 22338
+
+    func l2m11_fn04 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M25.L3M25Module.l3m25_fn01(x, 78)
+      let int:v2 = L3M28.L3M28Module.l3m28_fn12(x, 83)
+      return ((v1 + v2) + y)
+
+    func l2m11_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 3)
+      requires (y >= 0)
+      => (result >= 22345)
+      let int:total = ((x * 5) + y)
+      if (total < 22345)
+        return 22345
+      else
+        return total
+
+    func l2m11_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M06.L3M06Module.l3m06_fn03(x, 56)
+      return (v1 + y)
+
+    func l2m11_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 22352)
+      let int:total = ((x * 5) + y)
+      if (total < 22352)
+        return 22352
+      else
+        return total
+
+    func l2m11_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M28.L3M28Module.l3m28_fn03(x, 48)
+      let int:v2 = L3M13.L3M13Module.l3m13_fn12(x, 33)
+      return ((v1 + v2) + y)
+
+    func l2m11_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 22359)
+      let int:total = ((x * 2) + y)
+      if (total < 22359)
+        return 22359
+      else
+        return total
+
+    func l2m11_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22366)
+      let int:total = ((x * 2) + y)
+      if (total > 22366)
+        return 22366
+      return total
+
+    func l2m11_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 1)
+      requires (y >= 0)
+      => (result >= 22373)
+      let int:total = ((x * 2) + y)
+      if (total < 22373)
+        return 22373
+      else
+        return total
+
+    func l2m11_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M33.L3M33Module.l3m33_fn01(x, 35)
+      return (v1 + y)
+
+    func l2m11_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M34.L3M34Module.l3m34_fn07(x, 83)
+      let int:v2 = L3M34.L3M34Module.l3m34_fn11(x, 19)
+      return ((v1 + v2) + y)

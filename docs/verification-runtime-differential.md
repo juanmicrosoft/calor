@@ -21,7 +21,7 @@ anything. It derives 65 named forms from the machine whitelist:
 | Ordinal comparison rule | 1 |
 | Declarable quantifier-type policy representative | 1 |
 
-Every form is generated in all three positions (`§Q`, `§S`, explicit `§PROOF`), at identity-wrapper
+Every form is generated in all three positions (`requires`, `=>`, explicit `proof`), at identity-wrapper
 depths 1, 2, and 3, and with both a true/provable and false/refutable polarity: **65 × 3 × 3 × 2 =
 1,170 cases**. The identity wrappers preserve the base predicate while exercising nested lowering.
 Every row asserts that its registered form actually occurs in the base AST.
@@ -29,7 +29,7 @@ Every row asserts that its registered form actually occurs in the base AST.
 `SelfRefNode` needs a refinement binding. For that row only, the harness binds `#` to an
 `i32 __self__` parameter before solver translation; the generated C# uses the emitter's existing
 `__self__` lowering and receives the same runtime argument. This tests the modeled refinement
-meaning without presenting unbound `#` as ordinary source-valid `§Q`/`§S`/`§PROOF`.
+meaning without presenting unbound `#` as ordinary source-valid `requires`/`=>`/`proof`.
 
 `FieldAccessNode` runs through the production module-derived type registry. The contract pass and
 obligation solver derive `Probe.Value: u8` from the generated class declaration and translate it as

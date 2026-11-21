@@ -1,0 +1,27 @@
+module ModuloContracts ModuloContracts
+  module ModuloContractsModule
+    func ModBounded public (int:a, int:b) → int
+      !
+      requires b > 0
+      requires a >= 0
+      => result >= 0
+      => result < b
+      return a % b
+
+    func ModEvenOdd public (int:n) → int
+      !
+      => result >= 0
+      => result <= 1
+      let r = n % 2
+      if r < 0
+        return 0 - r
+      else
+        return r
+
+    func WrapAround public (int:index, int:size) → int
+      !
+      requires size > 0
+      requires index >= 0
+      => result >= 0
+      => result < size
+      return index % size

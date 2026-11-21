@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+"""Compiler-backed logic/control-flow/basic oracles; never invokes an agent."""
+
+import os
+import json
+import hashlib
+import platform
+import re
+from pathlib import Path
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+
+ADVANCED_INFRASTRUCTURE = re.compile(
+    r"timeout|timed out|deadline|\bEOF\b|cleanup|Cannot terminate|infrastructure|(?-i:\bUNKNOWN\b)|"
+    r"OutOfMemory|DllNotFound|BadImageFormat|FileNotFoundException|AccessViolation|"
+    r"Aborted|abnormal|segmentation|killed|\b(?:MSB|NU)\d+\b|Build FAILED|cannot launch|permission denied|"
+    r"Selected native manifest|Selected compiler dependency|native manifest changed|image changed or was substituted|"
+    r"\[Errno\b|OSError|WinError|Win32Exception|UnauthorizedAccessException|IOException|"
+    r"FileNotFoundError|PermissionError|ProcessLookupError|EOFError|"
+    r"\bOS\b|Traceback|ConnectionError|TimeoutError|success-shaped failure",
+    re.IGNORECASE,
+)
+
+
+def check_advanced_success(output, identity=None):
+    identities = [line for line in output.splitlines()
+                  if re.search(r"Selected\s+compiler\b", line, re.IGNORECASE)]
+    verdicts = [line for line in output.splitlines()
+                if re.search(r"Verification\s+passed\b", line, re.IGNORECASE)]
+    if (identities != ([] if identity is None else [identity])
+            or len(verdicts) != 1 or not verdicts[0].startswith("Verification passed: ")
+            or ADVANCED_INFRASTRUCTURE.search(output)
+            or re.search(r"Verifier\s+command\s+exited|\b(?:failure|failed|error)\b|Exception\b",
+                         output, re.IGNORECASE)):
+        raise RuntimeError("Advanced verifier returned success-shaped failure or extra identity/verdict output.")
+
+
+def stop(process, deadline):
+    deadline = min(deadline, time.monotonic() + 0.5)
+    process.poll()
+    termination_error = None
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except OSError as error:
+        termination_error = error
+    try:
+        process.communicate(timeout=max(0, deadline - time.monotonic()))
+    except subprocess.TimeoutExpired:
+        # Escaped descendants may retain stdout after the original process group
+        # dies. Do not wait for their EOF beyond the overall deadline.
+        if process.stdout is not None:
+            process.stdout.close()
+        try:
+            process.wait(timeout=max(0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Verifier cleanup timeout: child did not exit by the deadline.") from None
+        raise RuntimeError("Verifier cleanup EOF timeout: inherited output pipe did not close by the deadline.") from None
+    if termination_error is not None:
+        raise RuntimeError(f"Cannot terminate verifier process group {process.pid}: {termination_error}") from termination_error
+
+
+def run(command, cwd, deadline, env=None):
+    timeout = deadline - time.monotonic()
+    if timeout <= 0:
+        raise RuntimeError("Verifier timeout: overall deadline expired.")
+    process = subprocess.Popen(
+        command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, start_new_session=True, env=env,
+    )
+    try:
+        # Reserve part of this same deadline for bounded termination and EOF cleanup.
+        output, _ = process.communicate(timeout=max(0, deadline - time.monotonic() - min(0.5, timeout / 2)))
+    except BaseException as error:
+        failure = (RuntimeError(f"Verifier timeout after {timeout}s: {command[0]}")
+                   if isinstance(error, subprocess.TimeoutExpired) else error)
+        try:
+            stop(process, deadline)
+        except (OSError, RuntimeError) as cleanup_error:
+            message = f"Verifier cleanup failure while handling {type(failure).__name__}: {cleanup_error}"
+            failure.add_note(message)
+            print(message, file=sys.stderr)
+        if failure is error:
+            raise
+        raise failure from None
+    if process.returncode:
+        raise RuntimeError(f"Verifier command exited {process.returncode}:\n{output}")
+    return output
+
+
+def main():
+    native_only = sys.argv[1:] == ["--check-native"]
+    topology_only = sys.argv[1:] == ["--check-benchmark-native-topology"]
+    direct_check = native_only or topology_only
+    if not direct_check and len(sys.argv) != 3:
+        raise RuntimeError("Usage: verify-logic.py FUNCTION WORKSPACE | --check-native | --check-benchmark-native-topology")
+    helper = Path(__file__).resolve().parent
+    selected_root = os.environ.get("CALOR_COMPILER_ROOT", str(helper.parents[3]))
+    if not selected_root.strip():
+        raise RuntimeError("CALOR_COMPILER_ROOT must name a compiler checkout, not an empty path.")
+    root = Path(selected_root).resolve()
+    configuration = os.environ.get("CALOR_COMPILER_CONFIGURATION", "Debug")
+    if not configuration.strip() or configuration in (".", "..") or "/" in configuration or "\\" in configuration:
+        raise RuntimeError("CALOR_COMPILER_CONFIGURATION must be a nonempty directory name within the selected compiler root.")
+    compiler = root / "src/Calor.Compiler/bin" / configuration / "net10.0"
+    native = {"darwin": "libz3.dylib", "linux": "libz3.so", "win32": "libz3.dll"}.get(sys.platform)
+    if native is None:
+        raise RuntimeError(f"Unsupported verifier native platform: {sys.platform}")
+    for dependency in ("calor.dll", "Calor.Runtime.dll", "Microsoft.Z3.dll", native):
+        if not (compiler / dependency).is_file():
+            raise RuntimeError(f"Selected compiler dependency missing: {compiler / dependency}; build the selected root first.")
+    benchmark = not direct_check and sys.argv[1].startswith("bench-")
+    filename = ("Domain.calr" if sys.argv[1] in ("oop001", "oop002", "oop003", "oop004", "oop005", "oop006", "async004", "lam003", "lam004") else
+                "AsyncOps.calr" if sys.argv[1] in ("async001", "async002", "async003") else
+                "Generic.calr" if sys.argv[1] in ("gen001", "gen002", "gen003") else
+                "Enums.calr" if sys.argv[1] in ("enum001", "enum002", "enum003") else
+                "Impure.calr" if sys.argv[1] in ("ref001", "ref003", "ref007") else
+                "BuggyContracts.calr" if sys.argv[1] in ("contract003", "ref006") else
+                "MathUtils.calr" if sys.argv[1] in ("advanced001", "advanced002", "advanced003", "advanced004") else
+                "Contracts.calr" if sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005") else
+                "Collections.calr" if sys.argv[1] in ("PrintDictionary", "coll001", "coll002", "coll003", "coll004", "coll005", "coll006") else "Effects.calr"
+                if sys.argv[1] in ("PrintNumbers", "Countdown", "DoWhileDemo", "PrintEvenNumbers",
+                                    "eff001", "eff002", "eff003", "eff004", "eff005", "eff006", "ref002") else "Calculator.calr")
+    source = None if direct_check else Path(sys.argv[2]).resolve()
+    if source is not None and not benchmark:
+        source /= filename
+    if source is not None and not (source.is_dir() if benchmark else source.is_file()):
+        raise RuntimeError(f"Input missing: {source}")
+    maximum_timeout = 120
+    if benchmark:
+        task = helper.parent / "tasks/refactoring-benchmark" / sys.argv[1].removeprefix("bench-") / "task.json"
+        definition = json.loads(task.read_text(encoding="utf-8"))
+        if definition["id"] != sys.argv[1].removeprefix("bench-") or definition["timeout"] not in (120, 150, 180):
+            raise RuntimeError("Invalid original benchmark task identity/deadline.")
+        maximum_timeout = definition["timeout"]
+    timeout = float(os.environ.get("CALOR_LOGIC_TIMEOUT_SECONDS", str(maximum_timeout)))
+    if not 0 < timeout <= maximum_timeout:
+        raise RuntimeError(f"CALOR_LOGIC_TIMEOUT_SECONDS must be in (0, {maximum_timeout}].")
+    deadline = time.monotonic() + timeout
+    scalar_logic = not direct_check and sys.argv[1] in ("Factorial", "Clamp", "IsPositive", "Max")
+    advanced = scalar_logic or not direct_check and sys.argv[1] in ("ac001", "ac002", "ac003", "ac004", "ac005",
+                                                "advanced001", "advanced002", "advanced003", "advanced004")
+    carrier = topology_only or benchmark or advanced or not direct_check and sys.argv[1] in (
+        "type001", "type002", "type003", "type004", "pm004", "pm005",
+        "ref001", "ref002", "ref003", "ref004", "ref005", "ref006", "ref007", "ref008",
+        "lam001", "lam002", "lam003", "lam004")
+    images = {}
+    manifest_digest = None
+    if carrier:
+        manifest = root / ".github/z3-binaries-4.15.7.sha256"
+        manifest_digest = hashlib.sha256(manifest.read_bytes()).digest()
+        pins = {}
+        for line in manifest.read_text(encoding="utf-8").splitlines():
+            if line.strip() and not line.lstrip().startswith("#"):
+                digest, name, size = line.split()
+                if name in pins or len(digest) != 64:
+                    raise RuntimeError(f"Invalid selected native manifest: {manifest}")
+                pins[name] = (digest, int(size))
+        architecture = {"aarch64": "arm64", "arm64": "arm64", "amd64": "x64", "x86_64": "x64"}.get(
+            platform.machine().lower())
+        platform_name = {"darwin": "osx", "linux": "linux", "win32": "win"}[sys.platform]
+        extension = {"darwin": "dylib", "linux": "so", "win32": "dll"}[sys.platform]
+        for file, name in (("Microsoft.Z3.dll", "Microsoft.Z3.dll"),
+                           (native, f"libz3-{platform_name}-{architecture}.{extension}")):
+            image = compiler / file
+            if name not in pins or (hashlib.sha256(image.read_bytes()).hexdigest(), image.stat().st_size) != pins[name]:
+                raise RuntimeError(f"Selected native manifest mismatch: {image}")
+        images = {
+            image.relative_to(compiler): hashlib.sha256(image.read_bytes()).digest()
+            for image in (*compiler.iterdir(), *(compiler / "runtimes").rglob("*"))
+            if image.is_file() and (image.suffix == ".dll" or image.name.startswith("libz3."))
+        }
+
+    def check_images(output, *, check_deadline=True):
+        if hashlib.sha256(manifest.read_bytes()).digest() != manifest_digest:
+            raise RuntimeError(f"Selected native manifest changed: {manifest}")
+        for relative, expected in images.items():
+            for image in (compiler / relative, output / relative):
+                if not image.is_file() or hashlib.sha256(image.read_bytes()).digest() != expected:
+                    raise RuntimeError(f"Selected compiler/native image changed or was substituted: {image}")
+        if check_deadline and time.monotonic() >= deadline:
+            raise RuntimeError("Verifier timeout: selected image validation exceeded the overall deadline.")
+
+    with tempfile.TemporaryDirectory(prefix="calor-logic-verifier-") as temporary:
+        project = Path(temporary)
+        shutil.copytree(helper / "logic-verifier", project, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("bin", "obj"))
+        if scalar_logic:
+            run([
+                "dotnet", "restore", "LogicVerifier.csproj", "--locked-mode",
+                "--source", str(Path.home() / ".nuget/packages"),
+                f"-p:CompilerDirectory={compiler}", "-p:UseSharedCompilation=false",
+                "-nodeReuse:false", "--disable-build-servers", "-v", "quiet",
+            ], project, deadline)
+        run([
+            "dotnet", "build", "LogicVerifier.csproj", "--nologo", "-v", "quiet",
+            *(["--no-restore"] if scalar_logic else []),
+            f"-p:CompilerDirectory={compiler}", "-p:UseSharedCompilation=false",
+            *([f"-p:RestoreSources={Path.home() / '.nuget/packages'}"]
+              if not native_only and sys.argv[1] in ("advanced001", "advanced002", "advanced003", "advanced004") else []),
+            "-nodeReuse:false", "--disable-build-servers",
+        ], project, deadline)
+        if carrier:
+            check_images(project / "bin/Debug/net10.0")
+        print(f"Selected compiler: {compiler / 'calor.dll'}")
+        try:
+            output = run([
+                "dotnet", str(project / "bin/Debug/net10.0/LogicVerifier.dll"),
+                *([sys.argv[1]] if direct_check else [sys.argv[1], str(source)]),
+            ], project, deadline)
+        except BaseException as failure:
+            if scalar_logic:
+                try:
+                    check_images(project / "bin/Debug/net10.0", check_deadline=False)
+                except (OSError, RuntimeError) as image_error:
+                    message = f"Verifier post-failure image validation failure: {image_error}"
+                    failure.add_note(message)
+                    print(message, file=sys.stderr)
+            raise
+        if carrier:
+            check_images(project / "bin/Debug/net10.0")
+        if advanced:
+            check_advanced_success(output)
+        print(output, end="")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"Verification failed: {error}", file=sys.stderr)
+        sys.exit(1)

@@ -1,0 +1,30 @@
+module TextUtils TextUtils block
+  module TextUtilsModule public
+    func Slugify (string:s) → string
+      !
+      let string:lower = s.ToLowerInvariant()
+      return lower.Replace(" ", "-")
+
+    func Truncate (string:s, int:maxLen) → string
+      !
+      if (s.Length <= maxLen)
+        return s
+      if (maxLen > 3)
+        return ((s).Substring(0, (maxLen - 3)) + "...")
+      return (s).Substring(0, maxLen)
+
+    func WordCount (string:s) → int
+      !
+      var int:count = 0
+      var bool:inWord = false
+      var int:i = 0
+      while (i < s.Length)
+        let char:c = (s)[i]
+        if char.IsWhiteSpace(c)
+          set inWord false
+        else
+          if (!inWord)
+            set count (count + 1)
+          set inWord true
+        set i (i + 1)
+      return count

@@ -1,0 +1,16 @@
+module MinStack MinStack
+  module MinStackModule
+    func NewMin public (int:value, int:currentMin) → int
+      !
+      if value < currentMin
+        return value
+      else
+        return currentMin
+
+    func IsNewMin public (int:value, int:currentMin) → bool
+      !
+      return value <= currentMin
+
+    func CanPop public (int:size) → bool
+      !
+      return size > 0

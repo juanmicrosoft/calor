@@ -1,0 +1,15 @@
+module Composite Composite
+  module CompositeModule
+    func FileSize public (int:size) → int
+      !
+      requires size >= 0
+      return size
+
+    func TotalSize public (int:ownSize, int:childrenSize) → int
+      !
+      => result >= ownSize
+      return ownSize + childrenSize
+
+    func IsLeaf public (int:childCount) → bool
+      !
+      return childCount == 0

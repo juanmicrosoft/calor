@@ -1,0 +1,59 @@
+module CsvRow CsvRow block
+  module CsvRowModule public
+    func NeedsQuoting (string:@field) → bool
+      !
+      return ((@field).Contains(",") || ((@field).Contains("\"") || ((@field).Contains("\r") || (@field).Contains("\n"))))
+
+    func EscapeField (string:@field) → string
+      !
+      let bool:q = NeedsQuoting(@field)
+      if q
+        let string:doubled = (@field).Replace("\"", "\"\"")
+        return ("\"" + (doubled + "\""))
+      return @field
+
+    func JoinRow (List<string>:fields) → string
+      !
+      var string:result = ""
+      var bool:first = true
+      each @field in fields
+        let string:esc = EscapeField(@field)
+        if first
+          set result esc
+          set first false
+        else
+          set result (result + ("," + esc))
+      return result
+
+    func SplitRow (string:line) → List<string>
+      ! mut, alloc
+      let List<string>:fields = new List<string>()
+      let int:n = line.Length
+      var int:i = 0
+      while true
+        var string:@field = ""
+        let bool:quoted = ((i < n) && ((line).Substring(i, 1) == "\""))
+        if quoted
+          set i (i + 1)
+          while (i < n)
+            let string:c = (line).Substring(i, 1)
+            if (c == "\"")
+              if (((i + 1) < n) && ((line).Substring((i + 1), 1) == "\""))
+                set @field (@field + "\"")
+                set i (i + 2)
+              else
+                set i (i + 1)
+                break
+            else
+              set @field (@field + c)
+              set i (i + 1)
+        else
+          while ((i < n) && ((line).Substring(i, 1) != ","))
+            set @field (@field + (line).Substring(i, 1))
+            set i (i + 1)
+        fields.Add(@field)
+        if ((i < n) && ((line).Substring(i, 1) == ","))
+          set i (i + 1)
+        else
+          break
+      return fields

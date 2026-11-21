@@ -25,6 +25,121 @@ The `convert` command performs bidirectional conversion between C# and Calor:
 
 The conversion direction is automatically detected from the input file extension.
 
+Preserved C# retains its source text and behavior. Generated files use UTF-8.
+UTF-16/UTF-32 inputs therefore do **not** retain their original encoding or bytes.
+Exact-byte controls cover preserved UTF-8 sources, including BOMs, CRLF, and EOF comments.
+Malformed input encodings fail explicitly rather than using replacement text.
+
+When no C# namespace supplies a module label, the converter derives one from the
+filename and normalizes it to a valid Calor name. This file label does not change
+CLR namespaces, type names, or static containers.
+The API's `ConversionOptions.ModuleName` overrides only this file label.
+Original global and named CLR namespace owners remain unchanged.
+
+Standalone interpolation holes containing `null` or `default(bool)` convert
+natively, including in field initializers. This does not broaden C#-form call
+arguments, custom handler support, or numeric formatting effect contracts.
+Commented holes retain the existing preservation boundary.
+
+### Compilation context
+
+Conversion and generated-output validation default to an implicit `System`
+import, applied equally to original and emitted C#. Use `--no-implicit-system`
+for standalone validation. JSON output records the choice as `data.implicitSystem`.
+No other SDK namespace is implied. Opaque C# does not add blanket SDK imports;
+native AST visitors register their own generated dependencies. Preserved text and
+namespace-local imports are not rewritten, and preserved code remains non-native.
+
+The downstream C# project must supply the same context. Calor SDK/init projects
+add the real `Using` item; compiling a saved `.g.cs` elsewhere does not inherit
+the CLI's validation context. Short-name ambiguity reports `CS0104`; use an alias
+or a fully qualified name. See [compilation-context imports](../semantics/dotnet-backend.md#compilation-context-imports)
+for API defaults, project opt-out and editor settings.
+
+Lossless conversion can use the native file-header field `nullable oblivious`
+when the resolved original declarations have disabled nullable annotations.
+It retains explicit nullable annotations, including nested array and generic
+annotations, instead of replacing unknown reference types with nullable types.
+The converter admits this replacement only after strict compilation of the
+actual emitted/reparsed Calor, C# compilation, and an exact comparison of declared
+owner/type/nullability metadata. Already faithful native or preserved output is retained.
+Post-validation fallback also checks declaration metadata: unchanged C# text can
+inherit a different nullable context. If that context changes declaration semantics,
+lossless conversion preserves the original compilation unit instead.
+Mixed `#nullable` contexts, unresolved source context, or an uncertified native
+replacement retain the preservation boundary; raw C# is not native recovery.
+Conversion options and the default compilation context do not change.
+
+The library's explicit `Fidelity=Lossy, Mode=Interop` path also retains a uniform
+annotation-disabled context when the original C# resolves without errors and
+has no lexical nullable directives. For instance property reads and selected
+instance calls with no explicit or implicit arguments, it can express
+the CLR null-receiver failure as `receiver ?? throw null` rather than inventing
+a non-null declaration. The receiver is evaluated once. Reduced extension calls
+remain static calls and accept their declared nullable receiver. Calls with
+arguments retain receiving checks: moving a null guard ahead of their evaluation
+could change side effects or exception order. This does not certify
+effects, change the default lossless path, or disable explicit nullable checking.
+
+When this native candidate fails validation, conversion issues retain the compiler
+code, message, and location in the generated Calor or C#, rather than reporting a
+metadata mismatch. Candidate diagnostics remain warnings after exact original C#
+preservation; they do not mean the rejected native candidate compiled. A metadata
+mismatch is reported only after the generated C# compiles.
+
+Scoped-import fallback retains those candidate diagnostics too. A
+`namespace-split-refused` warning can accompany a nullable receiving error or an
+unknown effect; the namespace label alone does not identify the underlying defect.
+
+Static calls on source generic types use the selected constructed method signature,
+not a receiver name with its generic arguments removed. Namespace and alias lookup,
+arity, constraints, overloads, and nullable annotations must still resolve.
+Calls charge both the selected method and its declaring type's initialization
+effects. An unproved initializer remains unknown; this rule grants no new library
+effect permissions.
+
+For directly invoked delegate parameters, conversion can synthesize existing
+effect placeholders (`<! callback0>`) instead of assuming callbacks are pure.
+Each parameter gets its own row variable; invocation charges that row and the
+effects of evaluating its arguments. Effect binders erase without changing CLR
+signatures or generic arity. Returned lambdas receive a concrete row only when
+strict native inference verifies every return, including conditional branches.
+Unknown or assumed facts cannot establish a concrete return contract.
+Aliases, stored or captured callbacks, non-lambda returns, and dispatch contracts
+are outside this synthesis unit and retain their existing fail-closed behavior.
+These contracts do not establish whole-program equivalence.
+
+Converted private/internal bodies omit their own inferred rows. Their callback
+parameter and return contracts remain explicit, and public callers still declare
+the effects reached through those helpers. Abstract and extern declarations
+retain their existing boundary rows. Recompilation must still reject an unknown
+body or unproved virtual-slot contract.
+Required boundary rows are always printed, including explicit Pure rows.
+Callback positions without a proved contract retain `! unknown`; emitting that
+row does not make their invocation eligible for native conversion.
+A function or method whose effects cannot be resolved — usually because it calls
+an API with no effect contract — is written with `! unknown` as its own row. The
+file stays native Calor and compiles with default settings; it is no longer
+preserved as raw C# for that reason alone.
+
+### Generated output and refresh
+
+C#→Calor conversion saves an adjacent `<output>.conversion.json` receipt containing
+the original C# source, parse options, observed inputs and exact generated Calor.
+Keep this receipt with its output; it contains the original source, not just hashes.
+Generated Calor validation is mandatory before either file is written.
+
+An unchanged generated file can be refreshed from its original C# path. Edited
+outputs, missing receipts and outputs associated with another original path are
+refused without overwriting either file. Keep those files and convert to a new
+destination. A neighboring `.conversion.lock` serializes cooperating conversions.
+
+Output and receipt are not one atomic transaction. If the receipt cannot be saved
+after output commits, the command reports the written output and exits with an
+error. A missing or mismatched receipt blocks automatic refresh. Receipts detect
+edit conflicts and associate original context; they do not authenticate converter
+origin or prove that a preservation reason is still necessary.
+
 ---
 
 ## Quick Start
@@ -60,8 +175,7 @@ calor convert MyService.cs --benchmark
 | `--output` | `-o` | Auto-detected | Output file path |
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
-| `--lossy` | — | `false` | Explicitly allow reported substitutions or drops. Without this flag, unsupported code is preserved verbatim and both generated Calor and round-tripped C# must validate before the destination is replaced. |
-| `--select-active-preprocessor-branch-lossy` | — | `false` | Explicitly lossy: evaluate conditional compilation through Roslyn and retain only the active branch. This implies lossy fidelity. |
+| `--no-implicit-system` | — | `false` | Disable the System-only context import for original and generated C#. |
 | `--define` | — | — | Add a conditional-compilation symbol. Repeat or provide multiple values. |
 | `--configuration` | — | — | Configuration recorded in conversion metadata. |
 | `--framework` | — | — | Target framework recorded in conversion metadata. |
@@ -72,7 +186,6 @@ calor convert MyService.cs --benchmark
 | `--reference` | — | — | Metadata reference path, optionally `path=alias1,alias2` for extern aliases. |
 | `--validate` | — | — | Compatibility flag. Generated Calor validation is now mandatory in every mode. |
 | `--passthrough` | — | `false` | Preserve unconvertible members as raw C# interop blocks. Lossless mode already preserves unsupported descendants at the nearest complete boundary. |
-| `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
 | `--format` | — | `text` | Output format: `text` or `json` (envelope document on stdout) — see [JSON Output](#json-output---format-json). No `-f` short alias |
 
 ---
@@ -86,7 +199,7 @@ timeout, crash). Exit codes are unchanged.
 
 ```json
 {
-  "version": "1.1",
+  "version": "2.0",
   "command": "convert",
   "diagnostics": [
     { "code": "Calor1343", "message": "[local-functions] Local functions are not supported…",
@@ -115,11 +228,11 @@ timeout, crash). Exit codes are unchanged.
   their own codes.
 - `data.direction` — `csharp-to-calor` | `calor-to-csharp`.
 - `data.lossCount` / `data.losses[]` — C# → Calor structured semantic-loss
-  accounting: every §CSHARP interop preservation, TODO fallback, dropped
+  accounting: every converter-owned C# interop preservation, TODO fallback, dropped
   construct, and stripped preprocessor directive, each with
   `kind`, `feature`, `file`, `line`, and `description`. `lossCount: 0` means
   the output is fully native Calor. Interop preservation is lossless but not
-  native; substitutions and drops require `--lossy`. In text mode a conversion with losses
+  native; the CLI does not allow substitutions or drops. In text mode a conversion with losses
   prints a located loss summary instead of the `✓ Conversion successful` line.
 - `data.benchmark` — present with `--benchmark`: token/line/character counts
   before and after, reduction percentages, and `compactnessRatio`. The legacy
@@ -136,30 +249,61 @@ If `--output` is not specified:
 
 ## C# to Calor Conversion
 
+C# static classes convert to **named modules**, using a nested `module`
+declaration and `func` members. Their C# names are unchanged: a module
+converted from `Example.Utilities` still emits `Example.Utilities`, not a new
+wrapper type. Nested modules retain their containing type. Static fields,
+properties, constructors, attributes, generic parameters and constraints retain
+their member metadata.
+
+Extension functions keep their `this` parameter and must belong to a non-nested,
+non-generic module, as required by C#. Shapes outside native conversion support,
+including by-reference extension receivers, static events, unsafe type declarations and
+attributes on generic type parameters, remain explicitly reported C#
+interop rather than losing part of their signature. Modules and classes cannot
+share a name and generic arity in the same namespace or containing type
+(`Calor0201`). Native static containers use named modules, not a static class
+modifier. Ordinary non-static classes may still declare static members.
+The first `module` labels the file and carries its optional namespace; it is
+not itself the static container.
+
 When converting C# to Calor, the converter:
 
 1. Parses the C# source code
 2. Identifies supported constructs (classes, methods, properties, etc.)
 3. Maps C# patterns to Calor equivalents
-4. Generates unique IDs for all structural elements
+4. Maintains declaration identity in the project `.calor/ids.json` sidecar
 5. Adds effect declarations based on detected side effects
-6. Suggests contracts based on validation patterns
+6. Reports conversion issues and preservation paths for review
 
-The default contract is **lossless**: unsupported descendants bubble to the
-nearest complete member or type and are preserved verbatim as C# interop.
-Success means the emitted Calor parses and compiles, and its generated C#
-compiles through Roslyn. Output files are replaced atomically only after these
-checks pass. `--lossy` permits substitutions or drops, but every occurrence is
-reported with its source location. Lossy output still goes through the same
-round-trip compile check (#1514). When it fails, the file is written but
-`conversionPaths.outcome` is `unverified`, `conversionPaths.roundTrip` is
-`failed`, each compiler error is a warning, and the command exits `2`.
-(`--select-active-preprocessor-branch-lossy` still refuses on a failed check.)
+The contract is **lossless**: try native conversion, then preserve unsupported
+code at a complete member, type, or whole-file boundary. Failed generated-Calor
+or C# validation escalates preservation rather than discarding a buildable input.
+Whole-file passthrough reproduces the original C# without a generated preamble.
+Reports retain the reasons for escalation and never count passthrough as native.
+
+Object and collection initializers convert natively only at positions where their
+evaluation order is preserved. An unsupported position, such as the receiver in
+`new Box { Value = 2 }.Value`, preserves the complete containing member, not an
+opaque expression inside a native method. The reported interop feature and raw
+payload identify that boundary. Initializers inside a preserved type or whole
+file are not native. A preserved callback body grants no native effect contract.
+
+Local collection bindings (`let` or `var`) are not class members. They produce
+`Calor0100`; the parser consumes the invalid binding and retains later fields,
+methods and types for diagnostics. Use a `field` or `property` initializer instead.
+
+Writing and building are separate outcomes. Exact original C# can be written
+when a standalone file lacks its project references; that result is
+`unverified`, with `roundTrip: "failed"` and exit `2`, not a passed build.
+Use the original project references and configuration to verify it. Malformed,
+missing, unreadable inputs and write failures remain errors. The destructive
+`--lossy` and `--select-active-preprocessor-branch-lossy` options were removed.
 
 ### Conditional compilation and compiler directives
 
 C# → Calor conversion preserves conditional compilation by default. Every
-`#if`/`#elif`/`#else` branch is represented as explicit `§PP` AST, including
+`#if`/`#elif`/`#else` branch is represented by native `pp` branches, including
 conditional usings, declarations and partial types, class/struct members, and
 method statements. Conversion API callers can supply `CSharpParseOptions`,
 additional defined symbols, and a configuration name; these are recorded in
@@ -171,6 +315,31 @@ branch, and records every removed conditional directive as a conversion loss.
 Inactive `#nullable`, `#pragma`, `#warning`, `#error`, `#line`, `#define`, and
 `#undef` directives are removed individually with distinct losses; active
 directives remain effective.
+
+With both `Fidelity=Lossy` and `SelectActiveBranchLossy`, single-file conversion
+can retain namespace-local imports in one namespace, including ordinary imports,
+aliases and static imports. Balanced `#region`/`#endregion` trivia is allowed.
+The original semantic context must be complete and valid. Generated Calor must
+pass strict effect enforcement (`StrictEffects=true`), including rejection of
+unknown callback rows (`Calor0425`). Generated C# must
+compile and retain declared type and nullable-annotation metadata; preserved
+members or substitutions do not qualify. Other active directives and unsupported
+namespace topologies stay closed.
+
+Since 0.30, default lossless conversion also handles a file that is exactly one
+named namespace with local imports. It uses the scoped-import projection described
+in [migrate](migrate.md) (`namespace using`), which keeps the imports inside the
+namespace and needs no file split. If that projection cannot be certified — for
+example the original C# does not compile against the conversion references — the
+file falls back to the ordinary single-file path and is preserved as before.
+
+For a file with one uniform nullable-oblivious context, lossless conversion can
+retain direct, converter-owned member preservation under a `nullable oblivious`
+module header. The complete result must pass ordinary Calor compilation and
+preserve the original declared type and nullable-annotation metadata. Validation
+rescues and destructive losses do not qualify for this recovery. Preserved
+members remain recorded as interop losses; a hybrid result receives no fully
+native conversion credit.
 
 Compiler-affecting directives (`#nullable`, `#pragma`, `#warning`, `#error`,
 and `#line`) are preserved verbatim in source order. They remain explicit raw
@@ -195,27 +364,28 @@ missing `#r` or `#load` targets are errors rather than silently accepted.
 
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
-| `namespace` | `§M{id:Name}` module |
-| `class` | `§CL{id:Name:vis}` class |
-| `method` | `§F{id:Name:vis}` function |
-| `property` | `§PROP{id:Name:vis:type}` property |
-| `field` | `§FLD{id:type:name}` field |
-| `if/else if/else` | `§IF{id}` / `§EI` / `§EL` branches (end at dedent) |
-| `for` loop | `§L{id:var:from:to:step}` |
-| `while` loop | `§WH{id}` |
-| `try/catch` | Converted to `Result<T,E>` pattern |
-| `?.`, `??` | Converted to `Option<T>` pattern |
+| One supported namespace scope | Optional namespace after the file's `module` label |
+| Static class | Nested named `module` |
+| `class` | `class Name` with native visibility/modifiers |
+| `method` | `func Name (Type:parameter) → ReturnType` |
+| `property` | `property Type:Name` with indented accessors |
+| `field` | `field Type:name` |
+| `if/else if/else` | Native indented branches (end at dedent) |
+| `for` loop | Reevaluated `for i = start; condition; i = next`; inclusive snapshot ranges are a separate form |
+| `while` loop | `while condition` |
+| `try/catch` | Native `try` / `catch Type:name` |
+| `?.`, `??` | Nullable references and null-conditional / null-coalescing expressions |
 
 ### Conversion Warnings
 
-The converter reports patterns it can't perfectly translate:
+The converter reports preserved constructs and actual validation failures.
+It does not replace asynchronous execution with synchronous execution.
+For example, an iterator accessor retains its original C# member and is
+reported as preservation rather than native iterator-accessor support:
 
 ```
 Converting MyService.cs → MyService.calr
-  Warning: Complex LINQ query at line 42 - manual review recommended
-  Warning: Async method at line 78 - converted to sync equivalent
-
-Conversion complete with 2 warnings
+  [iterator-accessor] Original C# accessor preserved
 ```
 
 ---
@@ -231,8 +401,8 @@ calor convert Calculator.calr
 Output includes:
 - Proper C# namespaces and class structures
 - Contract enforcement via runtime checks (optional)
-- Effect documentation via XML comments
-- Generated file header with timestamp
+- Ordinary CLR calls after compile-time effect checks
+- A generated-file marker (not a timestamp or semantics-version attestation)
 
 ---
 
@@ -244,7 +414,7 @@ Use `--benchmark` to see how the Calor version compares to C#:
 calor convert PaymentService.cs --benchmark
 ```
 
-Output:
+Illustrative counts, not a current measured score:
 ```
 Converting PaymentService.cs → PaymentService.calr
 
@@ -270,7 +440,7 @@ Use `--verbose` to see detailed conversion progress:
 calor convert MyService.cs --verbose
 ```
 
-Output:
+Illustrative progress, not an exact CLI transcript:
 ```
 Converting MyService.cs → MyService.calr
 
@@ -281,7 +451,7 @@ Converting constructs:
   [OK] Class: MyService → c001
   [OK] Method: ProcessOrder → f001
   [OK] Method: ValidateInput → f002
-  [WARN] Method: FetchDataAsync → f003 (async converted to sync)
+  [OK] Method: FetchDataAsync → f003 (async behavior retained)
   [OK] Property: IsEnabled → y001
   ...
 
@@ -290,8 +460,8 @@ Detecting effects:
   f002: (pure)
   f003: net (HTTP call detected)
 
-Generating contracts:
-  f002: Added §Q (!= input null) from null check at line 24
+Reviewing contracts:
+  Keep validation behavior; add requires input != null only after checking the API contract.
 
 Writing output: MyService.calr
 Conversion complete with 1 warning
@@ -332,7 +502,7 @@ After conversion, use Claude to refine the Calor:
 Review the converted file src/Services/UserService.calr and:
 1. Add appropriate contracts based on the business logic
 2. Verify effect declarations are complete
-3. Improve naming of generated IDs if needed
+3. Use identity-aware tools for declaration renames; retain the sidecar
 ```
 
 ---
@@ -382,10 +552,11 @@ rm MyService.cs
 The converter may not perfectly handle:
 
 - **Complex LINQ expressions** - May need manual adjustment
-- **Async/await patterns** - Converted to synchronous equivalents
-- **Dynamic types** - Not supported in Calor
-- **Unsafe code** - Not supported in Calor
-- **Preprocessor directives** - Ignored during conversion
+- **Async/await patterns** - Preserve their carrier and scheduling behavior;
+  unsupported shapes remain C# rather than becoming synchronous
+- **Dynamic and unsafe code** - Check the feature registry and actual conversion
+  report; a native node does not prove complete analysis or effect coverage
+- **Preprocessor directives** - Retain branches and directive scope as described above
 
 Review the warnings and manually adjust as needed.
 
@@ -395,9 +566,9 @@ Review the warnings and manually adjust as needed.
 
 | Code | Meaning |
 |:-----|:--------|
-| `0` | Conversion completed; read `conversionPaths.outcome` to tell native from preserved or lossy output |
-| `1` | Missing input, timeout, `--no-fallback` refusal, or any refused conversion (`outcome: "refused"`; nothing written) |
-| `2` | Plain `--lossy` output was written, but its C# failed the round-trip compile check (`outcome: "unverified"`). With `--select-active-preprocessor-branch-lossy` the same failure is a refusal (exit `1`) |
+| `0` | Conversion completed; read `conversionPaths.outcome` to distinguish native from preserved output |
+| `1` | Invalid or missing input, timeout, filesystem failure, or any refused conversion (`outcome: "refused"`; nothing written) |
+| `2` | Exact original C# was preserved and written, but standalone compilation failed (`outcome: "unverified"`). Validate with the original project context. |
 
 ---
 

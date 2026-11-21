@@ -1,0 +1,20 @@
+module ArrayOps ArrayOps
+  module ArrayOpsModule
+    func Max public (int:a, int:b) → int
+      !
+      if a > b
+        return a
+      else
+        return b
+
+    func Max3 public (int:a, int:b, int:c) → int
+      !
+      if a > b
+        if a > c
+          return a
+        else
+          return c
+      else if b > c
+        return b
+      else
+        return c

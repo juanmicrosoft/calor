@@ -1,0 +1,141 @@
+{
+  "cli-convert": {
+    "command": "calor convert Shapes.cs -o Shapes.calr",
+    "exit": 0,
+    "stdout": [
+      "Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:",
+      "  InteropPreserved: 1",
+      "    <dir>/Shapes.cs:9 [method]",
+      "    {",
+      "        int Scale(int v) =>...",
+      "  ⓘ 1 member preserved as raw C# block(s) — the output parses, but this C# still needs migrating.",
+      "  Preservation paths: 1 by converter interop (unsupported construct)",
+      "Warnings (1):",
+      "  ⚠ Unsupported feature [local-function] escalated to raw C# preservation of the containing member: int Scale(int v) => v * factor;",
+      "Output: <dir>/Shapes.calr"
+    ],
+    "stderr": [],
+    "calor": "module Shapes overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      !\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Shapes.cs -o Shapes.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 3,
+    "interopPreservationCount": 1,
+    "lossCount": 1,
+    "losses": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": [
+      "Calor1343 x2"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Shapes.calr --output Shapes.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 3,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "info:Calor1343:method",
+      "warning:Calor1343:local-function"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      !\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 3,
+    "interopPreservations": 1,
+    "locations": [
+      {
+        "feature": "method",
+        "path": "interop",
+        "trigger": null,
+        "enabledBy": null
+      }
+    ],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "preserved",
+      "interop": 1,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "info:Calor1343:method",
+      "warning:Calor1343:local-function"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked\n  module Shapes\n    func Area (int:w, int:h) → int\n      !\n      let System.Func<int, int>:Clamp = static (int:v) => ((v < 0) ? 0 : v)\n      return (Clamp(w) * Clamp(h))\n\n    raw member:method:Method:Unsupported%20Method%3A%20public%20static%20int%20Scaled%28int%20w%2C%20int%20factor%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20int%20Scale%28int%20v%29%20%3D%3E... 126\n\n    public static int Scaled(int w, int factor)\n    {\n        int Scale(int v) => v * factor;\n        return Scale(w);\n    }\n\n\n\n"
+  }
+}

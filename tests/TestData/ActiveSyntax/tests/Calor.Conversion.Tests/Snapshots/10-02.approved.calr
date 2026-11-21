@@ -1,0 +1,6 @@
+module Test_10_02 Test_10_02 overflow unchecked
+  module GridHelper public
+    func CreateGrid public (int:rows, int:cols) → int[,]
+      ! alloc
+      let int[,]:grid = new int[rows, cols]
+      return grid

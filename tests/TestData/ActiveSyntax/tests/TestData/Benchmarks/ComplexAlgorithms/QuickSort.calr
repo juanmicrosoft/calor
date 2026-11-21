@@ -1,0 +1,19 @@
+module QuickSort QuickSort
+  module QuickSortModule
+    func ChoosePivot public (int:low, int:high) → int
+      !
+      requires low >= 0
+      requires low <= high
+      return high
+
+    func ShouldSwap public (int:value, int:pivot) → bool
+      !
+      return value <= pivot
+
+    func NextPartitionIndex public (int:current) → int
+      !
+      return current + 1
+
+    func IsSortedPair public (int:a, int:b) → bool
+      !
+      return a <= b

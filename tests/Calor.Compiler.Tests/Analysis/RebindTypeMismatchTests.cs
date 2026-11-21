@@ -19,6 +19,7 @@ public class RebindTypeMismatchTests
 {
     private static bool HasMismatch(string source)
     {
+        source = NativeSource(source);
         var lex = new DiagnosticBag();
         var tokens = new Lexer(source, lex).TokenizeAllForParser();
         Assert.False(lex.HasErrors, "lexer: " + string.Join("; ", lex.Select(d => d.Message)));
@@ -33,6 +34,7 @@ public class RebindTypeMismatchTests
 
     private static IReadOnlyList<Diagnostic> Validate(string source)
     {
+        source = NativeSource(source);
         var lex = new DiagnosticBag();
         var tokens = new Lexer(source, lex).TokenizeAllForParser();
         var parseBag = new DiagnosticBag();
@@ -42,18 +44,131 @@ public class RebindTypeMismatchTests
         return bag.ToList();
     }
 
+    // Preserve the original inputs and binding oracle below. Only these exact
+    // fixtures have native counterparts; the explicit namespace retains S.SModule.
+    private static string NativeSource(string original) => original switch
+    {
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                !
+                var int:x = 0
+                var string:x = "hi"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i32} 0\n    §B{~x} 1\n    §R x\n" => """
+            module S S
+              func Do public () → int
+                !
+                let int:x = 0
+                var x = 1
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x} \"hi\"\n    §R 0\n" => """
+            module S S
+              func Do public () → int
+                !
+                var int:x = 0
+                var x = "hi"
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+        "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n" => """
+            module S S
+              func Do public (string:p) → int
+                ! fs:r
+                var int:x = 0
+                var x = File.ReadAllText(p)
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (str:s) -> i32\n    §B{~x:i32} 0\n    §B{~x} s\n    §R 0\n" => """
+            module S S
+              func Do public (string:s) → int
+                !
+                var int:x = 0
+                var x = s
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i64\n    §B{~x:i64} 0\n    §B{~x} 5\n    §R x\n" => """
+            module S S
+              func Do public () → long
+                !
+                var long:x = 0
+                var x = 5
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} (i64:n) -> i32\n    §B{~x:i32} 0\n    §B{~x} n\n    §R 0\n" => """
+            module S S
+              func Do public (long:n) → int
+                !
+                var int:x = 0
+                var x = n
+                return 0
+            """,
+        "§M{S}\n  §F{Do:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
+        "    §B{~result} (* result n)\n    §R result\n" => """
+            module S S
+              func Do public (int:n) → int
+                !
+                var result = 1
+                var result = result * n
+                return result
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:i32} 5\n    §R x\n" => """
+            module S S
+              func Do public () → int
+                !
+                var int:x = 0
+                var int:x = 5
+                return x
+            """,
+        "§M{S}\n  §F{Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
+        "    §WH (<= 1 n)\n      §B{~result} (* result 2)\n    §R result\n" => """
+            module S S
+              func Fact public (int:n) → int
+                !
+                var result = 1
+                while 1 <= n
+                  var result = result * 2
+                return result
+            """,
+        "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x} 0\n    §B{~x:i32} 5\n    §R x\n" => """
+            module S S
+              func Do public () → int
+                !
+                var x = 0
+                var int:x = 5
+                return x
+            """,
+        "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+        "    §IF (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
+        "    §IF (== b true)\n      §B{~x:str} \"y\"\n      §R 0\n    §R 0\n" => """
+            module S S
+              func Do public (bool:a, bool:b) → int
+                !
+                if a == true
+                  var int:x = 1
+                  return x
+                if b == true
+                  var string:x = "y"
+                  return 0
+                return 0
+            """,
+        _ => throw new ArgumentException("No native counterpart is registered for this type-mismatch rebind fixture.", nameof(original))
+    };
+
     [Fact]
     public void RebindWithDifferentType_IsRejected()
     {
         Assert.True(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n"));
     }
 
     [Fact]
     public void RebindOfImmutableLocal_IsRejected()
     {
         var diagnostics = Validate(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i32} 0\n    §B{~x} 1\n    §R x\n");
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{x:i32} 0\n    §B{~x} 1\n    §R x\n");
 
         Assert.Contains(diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.BindReassignsImmutable);
@@ -64,20 +179,20 @@ public class RebindTypeMismatchTests
     {
         // #740 common case: no annotation, but the literal's type is statically known.
         Assert.True(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x} \"hi\"\n    §R 0\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x} \"hi\"\n    §R 0\n"));
     }
 
     [Fact]
     public void Message_UsesSurfaceSpellings_NotInternalForms()
     {
-        // The message must teach the syntax the user writes (i32/str), never the
+        // The message must teach current surface syntax (int/string), never the
         // expanded internal spelling (INT/STRING) — which isn't valid annotation syntax.
         var diag = Validate(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n")
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n")
             .Single(d => d.Code == DiagnosticCode.BindRebindTypeMismatch);
 
-        Assert.Contains("'i32'", diag.Message);
-        Assert.Contains("'str'", diag.Message);
+        Assert.Contains("'int'", diag.Message);
+        Assert.Contains("'string'", diag.Message);
         Assert.DoesNotContain("INT", diag.Message);
         Assert.DoesNotContain("STRING", diag.Message);
     }
@@ -88,7 +203,7 @@ public class RebindTypeMismatchTests
         // #740: no annotation, value is a string-returning BCL call — inferred as str,
         // rebinding an i32 → CS0029.
         Assert.True(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+            "§M{S}\n  §F{Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
             "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n"));
     }
 
@@ -97,7 +212,7 @@ public class RebindTypeMismatchTests
     {
         // #740: value is a reference to a str parameter — inferred as str, rebinding i32.
         Assert.True(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} (str:s) -> i32\n    §B{~x:i32} 0\n    §B{~x} s\n    §R 0\n"));
+            "§M{S}\n  §F{Do:pub} (str:s) -> i32\n    §B{~x:i32} 0\n    §B{~x} s\n    §R 0\n"));
     }
 
     [Fact]
@@ -106,7 +221,7 @@ public class RebindTypeMismatchTests
         // Regression guard: `long x = 0; x = 5;` is valid C# (int literal widens to long).
         // Category comparison must NOT flag it — a bug the earlier exact-equality check had.
         Assert.False(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i64\n    §B{~x:i64} 0\n    §B{~x} 5\n    §R x\n"));
+            "§M{S}\n  §F{Do:pub} () -> i64\n    §B{~x:i64} 0\n    §B{~x} 5\n    §R x\n"));
     }
 
     [Fact]
@@ -115,7 +230,7 @@ public class RebindTypeMismatchTests
         // Two numeric types share a category, so a numeric reference into a numeric local
         // is never flagged (a narrowing that needs a cast is a conservative miss, not a FP).
         Assert.False(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} (i64:n) -> i32\n    §B{~x:i32} 0\n    §B{~x} n\n    §R 0\n"));
+            "§M{S}\n  §F{Do:pub} (i64:n) -> i32\n    §B{~x:i32} 0\n    §B{~x} n\n    §R 0\n"));
     }
 
     [Fact]
@@ -124,7 +239,7 @@ public class RebindTypeMismatchTests
         // A value whose type can't be inferred (here a binary expression) is a
         // conservative miss, never a false positive — the accumulator idiom relies on it.
         Assert.False(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
+            "§M{S}\n  §F{Do:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
             "    §B{~result} (* result n)\n    §R result\n"));
     }
 
@@ -132,7 +247,7 @@ public class RebindTypeMismatchTests
     public void RebindWithSameType_IsAccepted()
     {
         Assert.False(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:i32} 5\n    §R x\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:i32} 5\n    §R x\n"));
     }
 
     [Fact]
@@ -141,8 +256,8 @@ public class RebindTypeMismatchTests
         // The accumulator idiom: the rebind carries no type annotation, so there is
         // nothing to contradict — unaffected.
         Assert.False(HasMismatch(
-            "§M{m:S}\n  §F{f:Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
-            "    §WH{w1} (<= 1 n)\n      §B{~result} (* result 2)\n    §R result\n"));
+            "§M{S}\n  §F{Fact:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
+            "    §WH (<= 1 n)\n      §B{~result} (* result 2)\n    §R result\n"));
     }
 
     [Fact]
@@ -151,7 +266,7 @@ public class RebindTypeMismatchTests
         // The first declaration is unannotated (inferred), so there is no known
         // original type to compare against — conservatively not flagged.
         Assert.False(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x} 0\n    §B{~x:i32} 5\n    §R x\n"));
+            "§M{S}\n  §F{Do:pub} () -> i32\n    §B{~x} 0\n    §B{~x:i32} 5\n    §R x\n"));
     }
 
     [Fact]
@@ -160,8 +275,8 @@ public class RebindTypeMismatchTests
         // Independent variables in sibling blocks (not a reassignment) may differ in
         // type — the second is a new declaration, not a rebind of the first.
         Assert.False(HasMismatch(
-            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
-            "    §IF{i2} (== b true)\n      §B{~x:str} \"y\"\n      §R 0\n    §R 0\n"));
+            "§M{S}\n  §F{Do:pub} (bool:a, bool:b) -> i32\n" +
+            "    §IF (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
+            "    §IF (== b true)\n      §B{~x:str} \"y\"\n      §R 0\n    §R 0\n"));
     }
 }

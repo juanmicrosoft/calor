@@ -1,0 +1,48 @@
+module OverflowSafe OverflowSafe
+  module OverflowSafeModule
+    func IncrementSafe public (int:x) → int
+      !
+      requires x < 2147483647
+      => result > x
+      return x + 1
+
+    func DecrementSafe public (int:x) → int
+      !
+      requires x > -2147483648
+      => result < x
+      return x - 1
+
+    func DoubleSafe public (int:x) → int
+      !
+      requires x > 0
+      requires x < 1073741824
+      => result > x
+      return x * 2
+
+    func SquareSafe public (int:x) → int
+      !
+      requires x >= 0
+      requires x <= 46340
+      => result >= 0
+      return x * x
+
+    func NegateSafe public (int:x) → int
+      !
+      requires x < 0
+      requires x > -2147483648
+      => result > 0
+      return 0 - x
+
+    func AddPositivesSafe public (int:x, int:y) → int
+      !
+      requires x > 0
+      requires x < 1073741824
+      requires y > 0
+      requires y < 1073741824
+      => result > 0
+      return x + y
+
+    func UnsignedNonNegative public (uint:x) → bool
+      !
+      => result == true
+      return x >= 0

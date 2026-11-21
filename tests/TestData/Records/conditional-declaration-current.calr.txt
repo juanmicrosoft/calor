@@ -1,0 +1,56 @@
+module Fixture Fixture overflow unchecked
+  pp FEATURE
+    class ConditionalClass
+      func Value static () → int
+        !
+        return 1
+
+
+    record ConditionalRecord (int:Value)
+
+
+    delegate ConditionalDelegate (int:value) → int
+      ! unknown
+
+    class ConditionalPartial partial
+      func PartialValue static () → int
+        !
+        return 10
+
+
+  pp else
+    class ConditionalClass
+      func Value static () → int
+        !
+        return 2
+
+
+    class ConditionalRecord sealed
+      property int:Value
+        get public
+
+      ctor (int:value)
+        set Value value
+
+
+    delegate ConditionalDelegate (int:value) → int
+      ! unknown
+
+    class ConditionalPartial partial
+      func PartialValue static () → int
+        !
+        return 20
+
+
+
+  class ConditionalPartial partial
+    func Shared static () → int
+      !
+      return 100
+
+
+  module ConditionalHarness
+    func Get () → int
+      ! unknown
+      let ConditionalDelegate:d = (int:value) => (value + 1)
+      return ((((ConditionalClass.Value() + new ConditionalRecord(3).Value) + d(4)) + ConditionalPartial.PartialValue()) + ConditionalPartial.Shared())

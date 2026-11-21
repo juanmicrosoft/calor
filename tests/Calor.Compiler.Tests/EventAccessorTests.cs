@@ -11,66 +11,6 @@ public class EventAccessorTests
 {
     #region Lexer Tests
 
-    [Fact]
-    public void Lexer_EventAdd_TokenizesCorrectly()
-    {
-        var source = "§EADD";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EventAdd);
-    }
-
-    [Fact]
-    public void Lexer_EndEventAdd_TokenizesCorrectly()
-    {
-        var source = "§/EADD";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndEventAdd);
-    }
-
-    [Fact]
-    public void Lexer_EventRemove_TokenizesCorrectly()
-    {
-        var source = "§EREM";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EventRemove);
-    }
-
-    [Fact]
-    public void Lexer_EndEventRemove_TokenizesCorrectly()
-    {
-        var source = "§/EREM";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndEventRemove);
-    }
-
-    [Fact]
-    public void Lexer_EndEvent_TokenizesCorrectly()
-    {
-        var source = "§/EVT[e001]";
-        var diag = new DiagnosticBag();
-        var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAllForParser();
-
-        Assert.Empty(diag);
-        Assert.Contains(tokens, t => t.Kind == TokenKind.EndEvent);
-    }
-
     #endregion
 
     #region Parser Tests
@@ -79,9 +19,9 @@ public class EventAccessorTests
     public void Parser_SimpleEventField_StillWorks()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
             """;
 
         var diag = new DiagnosticBag();
@@ -93,7 +33,8 @@ public class EventAccessorTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var evt = Assert.Single(cls.Events);
-        Assert.Equal("e001", evt.Id);
+        Assert.NotEmpty(evt.Id);
+        Assert.Null(evt.ToolingId);
         Assert.Equal("Click", evt.Name);
         Assert.Equal(Visibility.Public, evt.Visibility);
         Assert.Equal("EventHandler", evt.DelegateType);
@@ -106,16 +47,13 @@ public class EventAccessorTests
     public void Parser_EventWithAccessors_ParsesCorrectly()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
-                §EADD
-                §R INT:0
-                §/EADD
-                §EREM
-                §R INT:1
-                §/EREM
-                §/EVT{e001}
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
+                  add
+                    return 0
+                  remove
+                    return 1
             """;
 
         var diag = new DiagnosticBag();
@@ -127,7 +65,8 @@ public class EventAccessorTests
         Assert.Empty(diag);
         var cls = Assert.Single(module.Classes);
         var evt = Assert.Single(cls.Events);
-        Assert.Equal("e001", evt.Id);
+        Assert.NotEmpty(evt.Id);
+        Assert.Null(evt.ToolingId);
         Assert.Equal("Click", evt.Name);
         Assert.Equal(Visibility.Public, evt.Visibility);
         Assert.Equal("EventHandler", evt.DelegateType);
@@ -139,16 +78,14 @@ public class EventAccessorTests
     }
 
     [Fact]
-    public void Parser_EventWithAddOnly_ParsesCorrectly()
+    public void Parser_EventWithAddOnly_RequiresRemoveAccessor()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
-                §EADD
-                §R INT:0
-                §/EADD
-                §/EVT{e001}
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
+                  add
+                    return 0
             """;
 
         var diag = new DiagnosticBag();
@@ -157,11 +94,10 @@ public class EventAccessorTests
         var parser = new Parser(tokens, diag);
         var module = parser.Parse();
 
-        Assert.Empty(diag);
-        var evt = Assert.Single(module.Classes[0].Events);
-        Assert.True(evt.HasAccessors);
-        Assert.NotNull(evt.AddBody);
-        Assert.Null(evt.RemoveBody);
+        // 0.30: as in C#, an explicit event needs both accessors; an add-only event is an error.
+        var error = Assert.Single(diag.Errors);
+        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+        Assert.Contains("requires both add and remove accessors", error.Message);
     }
 
     #endregion
@@ -308,12 +244,14 @@ public class EventAccessorTests
                 private EventHandler _click;
                 public event EventHandler Click
                 {
-                    add { _click += value; }
-                    remove { _click -= value; }
+                    add { _click = (EventHandler)Delegate.Combine(_click, value); }
+                    remove { _click = (EventHandler)Delegate.Remove(_click, value); }
                 }
             }
             """;
 
+        // 0.30: native Calor lowers only primitive compound assignments, so `_click += value`
+        // (delegate combination) stays C#; the accessor bodies call Delegate.Combine directly.
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
@@ -337,8 +275,8 @@ public class EventAccessorTests
                 private EventHandler _click;
                 public event EventHandler Click
                 {
-                    add { _click += value; }
-                    remove { _click -= value; }
+                    add { _click = (EventHandler)Delegate.Combine(_click, value); }
+                    remove { _click = (EventHandler)Delegate.Remove(_click, value); }
                 }
             }
             """;
@@ -349,9 +287,9 @@ public class EventAccessorTests
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
 
         var calor = result.CalorSource;
-        Assert.Contains("§EADD", calor);
+        Assert.Contains("\n      add\n", calor);
         Assert.DoesNotContain("§/EADD", calor);
-        Assert.Contains("§EREM", calor);
+        Assert.Contains("\n      remove\n", calor);
         Assert.DoesNotContain("§/EREM", calor);
         Assert.DoesNotContain("§/EVT", calor);
     }
@@ -364,9 +302,9 @@ public class EventAccessorTests
     public void RoundTrip_SimpleEventField_ParseAndEmit()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
             """;
 
         var diag = new DiagnosticBag();
@@ -387,16 +325,13 @@ public class EventAccessorTests
     public void RoundTrip_EventWithAccessors_ParseAndEmit()
     {
         var source = """
-            §M{m1:Test}
-              §CL{c1:MyClass:pub}
-                §EVT{e001:Click:pub:EventHandler}
-                §EADD
-                §R INT:0
-                §/EADD
-                §EREM
-                §R INT:1
-                §/EREM
-                §/EVT{e001}
+            module Test Test block
+              class MyClass
+                event EventHandler:Click
+                  add
+                    return 0
+                  remove
+                    return 1
             """;
 
         var diag = new DiagnosticBag();

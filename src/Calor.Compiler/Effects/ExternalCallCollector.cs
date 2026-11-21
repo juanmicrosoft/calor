@@ -101,6 +101,16 @@ public sealed record RawCall(string CallerId, string CallerName, string Target, 
 ///      with no bound symbol) arrives as a null <c>Receiver</c> and is reported
 ///      unresolved — the source text is never echoed as a type.
 ///
+/// <para>0.30 native syntax: <c>X.Y()</c> always parses to an
+/// <c>ExpressionCallNode</c> over a member access, and the binder binds its
+/// receiver as an ordinary expression (the call's <c>EvaluatedReceiver</c>). The
+/// raw target is rebuilt from the written receiver (<c>OrderRepo.Save</c>, not
+/// <c>&lt;expression&gt;.Save</c>); a receiver typed by the binder's
+/// <c>OBJECT</c> fallback (<c>HasUnknownInferredType</c>) is unresolved; and a
+/// receiver whose head the binder could not bind at all is shape 4 above — it
+/// counts only when written as a type reference, with short BCL names
+/// expanded.</para>
+///
 /// An unresolved receiver keeps its source text in <see cref="CollectedCall.TypeName"/>
 /// for the report and sets <see cref="CollectedCall.ReceiverResolved"/> false; it
 /// is never given a guessed type.
@@ -125,6 +135,7 @@ public sealed record RawCall(string CallerId, string CallerName, string Target, 
 /// </summary>
 public sealed class ExternalCallCollector
 {
+    private IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? _crossModuleFunctions;
     private readonly List<CollectedCall> _calls = new();
     private readonly List<RawCall> _rawCalls = new();
     private readonly Dictionary<(int Start, int End, string Target), BoundReceiver> _boundReceiverTypes = new();
@@ -149,23 +160,13 @@ public sealed class ExternalCallCollector
     public static List<CollectedCall> Collect(ModuleNode module)
     {
         var collector = new ExternalCallCollector();
-        collector.IndexBoundCallReceivers(module);
+        var callGraph = CallGraphAnalysis.Build(module);
+        collector.IndexBoundCallReceivers(module, callGraph);
 
-        foreach (var function in module.Functions)
+        foreach (var function in callGraph.Functions.Values)
         {
+            collector.CollectContracts(function.Preconditions, function.Postconditions);
             collector.CollectFromFunctionBody(function.Body);
-        }
-
-        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
-        {
-            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
-            {
-                collector.CollectFromFunctionBody(method.Body);
-            }
-            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
-            {
-                collector.CollectFromFunctionBody(ctor.Body);
-            }
         }
 
         return collector._calls.Distinct().ToList();
@@ -177,36 +178,40 @@ public sealed class ExternalCallCollector
     /// cross-module resolution can match against the <see cref="CrossModuleEffectRegistry"/>.
     /// </summary>
     public static List<RawCall> CollectPerFunctionWithBareNames(ModuleNode module)
-    {
-        var collector = new ExternalCallCollector { _rawMode = true };
-        collector.IndexBoundCallReceivers(module);
+        => CollectPerFunctionWithBareNames(module, null);
 
-        foreach (var function in module.Functions)
+    internal static List<RawCall> CollectPerFunctionWithBareNames(ModuleNode module,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        CallGraphAnalysis? callGraph = null)
+    {
+        var collector = new ExternalCallCollector
+        {
+            _rawMode = true,
+            _crossModuleFunctions = crossModuleFunctions
+        };
+        callGraph ??= CallGraphAnalysis.Build(module, crossModuleFunctions);
+        collector.IndexBoundCallReceivers(module, callGraph);
+        var methodNames = CallGraphAnalysis.EnumerateClasses(module)
+            .SelectMany(cls => CallGraphAnalysis.EnumerateMethods(cls)
+                .Select(method => (Id: $"{cls.Name}.{method.Id}", Name: $"{cls.Name}.{method.Name}")))
+            .ToLookup(method => method.Id, method => method.Name, StringComparer.Ordinal);
+
+        foreach (var function in callGraph.Functions.Values)
         {
             collector._currentCallerId = function.Id;
-            collector._currentCaller = function.Name;
+            collector._currentCaller = methodNames[function.Id].FirstOrDefault() ?? function.Name;
+            collector.CollectContracts(function.Preconditions, function.Postconditions);
             collector.CollectFromFunctionBody(function.Body);
         }
 
-        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
-        {
-            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
-            {
-                // The same qualified id CallGraphAnalysis.ToFunctionNode assigns.
-                collector._currentCallerId = $"{cls.Name}.{method.Id}";
-                collector._currentCaller = $"{cls.Name}.{method.Name}";
-                collector.CollectFromFunctionBody(method.Body);
-            }
-            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
-            {
-                collector._currentCallerId = $"{cls.Name}.{ctor.Id}";
-                collector._currentCaller =
-                    $"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}";
-                collector.CollectFromFunctionBody(ctor.Body);
-            }
-        }
-
         return collector._rawCalls;
+    }
+
+    private void CollectContracts(IReadOnlyList<RequiresNode> preconditions, IReadOnlyList<EnsuresNode> postconditions)
+    {
+        foreach (var condition in preconditions.Select(precondition => precondition.Condition)
+                     .Concat(postconditions.Select(postcondition => postcondition.Condition)))
+            CollectFromNode(condition);
     }
 
     private void CollectFromFunctionBody(IReadOnlyList<StatementNode> body)
@@ -233,8 +238,31 @@ public sealed class ExternalCallCollector
             case NewExpressionNode newExpr:
                 TryAddCall(newExpr.TypeName, CallKind.Constructor, newExpr.Span);
                 break;
-            case ExpressionCallNode:
-                TryAddCall("<expression-call>", CallKind.Method, node.Span);
+            case ExpressionCallNode expressionCall:
+                if (_computedMemberCalls.TryGetValue((node.Span.Start, node.Span.End), out var bound)
+                    && expressionCall.TargetExpression is FieldAccessNode member)
+                {
+                    // A native `X.Y()` always parses to an expression call over a
+                    // member access, so the receiver's source text has to be
+                    // recovered here: it is what the summary's raw target, the
+                    // report of an unresolved receiver, and the type-reference
+                    // fallback below all read. Only a receiver that is not a
+                    // dotted name (`GetX().Y()`) stays `<expression>`.
+                    var receiverText = SourceReceiverText(member.Target) ?? "<expression>";
+                    var target = _crossModuleFunctions?.TryGetValue(bound.Target, out var moduleTarget) == true
+                        ? $"{moduleTarget.ModuleName}.{member.FieldName}"
+                        : $"{receiverText}.{member.FieldName}";
+                    // A head the binder could not bind to anything (no variable,
+                    // no type) is a receiver it does not vouch for — the same
+                    // null-receiver case as `§C{OrderRepo.Save}`. Leave it out of
+                    // the bound map so TryAddCall applies the written-as-a-type
+                    // rule (short BCL names expanded) or reports it unresolved.
+                    if (!HasUnboundHead(bound.Receiver))
+                        _boundReceiverTypes[(node.Span.Start, node.Span.End, target)] = ResolveBoundReceiver(bound.Receiver);
+                    TryAddCall(target, CallKind.Method, node.Span);
+                }
+                else
+                    TryAddCall("<expression-call>", CallKind.Method, node.Span);
                 break;
         }
 
@@ -316,15 +344,28 @@ public sealed class ExternalCallCollector
         }
     }
 
-    private void IndexBoundCallReceivers(ModuleNode module)
+    private readonly Dictionary<(int Start, int End), BoundCallExpression> _computedMemberCalls = new();
+
+    private void IndexBoundCallReceivers(ModuleNode module, CallGraphAnalysis callGraph)
     {
         try
         {
-            var bound = new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag()).Bind(module);
+            // The call graph already bound this module with exactly these inputs when
+            // it was built without a source path or project registry; read that tree
+            // instead of binding the module a second time.
+            var contractInheritance = callGraph.ContractInheritance;
+            var bound = callGraph.PlainBoundModule(module, _crossModuleFunctions, contractInheritance)
+                ?? new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag())
+                {
+                    CrossModuleFunctionModules = _crossModuleFunctions
+                }.Bind(module, contractInheritance);
             foreach (var node in Descendants(bound))
             {
                 switch (node)
                 {
+                    case BoundCallExpression { EvaluatedReceiver: not null } expression:
+                        _computedMemberCalls[(expression.Span.Start, expression.Span.End)] = expression;
+                        break;
                     case BoundCallStatement statement when HasReceiver(statement.Target):
                         _boundReceiverTypes[
                             (statement.Span.Start, statement.Span.End, statement.Target)] =
@@ -349,6 +390,32 @@ public sealed class ExternalCallCollector
     }
 
     private static bool HasReceiver(string target) => target.LastIndexOf('.') > 0;
+
+    /// <summary>
+    /// The receiver of a native member call as written: a dotted name
+    /// (<see cref="Binder.DottedReferenceName"/>), optionally rooted at
+    /// <c>this</c>/<c>base</c>. Null for any other expression.
+    /// </summary>
+    private static string? SourceReceiverText(ExpressionNode expression) => expression switch
+    {
+        ThisExpressionNode => "this",
+        BaseExpressionNode => "base",
+        FieldAccessNode field when SourceReceiverText(field.Target) is { } prefix => $"{prefix}.{field.FieldName}",
+        _ => Binder.DottedReferenceName(expression)
+    };
+
+    /// <summary>
+    /// True when the receiver chain bottoms out in a name the binder could not
+    /// bind at all — the undefined-name variable it substitutes for an unknown
+    /// head. Such a receiver carries no binder decision to report.
+    /// </summary>
+    private static bool HasUnboundHead(BoundExpression? receiver)
+    {
+        var head = receiver;
+        while (head is BoundFieldAccessExpression access)
+            head = access.Target;
+        return head is BoundVariableExpression { Variable.Id.IsNone: true };
+    }
 
     /// <summary>
     /// Receiver identity for one bound call site. <see cref="TypeName"/> is the
@@ -378,14 +445,26 @@ public sealed class ExternalCallCollector
     /// </summary>
     private static BoundReceiver ResolveBoundReceiver(BoundExpression? receiver)
     {
-        if (receiver is null)
+        // HasUnknownInferredType is the binder's own "this type is its OBJECT
+        // fallback" mark. A native receiver is bound as an ordinary expression,
+        // so a member chain through an untyped segment (`a.b.c`, `this.sb`)
+        // arrives typed OBJECT with this mark rather than as
+        // UnresolvedBoundType; it is the same answer and is never System.Object.
+        if (receiver is null || receiver.HasUnknownInferredType)
             return BoundReceiver.Unresolved;
 
         if (receiver is BoundTypeReferenceExpression)
         {
-            return receiver.Type is UnresolvedBoundType
-                ? BoundReceiver.Unresolved
-                : new BoundReceiver(receiver.Type.FullyQualifiedName);
+            return receiver.Type switch
+            {
+                UnresolvedBoundType => BoundReceiver.Unresolved,
+                // A metadata-resolved type reference keeps its SOURCE spelling
+                // (`Console`, `File`) as its qualified name; its identity is the
+                // Roslyn symbol, named the way the resolver keys it.
+                NominalBoundType { RoslynSymbol: not null, Declaration: null } metadata =>
+                    new BoundReceiver(EffectResolverKey.FromBoundReceiver(metadata, string.Empty).DeclaringType),
+                _ => new BoundReceiver(receiver.Type.FullyQualifiedName)
+            };
         }
 
         return FromBoundType(receiver.Type);

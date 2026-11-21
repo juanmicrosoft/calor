@@ -466,31 +466,6 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             : new FieldAccessNode(node.Span, target, node.FieldName);
     }
 
-    public ExpressionNode Visit(SomeExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return value == node.Value
-            ? node
-            : new SomeExpressionNode(node.Span, value);
-    }
-
-    public ExpressionNode Visit(NoneExpressionNode node) => node;
-
-    public ExpressionNode Visit(OkExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return value == node.Value
-            ? node
-            : new OkExpressionNode(node.Span, value);
-    }
-
-    public ExpressionNode Visit(ErrExpressionNode node)
-    {
-        var error = node.Error.Accept(this);
-        return error == node.Error
-            ? node
-            : new ErrExpressionNode(node.Span, error);
-    }
 
     public ExpressionNode Visit(CallExpressionNode node)
     {
@@ -536,7 +511,17 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
             }
         }
 
-        return argsChanged || initializersChanged
+        var collectionChanged = false;
+        var collection = new List<CallExpressionNode>();
+        foreach (var entry in node.CollectionInitializers)
+        {
+            var arguments = entry.Arguments.Select(argument => argument.Accept(this)).ToArray();
+            var changed = arguments.Where((argument, index) => !ReferenceEquals(argument, entry.Arguments[index])).Any();
+            collectionChanged |= changed;
+            collection.Add(changed ? new CallExpressionNode(entry.Span, entry.Target, arguments,
+                entry.ArgumentNames, entry.ArgumentModifiers, entry.TypeArguments, entry.CalleeSpan, entry.ReceiverSpan) : entry);
+        }
+        return argsChanged || initializersChanged || collectionChanged
             ? new NewExpressionNode(
                 node.Span,
                 node.TypeName,
@@ -544,7 +529,9 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 newArgs,
                 newInitializers,
                 node.TypeNameSpan,
-                node.TypeReference)
+                node.TypeReference,
+                node.ArgumentNames,
+                collection)
             : node;
     }
 
@@ -903,10 +890,6 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(WildcardPatternNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(VariablePatternNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(LiteralPatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(SomePatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(NonePatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(OkPatternNode node) => throw new InvalidOperationException();
-    public ExpressionNode Visit(ErrPatternNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RequiresNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(EnsuresNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(InvariantNode node) => throw new InvalidOperationException();
@@ -1025,6 +1008,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(FallbackExpressionNode node) => node;
     public ExpressionNode Visit(FallbackCommentNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(TypeOfExpressionNode node) => node;
+    // Constant folding must not replace the operand using a different overflow policy.
+    public ExpressionNode Visit(OverflowContextExpressionNode node) => node;
     public ExpressionNode Visit(NameOfExpressionNode node) => node;
     public ExpressionNode Visit(ExpressionCallNode node)
     {
@@ -1039,7 +1024,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
                 argsChanged = true;
         }
         return !ReferenceEquals(newTarget, node.TargetExpression) || argsChanged
-            ? new ExpressionCallNode(node.Span, newTarget, newArgs)
+            ? new ExpressionCallNode(node.Span, newTarget, newArgs,
+                node.ArgumentNames, node.ArgumentModifiers, node.TypeArguments)
             : node;
     }
     public ExpressionNode Visit(ExpressionStatementNode node) => throw new InvalidOperationException();

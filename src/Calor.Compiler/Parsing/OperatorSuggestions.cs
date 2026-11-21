@@ -20,9 +20,6 @@ public static class OperatorSuggestions
         // Logical operators
         "&&", "||", "!",
 
-        // Word forms of operators
-        "and", "or", "not", "mod", "eq", "ne", "neq", "lt", "le", "lte", "gt", "ge", "gte",
-
         // Bitwise operators
         "&", "|", "^", "<<", ">>", "~",
 
@@ -55,12 +52,6 @@ public static class OperatorSuggestions
         "list", "cons", "car", "cdr", "nth", "map", "filter", "reduce", "reverse",
         "append", "length",
 
-        // Option operations
-        "some", "none", "is-some", "is-none", "unwrap", "unwrap-or", "map-opt",
-
-        // Result operations
-        "ok", "err", "is-ok", "is-err", "unwrap-result",
-
         // Async operations
         "await",
 
@@ -83,28 +74,28 @@ public static class OperatorSuggestions
     public static readonly IReadOnlyDictionary<string, string> CSharpToCalorHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         // C# keywords with Calor equivalents
-        ["typeof"] = "Use (typeof Type) in Lisp expressions",
+        ["typeof"] = "Write typeof(Type) as an ordinary expression.",
         ["sizeof"] = "Size operations are not supported in Calor. Use constants for known sizes.",
-        ["default"] = "Use explicit default values (0 for numbers, \"\" for strings, §NN for None).",
-        ["new"] = "Use §NEW for object creation: §NEW[Type] §A arg1 §A arg2",
-        ["await"] = "Use (await expr) for async operations",
-        ["async"] = "Mark functions with §AWAIT effect, then use (await ...) in expressions",
-        ["throw"] = "Use (err message) to create error results, or §THROW for exceptions",
-        ["try"] = "Use Result types with (ok ...) and (err ...) instead of try-catch",
-        ["catch"] = "Use pattern matching on Result types: §MATCH[result] §ARM[Ok] ... §ARM[Err] ...",
-        ["finally"] = "Use §DEFER for cleanup code that must run",
-        ["lock"] = "Concurrency primitives are not supported in Calor",
-        ["using"] = "§U[namespace] for using directives, §USE[var] for resource management",
-        ["yield"] = "Use list comprehensions or §SEQ for lazy sequences",
-        ["unsafe"] = "Unsafe code is not supported in Calor",
+        ["default"] = "Write an explicit value such as 0, false or null.",
+        ["new"] = "Write object creation as new Type(arg1, arg2).",
+        ["await"] = "Write await expr inside an async function.",
+        ["async"] = "Mark the function async in its header: func Name async (...) → T.",
+        ["throw"] = "Write throw new Exception(\"message\") as a statement; the effect row needs throw, alloc.",
+        ["try"] = "Write try as a statement with an indented body, followed by catch or finally.",
+        ["catch"] = "Write catch Type:name after a try body, with its own indented body.",
+        ["finally"] = "Write finally after a try body, with its own indented body.",
+        ["lock"] = "Write lock gate as a statement with an indented body.",
+        ["using"] = "Write using Namespace for a directive, or using T:name = resource with an indented body.",
+        ["yield"] = "Write yield expr or yield break as a statement in an iterator.",
+        ["unsafe"] = "Write unsafe as a statement with an indented body.",
         ["fixed"] = "Fixed pointers are not supported in Calor",
         ["stackalloc"] = "Stack allocation is not supported in Calor",
-        ["checked"] = "Use explicit overflow checking if needed",
-        ["unchecked"] = "All arithmetic is unchecked by default in Calor",
-        ["delegate"] = "Use lambda expressions: §LAM[params] ... §/LAM",
-        ["event"] = "Events are not directly supported. Use callback functions.",
+        ["checked"] = "Use checked(expression) for a lexical checked overflow scope",
+        ["unchecked"] = "Use unchecked(expression) to override Calor's checked arithmetic default",
+        ["delegate"] = "Write a lambda as (T:x) => expr, or declare a delegate type with delegate Name (T:x) → R.",
+        ["event"] = "Declare an event with event DelegateType:Name.",
         ["volatile"] = "Volatile is not supported in Calor",
-        ["extern"] = "Use §EXTERN for external function declarations",
+        ["extern"] = "extern declarations are not supported in Calor.",
 
         // C# operators
         ["++"] = "Use (inc x) for prefix ++x, or (post-inc x) for x++",
@@ -114,9 +105,9 @@ public static class OperatorSuggestions
         ["*="] = "Use (set x (* x value))",
         ["/="] = "Use (set x (/ x value))",
         ["??"] = "Use (?? x default) for null-coalescing in Lisp expressions",
-        ["?."] = "Use pattern matching or (map-opt option fn) for null-conditional",
-        ["?["] = "Use (if (is-some opt) (nth (unwrap opt) i) default)",
-        ["!."] = "Use (unwrap option) to assert non-null",
+        ["?."] = "Use (?. receiver member) for null-conditional access",
+        ["?["] = "Check the nullable array for null before indexing",
+        ["!."] = "Check for null or use (?? value fallback)",
         ["::"] = "Namespace resolution is automatic in Calor",
 
         // Common C# methods
@@ -144,22 +135,22 @@ public static class OperatorSuggestions
         ["Sum"] = "Use (reduce list + 0)",
 
         // Null-related
-        ["null"] = "Use Option types: §SM for Some, §NN for None",
-        ["NULL"] = "Use Option types: §SM for Some, §NN for None",
-        ["Null"] = "Use Option types: §SM for Some, §NN for None",
+        ["null"] = "Use null with a nullable type",
+        ["NULL"] = "Use null with a nullable type",
+        ["Null"] = "Use null with a nullable type",
 
         // Boolean operators
         ["true"] = "Use #true for boolean true",
         ["false"] = "Use #false for boolean false",
-        ["True"] = "Use #true for boolean true",
-        ["False"] = "Use #false for boolean false",
+        ["True"] = "Write true.",
+        ["False"] = "Write false.",
 
         // Common typos that look like C#
         ["string.IsNullOrEmpty"] = "Use (isempty s)",
         ["string.IsNullOrWhiteSpace"] = "Use (isblank s)",
         ["string.Format"] = "Use (fmt template arg1 arg2 ...)",
         ["String.Format"] = "Use (fmt template arg1 arg2 ...)",
-        ["Console.WriteLine"] = "Use §PRINT or (print ...)",
+        ["Console.WriteLine"] = "Call Console.WriteLine(value); the effect row needs cw.",
         ["Math.Abs"] = "Math.Abs is not directly supported. Use (if (< x 0) (- 0 x) x) for absolute value.",
         ["Math.Max"] = "Math.Max is not directly supported. Use (if (> a b) a b) for maximum.",
         ["Math.Min"] = "Math.Min is not directly supported. Use (if (< a b) a b) for minimum.",

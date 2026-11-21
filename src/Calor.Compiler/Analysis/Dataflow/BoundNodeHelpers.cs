@@ -153,6 +153,8 @@ public static class BoundNodeHelpers
                     break;
                 case BoundForeachStatement forEach:
                     yield return forEach.LoopVariable;
+                    if (forEach.DeconstructionVariable != null)
+                        yield return forEach.DeconstructionVariable;
                     break;
                 case BoundUsingStatement { Resource: not null } usingStatement:
                     yield return usingStatement.Resource;
@@ -272,6 +274,8 @@ public static class BoundNodeHelpers
                     break;
                 case BoundForeachStatement forEach:
                     yield return forEach.LoopVariable;
+                    if (forEach.DeconstructionVariable != null)
+                        yield return forEach.DeconstructionVariable;
                     break;
                 case BoundUsingStatement { Resource: not null } usingStatement:
                     yield return usingStatement.Resource;

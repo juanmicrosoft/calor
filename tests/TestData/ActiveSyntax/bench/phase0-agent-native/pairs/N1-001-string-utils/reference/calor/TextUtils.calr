@@ -1,0 +1,28 @@
+module TextUtils TextUtils block
+  module TextUtilsModule partial
+    func Slugify (string:s) → string
+      !
+      let string:lower = s.ToLowerInvariant()
+      return lower.Replace(" ", "-")
+
+    func Truncate (string:s, int:maxLen) → string
+      !
+      if (s.Length <= maxLen)
+        return s
+      if (maxLen <= 3)
+        return s.Substring(0, maxLen)
+      return (s.Substring(0, (maxLen - 3)) + "...")
+
+    func WordCount (string:s) → int
+      !
+      let string:tabs = s.Replace("\t", " ")
+      let string:returns = tabs.Replace("\r", " ")
+      let string:norm = returns.Replace("\n", " ")
+      let string[]:parts = norm.Split(' ')
+      var int:count = 0
+      each part in parts
+        if (part.Length > 0)
+          set count (count + 1)
+      return count
+
+

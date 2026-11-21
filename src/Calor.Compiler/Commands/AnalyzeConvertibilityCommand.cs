@@ -38,6 +38,8 @@ public static class AnalyzeConvertibilityCommand
         var verboseOption = new Option<bool>(
             aliases: ["--verbose", "-v"],
             description: "Show per-file breakdown for directories");
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system", "Validate without the implicit System project import");
 
         var command = new Command("analyze-convertibility",
             "Analyze how likely C# code is to successfully convert to Calor")
@@ -46,10 +48,12 @@ public static class AnalyzeConvertibilityCommand
             formatOption,
             outputOption,
             quickOption,
-            verboseOption
+            verboseOption,
+            noImplicitSystemOption
         };
 
-        command.SetHandler(ExecuteAsync, pathArgument, formatOption, outputOption, quickOption, verboseOption);
+        command.SetHandler(ExecuteAsync, pathArgument, formatOption, outputOption, quickOption, verboseOption,
+            noImplicitSystemOption);
 
         return command;
     }
@@ -59,7 +63,8 @@ public static class AnalyzeConvertibilityCommand
         string format,
         FileInfo? output,
         bool quick,
-        bool verbose)
+        bool verbose,
+        bool noImplicitSystem)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("analyze-convertibility");
@@ -77,7 +82,7 @@ public static class AnalyzeConvertibilityCommand
                 var source = await File.ReadAllTextAsync(path);
                 var result = quick
                     ? analyzer.AnalyzeQuick(source, path)
-                    : analyzer.Analyze(source, path);
+                    : analyzer.Analyze(source, path, !noImplicitSystem);
 
                 formatted = format.ToLowerInvariant() switch
                 {
@@ -93,7 +98,7 @@ public static class AnalyzeConvertibilityCommand
                     Console.Error.WriteLine($"Analyzing {path}...");
                 }
 
-                var result = await analyzer.AnalyzeDirectoryAsync(path, quick);
+                var result = await analyzer.AnalyzeDirectoryAsync(path, quick, !noImplicitSystem);
 
                 formatted = format.ToLowerInvariant() switch
                 {

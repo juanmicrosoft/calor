@@ -1,0 +1,112 @@
+module L3M08 L3M08 block
+  module L3M08Module public
+
+    func l3m08_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24011)
+      let int:total = ((x * 2) + y)
+      if (total > 24011)
+        return 24011
+      return total
+
+    func l3m08_fn02 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24018)
+      if (x >= 24018)
+        return x
+      else
+        return 24018
+
+    func l3m08_fn03 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 44)
+
+    func l3m08_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24025)
+      let int:total = ((x * 3) + y)
+      if (total > 24025)
+        return 24025
+      return total
+
+    func l3m08_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 39)
+
+    func l3m08_fn06 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 43)
+
+    func l3m08_fn07 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24032)
+        return (acc + 24032)
+      else
+        return ((acc * 2) + 24032)
+
+    func l3m08_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 3)
+      requires (y >= 0)
+      => (result >= 24039)
+      let int:total = ((x * 5) + y)
+      if (total < 24039)
+        return 24039
+      else
+        return total
+
+    func l3m08_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24046)
+      let int:total = ((x * 3) + y)
+      if (total > 24046)
+        return 24046
+      return total
+
+    func l3m08_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 85)
+
+    func l3m08_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 24053)
+      let int:total = ((x * 3) + y)
+      if (total < 24053)
+        return 24053
+      else
+        return total
+
+    func l3m08_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 7)
+      requires (y >= 0)
+      => (result >= 24060)
+      let int:total = ((x * 3) + y)
+      if (total < 24060)
+        return 24060
+      else
+        return total
+
+    func l3m08_fn13 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24067)
+        return (acc + 24067)
+      else
+        return ((acc * 2) + 24067)

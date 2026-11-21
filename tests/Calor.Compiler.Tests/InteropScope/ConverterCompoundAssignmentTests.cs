@@ -8,8 +8,9 @@ namespace Calor.Compiler.Tests.InteropScope;
 /// #1633, #1632, #1634: compound assignments evaluate their target before the right-hand side,
 /// hoisted statements land inside the body they belong to, and compound assignments on small
 /// integral types keep C#'s implicit narrowing cast. Every row is converted on the library, CLI
-/// and MCP surfaces, compiled, run, and compared with the original C#; a row also states whether
-/// it must convert natively or be kept as C#.
+/// and MCP surfaces, run, and compared with the original C#. Native default output must compile
+/// strictly; marked preservation is not a certificate. The separate noncertifying lowering
+/// comparison retains each row's native-or-preserved shape requirement.
 /// </summary>
 public class ConverterCompoundAssignmentTests
 {
@@ -41,6 +42,13 @@ public class ConverterCompoundAssignmentTests
         yield return ("O-issue-repro", "public class C { public int N() => 2; } public static class Probe { static int x = 1; static C F() { x = 10; return new C(); } public static string Run() { x += F().N(); return x.ToString(); } }", "native");
         yield return ("O-local-postfix-rhs", "public static class Probe { public static string Run() { int x = 1; x += x++; int y = 1; y -= y--; return x + \":\" + y; } }", "native");
         yield return ("O-local-prefix-rhs", "public static class Probe { public static string Run() { int x = 1; x += ++x; return x.ToString(); } }", "native");
+        yield return ("C-prefix-postfix-values", "public static class Probe { public static string Run() { int x = 3; int a = ++x; int b = x++; int c = --x; int d = x--; return a + \":\" + b + \":\" + c + \":\" + d + \":\" + x; } }", "native");
+        yield return ("C-prefix-property-count", "public static class Probe { static int n = 1; static string log = \"\"; static int P { get { log += \"g\"; return n; } set { log += \"s\"; n = value; } } public static string Run() { int a = ++P; int b = P--; return log + \":\" + a + \":\" + b + \":\" + n; } }", "native");
+        yield return ("C-short-circuit-update", "public static class Probe { public static string Run() { int x = 1; bool no = false; bool yes = true; bool a = no && ++x > 0; bool b = yes || x++ > 0; int c = no ? ++x : x--; return a + \":\" + b + \":\" + c + \":\" + x; } }", "preserved");
+        yield return ("C-ref-alias-postfix", "public static class Probe { static int Read(ref int a, ref int b) { return a + b++; } public static string Run() { int x = 1; int seen = Read(ref x, ref x); return seen + \":\" + x; } }", "preserved");
+        yield return ("C-ref-alias-prefix", "public static class Probe { static int Read(ref int a, ref int b) { return a + ++b; } public static string Run() { int x = 1; int seen = Read(ref x, ref x); return seen + \":\" + x; } }", "preserved");
+        yield return ("C-user-prefix-result", "public class W { public int N; public static W operator ++(W w) => new W { N = w.N + 10 }; } public static class Probe { public static string Run() { var x = new W(); var seen = ++x; return seen.N + \":\" + x.N; } }", "preserved");
+        yield return ("C-prefix-before-throw", "public static class Probe { public static string Run() { int x = 1; var a = new int[0]; try { int y = a[0] + ++x; } catch (System.IndexOutOfRangeException) { } return x.ToString(); } }", "preserved");
         yield return ("O-member-receiver-reassigned", "public class B { public int N; } public static class Probe { static B b = new B(), second = new B(); static int G() { b = second; return 5; } public static string Run() { var first = b; b.N += G(); return first.N + \":\" + second.N; } }", "native");
         yield return ("O-member-receiver-call", "public class B { public int N = 1; } public static class Probe { " + Log + "static B b = new B(); static B Get() { log += \"get\"; return b; } public static string Run() { Get().N += G(); Get().N++; Get().N *= 2; return log + b.N; } }", "native");
         yield return ("O-member-receiver-hoisted-rhs", "public class C { public int N() => 3; } public class B { public int V = 1; } public static class Probe { public static string log = \"\"; static B b = new B(); static B Get() { log += \"get\"; return b; } static C F() { log += \"F\"; b = new B { V = 50 }; return new C(); } public static string Run() { var first = b; Get().V += F().N(); return log + first.V + \":\" + b.V; } }", "native");
@@ -162,7 +170,10 @@ public class ConverterCompoundAssignmentTests
     {
         var (_, source, allowed) = Rows().Single(row => row.Id == id);
         var original = RefOutImplementationTests.Run(source);
-        var (calor, losses) = await RefOutImplementationTests.ConvertAsync(source, surface);
+        // A row that allows only preservation is judged on what the surface delivers, not on the
+        // optional native-shaped lowering candidate (as RefOutImplementationTests does).
+        var (calor, losses) = await RefOutImplementationTests.ConvertForValueComparisonAsync(source, surface, original,
+            includeLoweringCandidate: allowed.Split("-or-").Contains("native"));
         var interop = calor.Contains("§CSHARP{", StringComparison.Ordinal) || calor.Contains("§CS{", StringComparison.Ordinal)
             || calor.Contains("§RAW", StringComparison.Ordinal) || losses.Count > 0;
         var strict = Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null });
@@ -172,6 +183,12 @@ public class ConverterCompoundAssignmentTests
             ? Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false })
             : strict;
         Assert.False(relaxed.HasErrors, $"{id} on {surface}: {string.Join("; ", relaxed.Diagnostics.Errors)}\n{calor}");
+        Assert.DoesNotContain(Compiler.Analysis.RecursiveAstWalker.DescendantsAndSelf(relaxed.Ast!),
+            node => node is Compiler.Ast.UnaryOperationNode
+            {
+                Operator: Compiler.Ast.UnaryOperator.PreIncrement or Compiler.Ast.UnaryOperator.PreDecrement
+                    or Compiler.Ast.UnaryOperator.PostIncrement or Compiler.Ast.UnaryOperator.PostDecrement
+            });
         // A hoist placed outside its loop can make the converted program loop forever.
         var converted = Task.Run(() => RefOutImplementationTests.Run(relaxed.GeneratedCode));
         var finished = await Task.WhenAny(converted, Task.Delay(TimeSpan.FromSeconds(30)));
@@ -185,7 +202,7 @@ public class ConverterCompoundAssignmentTests
     public void HoistedRightHandSide_ReadsTheTargetFirst()
     {
         var calor = Convert(Rows().Single(r => r.Id == "O-issue-repro").Source);
-        Assert.Matches(@"§B\{(_asg\d+)\} x\s+§B\{(_chain\w*)\} §C\{F\}\s+§ASSIGN x \(\+ \1 §C\{\2\.N\}", calor);
+        Assert.Matches(@"let (_asg\d+) = x\s+let (_chain\w*) = F\(\)\s+set x \(\1 \+ \2\.N\(\)\)", calor);
     }
 
     // #1633: an index with an effect runs once, bound before the statement.
@@ -193,24 +210,24 @@ public class ConverterCompoundAssignmentTests
     public void IndexWithAnEffect_IsBoundOnce()
     {
         var calor = Convert(Rows().Single(r => r.Id == "O-add-indexer-args").Source);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"§C\{I\}"));
-        Assert.Matches(@"§B\{(_asg\d+)\} §C\{I\}\s+§ASSIGN §IDX\{[^}]+\} \1 \(\+ §IDX\{[^}]+\} \1 §C\{G\}", calor);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"\bI\(\)"));
+        Assert.Matches(@"let (_asg\d+) = I\(\)\s+set (\w+)\[\1\] \(\2\[\1\] \+ G\(\)\)", calor);
     }
 
     // #1634: every compound operator and ++/-- on a small integral type casts back to the target type.
     [Theory]
-    [InlineData("byte", "u8")]
-    [InlineData("sbyte", "i8")]
-    [InlineData("short", "i16")]
-    [InlineData("ushort", "u16")]
-    [InlineData("char", "char")]
-    public void SmallIntegralTarget_CastsBack(string type, string calorType)
+    [InlineData("byte")]
+    [InlineData("sbyte")]
+    [InlineData("short")]
+    [InlineData("ushort")]
+    [InlineData("char")]
+    public void SmallIntegralTarget_CastsBack(string type)
     {
         foreach (var (name, _) in Operators)
-            Assert.Contains($"(cast {calorType} (", Convert(Rows().Single(r => r.Id == $"N-{type}-{name}").Source));
-        // Six statement-level ++/-- on v and w, and the updates of k++ and k-- used as values.
+            Assert.Contains($"(({type})(", Convert(Rows().Single(r => r.Id == $"N-{type}-{name}").Source));
+        // Eight statement updates plus k++, ++k and k-- as values all narrow explicitly.
         var increments = Convert(Rows().Single(r => r.Id == $"N-{type}-increment").Source);
-        Assert.Equal(10, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(cast {calorType} \(").Count);
+        Assert.Equal(11, System.Text.RegularExpressions.Regex.Matches(increments, $@"\(\({type}\)\(").Count);
     }
 
     // Controls: an int target, and a right-hand side that hoists nothing, convert exactly as before.
@@ -218,9 +235,9 @@ public class ConverterCompoundAssignmentTests
     public void Controls_KeepTheirShape()
     {
         var calor = Convert(Rows().Single(r => r.Id == "O-control-plain").Source);
-        Assert.Contains("§ASSIGN x (+ x §C{G})", calor);
+        Assert.Contains("set x (x + G())", calor);
         Assert.DoesNotContain("_asg", calor);
-        Assert.DoesNotContain("cast", Convert(Rows().Single(r => r.Id == "N-control-int").Source));
+        Assert.DoesNotMatch(@"\(\(\w+\)\(", Convert(Rows().Single(r => r.Id == "N-control-int").Source));
     }
 
     // #1632: the hoisted statements of an unbraced loop body are inside the loop.
@@ -228,7 +245,7 @@ public class ConverterCompoundAssignmentTests
     public void UnbracedBody_KeepsItsHoistedStatements()
     {
         var calor = Convert(Rows().Single(r => r.Id == "P-for").Source);
-        Assert.Matches(@"§L\{[^}]+\}\n\s+§B\{(_pre\d+)\} y\n\s+§ASSIGN y \(\+ \1 1\)\n\s+§ASSIGN y §C\{Use\} \1", calor);
+        Assert.Matches(@"for [^\n]+\n\s+let (_pre\d+) = y\n\s+set y \(@?\1 \+ 1\)\n\s+set y Use\(@?\1\)", calor);
     }
 
     [Theory]
@@ -246,6 +263,38 @@ public class ConverterCompoundAssignmentTests
     {
         Assert.Equal(SupportLevel.NotSupported, FeatureSupport.GetFeatureInfo("compound-assignment-order")!.Support);
         Assert.Equal(SupportLevel.NotSupported, FeatureSupport.GetFeatureInfo("compound-assignment-narrowing")!.Support);
+    }
+
+    [Theory]
+    [InlineData("", "int total = 7; int value = (total += 5); return total + \":\" + value;", "12:12")]
+    [InlineData("", "byte total = 250; byte value = (total += 10); return total + \":\" + value;", "4:4")]
+    [InlineData("", "int total = int.MaxValue; int value = (total += 1); return total + \":\" + value;", "-2147483648:-2147483648")]
+    [InlineData("", "int total = 7; int value = (total *= 3); return total + \":\" + value;", "21:21")]
+    [InlineData("static int total = 7; static int calls; static int Take() { calls++; total = 100; return 2; }",
+        "int value = (total += Take()); return total + \":\" + value + \":\" + calls;", "9:9:1")]
+    public void EmbeddedCompoundStores_PreserveValuesWithoutRetiredSyntax(string members, string body, string expected)
+    {
+        var source = $"public static class Probe {{ {members} public static string Run() {{ {body} }} }}";
+        Assert.Equal(expected, RefOutImplementationTests.Run(source));
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+        Assert.Empty(conversion.Losses);
+        Assert.NotNull(conversion.CalorSource);
+        Assert.DoesNotContain("§", conversion.CalorSource);
+        var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+        var module = new Compiler.Parsing.Parser(
+            new Compiler.Parsing.Lexer(conversion.CalorSource, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Empty(diagnostics);
+        foreach (var native in new[] { conversion.CalorSource, new CalorEmitter().Emit(module) })
+        {
+            foreach (var typeChecking in new[] { false, true })
+            {
+                var compiled = Program.Compile(native, "compound-value.calr",
+                    new CompilationOptions { EnableTypeChecking = typeChecking });
+                Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+                Assert.Equal(expected, RefOutImplementationTests.Run(compiled.GeneratedCode));
+            }
+        }
     }
 
     private static string Convert(string source)

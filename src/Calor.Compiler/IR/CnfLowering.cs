@@ -266,6 +266,9 @@ public sealed class CnfLowering
 
     private void LowerFor(ForStatementNode forStmt)
     {
+        if (forStmt.ReevaluatesCondition)
+            throw new NotSupportedException(
+                "CNF snapshot-range lowering does not model re-evaluated for conditions, updates and continue.");
         var type = CnfType.Int;
 
         // Initialize loop variable
@@ -420,6 +423,9 @@ public sealed class CnfLowering
 
             case CallExpressionNode call:
                 return LowerCallExpression(call);
+
+            case ExpressionCallNode:
+                throw new NotSupportedException("CNF does not support expression-valued callees.");
 
             case ConditionalExpressionNode cond:
                 return LowerConditional(cond);

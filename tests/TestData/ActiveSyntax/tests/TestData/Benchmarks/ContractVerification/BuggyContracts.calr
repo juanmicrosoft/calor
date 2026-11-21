@@ -1,0 +1,17 @@
+module BuggyMath BuggyMath
+  module BuggyMathModule
+    func BadAbs public (int:x) → int
+      !
+      => result >= 0
+      return x
+
+    func BadMax public (int:a, int:b) → int
+      !
+      => result >= a
+      => result >= b
+      return a
+
+    func BadDivide public (int:a, int:b) → int
+      !
+      => result == a / b
+      return 0

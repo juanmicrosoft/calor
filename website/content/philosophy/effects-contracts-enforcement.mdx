@@ -5,7 +5,10 @@ order: 3
 ---
 
 
-Why effects and contracts enforcement is only practical in coding agent languages—and why this changes everything.
+Coding agents may make contracts and effect annotations cheaper to produce.
+That is a hypothesis to measure, not a guarantee of correct annotations or
+zero-cost review. These techniques are also practical outside agent-oriented
+languages.
 
 ---
 
@@ -19,7 +22,8 @@ Computer scientists have known since the 1970s how to make software more reliabl
 
 These techniques can prove specific obligations inside a precisely modeled
 surface. They do not prove that an entire program is correct. When Calor cannot
-make a clean proof, it reports why and keeps the runtime check.
+make a clean proof, it reports why. Runtime checks separately require an enabled
+contract mode and supported lowering.
 
 **So why isn't all software written this way?**
 
@@ -27,7 +31,9 @@ make a clean proof, it reports why and keeps the runtime check.
 
 ## Why Humans Don't Write Annotations
 
-Every attempt to bring verification to mainstream programming has hit the same wall: **human annotation burden**.
+Annotation burden is one integration cost. Tooling, libraries, education,
+runtime behavior, and review requirements also matter; the examples below do
+not establish why a language or verification system gained adoption.
 
 | Reason | Impact |
 |:-------|:-------|
@@ -35,28 +41,29 @@ Every attempt to bring verification to mainstream programming has hit the same w
 | **Time pressure** | Deadlines trump verification discipline |
 | **Maintenance burden** | Contracts rot when code changes |
 | **Learning curve** | Teams resist unfamiliar syntax |
-| **Escape hatches** | `throws Exception` or catch-all blocks defeat the system |
+| **Broad interfaces** | A broad exception or effect declaration can lose useful specificity |
 
 ### Haskell's Effect System
 
 ```haskell
--- Haskell requires effect annotations everywhere
+-- Explicit signatures expose these IO-returning interfaces
 readFile :: FilePath -> IO String
 writeFile :: FilePath -> String -> IO ()
 
--- Every function that uses IO must declare it
+-- An implementation performing IO also has an IO result
 processConfig :: FilePath -> IO Config
 processConfig path = do
     contents <- readFile path  -- Forces IO in type signature
     return (parseConfig contents)
 ```
 
-**Result**: Haskell remains a niche language. Most programmers find the discipline too burdensome for everyday work.
+Haskell can infer types; explicit signatures are not required everywhere.
+This example shows an `IO` interface, not an adoption or productivity result.
 
 ### Eiffel's Design by Contract (1986)
 
 ```eiffel
--- Eiffel requires manual contract annotation
+-- An Eiffel contract written alongside its implementation
 deposit (amount: INTEGER)
     require
         positive_amount: amount > 0
@@ -68,19 +75,22 @@ deposit (amount: INTEGER)
     end
 ```
 
-**Result**: Eiffel never achieved mainstream adoption. The annotation overhead was too high for most development teams.
+The contract makes the intended balance change explicit. Its usefulness still
+depends on the chosen specification and implementation.
 
 ### Java's Checked Exceptions
 
 ```java
-// Java forces you to declare every exception
+// Java requires handling or declaring checked exceptions
 public void processFile(String path) throws IOException, ParseException {
     String content = Files.readString(Path.of(path));  // throws IOException
     parse(content);  // throws ParseException
 }
 ```
 
-**Result**: Developers circumvent the system with `throws Exception` or catch-all blocks. The signal is lost.
+Unchecked exceptions do not have this declaration requirement. Broad checked
+exception declarations can reduce specificity; they do not prove that the
+implementation handles failures correctly.
 
 ### C# Code Contracts (2008-2015)
 
@@ -89,31 +99,35 @@ Microsoft introduced Code Contracts for .NET—a promising approach to design-by
 ```csharp
 public int Divide(int a, int b)
 {
-    Contract.Requires(b != 0);
-    Contract.Ensures(Contract.Result<int>() * b == a);
+    Contract.Requires(a >= 0 && b > 0);
+    Contract.Ensures(Contract.Result<int>() >= 0);
     return a / b;
 }
 ```
 
-**Result**: [Abandoned by Microsoft](https://github.com/Microsoft/CodeContracts). The static analyzer was slow, the runtime overhead was significant, and developers simply didn't write contracts consistently enough to justify the tooling investment.
+The [historical Code Contracts project](https://github.com/Microsoft/CodeContracts)
+is a useful comparison, not evidence that agents eliminate integration costs.
+Integer division truncates: a postcondition claiming `result * b == a` would
+be false for `Divide(9, 2)`.
 
 ---
 
 ## Why AI Agents Change Everything
 
-Coding agents change this equation fundamentally:
+Agents can draft annotations, but their output still needs checking:
 
 | Human Developers | Coding Agents |
 |:----------------|:--------------|
-| Find annotation tedious | Generate annotations for free |
-| Forget to update contracts | Maintain perfect consistency |
-| Skip verification under time pressure | Never cut corners |
-| Resist learning new syntax | Adapt instantly to any syntax |
-| Trade safety for productivity | Safety IS productivity |
+| Write and review annotations | Generate candidates that still need review |
+| Can forget to update contracts | Can produce stale or vacuous contracts |
+| Can skip checks | Can omit checks or misread failures |
+| Learn a language and toolchain | Need accurate teaching material and real compiler feedback |
+| Balance time and correctness | Consume tokens, execution time, and reviewer attention |
 
-**When an agent writes code, the annotation cost is zero.**
+Generating a contract is not the same as choosing the right contract.
 
-This isn't incremental improvement. It's a phase transition that makes previously impractical techniques suddenly viable.
+Measure annotation quality, task outcomes, review time, and total cost under
+both workflows before claiming a benefit.
 
 ---
 
@@ -135,26 +149,35 @@ public async Task<User> GetUser(int id)
 // Answer: You have NO IDEA without reading every dependency
 ```
 
-In Calor, effects are explicit in the signature:
+In Calor, an effect row is a permission contract. This is a signature template,
+not an executable database or network implementation:
 
-```calor
-§F{f001:GetUser:pub}
-  §I{i32:id}
-  §O{User}
-  §E{db,cw,net}                    // EXPLICIT: database, console write, network
-
-  §B{user:User} §C{GetById} §A id §/C
-  §C{Log} (concat "Retrieved user " (str id))
-  §C{CacheSet} user
-  §R user
+```calor-fragment
+func GetUser public (int:id) → User
+  ! db:r,cw,net:rw
+  // Implementation and dependency contracts are required.
 ```
 
-An agent (or human) reading this function knows immediately:
-- It accesses a database
-- It writes to the console
-- It uses the network
+The row permits database reads, console writes, and network operations. It does
+not prove that all three happen, identify a server, or establish that a
+third-party API's declared effects are accurate.
 
-No guessing. No reading implementation details. No surprises.
+This complete example isolates a real console write, without pretending to
+query a database or send a network request:
+
+```calor
+module VisibleConsoleEffect
+  func LogRetrieval public (int:id) → int
+    ! cw
+    System.Console.WriteLine("Retrieved user {0}", id)
+    return id
+```
+
+`LogRetrieval(42)` writes `Retrieved user 42` once and returns `42`.
+The Console call performs the formatting under its `cw` contract; the example
+does not assume that numeric interpolation is pure.
+External APIs need selected-call coverage and reviewed effect contracts;
+unknown calls are not automatically pure.
 
 ### Problem 2: Contracts That Disappear
 
@@ -178,54 +201,76 @@ proof-based removal; they do not guarantee that runtime lowering is supported.
 See [verification modes and limits](/docs/guides/verification-guarantees/).
 
 ```calor
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q{message="divisor must not be zero"} (!= b 0)
-  §R (/ a b)
+module EnforcedDivide
+  func Divide public (int:a, int:b) → int
+    !
+    requires b != 0
+    return a / b
 ```
 
-The generated C# includes runtime checks:
+`Divide(9, 2)` returns `4`. With checks enabled, `Divide(9, 0)` fails the
+precondition before division. Native `requires` has no custom-message clause.
+The condition does not prevent every arithmetic exception:
+`Divide(int.MinValue, -1)` still overflows.
 
-```csharp
-public static int Divide(int a, int b)
-{
-    if (!(b != 0))
-        throw new ContractViolationException(
-            "Precondition failed: divisor must not be zero",
-            functionId: "f001",
-            kind: ContractKind.Requires,
-            line: 5);
-    return a / b;
-}
-```
+The generated check throws `Calor.Runtime.ContractViolationException`.
+`debug` includes source details; `release` uses a leaner exception but does
+not remove the precondition. An explicit body check is the alternative when
+an API needs its own exception type or message.
 
 ---
 
 ## Interprocedural Analysis
 
-Calor doesn't just check individual functions. It analyzes the entire call graph:
+Calor follows resolved calls within its admitted effect-analysis surface.
+For example, the following caller is missing the console permission:
 
 ```text illustrative
-error Calor0410: Function 'ProcessOrder' uses effect 'network'
+error Calor0410: Function 'ProcessOrder' uses effect 'cw'
                  but does not declare it
-  Call chain: ProcessOrder → NotifyCustomer → SendEmail → HttpClient.PostAsync
+  Call chain: ProcessOrder → NotifyCustomer → PrintNotice → System.Console.WriteLine
 ```
 
-The compiler traces effect violations through any depth of calls. You can't hide a side effect by burying it in helper functions.
+This is an explanatory call chain, not a byte-for-byte CLI transcript.
+
+```calor expect=Calor0410
+module MissingConsoleEffect
+  func ProcessOrder (int:order) → bool
+    !
+    return NotifyCustomer(order)
+
+  func NotifyCustomer (int:order) → bool
+    ! cw
+    return PrintNotice(order)
+
+  func PrintNotice (int:order) → bool
+    ! cw
+    System.Console.WriteLine("Order {0}", order)
+    return true
+```
+
+Ordinary compilation rejects `ProcessOrder` with `Calor0410`. Declaring the
+actual permission makes this complete counterpart compile:
 
 ```calor
-§F{f001:ProcessOrder:pub}
-  §I{Order:order}
-  §O{bool}
-  §E{db}                    // Declares: only database effects
+module DeclaredConsoleEffect
+  func ProcessOrder (int:order) → bool
+    ! cw
+    return NotifyCustomer(order)
 
-  §C{SaveOrder} order       // OK: SaveOrder has db effect
-  §C{SendEmail} order       // ERROR: SendEmail has net effect
+  func NotifyCustomer (int:order) → bool
+    ! cw
+    return PrintNotice(order)
+
+  func PrintNotice (int:order) → bool
+    ! cw
+    System.Console.WriteLine("Order {0}", order)
+    return true
 ```
 
-**The compiler catches this.** Not a linter warning. Not a code review comment. A hard error that blocks compilation.
+`ProcessOrder(42)` writes `Order 42` once and returns `true`. These controls
+exercise source calls and an actual console effect, not arbitrary network
+coverage. Unknown, preserved, or unmodeled paths cannot borrow this result.
 
 ---
 
@@ -250,8 +295,9 @@ When agents both write and verify code, a powerful feedback loop emerges:
 4. **Agent fixes violations** with precise information
 5. **Repeat until checks pass and the remaining assumptions are reviewed**
 
-This shortens the feedback loop while keeping unresolved boundaries visible to
-the reviewer.
+This defines a feedback loop to evaluate. A passing compiler check still
+requires review of assumptions, coverage boundaries, and task behavior; the
+diagram is not a measured productivity result.
 
 ---
 
@@ -261,11 +307,11 @@ the reviewer.
 
 | Bug Category | Traditional Detection | Calor Detection |
 |:-------------|:---------------------|:----------------|
-| Undeclared side effect | Code review (maybe) | Compile error |
+| Undeclared side effect in an analyzed path | Review or runtime observation | Compile error |
 | Possibly-null value crossing a supported receiving boundary | Runtime null-reference exception | Calor 0.22 binding Error at initialization, native return, or method input |
 | Invalid state transition | Integration test (if lucky) | Contract violation when the contract covers it |
-| Effect leaking through abstraction | Production incident | Compile error with call chain |
-| Contract violation | Silent corruption | Immediate, traced exception |
+| Effect leaking through a resolved supported call | Review or runtime observation | Compile error; call-chain detail depends on analysis coverage |
+| False contract on a supported runtime path | Tests or explicit validation | Contract exception when checks are enabled |
 
 The [nullability guide](/docs/guides/nullability-and-dotnet-interop/) defines
 Calor 0.22's bounded support. It does not promise whole-program
@@ -292,11 +338,13 @@ To see effect and contract enforcement in action:
 calor --input myprogram.calr --output myprogram.g.cs
 
 # See effect violations with call chains
-# error Calor0410: Function 'f001' uses effect 'console_write' but does not declare it
+# error Calor0410: Function 'ProcessOrder' uses effect 'cw' but does not declare it
 
-# Disable for migration (not recommended)
+# Migration-only bypass: NOT evidence of effect enforcement
 calor --input myprogram.calr --output myprogram.g.cs --no-enforce-effects
 ```
+
+Do not count bypassed compilation as a normally enforced native success.
 
 ---
 

@@ -1,0 +1,210 @@
+module Scheduler Scheduler block
+  module SchedulerModule partial
+    func IsValidInterval (int:s, int:e) → bool
+      !
+      return ((s >= 0) && (s < e))
+
+    func Overlaps (int:s1, int:e1, int:s2, int:e2) → bool
+      !
+      return ((s1 < e2) && (s2 < e1))
+
+    func ConflictIndex (int[]:starts, int[]:ends, int[]:active, int:count, int:s, int:e) → int
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      => (result >= -1)
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          let bool:ov = Overlaps(bs, be, s, e)
+          if ov
+            return i
+        set i (i + 1)
+      return -1
+
+    func HasConflict (int[]:starts, int[]:ends, int[]:active, int:count, int:s, int:e) → bool
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      let int:idx = ConflictIndex(starts, ends, active, count, s, e)
+      return (idx >= 0)
+
+    func AddBooking (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:s, int:e, int:prio) → int
+      ! mut
+      requires (count >= 0)
+      requires (count < starts.Length)
+      requires (count < ends.Length)
+      requires (count < prios.Length)
+      requires (count < active.Length)
+      => (result >= -1)
+      let bool:valid = IsValidInterval(s, e)
+      if (!valid)
+        return -1
+      let bool:conflict = HasConflict(starts, ends, active, count, s, e)
+      if conflict
+        return -1
+      set starts[count] s
+      set ends[count] e
+      set prios[count] prio
+      set active[count] 1
+      return (count + 1)
+
+    func Cancel (int[]:active, int:count, int:index) → bool
+      ! mut
+      requires (count >= 0)
+      requires (index >= 0)
+      requires (index < count)
+      requires (count <= active.Length)
+      if (active[index] == 1)
+        set active[index] 0
+        return true
+      return false
+
+    func NextFreeStart (int[]:starts, int[]:ends, int[]:active, int:count, int:duration, int:earliest, int:horizon) → int
+      !
+      requires (count >= 0)
+      requires (earliest >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      => (result >= -1)
+      var int:t = earliest
+      while ((t + duration) <= horizon)
+        let int:te = (t + duration)
+        let int:idx = ConflictIndex(starts, ends, active, count, t, te)
+        if (idx < 0)
+          return t
+        set t ends[idx]
+      return -1
+
+    func ActiveCount (int[]:active, int:count) → int
+      !
+      requires (count >= 0)
+      requires (count <= active.Length)
+      => (result >= 0)
+      var int:n = 0
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          set n (n + 1)
+        set i (i + 1)
+      return n
+
+    func OverlapLength (int:s, int:e, int:winFrom, int:winTo) → int
+      !
+      => (result >= 0)
+      var int:lo = s
+      if (winFrom > lo)
+        set lo winFrom
+      var int:hi = e
+      if (winTo < hi)
+        set hi winTo
+      if (hi <= lo)
+        return 0
+      return (hi - lo)
+
+    func BusyTime (int[]:starts, int[]:ends, int[]:active, int:count, int:winFrom, int:winTo) → int
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      var int:total = 0
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          let int:part = OverlapLength(bs, be, winFrom, winTo)
+          set total (total + part)
+        set i (i + 1)
+      return total
+
+    func UtilizationPercent (int[]:starts, int[]:ends, int[]:active, int:count, int:winFrom, int:winTo) → int
+      !
+      requires (count >= 0)
+      requires (winFrom >= 0)
+      requires (winFrom < winTo)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= active.Length)
+      let int:busy = BusyTime(starts, ends, active, count, winFrom, winTo)
+      return ((busy * 100) / (winTo - winFrom))
+
+    func PriorityAt (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:t) → int
+      !
+      requires (count >= 0)
+      requires (count <= starts.Length)
+      requires (count <= ends.Length)
+      requires (count <= prios.Length)
+      requires (count <= active.Length)
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          if ((bs <= t) && (t < be))
+            return prios[i]
+        set i (i + 1)
+      return -1
+
+    func AddWithPreemption (int[]:starts, int[]:ends, int[]:prios, int[]:active, int:count, int:s, int:e, int:prio, int:horizon) → int
+      ! mut
+      requires (count >= 0)
+      requires (count < starts.Length)
+      requires (count < ends.Length)
+      requires (count < prios.Length)
+      requires (count < active.Length)
+      => (result >= -1)
+      let bool:valid = IsValidInterval(s, e)
+      if (!valid)
+        return -1
+      var bool:blocked = false
+      var int:i = 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:bs = starts[i]
+          let int:be = ends[i]
+          let bool:ov = Overlaps(bs, be, s, e)
+          if ov
+            if (prios[i] >= prio)
+              set blocked true
+        set i (i + 1)
+      if blocked
+        return -1
+      set i 0
+      while (i < count)
+        if (active[i] == 1)
+          let int:cs = starts[i]
+          let int:ce = ends[i]
+          let bool:ov2 = Overlaps(cs, ce, s, e)
+          if ov2
+            set active[i] 2
+        set i (i + 1)
+      set starts[count] s
+      set ends[count] e
+      set prios[count] prio
+      set active[count] 1
+      let int:newCount = (count + 1)
+      set i 0
+      while (i < count)
+        if (active[i] == 2)
+          let int:ds = starts[i]
+          let int:de = ends[i]
+          let int:dur = (de - ds)
+          set active[i] 0
+          let int:slot = NextFreeStart(starts, ends, active, newCount, dur, e, horizon)
+          if (slot >= 0)
+            set starts[i] slot
+            set ends[i] (slot + dur)
+            set active[i] 1
+        set i (i + 1)
+      return newCount
+
+

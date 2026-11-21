@@ -44,21 +44,18 @@ public class Issue1176AccessorContractTests
     public void ReadingAGetterChargesTheReaderWithEffectsTheContractPermits()
     {
         const string source = """
-            §M{m001:GetterCharge}
-              §U{System.Collections.Generic}
-
-              §CL{c001:Box:pub}
-                §FLD{List<i32>:_items:priv}
-
-                §PROP{p001:Items:List<i32>:pub}
-                  §GET
-                    §IF{if1} (== this._items null)
-                      §ASSIGN this._items §NEW{List<i32>} §/NEW
-                    §R this._items
-
-                §MT{mt001:Peek:pub} () -> List<i32>
-                  §E{}
-                  §R this.Items
+            module GetterCharge GetterCharge block
+              using System.Collections.Generic
+              class Box
+                field List<int>:_items private
+                property List<int>:Items
+                  get
+                    if (this._items == null)
+                      set this._items new List<int>()
+                    return this._items
+                func Peek () → List<int>
+                  !
+                  return this.Items
             """;
 
         var result = TestHarness.CompileWithEffects(source);
@@ -79,13 +76,12 @@ public class Issue1176AccessorContractTests
     public void AnAllocatingGetterIsWithinTheContract()
     {
         const string source = """
-            §M{m001:AllocGetter}
-              §U{System.Collections.Generic}
-
-              §CL{c001:Box:pub}
-                §PROP{p001:Items:List<i32>:pub}
-                  §GET
-                    §R §NEW{List<i32>} §/NEW
+            module AllocGetter AllocGetter block
+              using System.Collections.Generic
+              class Box
+                property List<int>:Items
+                  get
+                    return new List<int>()
             """;
 
         var result = TestHarness.CompileWithEffects(source);
@@ -104,17 +100,15 @@ public class Issue1176AccessorContractTests
     public void AMemoisingGetterMutatesAndAllocatesAndIsStillWithinTheContract()
     {
         const string source = """
-            §M{m001:Memoise}
-              §U{System.Collections.Generic}
-
-              §CL{c001:Box:pub}
-                §FLD{List<i32>:_items:priv}
-
-                §PROP{p001:Items:List<i32>:pub}
-                  §GET
-                    §IF{if1} (== this._items null)
-                      §ASSIGN this._items §NEW{List<i32>} §/NEW
-                    §R this._items
+            module Memoise Memoise block
+              using System.Collections.Generic
+              class Box
+                field List<int>:_items private
+                property List<int>:Items
+                  get
+                    if (this._items == null)
+                      set this._items new List<int>()
+                    return this._items
             """;
 
         var result = TestHarness.CompileWithEffects(source);
@@ -134,12 +128,12 @@ public class Issue1176AccessorContractTests
     public void AGetterThatWritesToTheConsoleIsStillRejected()
     {
         const string source = """
-            §M{m001:LoudGetter}
-              §CL{c001:Box:pub}
-                §PROP{p001:Value:i32:pub}
-                  §GET
-                    §P "side effect"
-                    §R INT:1
+            module LoudGetter LoudGetter block
+              class Box
+                property int:Value
+                  get
+                    Console.WriteLine("side effect")
+                    return 1
             """;
 
         var result = TestHarness.CompileWithEffects(source);
@@ -158,15 +152,13 @@ public class Issue1176AccessorContractTests
     public void AnAllocatingSetterIsWithinTheContract()
     {
         const string source = """
-            §M{m001:AllocSetter}
-              §U{System.Collections.Generic}
-
-              §CL{c001:Box:pub}
-                §FLD{List<i32>:_items:priv}
-
-                §PROP{p001:Items:List<i32>:pub}
-                  §SET
-                    §ASSIGN this._items §NEW{List<i32>} §/NEW
+            module AllocSetter AllocSetter block
+              using System.Collections.Generic
+              class Box
+                field List<int>:_items private
+                property List<int>:Items
+                  set
+                    set this._items new List<int>()
             """;
 
         var result = TestHarness.CompileWithEffects(source);

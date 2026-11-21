@@ -1,0 +1,110 @@
+module L1M12 L1M12 block
+  module L1M12Module public
+
+    func l1m12_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M02.L2M02Module.l2m02_fn10(x, 25)
+      let int:v2 = L2M08.L2M08Module.l2m08_fn02(x, 88)
+      return ((v1 + v2) + y)
+
+    func l1m12_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M22.L2M22Module.l2m22_fn07(x, 3)
+      let int:v2 = L2M34.L2M34Module.l2m34_fn05(x, 54)
+      return ((v1 + v2) + y)
+
+    func l1m12_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 7)
+      requires (y >= 0)
+      => (result >= 20623)
+      let int:total = ((x * 2) + y)
+      if (total < 20623)
+        return 20623
+      else
+        return total
+
+    func l1m12_fn04 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 5) + y)
+      if (acc > 20630)
+        return (acc + 20630)
+      else
+        return ((acc * 2) + 20630)
+
+    func l1m12_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M07.L2M07Module.l2m07_fn03(x, 76)
+      let int:v2 = L2M09.L2M09Module.l2m09_fn03(x, 37)
+      return ((v1 + v2) + y)
+
+    func l1m12_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M14.L2M14Module.l2m14_fn08(x, 44)
+      let int:v2 = L2M21.L2M21Module.l2m21_fn10(x, 73)
+      return ((v1 + v2) + y)
+
+    func l1m12_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 8)
+      requires (y >= 0)
+      => (result >= 20637)
+      let int:total = ((x * 2) + y)
+      if (total < 20637)
+        return 20637
+      else
+        return total
+
+    func l1m12_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 20644)
+      let int:total = ((x * 5) + y)
+      if (total > 20644)
+        return 20644
+      return total
+
+    func l1m12_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M03.L2M03Module.l2m03_fn02(x, 21)
+      let int:v2 = L2M06.L2M06Module.l2m06_fn13(x, 24)
+      return ((v1 + v2) + y)
+
+    func l1m12_fn10 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M21.L2M21Module.l2m21_fn10(x, 25)
+      let int:v2 = L2M28.L2M28Module.l2m28_fn12(x, 15)
+      return ((v1 + v2) + y)
+
+    func l1m12_fn11 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 5) + y)
+      if (acc > 20651)
+        return (acc + 20651)
+      else
+        return ((acc * 2) + 20651)
+
+    func l1m12_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 20658)
+      let int:total = ((x * 3) + y)
+      if (total < 20658)
+        return 20658
+      else
+        return total
+
+    func l1m12_fn13 public (int:x, int:y) → int
+      !
+      requires (x > 6)
+      => (x >= 7)
+      let int:acc = ((x * 2) + y)
+      if (acc > 20665)
+        return (acc + 20665)
+      else
+        return ((acc * 2) + 20665)

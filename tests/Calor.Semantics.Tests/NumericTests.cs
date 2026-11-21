@@ -16,11 +16,11 @@ public class NumericTests
     {
         // Adding 1 to int.MaxValue should overflow
         var source = @"
-§M{m001:Test}
-  §F{f001:overflow:pub}
-      §O{i32}
-      §B{max} INT:2147483647
-      §R (+ max INT:1)
+module Test Test
+  func overflow () → int
+    !
+    let max = 2147483647
+    return max + 1
 ";
 
         var result = SemanticsTestHarness.Execute(source, "overflow");
@@ -43,11 +43,10 @@ public class NumericTests
         // Assigning int to float should work (implicit widening)
         // Using simple approach without typed bindings
         var source = @"
-§M{m001:Test}
-  §F{f001:convert:pub}
-      §I{i32:i}
-      §O{f64}
-      §R i
+module Test Test
+  func convert (int:i) → double
+    !
+    return i
 ";
 
         var result = SemanticsTestHarness.Execute(source, "convert", new object[] { 42 });
@@ -64,12 +63,10 @@ public class NumericTests
     public void Division_ByZero_ThrowsException()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:divZero:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ a b)
+module Test Test
+  func divZero (int:a, int:b) → int
+    !
+    return a / b
 ";
 
         var result = SemanticsTestHarness.Execute(source, "divZero", new object[] { 42, 0 });
@@ -88,17 +85,13 @@ public class NumericTests
     public void Arithmetic_BasicOperations()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
-  §F{f002:mul:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (* a b)
+module Test Test
+  func add (int:a, int:b) → int
+    !
+    return a + b
+  func mul (int:a, int:b) → int
+    !
+    return a * b
 ";
 
         var addResult = SemanticsTestHarness.Execute(source, "add", new object[] { 3, 4 });
@@ -117,17 +110,13 @@ public class NumericTests
     public void Comparison_Operators()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:lessThan:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (< a b)
-  §F{f002:equals:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (== a b)
+module Test Test
+  func lessThan (int:a, int:b) → bool
+    !
+    return a < b
+  func equals (int:a, int:b) → bool
+    !
+    return a == b
 ";
 
         var ltResult = SemanticsTestHarness.Execute(source, "lessThan", new object[] { 3, 5 });
@@ -146,12 +135,10 @@ public class NumericTests
     public void Modulo_Operation()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:mod:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (% a b)
+module Test Test
+  func mod (int:a, int:b) → int
+    !
+    return a % b
 ";
 
         var result = SemanticsTestHarness.Execute(source, "mod", new object[] { 10, 3 });

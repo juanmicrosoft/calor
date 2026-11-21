@@ -6,9 +6,11 @@ name: Publish to NuGet
 #   SBOM, notes, wording scan, existing-version compare; needs the site build and scan) ->
 #   publish (OIDC exchange in the main-only nuget-release environment, attest, push,
 #   served-package compare) -> install-check (installs calor from nuget.org) -> release (GitHub
-#   release, metadata) -> website dispatch.
+#   release, metadata) -> website (verified bundled site) -> website-deploy.
 # Every step before the push blocks the push; every step after it blocks the GitHub release,
-# its metadata, and the website. `dry_run: true` runs everything up to, not including, the
+# its metadata, and the website. Approve this run's publish deployment after validation;
+# do not dispatch a second run. Retry failed jobs only to retain the same immutable bundle.
+# `dry_run: true` is diagnostic only and runs everything up to, not including, the
 # publish job, so it never reaches the OIDC exchange. The workflow creates the tag; there is no
 # tag-push trigger (a `v*` trigger would let any writer push a tag carrying an edited workflow
 # into the publish job, #1545). It never dispatches benchmark publication (#1547).
@@ -50,6 +52,7 @@ jobs:
       - name: Checkout main with full history and tags
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -61,7 +64,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           DRY_RUN: ${{ inputs.dry_run }}
-        run: python3 scripts/release_checks.py preflight --version "$VERSION" --dry-run "$DRY_RUN"
+        run: python3 scripts/release_checks.py preflight --version "$VERSION" --dry-run "$DRY_RUN" --require-unpublished
 
   test:
     # One project per runner, mirroring test.yml's matrix. A single runner running all 13
@@ -362,10 +365,13 @@ jobs:
 
   # The candidate's website, built and scanned before anything is pushed (formerly gate code
   # G012: no claim that the release evidence was independently adjudicated or verified). A dry
-  # run runs it too. nextjs-gh-pages.yml rebuilds and rescans the same commit when it deploys.
+  # run runs it too. Promotion deploys these exact bytes, without another npm install/build.
   site:
     runs-on: ubuntu-latest
     needs: preflight
+    outputs:
+      artifact: ${{ steps.site-upload.outputs.artifact-id }}
+      tar-sha256: ${{ steps.site-record.outputs.sha256 }}
     steps:
       - name: Checkout the candidate website
         uses: actions/checkout@v4
@@ -394,6 +400,22 @@ jobs:
       - name: Scan the built site for forbidden wording
         run: python3 scripts/release_checks.py wording website/out
 
+      - name: Record the validated site bytes
+        id: site-record
+        run: |
+          mkdir site
+          tar --dereference --hard-dereference -cf site/site.tar -C website/out .
+          echo "sha256=$(sha256sum site/site.tar | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the validated site
+        id: site-upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-site
+          path: site/site.tar
+          if-no-files-found: error
+          retention-days: 90
+
   # Builds and checks the exact bytes to publish. No environment and no id-token: nothing here
   # can obtain a NuGet key. A dry run ends after this job.
   package:
@@ -401,6 +423,8 @@ jobs:
     needs: [preflight, test, sdk-consumer, release-quality, site]
     outputs:
       sums: ${{ steps.bundle.outputs.sums }}
+      artifact: ${{ steps.bundle-upload.outputs.artifact-id }}
+      digest: ${{ steps.bundle-upload.outputs.artifact-digest }}
     steps:
       - name: Checkout the candidate with full history
         uses: actions/checkout@v4
@@ -486,6 +510,20 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run }}
         run: python3 scripts/release_checks.py registry --mode existing --version "$VER" --nuget-dir ./nupkg --dry-run "$DRY_RUN"
 
+      - name: Download the validated site by immutable ID
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.site.outputs.artifact }}
+          merge-multiple: true
+          path: ./site
+
+      - name: Verify the validated site bytes
+        env:
+          SITE_SHA256: ${{ needs.site.outputs.tar-sha256 }}
+        run: |
+          set -euo pipefail
+          echo "$SITE_SHA256  site/site.tar" | sha256sum --check --strict
+
       - name: Record the bundle
         id: bundle
         env:
@@ -493,11 +531,12 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/release_checks.py bundle --version "$VER" --nuget-dir ./nupkg
-          sha256sum ./nupkg/*.nupkg ./release-metadata/*.json ./release-notes/notes.md > SHA256SUMS
+          sha256sum ./nupkg/*.nupkg ./release-metadata/*.json ./release-notes/notes.md ./site/site.tar > SHA256SUMS
           cat SHA256SUMS
           echo "sums=$(sha256sum SHA256SUMS | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Upload the release bundle
+        id: bundle-upload
         uses: actions/upload-artifact@v4
         with:
           name: release-bundle
@@ -505,13 +544,52 @@ jobs:
             ./nupkg/*.nupkg
             ./release-metadata/*.json
             ./release-notes/notes.md
+            ./site/site.tar
             SHA256SUMS
           if-no-files-found: error
           retention-days: 90
 
-  publish:
+      - name: Summarize the immutable candidate for approval
+        env:
+          CANDIDATE: ${{ needs.preflight.outputs.candidate }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+          ARTIFACT: ${{ steps.bundle-upload.outputs.artifact-id }}
+          DIGEST: ${{ steps.bundle-upload.outputs.artifact-digest }}
+        run: |
+          printf '## Release approval\n\nCandidate: `%s`\n\nVersion: `%s`\n\nArtifact ID: `%s`\n\nSHA-256: `%s`\n\nApprove only this run in nuget-release. Retry failed jobs; do not rebuild a partially published version.\n' \
+            "$CANDIDATE" "$VERSION" "$ARTIFACT" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+  promotion-check:
     runs-on: ubuntu-latest
     needs: [preflight, test, sdk-consumer, release-quality, site, package]
+    if: ${{ !inputs.dry_run }}
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout the candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.candidate }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the promotion boundary before requesting approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NEEDS: ${{ toJSON(needs) }}
+          CANDIDATE: ${{ needs.preflight.outputs.candidate }}
+          VER: ${{ needs.preflight.outputs.version }}
+          ARTIFACT: ${{ needs.package.outputs.artifact }}
+          DIGEST: ${{ needs.package.outputs.digest }}
+          SUMS: ${{ needs.package.outputs.sums }}
+        run: |
+          python3 scripts/release_promotion.py --candidate "$CANDIDATE" --version "$VER" \
+            --artifact-id "$ARTIFACT" --digest "$DIGEST" --sums "$SUMS" --destination "$RUNNER_TEMP/verified"
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [preflight, test, sdk-consumer, release-quality, site, package, promotion-check]
     if: ${{ !inputs.dry_run }}
     # #1545: no NuGet key is stored anywhere. nuget.org Trusted Publishing (policy "calor-release":
     # juanmicrosoft/calor, workflow file publish-nuget.yml, environment nuget-release) exchanges this
@@ -525,12 +603,14 @@ jobs:
     environment: nuget-release
     permissions:
       contents: read
+      actions: read
       id-token: write
       attestations: write
 
     steps:
-      # Fail closed before any work: the OIDC exchange runs first, so a missing or mismatched
-      # nuget.org policy, or a run outside `nuget-release`, stops the job before it attests or
+      # promotion-check has already verified the artifact and mandatory environment reviewers.
+      # Admission to this job requires their approval. The OIDC exchange runs first, so a missing
+      # or mismatched nuget.org policy stops the job before it attests or
       # pushes. The key lives one hour; the push follows within this job. Both steps are
       # unconditional and never continue-on-error (ReleaseWorkflowTests and
       # check_release_credentials.py check this). `user` is the nuget.org account that owns
@@ -554,17 +634,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.preflight.outputs.candidate }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up the pinned release SDK (#1548)
         uses: ./.github/actions/setup-release-sdk
 
       # Outside the checkout: nothing in the bundle can replace a script these jobs run.
-      - name: Download the release bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: release-bundle
-          path: ${{ runner.temp }}/bundle
+      - name: Download and verify the approved immutable artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NEEDS: ${{ toJSON(needs) }}
+          CANDIDATE: ${{ needs.preflight.outputs.candidate }}
+          VER: ${{ needs.preflight.outputs.version }}
+          ARTIFACT: ${{ needs.package.outputs.artifact }}
+          DIGEST: ${{ needs.package.outputs.digest }}
+          SUMS: ${{ needs.package.outputs.sums }}
+        run: |
+          python3 scripts/release_promotion.py --candidate "$CANDIDATE" --version "$VER" \
+            --artifact-id "$ARTIFACT" --digest "$DIGEST" --sums "$SUMS" --destination "$RUNNER_TEMP/bundle"
 
       # The bundle must be exactly the files the package job recorded, and nothing more.
       - name: Verify the bundle against the package job's record
@@ -601,7 +689,7 @@ jobs:
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nuget-package
+          name: nuget-package-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/bundle/nupkg/*.nupkg
             ${{ runner.temp }}/bundle/release-metadata/*.json
@@ -634,7 +722,8 @@ jobs:
       - name: Download the release bundle
         uses: actions/download-artifact@v4
         with:
-          name: release-bundle
+          artifact-ids: ${{ needs.package.outputs.artifact }}
+          merge-multiple: true
           path: ${{ runner.temp }}/bundle
 
       - name: Verify the bundle against the package job's record
@@ -702,18 +791,70 @@ jobs:
             fi
           done
 
-  # Releases created with GITHUB_TOKEN raise no `release` events, so the website is dispatched
-  # explicitly, from main, for the release tag and the candidate commit it must name. #1547:
-  # nothing dispatches benchmark publication; that is a separate dispatch of benchmark.yml.
+  # Deploy the already built/scanned bytes. Manual historical site deployments remain available
+  # through nextjs-gh-pages.yml; this release path never rebuilds or dispatches that workflow.
   website:
     runs-on: ubuntu-latest
-    needs: [preflight, release]
+    needs: [preflight, package, release]
     permissions:
-      actions: write
+      contents: read
     steps:
-      - name: Dispatch the website deployment
+      - name: Checkout the candidate scripts
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.candidate }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the release tag still names the protected-main candidate
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.preflight.outputs.tag }}
           CANDIDATE: ${{ needs.preflight.outputs.candidate }}
-        run: gh workflow run nextjs-gh-pages.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$TAG" -f commit="$CANDIDATE"
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$CANDIDATE" refs/remotes/origin/main
+          tagged="$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha)"
+          test "$tagged" = "$CANDIDATE" || { echo "::error::release tag no longer names the candidate"; exit 1; }
+
+      - name: Download the release bundle by immutable ID
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.package.outputs.artifact }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/bundle
+
+      - name: Verify the bundle against the package job's record
+        env:
+          SUMS: ${{ needs.package.outputs.sums }}
+          VER: ${{ needs.preflight.outputs.version }}
+        run: python3 scripts/release_checks.py verify-bundle --version "$VER" --dir "$RUNNER_TEMP/bundle" --sums-sha256 "$SUMS"
+
+      - name: Prepare the validated site for Pages
+        run: |
+          mkdir "$RUNNER_TEMP/site"
+          tar -xf "$RUNNER_TEMP/bundle/site/site.tar" -C "$RUNNER_TEMP/site"
+          python3 scripts/check_website_fonts.py --out "$RUNNER_TEMP/site"
+          python3 scripts/release_checks.py wording "$RUNNER_TEMP/site"
+
+      - name: Upload the validated Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
+  website-deploy:
+    runs-on: ubuntu-latest
+    needs: [preflight, website]
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy the validated site to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

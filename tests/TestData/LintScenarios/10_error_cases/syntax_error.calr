@@ -1,6 +1,3 @@
-§M{m1:Bad}
-§F{f1:Main:pub}
-§O{void}
-§INVALID_TAG
-§/F{f1}
-§/M{m1}
+§M{Bad}
+  §F{Main:pub} () -> void
+    §INVALID_TAG

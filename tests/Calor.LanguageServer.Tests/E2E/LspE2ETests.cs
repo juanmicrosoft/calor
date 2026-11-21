@@ -76,11 +76,14 @@ public class LspE2ETests
     {
         const string uri = "file:///calor-lsp-e2e/main.calr";
         const string source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub} () -> i32
-                §R 42
-              §F{f002:Use:pub} () -> i32
-                §R §C{Compute} §/C
+            module TestModule TestModule block
+              func Compute () → int
+                !
+                return 42
+
+              func Use () → int
+                !
+                return Compute()
             """;
         await using var client = await LspClient.StartAsync(_output);
         await client.InitializeAsync();
@@ -136,44 +139,50 @@ public class LspE2ETests
                 .GetArrayLength());
 
         const string changedSource = """
-            §M{m001:TestModule}
-              §F{f001:Calculate:pub} () -> i32
-                §R 42
-              §F{f002:Use:pub} () -> i32
-                §R §C{Calculate} §/C
+            module TestModule TestModule block
+              func Calculate () → int
+                !
+                return 42
+
+              func Use () → int
+                !
+                return Calculate()
             """;
         await client.ChangeAsync(uri, changedSource, version: 2);
         var changedDiagnostics = await client.WaitForDiagnosticsAsync(uri, version: 2);
         Assert.Equal(0, changedDiagnostics.GetArrayLength());
 
+        // 0.30: completion and diagnostics use native syntax. The section-marker inputs
+        // this flow used before are lexer errors now; the live LSP flake gate
+        // (scripts/run_flake_gate.py) runs this test, so it is restored, not dropped.
         const string completionUri = "file:///calor-lsp-e2e/completion.calr";
-        await client.OpenAsync(completionUri, "§", version: 1);
+        await client.OpenAsync(completionUri, "mod", version: 1);
         await client.WaitForDiagnosticsAsync(completionUri, version: 1);
         var completion = await client.RequestResultAsync(
             "textDocument/completion",
             new
             {
                 textDocument = new { uri = completionUri },
-                position = new { line = 0, character = 1 },
+                position = new { line = 0, character = 3 },
             });
         var completionItems = completion.ValueKind == JsonValueKind.Array
             ? completion
             : completion.GetProperty("items");
         Assert.Contains(
             completionItems.EnumerateArray(),
-            item => item.GetProperty("label").GetString() == "§M");
+            item => item.GetProperty("label").GetString() == "module");
 
         const string diagnosticUri = "file:///calor-lsp-e2e/diagnostics.calr";
         await client.OpenAsync(
             diagnosticUri,
-            "§M{m003:Broken}\n  §UNKNOWN_TOKEN_XYZ",
+            "module Broken Broken block\n  func F () → int\n    !\n    return undefinedName\n",
             version: 1);
         var errors = await client.WaitForDiagnosticsAsync(diagnosticUri, version: 1);
         Assert.Contains(errors.EnumerateArray(), diagnostic =>
             diagnostic.GetProperty("severity").GetInt32() == 1);
         await client.ChangeAsync(
             diagnosticUri,
-            "§M{m003:Fixed}\n",
+            "module Fixed Fixed block\n",
             version: 2);
         var cleared = await client.WaitForDiagnosticsAsync(diagnosticUri, version: 2);
         Assert.Equal(0, cleared.GetArrayLength());

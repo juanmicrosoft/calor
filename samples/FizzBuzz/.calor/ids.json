@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Files": [
+    "fizzbuzz.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_e6a9rjva06eg",
+      "File": "fizzbuzz.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "FizzBuzz",
+      "Signature": ""
+    },
+    {
+      "Id": "f_g9z8cyqys801",
+      "File": "fizzbuzz.calr",
+      "Container": "FizzBuzz",
+      "Kind": 1,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

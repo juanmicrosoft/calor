@@ -1,0 +1,26 @@
+module LinqPipeline LinqPipeline
+  module LinqPipelineModule
+    func SumPositive public (int:value, int:acc) → int
+      !
+      if value > 0
+        return acc + value
+      else
+        return acc
+
+    func CountEven public (int:value, int:acc) → int
+      !
+      if value % 2 == 0
+        return acc + 1
+      else
+        return acc
+
+    func MaxOfTwo public (int:a, int:b) → int
+      !
+      if a > b
+        return a
+      else
+        return b
+
+    func AnyAboveThreshold public (int:value, int:threshold) → bool
+      !
+      return value > threshold

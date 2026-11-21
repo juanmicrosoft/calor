@@ -1,13 +1,12 @@
-§M{m1:Complex}
-  §F{f1:Process:pub} () -> i32
-    §E{cw}
-    §B{~result} 0
-    §L{l1:i:1:10:1}
-      §IF{i1} (> i 5)
-        §L{l2:j:1:5:1}
-          §IF{i2} (== (% j 2) 0)
-            §B{~result} (+ result j)
-      §EL
-        §B{~result} (+ result i)
-    §R result
-
+module Complex Complex block
+  func Process () → int
+    ! cw
+    var result = 0
+    for i from 1 to 10 step 1
+      if (i > 5)
+        for j from 1 to 5 step 1
+          if ((j % 2) == 0)
+            var result = (result + j)
+      else
+        var result = (result + i)
+    return result

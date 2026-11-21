@@ -69,16 +69,21 @@ public sealed class PrimitiveBoundType : BoundType
     public override string DisplayString { get; }
 
     public PrimitiveBoundType(string name, int? bits = null, bool? signed = null)
+        : this(name, bits, signed, null)
+    {
+    }
+
+    internal PrimitiveBoundType(string name, int? bits, bool? signed, string? displayOverride)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Bits = bits;
         Signed = signed;
-        DisplayString = (bits, signed) switch
+        DisplayString = displayOverride ?? ((bits, signed) switch
         {
             (int b, bool s) => $"{name}[bits={b}][signed={s.ToString().ToLowerInvariant()}]",
             (int b, null) => $"{name}[bits={b}]",
             _ => name,
-        };
+        });
     }
 
     public override bool Equals(BoundType? other) =>
@@ -154,6 +159,8 @@ public sealed class NominalBoundType : BoundType
 public sealed class GenericInstantiationBoundType : BoundType
 {
     public NominalBoundType Definition { get; }
+    /// <summary>The selected constructed CLR type, including containing-type substitutions.</summary>
+    public INamedTypeSymbol? RoslynSymbol { get; }
     public ImmutableArray<BoundType> TypeArguments { get; }
     public NullableAnnotation NullableAnnotation { get; }
     public override string DisplayString { get; }
@@ -161,17 +168,19 @@ public sealed class GenericInstantiationBoundType : BoundType
     public GenericInstantiationBoundType(
         NominalBoundType definition,
         ImmutableArray<BoundType> typeArguments,
-        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious)
+        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious,
+        INamedTypeSymbol? roslynSymbol = null)
     {
         if (definition is null) throw new ArgumentNullException(nameof(definition));
         // default(ImmutableArray) has IsDefault=true; enumerating throws NRE.
         // Normalize to Empty so downstream code (Select, SequenceEqual) is safe.
         if (typeArguments.IsDefault) typeArguments = ImmutableArray<BoundType>.Empty;
         Definition = definition;
+        RoslynSymbol = roslynSymbol;
         TypeArguments = typeArguments;
         NullableAnnotation = nullableAnnotation;
         var args = string.Join(", ", typeArguments.Select(t => t.DisplayString));
-        DisplayString = $"{definition.QualifiedName}<{args}>";
+        DisplayString = roslynSymbol?.ToDisplayString() ?? $"{definition.QualifiedName}<{args}>";
     }
 
     public override bool Equals(BoundType? other) =>
@@ -210,8 +219,14 @@ public sealed class ArrayBoundType : BoundType
         ElementType = elementType;
         Rank = rank;
         NullableAnnotation = nullableAnnotation;
-        var commas = new string(',', rank - 1);
-        DisplayString = $"{elementType.DisplayString}[{commas}]";
+        var ranks = $"[{new string(',', rank - 1)}]";
+        var element = elementType;
+        while (element is ArrayBoundType array)
+        {
+            ranks += $"[{new string(',', array.Rank - 1)}]";
+            element = array.ElementType;
+        }
+        DisplayString = element.DisplayString + ranks;
     }
 
     public override bool Equals(BoundType? other) =>

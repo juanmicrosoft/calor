@@ -1,0 +1,9 @@
+module ThreeWayMerge ThreeWayMerge
+  module ThreeWayMergeModule
+    func Merge public (int:a, int:b, int:c) → int
+      !
+      return (a + b) + c
+
+    func Run public (int:x, int:y, int:z) → int
+      !
+      return Merge(x, y, z)

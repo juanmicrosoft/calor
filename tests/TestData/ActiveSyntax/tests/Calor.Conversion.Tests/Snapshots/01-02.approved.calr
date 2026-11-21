@@ -1,0 +1,10 @@
+module Test_01_02 Test_01_02 overflow unchecked
+  class Person public
+    property string:Name public
+      get
+      set
+    property int:Age public
+      get
+    property string:Email public = ""
+      get
+      set

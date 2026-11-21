@@ -12,7 +12,7 @@ public static class SemanticsVersion
     /// <remarks>
     /// Bumped 1 → 2 as the v0.14 nullability workstream precursor (task #14).
     /// Unblocks S5 severity flip: Calor0272/0273/0274 emit at Error when
-    /// <c>SemanticsVersion.Major &gt;= 2</c> (or no <c>§SEMVER</c> directive).
+    /// <c>SemanticsVersion.Major &gt;= 2</c> (or no <c>semver</c> declaration).
     /// Binder severity does not establish CLI rejection: BindingDiagnosticPolicy
     /// excludes these three codes from compilation diagnostics.
     /// See <c>docs/plans/v0.14-nullability-enforcement-scoping.md</c> D7/F-3
@@ -38,7 +38,7 @@ public static class SemanticsVersion
     /// <remarks>
     /// Major must match exactly. A declared major <em>newer</em> than
     /// <see cref="Major"/> means this compiler is too old for the file; a declared
-    /// major <em>older</em> than <see cref="Major"/> (e.g. <c>§SEMVER{1.0.0}</c> on
+    /// major <em>older</em> than <see cref="Major"/> (e.g. <c>semver "1.0.0"</c> on
     /// the 2.x compiler) means the file was written against retired semantics and
     /// must be migrated — it is refused rather than silently reinterpreted
     /// (roadmap §3.3 decision 1, fail-closed; tracked in #1084 item 1). Same major
@@ -63,7 +63,7 @@ public static class SemanticsVersion
     /// pin the exact wording.
     /// </summary>
     public const string LegacyMajorMigrationHint =
-        "Manually review and migrate the module to current semantics, then declare §SEMVER{2.0.0}; "
+        "Manually review and migrate the module to current semantics, then declare semver \"2.0.0\"; "
         + "changing the version alone is not a migration. Legacy Info mode is not supported. "
         + "Calor0272/0273/0274 are binder/editor diagnostics, not production CLI rejection gates; "
         + "other passes may still reject the program. "
@@ -71,7 +71,7 @@ public static class SemanticsVersion
         + "https://github.com/juanmicrosoft/calor/issues/1082 (planned nullability enforcement).";
 
     /// <summary>
-    /// Validates a module's <c>§SEMVER{...}</c> directive against this compiler and
+    /// Validates a module's <c>semver "..."</c> declaration against this compiler and
     /// reports the outcome: Calor0702 (Error) when the text is not a
     /// <c>MAJOR.MINOR.PATCH</c> version, Calor0701 (Error) when the major does not
     /// match <see cref="Major"/> — with <see cref="LegacyMajorMigrationHint"/> when the
@@ -81,10 +81,10 @@ public static class SemanticsVersion
     /// </summary>
     /// <param name="diagnostics">The bag to report into.</param>
     /// <param name="span">The directive's span.</param>
-    /// <param name="versionText">The raw text inside the braces. It must be exactly
+    /// <param name="versionText">The text inside the string literal. It must be exactly
     /// <c>MAJOR.MINOR.PATCH</c> — three runs of ASCII digits separated by dots, with
     /// no sign, whitespace, or extra components; the text is deliberately not trimmed
-    /// (<c>§SEMVER{ 2.0.0 }</c> is malformed) so the accepted form has one spelling.</param>
+    /// (<c>semver " 2.0.0 "</c> is malformed) so the accepted form has one spelling.</param>
     /// <returns><c>true</c> when the text parsed as a version (even if it was then
     /// refused), <c>false</c> when it was malformed.</returns>
     public static bool ReportDeclaredVersion(DiagnosticBag diagnostics, Parsing.TextSpan span, string? versionText)
@@ -99,8 +99,8 @@ public static class SemanticsVersion
             || !Version.TryParse(versionText, out var declared))
         {
             diagnostics.ReportError(span, DiagnosticCode.SemanticsVersionInvalidDeclaration,
-                $"Invalid §SEMVER declaration '{versionText ?? ""}': expected §SEMVER{{MAJOR.MINOR.PATCH}}, "
-                + $"e.g. §SEMVER{{{VersionString}}}.");
+                $"Invalid semantics-version declaration '{versionText ?? ""}': expected semver \"MAJOR.MINOR.PATCH\", "
+                + $"e.g. semver \"{VersionString}\".");
             return false;
         }
 

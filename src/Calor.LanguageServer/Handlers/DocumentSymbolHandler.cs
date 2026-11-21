@@ -120,6 +120,8 @@ public sealed class DocumentSymbolHandler : DocumentSymbolHandlerBase
             // Constructors
             foreach (var ctor in cls.Constructors)
             {
+                if (ReferenceEquals(ctor, cls.RecordCopyConstructor))
+                    continue;
                 classChildren.Add(new DocumentSymbol
                 {
                     Name = cls.Name,
@@ -258,7 +260,7 @@ public sealed class DocumentSymbolHandler : DocumentSymbolHandlerBase
         if (cls.IsSealed) parts.Add("sealed");
         if (cls.IsStatic) parts.Add("static");
         if (cls.IsPartial) parts.Add("partial");
-        parts.Add("class");
+        parts.Add(cls.IsRecord ? "record" : "class");
         if (cls.BaseClass != null) parts.Add($": {cls.BaseClass}");
         return string.Join(" ", parts);
     }

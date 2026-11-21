@@ -1,0 +1,106 @@
+module L3M26 L3M26 block
+  module L3M26Module public
+
+    func l3m26_fn01 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25040)
+      let int:total = ((x * 3) + y)
+      if (total > 25040)
+        return 25040
+      return total
+
+    func l3m26_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 40)
+
+    func l3m26_fn03 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 25047)
+      if (x >= 25047)
+        return x
+      else
+        return 25047
+
+    func l3m26_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 7)
+
+    func l3m26_fn05 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 7)
+
+    func l3m26_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 7)
+      requires (y >= 0)
+      => (result >= 25054)
+      let int:total = ((x * 3) + y)
+      if (total < 25054)
+        return 25054
+      else
+        return total
+
+    func l3m26_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25061)
+      let int:total = ((x * 3) + y)
+      if (total > 25061)
+        return 25061
+      return total
+
+    func l3m26_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 45)
+
+    func l3m26_fn09 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 25068)
+      let int:total = ((x * 3) + y)
+      if (total < 25068)
+        return 25068
+      else
+        return total
+
+    func l3m26_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25075)
+      let int:total = ((x * 2) + y)
+      if (total > 25075)
+        return 25075
+      return total
+
+    func l3m26_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 25082)
+      let int:total = ((x * 2) + y)
+      if (total > 25082)
+        return 25082
+      return total
+
+    func l3m26_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 68)
+
+    func l3m26_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 25089)
+      let int:total = ((x * 3) + y)
+      if (total < 25089)
+        return 25089
+      else
+        return total

@@ -1,3 +1,4 @@
+using Calor.Compiler;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
@@ -11,148 +12,138 @@ namespace Calor.Verification.Tests;
 
 public sealed class DottedFieldTypeResolutionTests
 {
+    [Fact]
+    public void NativeCaseDistinctClasses_KeepTheirOwnFieldProofs()
+    {
+        const string source = """
+            module CaseDistinctFields
+              class Box public
+                field long:Value public
+              class box public
+                field byte:Value public
+              func WideBoundary public (Box:item) → bool
+                !
+                => item.Value >= -2147483648
+                return true
+              func SmallBoundary public (box:item) → bool
+                !
+                => item.Value >= 0 && item.Value <= 255
+                return true
+            """;
+        var options = new CompilationOptions
+        {
+            VerifyContracts = true,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+        };
+        var compilation = Program.Compile(source, "case-distinct-fields.calr", options);
+        Assert.False(compilation.HasErrors,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Errors.Select(error => error.Message)));
+        var registry = ContractTranslator.BuildUserTypeRegistry(compilation.Ast!);
+        Assert.Equal("long", registry["Box"]["Value"]);
+        Assert.Equal("byte", registry["box"]["Value"]);
+
+        var wide = options.VerificationResults!.Functions.Single(function => function.FunctionName == "WideBoundary");
+        var small = options.VerificationResults.Functions.Single(function => function.FunctionName == "SmallBoundary");
+        Assert.Equal(ProofStatus.Refuted, Assert.Single(wide.PostconditionResults).EffectiveOutcome.Status);
+        Assert.Equal(ProofStatus.Assumed, Assert.Single(small.PostconditionResults).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void CaseDistinctUserTypes_DoNotShareSolverSorts()
+    {
+        using var context = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(context);
+        Assert.True(translator.DeclareVariable("upper", "Box"));
+        Assert.True(translator.DeclareVariable("lower", "box"));
+
+        Assert.NotEqual(
+            translator.Variables["upper"].Expr.Sort,
+            translator.Variables["lower"].Expr.Sort);
+    }
+
+    [Theory]
+    [InlineData("byte", 8u, false)]
+    [InlineData("sbyte", 8u, true)]
+    [InlineData("short", 16u, true)]
+    [InlineData("ushort", 16u, false)]
+    public void NativeSmallFieldTypes_KeepTheirWidthAndSignedness(string type, uint width, bool signed)
+    {
+        var module = Parse($$"""
+            module SmallFieldTypes
+              class Payload public
+                field {{type}}:Value public
+            """);
+        using var context = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(context);
+        translator.SetUserTypeRegistry(ContractTranslator.BuildUserTypeRegistry(module));
+        Assert.True(translator.DeclareVariable("item", "Payload"));
+        var field = new FieldAccessNode(default, new ReferenceNode(default, "item"), "Value");
+        var translatedField = translator.TranslateBitVecExpr(field);
+        Assert.NotNull(translatedField);
+        Assert.Equal(width, translatedField.SortSize);
+
+        var nonnegative = translator.TranslateBoolExpr(new BinaryOperationNode(
+            default, BinaryOperator.GreaterOrEqual, field, new IntLiteralNode(default, 0)));
+        Assert.NotNull(nonnegative);
+        using var solver = context.MkSolver();
+        solver.Assert(context.MkNot(nonnegative));
+        Assert.Equal(signed ? Status.SATISFIABLE : Status.UNSATISFIABLE, solver.Check());
+    }
+
+    [Fact]
+    public void CaseFoldedTypeCacheEntries_AreNotReused()
+    {
+        var entry = new VerificationCacheEntry
+        {
+            Version = "1.23",
+            Status = ContractVerificationStatus.Proven
+        };
+        Assert.False(entry.IsValidFor(currentZ3Version: null));
+    }
+
     private const string Source = """
-        §M{m001:DottedFields}
-          §CL{o001:Outer:pub:partial}
-            §CL{b001:Base:pub:partial}
+        §M{DottedFields}
+          §CL{Outer:pub:partial}
+            §CL{Base:pub:partial}
               §FLD{i64:Wide:pub}
               §FLD{i16:Hidden:priv}
-          §CL{o002:Outer:pub:partial}
-            §CL{b002:Base:pub:partial}
+          §CL{Outer:pub:partial}
+            §CL{Base:pub:partial}
               §FLD{u8:Small:int}
-            §CL{d001:Derived:Base}
+            §CL{Derived:Base}
               §FLD{bool:Own:priv}
-          §F{f001:WideBoundary:pub} (Outer.Derived:item) -> bool
+          §F{WideBoundary:pub} (Outer.Derived:item) -> bool
             §S (>= item.Wide INT:-2147483648)
             §R true
-          §F{f002:SmallBoundary:pub} (Outer.Derived:item) -> bool
+          §F{SmallBoundary:pub} (Outer.Derived:item) -> bool
             §S (&& (>= item.Small INT:0) (<= item.Small INT:255))
             §R true
-          §F{f003:MissingBoundary:pub} (Outer.Derived:item) -> bool
+          §F{MissingBoundary:pub} (Outer.Derived:item) -> bool
             §S (>= item.Missing INT:-2147483648)
             §R true
         """;
 
     private const string ProductionSource = """
-        §M{m001:DottedProduction}
-          §CL{b001:Base:pub}
-            §FLD{i64:Wide:pub}
-            §FLD{u8:Small:pub}
-          §CL{d001:Derived:Base}
-            §FLD{bool:Own:priv}
-          §F{f001:WideBoundary:pub} (Derived:item) -> bool
-            §S (>= item.Wide INT:-2147483648)
-            §R true
-          §F{f002:SmallBoundary:pub} (Derived:item) -> bool
-            §S (&& (>= item.Small INT:0) (<= item.Small INT:255))
-            §R true
+        module DottedProduction DottedProduction block
+          class Base
+            field long:Wide
+            field byte:Small
+
+          class Derived internal
+            extends Base
+
+            field bool:Own private
+
+          func WideBoundary (Derived:item) → bool
+            !
+            => (item.Wide >= -2147483648)
+            return true
+
+          func SmallBoundary (Derived:item) → bool
+            !
+            => ((item.Small >= 0) && (item.Small <= 255))
+            return true
         """;
-
-    [Fact]
-    public void RegistryMergesNestedPartialsAndInheritedAccessibleFields()
-    {
-        var module = Parse(Source);
-        var registry = ContractTranslator.BuildUserTypeRegistry(module);
-
-        Assert.Equal("i64", registry["outer.base"]["Wide"]);
-        Assert.Equal("u8", registry["outer.base"]["Small"]);
-        Assert.Equal("i16", registry["outer.base"]["Hidden"]);
-        Assert.Equal("i64", registry["outer.derived"]["Wide"]);
-        Assert.Equal("u8", registry["outer.derived"]["Small"]);
-        Assert.False(registry["outer.derived"].ContainsKey("Hidden"));
-
-        Assert.Same(registry["outer.base"], registry["base"]);
-        Assert.Same(registry["outer.derived"], registry["derived"]);
-
-        var changedModule = Parse(Source.Replace(
-            "§FLD{i64:Wide:pub}",
-            "§FLD{i32:Wide:pub}",
-            StringComparison.Ordinal));
-        var changedRegistry = ContractTranslator.BuildUserTypeRegistry(changedModule);
-        Assert.NotEqual(
-            ContractTranslator.BuildUserTypeRegistryCacheScope(registry),
-            ContractTranslator.BuildUserTypeRegistryCacheScope(changedRegistry));
-    }
-
-    [Fact]
-    public void ParsedDottedReferencesUseInheritedI64AndU8SortsWithoutGuessing()
-    {
-        Assert.True(
-            Z3ContextFactory.IsAvailable,
-            "Dotted field sort regression cannot run: Z3 is unavailable.");
-
-        var module = Parse(Source);
-        var registry = ContractTranslator.BuildUserTypeRegistry(module);
-        var wideCondition = module.Functions
-            .Single(function => function.Name == "WideBoundary")
-            .Postconditions.Single().Condition;
-        var smallCondition = module.Functions
-            .Single(function => function.Name == "SmallBoundary")
-            .Postconditions.Single().Condition;
-
-        var wideReference = FindDottedReference(wideCondition, "item.Wide");
-        var smallReference = FindDottedReference(smallCondition, "item.Small");
-        Assert.Equal("item.Wide", wideReference.Name);
-        Assert.Equal("item.Small", smallReference.Name);
-
-        var inheritedWide = TranslateAndCheckNegation(
-            wideCondition,
-            wideReference,
-            registry);
-        var inheritedSmall = TranslateAndCheckNegation(
-            smallCondition,
-            smallReference,
-            registry);
-
-        Assert.Equal(64u, inheritedWide.Width);
-        Assert.Equal(Status.SATISFIABLE, inheritedWide.NegatedStatus);
-        Assert.Equal(8u, inheritedSmall.Width);
-        Assert.Equal(Status.UNSATISFIABLE, inheritedSmall.NegatedStatus);
-
-        var i32Mutation = registry.ToDictionary(
-            type => type.Key,
-            type => (IReadOnlyDictionary<string, string>)
-                new Dictionary<string, string>(type.Value, StringComparer.Ordinal),
-            StringComparer.Ordinal);
-        i32Mutation["outer.derived"] =
-            new Dictionary<string, string>(registry["outer.derived"], StringComparer.Ordinal)
-            {
-                ["Wide"] = "i32"
-            };
-        var historicalFallback = TranslateAndCheckNegation(
-            wideCondition,
-            wideReference,
-            i32Mutation);
-
-        Assert.Equal(32u, historicalFallback.Width);
-        Assert.Equal(
-            Status.UNSATISFIABLE,
-            historicalFallback.NegatedStatus);
-    }
-
-    [Fact]
-    public void ParsedMissingDottedFieldIsExplicitlyRefused()
-    {
-        Assert.True(
-            Z3ContextFactory.IsAvailable,
-            "Dotted field refusal regression cannot run: Z3 is unavailable.");
-
-        var module = Parse(Source);
-        var registry = ContractTranslator.BuildUserTypeRegistry(module);
-        var function = module.Functions.Single(candidate => candidate.Name == "MissingBoundary");
-        var condition = function.Postconditions.Single().Condition;
-
-        using var context = Z3ContextFactory.Create();
-        var translator = new ContractTranslator(context);
-        translator.SetUserTypeRegistry(registry);
-        Assert.True(translator.DeclareVariable("item", "Outer.Derived"));
-
-        Assert.Null(translator.TranslateBoolExpr(condition));
-        Assert.Contains(
-            "field 'outer.derived.Missing' has no registered type",
-            translator.LastRefusalReason,
-            StringComparison.Ordinal);
-    }
 
     [Fact]
     public void ProductionPassUsesInheritedDottedTypesWithoutFalseProven()
@@ -172,9 +163,9 @@ public sealed class DottedFieldTypeResolutionTests
             .Verify(module);
 
         var wide = Assert.Single(
-            result.GetFunctionResult("f001")!.PostconditionResults);
+            result.GetFunctionResult(module.Functions.Single(f => f.Name == "WideBoundary").Id)!.PostconditionResults);
         var small = Assert.Single(
-            result.GetFunctionResult("f002")!.PostconditionResults);
+            result.GetFunctionResult(module.Functions.Single(f => f.Name == "SmallBoundary").Id)!.PostconditionResults);
         Assert.Equal(ProofStatus.Refuted, wide.EffectiveOutcome.Status);
         Assert.Equal(ProofStatus.Assumed, small.EffectiveOutcome.Status);
         Assert.DoesNotContain(

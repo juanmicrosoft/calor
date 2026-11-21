@@ -1,0 +1,9 @@
+module AsyncPure AsyncPure
+  module AsyncPureModule
+    func PureAdd public async (int:a, int:b) → int
+      !
+      return a + b
+
+    func PureMultiply public async (int:a, int:b) → int
+      !
+      return a * b

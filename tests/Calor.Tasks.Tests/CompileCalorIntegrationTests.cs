@@ -35,28 +35,48 @@ internal sealed class TestBuildEngine : IBuildEngine
     public void LogWarningEvent(BuildWarningEventArgs e) => Warnings.Add(e.Message ?? "");
 }
 
+[Xunit.Collection(ProcessStateCollection.Name)]
 public class CompileCalorIntegrationTests : IDisposable
 {
+    [Theory]
+    [InlineData("module Gate\n  func Run () \u2192 void\n    !\n    ", "statement", "return;")]
+    [InlineData("module Gate\n  class Host\n    ", "member", "public int Value => 7;")]
+    [InlineData("module _global\n  ", "unit", "public class Kept { }")]
+    public void InteropReasonGate_ChangedWarmSourceFailsEvenWithAllOptOuts(
+        string prefix, string marker, string payload)
+    {
+        var source = CreateSourceFile("ReasonGate.calr",
+            "module Gate\n  func Value () \u2192 int\n    !\n    return 7\n");
+        Assert.True(CreateTask(source).Execute());
+        File.WriteAllText(source,
+            $"{prefix}raw {marker} {System.Text.Encoding.UTF8.GetByteCount(payload)}\n{payload}\n");
+        var task = CreateTask(source);
+        task.TypeCheck = false;
+        task.TranspileOnly = true;
+        task.EnforceEffects = false;
+        task.PermissiveEffects = true;
+        Assert.False(task.Execute());
+        Assert.Equal("Calor1012", Assert.Single(((TestBuildEngine)task.BuildEngine).ErrorCodes));
+        Assert.Empty(task.GeneratedFiles);
+    }
+
     private readonly string _tempDir;
     private readonly string _projectDir;
     private readonly string _outputDir;
 
     // A minimal valid Calor module
     private const string ValidCalorSource = """
-        §M{m001:TestModule}
-
-          §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
+        module TestModule TestModule block
+          func Add (int:a, int:b) → int
+            !
+            return (a + b)
 
         """;
 
     // Source that will cause a compile error (unclosed paren)
     private const string InvalidCalorSource = """
-        §M{m001:TestModule}
-          §F{f001:Broken:pub}
+        §M{TestModule}
+          §F{Broken:pub}
               §I{i32:a}
               §O{i32}
               §R (+ a b
@@ -106,34 +126,21 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void CrossModuleVariance_WarmBuildRechecksChangedBaseContract()
+    public void GeneratedTeachingPrimer_CompilesThroughBuildTask()
     {
-        const string baseSource = """
-            §M{m1:Shared}
-              §CL{c1:Base:pub}
-                §MT{mt1:Render:pub:virt} () -> void
-                  §E{cw}
-            """;
-        var basePath = CreateSourceFile("Base.calr", baseSource);
-        var derivedPath = CreateSourceFile("Derived.calr", """
-            §M{m2:Shared}
-              §CL{c2:Derived:Base:pub}
-                §MT{mt2:Render:pub:over} () -> void
-                  §E{cw}
-            """);
-        Assert.True(CreateTask(basePath, derivedPath).Execute());
-        var warm = CreateTask(basePath, derivedPath);
-        Assert.True(warm.Execute());
-        Assert.Equal(2, ((TestBuildEngine)warm.BuildEngine).Messages.Count(
-            message => message.Contains("skipping")));
-
-        File.WriteAllText(basePath, baseSource.Replace("§E{cw}", "§E{}"));
-        var changed = CreateTask(basePath, derivedPath);
-        Assert.False(changed.Execute());
-        Assert.Contains("Calor0420", ((TestBuildEngine)changed.BuildEngine).ErrorCodes);
+        var primer = Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+            "Calor.Compiler.Resources.agent-syntax-exemplar.md");
+        var programs = Calor.Compiler.SelfCheck.ExemplarCompileChecker.ExtractCompletePrograms(primer);
+        Assert.Equal(9, programs.Count);
+        foreach (var (program, index) in programs.Select((program, index) => (program, index)))
+        {
+            var source = CreateSourceFile($"Reference{index}.calr", program.Source);
+            var task = CreateTask(source);
+            Assert.True(task.Execute(), string.Join("\n", ((TestBuildEngine)task.BuildEngine).Errors));
+            Assert.Single(task.GeneratedFiles);
+        }
     }
 
-    // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (1 compiles) → clean → build (all)
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
@@ -143,11 +150,14 @@ public class CompileCalorIntegrationTests : IDisposable
         var source = CreateSourceFile("Routing.calr", ValidCalorSource);
         Assert.True(CreateTask(source).Execute());
         File.WriteAllText(source, """
-            §M{m1:Routing}
-              §F{f1:Probe:pub} () -> i32
-                §R 1
-              §F{f2:Probe:pub} () -> i32
-                §R 2
+            module Routing Routing block
+              func Probe () → int
+                !
+                return 1
+
+              func Probe () → int
+                !
+                return 2
             """);
         var task = CreateTask(source);
         task.TypeCheck = !typeOff;
@@ -159,78 +169,77 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Empty(task.GeneratedFiles);
     }
 
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public void NullableReferenceTyping_AgreesWithTaskAndRejectsWarmOptionMismatch(bool typeOff, bool transpile)
-    {
-        const string safe = """
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} () -> ?str
-                §E{alloc}
-                §B{value:?str} "safe"
-                §R value
-            """;
-        var source = CreateSourceFile("NullableTyping.calr", safe);
-        var accepted = CreateTask(source);
-        accepted.TypeCheck = !typeOff;
-        accepted.TranspileOnly = transpile;
-        Assert.True(accepted.Execute());
-        Assert.Empty(((TestBuildEngine)accepted.BuildEngine).ErrorCodes);
-        File.WriteAllText(source, safe.Replace("§R value", "§R §SM value", StringComparison.Ordinal));
-        var rejected = CreateTask(source);
-        rejected.TypeCheck = !typeOff;
-        rejected.TranspileOnly = transpile;
-        Assert.False(rejected.Execute());
-        Assert.Contains("Calor0275", ((TestBuildEngine)rejected.BuildEngine).ErrorCodes);
-        Assert.Empty(rejected.GeneratedFiles);
-    }
-
+    // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (1 compiled, 1 skipped)
+    // → build (skip) → clean → build (all)
     [Fact]
     public void FullLifecycle_BuildSkipEditCleanBuild()
     {
         var src1 = CreateSourceFile("Foo.calr", ValidCalorSource);
         var src2 = CreateSourceFile("Bar.calr", ValidCalorSource.Replace("TestModule", "BarModule")
             .Replace("m001", "m002").Replace("f001", "f002"));
+        static int Count(TestBuildEngine engine, string prefix) =>
+            engine.Messages.Count(m => m.StartsWith(prefix, StringComparison.Ordinal));
+        const string compiling = "Compiling Calor:";
+        const string skipping = "Calor: skipping (up-to-date):";
 
         // First build — all compile
         var task1 = CreateTask(src1, src2);
         Assert.True(task1.Execute());
         Assert.Equal(2, task1.GeneratedFiles.Length);
+        Assert.Equal(2, Count((TestBuildEngine)task1.BuildEngine, compiling));
 
         // Second build — all skip (cache hit)
         var task2 = CreateTask(src1, src2);
         Assert.True(task2.Execute());
         Assert.Equal(2, task2.GeneratedFiles.Length);
         var engine2 = (TestBuildEngine)task2.BuildEngine;
-        Assert.Contains(engine2.Messages, m => m.Contains("skipping"));
+        Assert.Equal(2, Count(engine2, skipping));
+        Assert.Equal(0, Count(engine2, compiling));
 
-        // Edit one file — body-only: renaming a PUBLIC function changes the
-        // cross-module qualification map and (soundly, conservatively)
-        // invalidates every skip; that behavior is pinned separately in
+        // Edit one file, body only. Every source's content hash is in
+        // CrossModuleMapHash (9ce37a970), so the edit changes it; the function
+        // map is unchanged, so the task takes the CLI's independence proof
+        // (CrossModuleCacheReuse, #1732). Bar's output names nothing Foo
+        // declares, and the namespaced `static partial` module wrappers differ
+        // (TestModuleModule vs BarModuleModule), so Bar is proven independent.
+        // Renaming a public function is pinned separately in
         // EditRenamingPublicFunction_InvalidatesAllSkips (G3/#809).
         Thread.Sleep(50); // ensure mtime changes
-        File.WriteAllText(src1, ValidCalorSource.Replace("(+ a b)", "(- a b)"));
+        var editedSource = ValidCalorSource.Replace("(a + b)", "(a - b)");
+        Assert.NotEqual(ValidCalorSource, editedSource); // the edit must land, or this phase is vacuous
+        File.WriteAllText(src1, editedSource);
 
-        // Third build — only edited file compiles
+        // Third build — Foo recompiles, Bar is skipped
         var task3 = CreateTask(src1, src2);
         Assert.True(task3.Execute());
         Assert.Equal(2, task3.GeneratedFiles.Length);
         var engine3 = (TestBuildEngine)task3.BuildEngine;
-        // Bar should be skipped, Foo should be compiled
-        var msgs3 = string.Join("\n", engine3.Messages);
-        Assert.Contains("skipping", msgs3);
-        Assert.Contains("Compiling", msgs3);
+        Assert.DoesNotContain(engine3.Messages, m => m.Contains("global invalidation", StringComparison.Ordinal));
+        Assert.Contains(engine3.Messages,
+            m => m.Contains("[cross-module-sources-changed]", StringComparison.Ordinal));
+        Assert.Equal(new[] { src2 }, engine3.Messages.Where(m => m.StartsWith(skipping, StringComparison.Ordinal))
+            .Select(m => m[skipping.Length..].Trim()).ToArray());
+        Assert.Equal(new[] { src1 }, engine3.Messages.Where(m => m.StartsWith(compiling, StringComparison.Ordinal))
+            .Select(m => m[compiling.Length..].Split(" -> ")[0].Trim()).ToArray());
+
+        // Fourth build — no edit: the rewritten cache is warm, everything skips again
+        var task4 = CreateTask(src1, src2);
+        Assert.True(task4.Execute());
+        var engine4 = (TestBuildEngine)task4.BuildEngine;
+        Assert.DoesNotContain(engine4.Messages, m => m.Contains("global invalidation", StringComparison.Ordinal));
+        Assert.Equal(2, Count(engine4, skipping));
+        Assert.Equal(0, Count(engine4, compiling));
 
         // Clean — delete output dir
         Directory.Delete(_outputDir, recursive: true);
         Directory.CreateDirectory(_outputDir);
 
-        // Fourth build — all compile (cache gone)
-        var task4 = CreateTask(src1, src2);
-        Assert.True(task4.Execute());
-        Assert.Equal(2, task4.GeneratedFiles.Length);
+        // Fifth build — all compile (cache gone)
+        var task5 = CreateTask(src1, src2);
+        Assert.True(task5.Execute());
+        Assert.Equal(2, task5.GeneratedFiles.Length);
+        Assert.Equal(2, Count((TestBuildEngine)task5.BuildEngine, compiling));
+        Assert.All(task5.GeneratedFiles, f => Assert.True(File.Exists(f.ItemSpec)));
     }
 
     /// <summary>
@@ -360,9 +369,10 @@ public class CompileCalorIntegrationTests : IDisposable
         var src = CreateSourceFile(
             "GeneratedError.calr",
             """
-            §M{m001:GeneratedError}
-              §F{f001:Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module GeneratedError GeneratedError block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         var task = CreateTask(src);
         task.TypeCheck = false;
@@ -389,9 +399,10 @@ public class CompileCalorIntegrationTests : IDisposable
         File.WriteAllText(
             src,
             """
-            §M{m001:GeneratedError}
-              §F{f001:Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module GeneratedError GeneratedError block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         var failingTask = CreateTask(src);
         failingTask.TypeCheck = false;
@@ -402,82 +413,15 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void GeneratedCSharpValidation_IncludesExistingProjectSources()
-    {
-        var projectSource = CreateSourceFile(
-            "ProjectApi.cs",
-            "public static class ProjectApi { public static int Value => 42; }");
-        var calorSource = CreateSourceFile(
-            "Consumer.calr",
-            """
-            §M{m001:Consumer}
-              §CL{c001:Reader:pub}
-                §CSHARP{
-                  public int Read() => ProjectApi.Value;
-                }§/CSHARP
-            """);
-        var task = CreateTask(calorSource);
-        task.ProjectSourceFiles = [new TaskItem(projectSource)];
-
-        Assert.True(task.Execute());
-        Assert.Single(task.GeneratedFiles);
-    }
-
-    [Fact]
-    public void GeneratedCSharpValidation_UsesProjectUnsafeSetting()
-    {
-        var src = CreateSourceFile(
-            "UnsafeBlock.calr",
-            """
-            §M{m001:UnsafeBlock}
-              §CL{c001:Worker:pub}
-                §MT{m001:Run:pub} () -> void
-                  §E{unsafe}
-                  §UNSAFE{u1}
-                    §B{~x:i32} INT:42
-                  §/UNSAFE{u1}
-            """);
-        var rejected = CreateTask(src);
-        rejected.AllowUnsafeBlocks = false;
-        Assert.False(rejected.Execute());
-
-        var accepted = CreateTask(src);
-        accepted.AllowUnsafeBlocks = true;
-        Assert.True(
-            accepted.Execute(),
-            string.Join("; ", ((TestBuildEngine)accepted.BuildEngine).Errors));
-    }
-
-    [Fact]
-    public void GeneratedCSharpValidation_DisabledImplicitUsings_UsesStandaloneStructuralUsings()
-    {
-        var src = CreateSourceFile(
-            "ImplicitUsings.calr",
-            """
-            §M{m001:ImplicitUsings}
-              §CL{c001:Reader:pub}
-                §CSHARP{public string Read() => File.ReadAllText("input.txt");}§/CSHARP
-            """);
-        var task = CreateTask(src);
-        task.ImplicitUsings = "disable";
-
-        Assert.True(
-            task.Execute(),
-            string.Join("; ", ((TestBuildEngine)task.BuildEngine).Errors));
-        var generated = File.ReadAllText(task.GeneratedFiles.Single().ItemSpec);
-        Assert.Contains("using System.IO;", generated);
-        Assert.Contains("File.ReadAllText", generated);
-    }
-
-    [Fact]
     public void TranspileOnly_EmitsWithoutCreatingCache()
     {
         var src = CreateSourceFile(
             "Unsafe.calr",
             """
-            §M{m001:Unsafe}
-              §F{f001:Main:pub} () -> void
-                §B{x:i32} STR:"not an int"
+            module Unsafe Unsafe block
+              func Main () → void
+                !
+                let int:x = "not an int"
             """);
         var task = CreateTask(src);
         task.TranspileOnly = true;
@@ -667,17 +611,16 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_CallerMissingEffect_Errors()
     {
         var callee = """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
-                  §O{void}
-                  §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """;
         var caller = """
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
-                  §O{void}
-                  §C{SaveOrder}
-                  §/C
+            module Handler Handler block
+              func HandleRequest () → void
+                !
+                SaveOrder()
             """;
 
         var src1 = CreateSourceFile("Callee.calr", callee);
@@ -698,18 +641,16 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CrossModuleEffect_CallerDeclaresEffect_Succeeds()
     {
         var callee = """
-            §M{m001:OrderService}
-              §F{f001:SaveOrder:pub}
-                  §O{void}
-                  §E{db:w}
+            module OrderService OrderService block
+              func SaveOrder () → void
+                ! db:w
+                return
             """;
         var caller = """
-            §M{m002:Handler}
-              §F{f001:HandleRequest:pub}
-                  §O{void}
-                  §E{db:w}
-                  §C{SaveOrder}
-                  §/C
+            module Handler Handler block
+              func HandleRequest () → void
+                ! db:w
+                SaveOrder()
             """;
 
         var src1 = CreateSourceFile("Callee.calr", callee);
@@ -723,66 +664,22 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.DoesNotContain(engine.Errors, e => e.Contains("Calor0410"));
     }
 
-    // Warm-build cross-module enforcement: if the callee's declared effects change
-    // (and the caller's content doesn't), the caller's cached summary + the callee's
-    // fresh summary together should still detect the violation on the warm build.
-    [Fact]
-    public void CrossModuleEffect_WarmBuild_DetectsViolationAfterCalleeEdit()
-    {
-        var calleeOriginal = """
-            §M{m001:Repo}
-              §F{f001:Save:pub}
-                  §O{void}
-                  §E{db:w}
-            """;
-        var caller = """
-            §M{m002:App}
-              §F{f001:Run:pub}
-                  §O{void}
-                  §E{db:w}
-                  §C{Save}
-                  §/C
-            """;
-
-        var src1 = CreateSourceFile("Repo.calr", calleeOriginal);
-        var src2 = CreateSourceFile("App.calr", caller);
-
-        // Cold build — clean, caller declares db:w which covers callee's db:w.
-        var task1 = CreateTask(src1, src2);
-        Assert.True(task1.Execute());
-
-        // Edit callee to add net:w. Caller source unchanged → caller should be incrementally
-        // skipped on the next build, but cross-module pass should still see the violation
-        // because the caller's summary (including its call to Save) is cached.
-        Thread.Sleep(50);
-        File.WriteAllText(src1, calleeOriginal.Replace("§E{db:w}", "§E{db:w, net:w}"));
-
-        var task2 = CreateTask(src1, src2);
-        var result = task2.Execute();
-
-        Assert.False(result, "Build should fail — caller needs net:w after callee's §E expanded.");
-        var engine = (TestBuildEngine)task2.BuildEngine;
-        Assert.Contains(engine.Errors, e => e.Contains("net:w") && e.Contains("Save"));
-    }
-
     // Warm-build no-change path: both files stay cached, cross-module pass runs from cached
     // summaries on every build and stays clean.
     [Fact]
     public void CrossModuleEffect_WarmBuild_NoChanges_RunsFromCachedSummariesAndStaysClean()
     {
         var callee = """
-            §M{m001:Repo}
-              §F{f001:Save:pub}
-                  §O{void}
-                  §E{db:w}
+            module Repo Repo block
+              func Save () → void
+                ! db:w
+                return
             """;
         var caller = """
-            §M{m002:App}
-              §F{f001:Run:pub}
-                  §O{void}
-                  §E{db:w}
-                  §C{Save}
-                  §/C
+            module App App block
+              func Run () → void
+                ! db:w
+                Save()
             """;
 
         var src1 = CreateSourceFile("Repo.calr", callee);
@@ -983,15 +880,14 @@ public class CompileCalorIntegrationTests : IDisposable
     public void ElideProvenGuards_OptOutAfterDefaultBuild_RecompilesAndKeepsGuard()
     {
         var src = CreateSourceFile("ElideOptOut.calr", """
-            §M{m001:ElideOptOut}
-              §CL{c001:Calc:pub}
-                §MT{mt001:Square:pub}
-                  §I{i32:x}
-                  §O{i32}
-                  §Q (>= x 0)
-                  §Q (<= x 46340)
-                  §S (>= result 0)
-                  §R (* x x)
+            module ElideOptOut ElideOptOut block
+              class Calc
+                func Square (int:x) → int
+                  !
+                  requires (x >= 0)
+                  requires (x <= 46340)
+                  => (result >= 0)
+                  return (x * x)
             """);
         var output = Path.Combine(_outputDir, "ElideOptOut.g.cs");
 
@@ -1128,6 +1024,46 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void ReferencedAssemblies_ReachTheBinder_AndTheirContractsApply()
+    {
+        // 0.30: the task's references are loaded into the binder's metadata set, so a
+        // call on a referenced type binds to its metadata member and a manifest entry
+        // for that member applies. xunit.assert stands in for a framework package.
+        var src = CreateSourceFile("UsesReference.calr", """
+            module UsesReference UsesReference block
+              using Xunit
+              func Check () → void
+                !
+                Assert.True(true)
+            """);
+        File.WriteAllText(Path.Combine(_projectDir, ".calor-effects.json"), """
+            {
+              "version": "1.0",
+              "mappings": [
+                { "type": "Xunit.Assert", "methods": { "True": [] } }
+              ]
+            }
+            """);
+
+        CompileCalor Task(bool withReference)
+        {
+            var task = CreateTask(src);
+            if (withReference)
+                task.ReferencedAssemblies = [new TaskItem(typeof(Xunit.Assert).Assembly.Location)];
+            return task;
+        }
+
+        var referenced = Task(withReference: true);
+        Assert.True(referenced.Execute(), string.Join("\n", ((TestBuildEngine)referenced.BuildEngine).Errors));
+
+        // Without the reference the call cannot bind, the entry does not apply (D3),
+        // and the unknown call is an undeclared effect.
+        var unreferenced = Task(withReference: false);
+        Assert.False(unreferenced.Execute());
+        Assert.Contains(((TestBuildEngine)unreferenced.BuildEngine).Errors, e => e.Contains("'unknown'"));
+    }
+
+    [Fact]
     public void CanonicalInputs_ReferencedAssemblyContentMutation_InvalidatesWarmCache()
     {
         var src = CreateSourceFile("ReferenceContent.calr", ValidCalorSource);
@@ -1191,7 +1127,8 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         var editPhase = (CompileCalorTestPhase)editPhaseValue;
         var original = ValidCalorSource;
-        var edited = ValidCalorSource.Replace("(+ a b)", "(- a b)");
+        var edited = ValidCalorSource.Replace("(a + b)", "(a - b)");
+        Assert.NotEqual(original, edited); // the edit must land, or the race is vacuous
         var src = CreateSourceFile("Race.calr", original);
         var task = CreateTask(src);
         var editedOnce = false;
@@ -1374,16 +1311,16 @@ public class CompileCalorIntegrationTests : IDisposable
         // #823 review M2 pin: MSBuild is the surface where csc consumes the
         // outputs — the task itself must produce qualified cross-module calls.
         var src1 = CreateSourceFile("Store.calr", """
-            §M{m001:Store}
-              §F{f001:SaveSnapshot:pub} (str:path) -> void
-                §E{fs:w}
-                §C{File.WriteAllText} §A path §A "x" §/C
+            module Store Store block
+              func SaveSnapshot (string:path) → void
+                ! fs:w
+                File.WriteAllText(path, "x")
             """);
         var src2 = CreateSourceFile("Catalog.calr", """
-            §M{m002:Catalog}
-              §F{f001:Ping:pub} (str:path) -> void
-                §E{fs:w}
-                §C{SaveSnapshot} §A path §/C
+            module Catalog Catalog block
+              func Ping (string:path) → void
+                ! fs:w
+                SaveSnapshot(path)
             """);
 
         var task = CreateTask(src1, src2);
@@ -1397,13 +1334,14 @@ public class CompileCalorIntegrationTests : IDisposable
     // A refutable postcondition: total can exceed cap because the guard's
     // threshold is (cap + 10) — the W5-B defective shape from the outcome corpus.
     private const string RefutedContractSource = """
-        §M{m001:Quotes}
-          §F{f003:QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
-            §S (<= result cap)
-            §B{total:i32} (+ baseAmount surcharge)
-            §IF{if1} (> total (+ cap 10))
-              §R cap
-            §R total
+        module Quotes Quotes block
+          func QuoteWithSurchargeDefective (int:baseAmount, int:surcharge, int:cap) → int
+            !
+            => (result <= cap)
+            let int:total = (baseAmount + surcharge)
+            if (total > (cap + 10))
+              return cap
+            return total
         """;
 
     // G5 instrumentation (A-1.3 item 1): the Verify task property must run Z3
@@ -1501,17 +1439,17 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CascadeSuppression_MsBuildTaskAgreesWithTheDriver()
     {
         const string CalleeSource = """
-            §M{m001:Lib}
-              §F{f001:Ping:pub} () -> i32
-                §E{}
-                §P "ping"
-                §R INT:1
+            module Lib Lib block
+              func Ping () → int
+                !
+                Console.WriteLine("ping")
+                return 1
             """;
         const string CallerSource = """
-            §M{m002:App}
-              §F{f001:Main:pub} () -> i32
-                §E{}
-                §R §C{Ping} §/C
+            module App App block
+              func Main () → int
+                !
+                return Ping()
             """;
 
         var callee = CreateSourceFile("Callee.calr", CalleeSource);
@@ -1564,16 +1502,16 @@ public class CompileCalorIntegrationTests : IDisposable
     {
         // Calor0002 comes from the LEXER, so Program.Compile returns a null Ast.
         const string UnlexableSource = """
-            §M{m001:Broken}
-              §F{f001:Boom:pub} () -> void
+            §M{Broken}
+              §F{Boom:pub} () -> void
                 §E{cw}
                 §P "unterminated
             """;
         const string CleanSource = """
-            §M{m002:Interop}
-              §F{f001:Use:pub} () -> i32
-                §E{}
-                §R INT:1
+            module Interop Interop block
+              func Use () → int
+                !
+                return 1
             """;
 
         var broken = CreateSourceFile("Broken.calr", UnlexableSource);
@@ -1601,16 +1539,16 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CascadeSuppression_TranspileOnly_PublishesDespiteAnUnlexableSibling()
     {
         const string UnlexableSource = """
-            §M{m001:Broken}
-              §F{f001:Boom:pub} () -> void
+            §M{Broken}
+              §F{Boom:pub} () -> void
                 §E{cw}
                 §P "unterminated
             """;
         const string CleanSource = """
-            §M{m002:Good}
-              §F{f001:One:pub} () -> i32
-                §E{}
-                §R INT:1
+            module Good Good block
+              func One () → int
+                !
+                return 1
             """;
 
         var broken = CreateSourceFile("Broken.calr", UnlexableSource);

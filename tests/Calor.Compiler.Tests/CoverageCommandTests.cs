@@ -237,9 +237,10 @@ public class CoverageCommandTests : IDisposable
     #region Blocker Detection
 
     [Fact]
-    public async Task Coverage_AllPhase1Blockers_NowFullySupported()
+    public async Task Coverage_Phase1Blockers_YieldAndUnsafeSupported_PointersKeptAsCSharp()
     {
-        // yield-return and unsafe are now fully supported — should not appear as unsupported
+        // yield-return and unsafe are supported; 0.30 has no native pointer syntax, so pointer
+        // operations keep their member as C# and count as unsupported.
         var yieldSource = """
             using System.Collections.Generic;
             public class Gen { public IEnumerable<int> Get() { yield return 1; } }
@@ -252,7 +253,7 @@ public class CoverageCommandTests : IDisposable
             """;
         var unsafeResult = await _analyzer.AnalyzeFileAsync(CreateTestFile("unsafe.cs", unsafeSource));
         Assert.DoesNotContain(unsafeResult.UnsupportedConstructs, c => c.Name == "unsafe");
-        Assert.DoesNotContain(unsafeResult.UnsupportedConstructs, c => c.Name == "pointer");
+        Assert.Contains(unsafeResult.UnsupportedConstructs, c => c.Name == "pointer");
     }
 
     [Fact]

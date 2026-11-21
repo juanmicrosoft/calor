@@ -31,6 +31,8 @@ public enum MethodModifiers
 /// </summary>
 public sealed class InterfaceDefinitionNode : TypeDefinitionNode
 {
+    public Visibility Visibility { get; }
+
     /// <summary>
     /// Interface methods (signatures only).
     /// </summary>
@@ -130,7 +132,8 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         TextSpan? identifierSpan = null,
         IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
         IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null,
-        IReadOnlyList<AstNode>? items = null)
+        IReadOnlyList<AstNode>? items = null,
+        Visibility visibility = Visibility.Public)
         : base(span, id, name, attributes, identifierSpan)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
@@ -143,6 +146,7 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         InteropBlocks = interopBlocks ?? Array.Empty<CSharpInteropBlockNode>();
         PreprocessorBlocks = preprocessorBlocks ?? Array.Empty<MemberPreprocessorBlockNode>();
         Items = items ?? Array.Empty<AstNode>();
+        Visibility = visibility;
     }
 
 
@@ -154,8 +158,10 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
 /// </summary>
 public sealed class MethodSignatureNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; init; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
 
     /// <summary>
@@ -236,8 +242,9 @@ public sealed class MethodSignatureNode : AstNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = span;
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
@@ -280,6 +287,29 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// True if this is a static class.
     /// </summary>
     public bool IsStatic { get; }
+
+    /// <summary>
+    /// A named module uses the shared type-member representation, but owns
+    /// static functions rather than instance methods. C# lowers it to a static class.
+    /// </summary>
+    public bool IsModule { get; }
+
+    /// <summary>
+    /// 0.30: the row of the type's implicit static initialization, written as a header
+    /// clause (<c>! codes</c> on its own line before the first member). It covers the static
+    /// field and property initializers C# runs when the type has no explicit static
+    /// constructor; no static constructor is synthesized, so <c>beforefieldinit</c> timing
+    /// is unchanged. A type with an explicit static constructor declares the row there.
+    /// Readers of the type's static fields are charged the initializers' effects and this row.
+    /// </summary>
+    public EffectsNode? StaticInitializerEffects { get; set; }
+
+    public bool IsRecord { get; }
+    public IReadOnlyList<ParameterNode>? RecordParameters { get; }
+    public IReadOnlyList<ExpressionNode>? RecordBaseArguments { get; }
+    public ConstructorNode? RecordPrimaryConstructor { get; }
+    public ConstructorNode? RecordCopyConstructor { get; }
+    public IReadOnlyList<PropertyNode> RecordPositionalProperties { get; }
 
     /// <summary>
     /// True if this is a struct (value type).
@@ -529,13 +559,25 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         TextSpan? identifierSpan = null,
         TextSpan? baseClassSpan = null,
         IReadOnlyList<TextSpan>? implementedInterfaceSpans = null,
-        IReadOnlyList<AstNode>? items = null)
+        IReadOnlyList<AstNode>? items = null,
+        bool isModule = false,
+        bool isRecord = false,
+        IReadOnlyList<ParameterNode>? recordParameters = null,
+        IReadOnlyList<ExpressionNode>? recordBaseArguments = null)
         : base(span, id, name, attributes, identifierSpan)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
         IsPartial = isPartial;
-        IsStatic = isStatic;
+        IsModule = isModule;
+        IsRecord = isRecord;
+        RecordParameters = recordParameters;
+        RecordBaseArguments = recordBaseArguments;
+        if (isRecord && (isStruct || isStatic || isModule || isReadOnly))
+            throw new ArgumentException("A native record declaration represents a C# record class.");
+        if (!isRecord && (recordParameters != null || recordBaseArguments != null))
+            throw new ArgumentException("Positional record metadata requires a record declaration.");
+        IsStatic = isStatic || isModule;
         IsStruct = isStruct;
         IsReadOnly = isReadOnly;
         Visibility = visibility;
@@ -559,6 +601,55 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         NestedEnums = nestedEnums ?? Array.Empty<EnumDefinitionNode>();
         NestedDelegates = nestedDelegates ?? Array.Empty<DelegateDefinitionNode>();
         Items = items ?? Array.Empty<AstNode>();
+        RecordPositionalProperties = Array.Empty<PropertyNode>();
+        var recordSelfType = typeParameters.Count == 0 ? name
+            : $"{name}<{string.Join(",", typeParameters.Select(parameter => parameter.Name))}>";
+        bool IsCopyConstructor(ConstructorNode constructor) => !constructor.IsStatic
+            && constructor.Parameters.Count == 1 && constructor.Parameters[0].TypeName == recordSelfType;
+        if (recordParameters != null || isRecord && constructors.All(constructor => constructor.IsStatic || IsCopyConstructor(constructor)))
+        {
+            var primaryParameters = recordParameters ?? [];
+            // Synthesized declarations participate in binding and effect inference,
+            // but emission leaves their implementation to the C# record compiler.
+            RecordPositionalProperties = primaryParameters
+                .Where(parameter => !properties.Any(property => property.Name == parameter.Name)
+                    && !fields.Any(field => field.Name == parameter.Name))
+                .Select(parameter => new PropertyNode(
+                    parameter.Span, $"{id}:positional:{parameter.Name}", parameter.Name,
+                    parameter.TypeName, Visibility.Public, MethodModifiers.None,
+                    new PropertyAccessorNode(parameter.Span, PropertyAccessorNode.AccessorKind.Get,
+                        null, [], [], new AttributeCollection()),
+                    null,
+                    new PropertyAccessorNode(parameter.Span, PropertyAccessorNode.AccessorKind.Init,
+                        null, [], [], new AttributeCollection()),
+                    null, new AttributeCollection(), [],
+                    identifierSpan: parameter.IdentifierSpan,
+                    typeNameSpan: parameter.TypeNameSpan, row: parameter.Row))
+                .ToArray();
+            Properties = properties.Concat(RecordPositionalProperties).ToArray();
+            RecordPrimaryConstructor = new ConstructorNode(
+                new TextSpan(span.Start, 0, span.Line, span.Column),
+                $"{id}:primary", isAbstract ? Visibility.Protected : Visibility.Public,
+                primaryParameters, [],
+                recordBaseArguments == null ? null : new ConstructorInitializerNode(span, true, recordBaseArguments),
+                RecordPositionalProperties.Select(property => (StatementNode)new AssignmentStatementNode(
+                    property.Span,
+                    new FieldAccessNode(property.Span, new ThisExpressionNode(property.Span), property.Name),
+                    new ReferenceNode(property.Span, property.Name, isVerbatim: true))).ToArray(),
+                new AttributeCollection());
+            Constructors = constructors.Append(RecordPrimaryConstructor).ToArray();
+        }
+        if (isRecord && !constructors.Any(IsCopyConstructor))
+        {
+            var copySpan = IdentifierSpan;
+            var original = new ParameterNode(copySpan, "original", recordSelfType, new AttributeCollection());
+            RecordCopyConstructor = new ConstructorNode(copySpan, $"{id}:copy",
+                isSealed ? Visibility.Private : Visibility.Protected, [original], [],
+                baseClass == null ? null : new ConstructorInitializerNode(copySpan, true,
+                    [new ReferenceNode(copySpan, original.Name, isVerbatim: true)]),
+                [], new AttributeCollection());
+            Constructors = Constructors.Append(RecordCopyConstructor).ToArray();
+        }
     }
 
 
@@ -589,7 +680,7 @@ public sealed class ClassFieldNode : AstNode
 
     /// <summary>
     /// Optional effect row annotating the field type, written same-line-adjacent to
-    /// the header group: <c>§FLD{Action&lt;i32&gt;:onChange:pri} §E{cw}</c>.
+    /// the header group: <c>§FLD{Action&lt;i32&gt;:onChange:priv} §E{cw}</c>.
     /// Position 8 of docs/design/effect-rows-in-the-type-system.md §3.3. A <c>§E</c>
     /// on a later line is Calor0405 — the class-member loop has no <c>§E</c> arm.
     /// </summary>
@@ -656,20 +747,28 @@ public sealed class ClassFieldNode : AstNode
 /// </summary>
 public sealed class MethodNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
+    private IReadOnlyList<EffectParameterInfo> _effectParameters = Array.Empty<EffectParameterInfo>();
 
     /// <summary>
     /// Effect variables this method binds with an <c>eff</c> modifier in its
     /// type-parameter list — <c>§MT{mt001:Handle:pub}&lt;eff e&gt;</c>. Kept out of
     /// <see cref="TypeParameters"/> so codegen erases them by construction.
     /// </summary>
-    public IReadOnlyList<EffectParameterInfo> EffectParameters { get; init; }
-        = Array.Empty<EffectParameterInfo>();
+    public IReadOnlyList<EffectParameterInfo> EffectParameters
+    {
+        get => _effectParameters;
+        init => _effectParameters = value;
+    }
+
+    internal void SetSynthesizedEffectParameters(IReadOnlyList<EffectParameterInfo> parameters)
+        => _effectParameters = parameters;
 
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
@@ -695,6 +794,9 @@ public sealed class MethodNode : AstNode
     /// True if this is an async method.
     /// </summary>
     public bool IsAsync { get; }
+    public SinceNode? Since { get; }
+    public DeprecatedNode? Deprecated { get; }
+    public IReadOnlyList<BreakingChangeNode> BreakingChanges { get; }
 
     public MethodNode(
         TextSpan span,
@@ -731,10 +833,13 @@ public sealed class MethodNode : AstNode
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         bool isAsync = false,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        SinceNode? since = null,
+        DeprecatedNode? deprecated = null,
+        IReadOnlyList<BreakingChangeNode>? breakingChanges = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         Visibility = visibility;
@@ -749,6 +854,9 @@ public sealed class MethodNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
         IsAsync = isAsync;
+        Since = since;
+        Deprecated = deprecated;
+        BreakingChanges = breakingChanges ?? Array.Empty<BreakingChangeNode>();
     }
 
     public bool IsVirtual => (Modifiers & MethodModifiers.Virtual) != 0;
@@ -813,7 +921,8 @@ public enum OperatorOverloadKind
 /// </summary>
 public sealed class OperatorOverloadNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string OperatorToken { get; }
     public OperatorOverloadKind Kind { get; }
     public Visibility Visibility { get; }
@@ -826,6 +935,7 @@ public sealed class OperatorOverloadNode : AstNode
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
     public bool IsConversion => Kind == OperatorOverloadKind.Implicit || Kind == OperatorOverloadKind.Explicit;
+    public EffectsNode? Effects { get; set; }
     public bool IsUnary => Kind is OperatorOverloadKind.UnaryPlus or OperatorOverloadKind.UnaryNegate
         or OperatorOverloadKind.LogicalNot or OperatorOverloadKind.BitwiseNot
         or OperatorOverloadKind.Increment or OperatorOverloadKind.Decrement
@@ -863,7 +973,7 @@ public sealed class OperatorOverloadNode : AstNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         OperatorToken = operatorToken ?? throw new ArgumentNullException(nameof(operatorToken));
         Kind = kind;
         Visibility = visibility;
@@ -929,11 +1039,13 @@ public sealed class NewExpressionNode : ExpressionNode
     public TypeReferenceNode TypeReference { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
 
     /// <summary>
     /// Object initializer property assignments (e.g., new Person { Name = "John", Age = 30 }).
     /// </summary>
     public IReadOnlyList<ObjectInitializerAssignment> Initializers { get; }
+    public IReadOnlyList<CallExpressionNode> CollectionInitializers { get; }
 
     public NewExpressionNode(
         TextSpan span,
@@ -951,7 +1063,9 @@ public sealed class NewExpressionNode : ExpressionNode
         IReadOnlyList<ExpressionNode> arguments,
         IReadOnlyList<ObjectInitializerAssignment> initializers,
         TextSpan? typeNameSpan = null,
-        TypeReferenceNode? typeReference = null)
+        TypeReferenceNode? typeReference = null,
+        IReadOnlyList<string?>? argumentNames = null,
+        IReadOnlyList<CallExpressionNode>? collectionInitializers = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
@@ -964,7 +1078,13 @@ public sealed class NewExpressionNode : ExpressionNode
                 .Select(argument => new TypeReferenceNode(TextSpan.Empty, argument))
                 .ToArray());
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        if (argumentNames != null && argumentNames.Count != Arguments.Count)
+            throw new ArgumentException("Argument names must align with constructor arguments.", nameof(argumentNames));
+        ArgumentNames = argumentNames;
         Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();
+        CollectionInitializers = collectionInitializers ?? Array.Empty<CallExpressionNode>();
+        if (Initializers.Count > 0 && CollectionInitializers.Count > 0)
+            throw new ArgumentException("Object and collection initializer entries cannot be mixed.", nameof(collectionInitializers));
     }
 
 

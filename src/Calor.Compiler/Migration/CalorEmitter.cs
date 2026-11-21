@@ -6,8 +6,8 @@ using Calor.Compiler.Parsing;
 namespace Calor.Compiler.Migration;
 
 /// <summary>
-/// Emits Calor v2+ source code from an Calor AST.
-/// Uses Lisp-style expressions and arrow syntax for control flow.
+/// Emits native Calor source from a Calor AST.
+/// Uses infix expressions and indentation-only block structure.
 /// </summary>
 public sealed class CalorEmitter : IAstVisitor<string>
 {
@@ -16,12 +16,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private readonly ConversionContext _context;
     private bool _inInterpolation;
     private readonly List<string> _pendingHoistedLines = new();
-    private int _ternaryCounter;
     private int _hoistCounter;
     private int _conditionalExpressionDepth;
     private int _memberBodyDepth;
     private int _inlineObjectInitializers;
     private int _inlineCollections;
+    private IReadOnlySet<ReferenceNode>? _memberAccessRoots;
+    private IReadOnlyDictionary<IfStatementNode, ReturnStatementNode> _canonicalLiteralReturns =
+        new Dictionary<IfStatementNode, ReturnStatementNode>();
 
     // How many lambda bodies deep we are emitting. A block lambda nested inside
     // ANOTHER lambda's body must never be hoisted to the enclosing statement:
@@ -59,12 +61,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public IReadOnlyList<ConversionIssue> Issues => _context.Issues;
 
+    internal Action<AstNode, int>? EffectRowDeclarationEmitted { get; init; }
+
     public string Emit(ModuleNode module)
     {
+        _context.EmittedPreservations.Clear();
         _builder.Clear();
         _indentLevel = 0;
         _pendingHoistedLines.Clear();
-        _ternaryCounter = 0;
         _hoistCounter = 0;
         _memberBodyDepth = 0;
         _lambdaBodyDepth = 0;
@@ -72,6 +76,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _inInlineSiblingContext = 0;
         _inlineObjectInitializers = 0;
         _inlineCollections = 0;
+        _canonicalLiteralReturns = IfStatementNode.GetCanonicalLiteralReturns(module);
+        _memberAccessRoots = Parser.FindMemberAccessRoots(module);
         Visit(module);
         return _builder.ToString();
     }
@@ -83,8 +89,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _pendingHoistedLines.Clear();
         foreach (var line in lines)
         {
-            _builder.Append(new string(' ', _indentLevel * 2));
-            _builder.AppendLine(line);
+            AppendIndentedLine(line);
         }
     }
 
@@ -97,9 +102,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else
         {
-            _builder.Append(new string(' ', _indentLevel * 2));
+            AppendIndentedLine(line);
+        }
+    }
+
+    private void AppendIndentedLine(string line)
+    {
+        var indent = new string(' ', _indentLevel * 2);
+        if (line.Contains('\n'))
+        {
+            _builder.AppendLine(RawCSharpFrame.RewriteOutsideFrames(line, text =>
+                indent + text.Replace("\n", "\n" + indent, StringComparison.Ordinal)));
+        }
+        else
+        {
+            _builder.Append(indent);
             _builder.AppendLine(line);
         }
+    }
+
+    private void AppendEffectRowDeclaration(AstNode declaration, string line)
+    {
+        FlushHoistedLines();
+        EffectRowDeclarationEmitted?.Invoke(declaration, _builder.Length + _indentLevel * 2);
+        AppendLine(line);
     }
 
     private void Append(string text)
@@ -111,33 +137,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void Dedent() => _indentLevel--;
 
     /// <summary>
-    /// Phase 3 — indent-form block terminator. The CalorEmitter no longer
-    /// emits structural `§/X{...}` closing tags; block ends are conveyed by
-    /// dedentation at the parent indent column, which the indent-aware lexer
-    /// converts to <see cref="Calor.Compiler.Parsing.TokenKind.Dedent"/>.
-    /// This is a documented no-op (kept as an explicit call so the diff
-    /// reviewing the Phase 3 transition shows clearly which sites stopped
-    /// emitting closers and which still do — see do-while, switch case
-    /// bodies, and preprocessor blocks for the remaining exceptions, which
-    /// carry trailing payload on the closer and need Phase 4 design work).
-    /// </summary>
-    private static void EmitBlockEnd(string legacyCloser)
-    {
-        _ = legacyCloser;
-    }
-
-    /// <summary>
     /// Emits doc comment lines (if present) as Calor line comments before a construct.
     /// </summary>
     private void EmitDocComment(AstNode node)
     {
         if (node.DocComment == null)
             return;
-        // Normalize \r\n and \r to \n to avoid orphaned text from embedded carriage returns
-        var normalized = node.DocComment.Replace("\r\n", "\n").Replace("\r", "");
+        EmitDocumentationText(node.DocComment);
+    }
+
+    private void EmitDocumentationText(string text)
+    {
+        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
         foreach (var line in normalized.Split('\n'))
         {
-            AppendLine($"// {line.Trim()}");
+            AppendLine($"/// {line.Trim()}");
         }
     }
 
@@ -168,7 +182,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Capture result. Any binding still pending belongs to this statement
         // (the visitor returned without an AppendLine), so it leads the capture.
         var leftover = _pendingHoistedLines.ToList();
-        var result = _builder.ToString().TrimEnd('\r', '\n');
+        var result = RawCSharpFrame.RewriteOutsideFrames(
+            _builder.ToString(), text => text.TrimEnd('\r', '\n'));
         if (leftover.Count > 0)
             result = string.Join("\n", leftover) + "\n" + result;
 
@@ -193,7 +208,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         try
         {
             return node.StatementBody!
-                .Select(s => CaptureStatementOutput(s).Trim())
+                .Select(s => RawCSharpFrame.RewriteOutsideFrames(
+                    CaptureStatementOutput(s), text => text.Trim()))
                 .ToList();
         }
         finally
@@ -203,275 +219,47 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
     }
 
-    private string BuildLambdaHeader(LambdaExpressionNode node)
-    {
-        // Format: §LAM{id[:static][:async]:param1:type1[:param2:type2:...]}
-        // The parameter list is positional name:type pairs. A parameter whose
-        // type the converter could not infer (#1097: TypeName null, previously
-        // written as the bare "?" the binder cannot canonicalize) is written
-        // WITHOUT a type when it is the last parameter — the parser reads a
-        // trailing unpaired name as untyped, the binder defaults it to OBJECT
-        // (Binder.BindLambdaExpression), and the C# emitter writes the bare
-        // name so C# infers it. An earlier untyped parameter still needs a slot
-        // to keep the pairing aligned (an empty slot lexes as `::`), so it is
-        // written as `object` — the same type the binder would default to.
-        var headerParts = new List<string> { node.Id };
-        if (node.IsStatic) headerParts.Add("static");
-        if (node.IsAsync) headerParts.Add("async");
-        for (var i = 0; i < node.Parameters.Count; i++)
-        {
-            var p = node.Parameters[i];
-            headerParts.Add(p.Name);
-            if (p.TypeName != null)
-                headerParts.Add(TypeMapper.CSharpToCalor(p.TypeName));
-            else if (i < node.Parameters.Count - 1)
-                headerParts.Add("object");
-        }
-        return string.Join(":", headerParts);
-    }
-
-    /// <summary>
-    /// Block form of a statement-bodied lambda as a list of lines relative to
-    /// indent 0: <c>{opener} §LAM{header}</c>, each captured statement's lines one
-    /// level deeper, and <c>§/LAM{id}</c> at the opener's column. Nested block
-    /// content keeps its relative indentation, so prefixing every line by the
-    /// caller's indent (AppendLine / FlushHoistedLines) yields a well-formed block
-    /// wherever it lands (#903 cluster 1: the legacy multi-line string put the
-    /// closer at column 0 and only re-indented the first line of each statement).
-    /// </summary>
-    private static List<string> BuildBlockLambdaLines(
-        string opener, string header, string lambdaRow, string lambdaId, IReadOnlyList<string> capturedStatements)
-    {
-        var lines = new List<string> { $"{opener}§LAM{{{header}}}{lambdaRow}" };
-        foreach (var stmt in capturedStatements)
-        {
-            if (string.IsNullOrWhiteSpace(stmt)) continue;
-            foreach (var line in stmt.Split('\n'))
-            {
-                var trimmed = line.TrimEnd('\r');
-                lines.Add(trimmed.Length == 0 ? "" : "  " + trimmed);
-            }
-        }
-        lines.Add($"§/LAM{{{lambdaId}}}");
-        return lines;
-    }
-
-    /// <summary>
-    /// True when a statement-bodied lambda may be space-joined on one line:
-    /// at most two statements, none a fallback/raw node, and — new for #903 — none
-    /// whose captured rendering spans several lines (a nested block lambda, an object
-    /// initializer, or a hoisted temp all do). The old check looked only at node
-    /// kinds, so a two-statement lambda with a multi-line statement was joined onto
-    /// one line and its continuation lines landed at column 0/2 mid-block.
-    /// </summary>
-    private static bool CanInlineLambdaStatements(LambdaExpressionNode node, IReadOnlyList<string> captured)
-        => node.StatementBody!.Count <= 2
-           && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
-           && captured.All(s => !s.Contains('\n'));
-
-    /// <summary>
-    /// Captures a statement-bodied lambda's statements once and reports whether the
-    /// single-line form is valid. When it is, <paramref name="inline"/> holds the
-    /// complete <c>§LAM{...} ... §/LAM{id}</c> text; otherwise the caller builds the
-    /// block form from <paramref name="stmts"/> without re-visiting the body.
-    /// </summary>
-    private bool TryRenderStatementLambdaInline(
-        LambdaExpressionNode node, string header, string lambdaRow, out string inline, out List<string> stmts)
-    {
-        var shortCandidate = node.StatementBody!.Count <= 2
-            && !node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)
-            // A lone call on the header line denotes an expression body. Keep
-            // discarded-return statement lambdas unambiguously block-bodied.
-            && !(node.StatementBody.Count == 1 && node.StatementBody[0] is CallStatementNode);
-        stmts = CaptureLambdaStatements(node, inlineSibling: shortCandidate);
-        if (shortCandidate && CanInlineLambdaStatements(node, stmts))
-        {
-            inline = $"§LAM{{{header}}}{lambdaRow} {string.Join(" ", stmts)} §/LAM{{{node.Id}}}";
-            return true;
-        }
-        inline = "";
-        return false;
-    }
-
     public string Visit(ModuleNode node)
     {
+        EmitDocComment(node);
+        foreach (var issue in node.Issues) Visit(issue);
+        foreach (var decision in node.Decisions) Visit(decision);
+        if (node.Context != null) Visit(node.Context);
         // Module header — sanitize backtick (C# generic arity) and @ from name
         var moduleName = node.Name.Replace("`", "").Replace("@", "");
-        var overflow = node.Attributes["overflow"] is { } mode ? $":overflow={mode}" : "";
-        AppendLine($"§M{{{node.Id}:{moduleName}{overflow}}}");
+        if (node.NamespaceScopes.Count > 1 || node.NamespaceScopes.Any(scope => scope.ParentScopeId != null))
+            throw new InvalidOperationException("Native modules support one namespace per file; preserve other topologies as whole-file C#.");
+        var namespaceScope = node.NamespaceScopes.SingleOrDefault();
+        var declarationNamespaces = EnumerateModuleDeclarations(node)
+            .Select(declaration => declaration.NamespaceIdentity).Where(name => name != null)
+            .Distinct(StringComparer.Ordinal).ToArray();
+        var namespaceName = namespaceScope?.FullName
+            ?? node.NamespaceIdentity ?? declarationNamespaces.FirstOrDefault() ?? "";
+        if (declarationNamespaces.Any(name => name != namespaceName)
+            || node.Usings.Any(directive => directive.NamespaceScopeId != null
+                && (namespaceScope == null || namespaceScope.IsGlobal
+                    || directive.NamespaceScopeId != namespaceScope.Id
+                    || directive.NamespaceIdentity != namespaceName || directive.IsGlobal)))
+            throw new InvalidOperationException("Native module headers cannot flatten distinct namespace or using scopes; preserve the original C#.");
+        var namespaceHeader = namespaceName.Length == 0 ? "" : " " + EscapeNamespaceName(namespaceName);
+        var origin = namespaceScope is { IsGlobal: false, IsFileScoped: false } ? " block" : "";
+        var overflow = node.Attributes["overflow"] is { } mode ? $" overflow {mode}" : "";
+        var nullable = node.HasObliviousNullability() ? " nullable oblivious" : "";
+        AppendLine($"module {EscapeCalorIdentifier(moduleName)}{namespaceHeader}{origin}{overflow}{nullable}");
         Indent();
 
         if (node.DeclaredSemanticsVersion != null)
         {
-            AppendLine($"§SEMVER{{{node.DeclaredSemanticsVersion}}}");
+            AppendLine($"semver \"{node.DeclaredSemanticsVersion}\"");
         }
+        foreach (var assumption in node.Assumptions) Visit(assumption);
+        foreach (var invariant in node.Invariants) Visit(invariant);
 
-        if (HasExplicitNamespaceTopology(node))
-        {
-            EmitScopedModuleBody(node);
-        }
-        else
-        {
-            EmitModuleItems(node, scopeId: null, includeUsings: true);
-        }
+        EmitModuleItems(node, scopeId: null, includeUsings: true);
 
         Dedent();
-        EmitBlockEnd($"§/M{{{node.Id}}}");
 
         return _builder.ToString();
-    }
-
-    private static bool HasExplicitNamespaceTopology(ModuleNode node)
-        => node.NamespaceScopes.Count > 0
-           || node.Usings.Any(item => item.NamespaceScopeId != null)
-           || EnumerateModuleDeclarations(node).Any(item =>
-               item.NamespaceScopeId != null
-               && !(item.NamespaceScopeId == ""
-                    && !string.IsNullOrEmpty(item.NamespaceIdentity)));
-
-    private void EmitScopedModuleBody(ModuleNode node)
-    {
-        var leadingItems = node.Items.Count > 0
-            ? node.Items.TakeWhile(IsCompilationUnitPrefixItem).ToList()
-            : [];
-        if (leadingItems.Count > 0)
-        {
-            foreach (var item in leadingItems)
-                EmitModuleItem(item);
-        }
-        else
-        {
-            foreach (var usingDirective in node.Usings.Where(item => item.NamespaceScopeId == null))
-                Visit(usingDirective);
-            if (node.Usings.Any(item => item.NamespaceScopeId == null))
-                AppendLine();
-            foreach (var preprocessor in node.TypePreprocessorBlocks.Where(
-                         item => item.NamespaceScopeId == null
-                                 && !ContainsConditionalDeclarations(item)))
-            {
-                Visit(preprocessor);
-                AppendLine();
-            }
-        }
-
-        var usedScopeIds = EnumerateModuleDeclarations(node)
-            .Select(item => item.NamespaceScopeId)
-            .Concat(node.Usings.Select(item => item.NamespaceScopeId))
-            .Concat(node.NamespaceScopes.Select(scope => scope.Id))
-            .Where(scopeId => !string.IsNullOrEmpty(scopeId))
-            .Select(scopeId => scopeId!)
-            .ToHashSet(StringComparer.Ordinal);
-        var emittedScopeIds = new HashSet<string>(StringComparer.Ordinal);
-        var hasGlobalScopeItems =
-            EnumerateModuleDeclarations(node).Any(item => item.NamespaceScopeId == "")
-            || node.Items.Except(leadingItems).Any(item =>
-                item.NamespaceScopeId == null
-                && item is CompilerDirectiveNode);
-        if (hasGlobalScopeItems)
-        {
-            EmitSyntheticNamespaceScope(
-                node,
-                CreateSyntheticScopeId("ns_global", usedScopeIds),
-                "_global",
-                "",
-                NamespaceScopeKind.Global,
-                includeUnscopedCompilerItems: true,
-                excludedItems: leadingItems);
-        }
-
-        foreach (var root in node.NamespaceScopes.Where(scope => scope.ParentScopeId == null))
-        {
-            EmitNamespaceScope(node, root, emittedScopeIds);
-        }
-        if (!hasGlobalScopeItems)
-        {
-            foreach (var directive in node.Items
-                         .Except(leadingItems)
-                         .OfType<CompilerDirectiveNode>()
-                         .Where(item => item.NamespaceScopeId == null))
-            {
-                Visit(directive);
-            }
-        }
-
-        var orphanScopeIds = EnumerateModuleDeclarations(node)
-            .Select(item => item.NamespaceScopeId)
-            .Concat(node.Usings.Select(item => item.NamespaceScopeId))
-            .Where(scopeId => !string.IsNullOrEmpty(scopeId) && !emittedScopeIds.Contains(scopeId))
-            .Select(scopeId => scopeId!)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-        foreach (var scopeId in orphanScopeIds)
-        {
-            var namespaceIdentity = EnumerateModuleDeclarations(node)
-                .FirstOrDefault(item => item.NamespaceScopeId == scopeId)
-                ?.NamespaceIdentity
-                ?? node.Usings.FirstOrDefault(item => item.NamespaceScopeId == scopeId)
-                    ?.NamespaceIdentity;
-            if (namespaceIdentity == null)
-            {
-                _context.AddError(
-                    $"Namespace scope '{scopeId}' has no scope declaration or namespace identity; " +
-                    "its declarations were preserved in the global namespace.",
-                    feature: "namespace-topology");
-                namespaceIdentity = "";
-            }
-            EmitSyntheticNamespaceScope(
-                node,
-                scopeId,
-                string.IsNullOrEmpty(namespaceIdentity) ? "_global" : namespaceIdentity,
-                scopeId,
-                string.IsNullOrEmpty(namespaceIdentity)
-                    ? NamespaceScopeKind.Global
-                    : NamespaceScopeKind.Named);
-        }
-
-        var unscopedDeclarations = EnumerateModuleDeclarations(node)
-            .Where(item => item.NamespaceScopeId == null)
-            .ToList();
-        foreach (var namespaceIdentity in unscopedDeclarations
-                     .Where(item => !string.IsNullOrEmpty(item.NamespaceIdentity))
-                     .Select(item => item.NamespaceIdentity!)
-                     .Distinct(StringComparer.Ordinal))
-        {
-            EmitSyntheticNamespaceScope(
-                node,
-                CreateSyntheticScopeId("ns_synthetic", usedScopeIds),
-                namespaceIdentity,
-                scopeId: null,
-                NamespaceScopeKind.Named,
-                exactUnscoped: true,
-                unscopedNamespaceIdentity: namespaceIdentity);
-        }
-
-        var missingIdentity = unscopedDeclarations
-            .Where(item => item.NamespaceIdentity == null)
-            .ToList();
-        if (missingIdentity.Count > 0)
-        {
-            _context.AddError(
-                "Explicit namespace topology contains declarations with neither a namespace scope " +
-                "nor an explicit namespace identity; they were preserved in the global namespace: " +
-                string.Join(
-                    ", ",
-                    missingIdentity.Select(item =>
-                        item.FullyQualifiedSymbolIdentity ?? item.GetType().Name)),
-                feature: "namespace-topology");
-        }
-
-        if (missingIdentity.Count > 0
-            || unscopedDeclarations.Any(item => item.NamespaceIdentity == ""))
-        {
-            EmitSyntheticNamespaceScope(
-                node,
-                CreateSyntheticScopeId("ns_global", usedScopeIds),
-                "_global",
-                scopeId: null,
-                NamespaceScopeKind.Global,
-                exactUnscoped: true,
-                unscopedNamespaceIdentity: "",
-                includeMissingNamespaceIdentity: true);
-        }
     }
 
     private void EmitNamespaceScope(
@@ -481,46 +269,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         emittedScopeIds.Add(scope.Id);
         AppendLine(
-            $"§NS{{{scope.Id}:{scope.Name}{GetNamespaceScopeMarkers(scope)}}}");
+            $"§NS{{{scope.Name}{GetNamespaceScopeMarkers(scope)}}}");
         Indent();
         EmitModuleItems(module, scope.Id, includeUsings: true);
         foreach (var child in module.NamespaceScopes.Where(item => item.ParentScopeId == scope.Id))
             EmitNamespaceScope(module, child, emittedScopeIds);
         Dedent();
-        EmitBlockEnd($"§/NS{{{scope.Id}}}");
-        AppendLine();
-    }
-
-    private void EmitSyntheticNamespaceScope(
-        ModuleNode module,
-        string id,
-        string name,
-        string? scopeId,
-        NamespaceScopeKind kind,
-        bool exactUnscoped = false,
-        string? unscopedNamespaceIdentity = null,
-        bool includeMissingNamespaceIdentity = false,
-        bool includeUnscopedCompilerItems = false,
-        IReadOnlyCollection<AstNode>? excludedItems = null)
-    {
-        var marker = kind == NamespaceScopeKind.Global
-            ? ":global"
-            : name == "_global"
-                ? ":named"
-                : "";
-        AppendLine($"§NS{{{id}:{name}{marker}}}");
-        Indent();
-        EmitModuleItems(
-            module,
-            scopeId,
-            includeUsings: !exactUnscoped,
-            exactUnscoped,
-            unscopedNamespaceIdentity,
-            includeMissingNamespaceIdentity,
-            includeUnscopedCompilerItems,
-            excludedItems);
-        Dedent();
-        EmitBlockEnd($"§/NS{{{id}}}");
         AppendLine();
     }
 
@@ -647,12 +401,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
            || block.ElseBranch != null
            && ContainsConditionalDeclarations(block.ElseBranch);
 
-    private static bool IsCompilationUnitPrefixItem(AstNode item)
-        => item.NamespaceScopeId == null
-           && (item is UsingDirectiveNode or CompilerDirectiveNode
-               || item is TypePreprocessorBlockNode block
-               && !ContainsConditionalDeclarations(block));
-
     private static bool IsCompilerDirectiveCode(string code)
         => code.TrimStart().StartsWith("#", StringComparison.Ordinal);
 
@@ -666,17 +414,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (scope.IsFileScoped)
             markers.Add("file");
         return markers.Count == 0 ? "" : ":" + string.Join(":", markers);
-    }
-
-    private static string CreateSyntheticScopeId(
-        string prefix,
-        ISet<string> usedScopeIds)
-    {
-        var candidate = prefix;
-        var suffix = 1;
-        while (!usedScopeIds.Add(candidate))
-            candidate = $"{prefix}_{suffix++}";
-        return candidate;
     }
 
     private void EmitModuleItem(AstNode item)
@@ -735,23 +472,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(UsingDirectiveNode node)
     {
-        var globalPrefix = node.IsGlobal ? "global:" : "";
+        var globalPrefix = !string.IsNullOrEmpty(node.NamespaceScopeId) && !string.IsNullOrEmpty(node.NamespaceIdentity)
+            ? "namespace " : node.IsGlobal ? "global " : "";
         if (node.IsStatic)
         {
-            AppendLine($"§U{{{globalPrefix}static:{node.Namespace}}}");
+            AppendLine($"{globalPrefix}using static {node.Namespace}");
         }
         else if (node.Alias != null)
         {
-            AppendLine($"§U{{{globalPrefix}{node.Alias}:{node.Namespace}}}");
+            AppendLine($"{globalPrefix}using {EscapeCalorIdentifier(node.Alias)} = {node.Namespace}");
         }
         else
         {
-            AppendLine(node.IsGlobal
-                ? $"§U{{global:{node.Namespace}}}"
-                : $"§U{{{node.Namespace}}}");
+            AppendLine($"{globalPrefix}using {node.Namespace}");
         }
         return "";
     }
+
+    private static string EscapeNamespaceName(string name) =>
+        string.Join(".", name.Split('.').Select(segment => segment is "overflow" or "block" or "nullable"
+            ? "@" + segment : EscapeCalorIdentifier(segment.TrimStart('@'))));
 
     public string Visit(InterfaceDefinitionNode node)
     {
@@ -759,15 +499,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
-        var baseList = node.BaseInterfaces.Count > 0
-            ? $":{string.Join(",", node.BaseInterfaces)}"
-            : "";
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§IFACE{{{node.Id}:{node.Name}{typeParams}{baseList}}}{attrs}");
+        AppendLine($"interface {EscapeCalorIdentifier(node.Name)}{typeParams}{visibility}{attrs}");
         Indent();
 
         EmitTypeParameterConstraints(node.TypeParameters);
+        foreach (var baseInterface in node.BaseInterfaces)
+            AppendLine($"extends {TypeMapper.ToSurfaceType(baseInterface)}");
 
         if (node.Items.Count > 0)
         {
@@ -814,31 +554,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/IFACE{{{node.Id}}}");
 
         return "";
     }
 
     /// <summary>
     /// Format inline parameter list for compact signatures: (type:name, type:name, ...)
-    /// Returns null if any parameter has C# attributes or default values (which can't be inlined).
     /// </summary>
     private string? TryFormatInlineParams(IReadOnlyList<ParameterNode> parameters)
     {
-        if (parameters.Any(p => p.CSharpAttributes.Count > 0 || p.DefaultValue != null || p.InlineRefinement != null))
-            return null;
-
-        return string.Join(", ", parameters.Select(p =>
+        return string.Join(", ", parameters.Select((p, index) =>
         {
-            var typeName = TypeMapper.CSharpToCalor(p.TypeName);
+            var typeName = TypeMapper.ToSurfaceType(p.TypeName);
+            if (index > 0 && parameters[index - 1].Row != null
+                && EffectCodes.IsKnownCompactCode($"{typeName}:{p.Name}"))
+                typeName = "@" + typeName;
             var modifiers = new List<string>();
             if (p.Modifier.HasFlag(ParameterModifier.This)) modifiers.Add("this");
             if (p.Modifier.HasFlag(ParameterModifier.Ref)) modifiers.Add("ref");
             if (p.Modifier.HasFlag(ParameterModifier.Out)) modifiers.Add("out");
             if (p.Modifier.HasFlag(ParameterModifier.In)) modifiers.Add("in");
             if (p.Modifier.HasFlag(ParameterModifier.Params)) modifiers.Add("params");
-            var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-            return $"{typeName}:{EscapeCalorIdentifier(p.Name)}{modStr}{FormatEffectRow(p.Row)}";
+            var modStr = modifiers.Count > 0 ? $"{string.Join(" ", modifiers)} " : "";
+            var attributes = p.CSharpAttributes.Count == 0 ? "" : $" {EmitCSharpAttributes(p.CSharpAttributes)}";
+            var refinement = p.InlineRefinement == null ? "" : $" | {p.InlineRefinement.Predicate.Accept(this)}";
+            var defaultValue = p.DefaultValue == null ? "" : $" = {p.DefaultValue.Accept(this)}";
+            return $"{modStr}{typeName}:{EscapeCalorIdentifier(p.Name)}{attributes}{FormatEffectRow(p.Row)}{refinement}{defaultValue}";
         }));
     }
 
@@ -848,6 +589,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             AppendLine(Visit(param));
     }
 
+    // Otherwise an initial parenthesized callee can be mistaken for the declaration's signature.
     private void EmitOutputLine(OutputNode? output)
     {
         if (output != null)
@@ -856,6 +598,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MethodSignatureNode node)
     {
+        EmitDocComment(node);
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
@@ -863,17 +606,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            var inlineParams = $" ({inlineFmt})";
+            var inlineReturn = node.Output != null ? $" → {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{attrs}{typeParams}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§MT{{{node.Id}:{node.Name}}}{attrs}{typeParams}{typeParamsAfterGroup}");
-            Indent();
-            EmitParameterLines(node.Parameters);
-            EmitOutputLine(node.Output);
-            Dedent();
+            throw new InvalidOperationException("Canonical interface method parameters require an inline signature.");
         }
         if (node.TypeParameters.Any(typeParameter =>
                 typeParameter.Constraints.Count > 0))
@@ -891,49 +630,78 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // travel to the interface it implements or the converter would trade
         // Calor0410 for Calor0421.
         Indent();
-        EmitEffects(node.Effects);
+        EmitEffects(node.Effects, required: true);
+        foreach (var precondition in node.Preconditions) Visit(precondition);
+        foreach (var postcondition in node.Postconditions) Visit(postcondition);
         Dedent();
 
-        EmitBlockEnd($"§/MT{{{node.Id}}}");
 
         return "";
     }
 
+    private bool _emittingModuleMembers;
+
     public string Visit(ClassDefinitionNode node)
+    {
+        var previous = _emittingModuleMembers;
+        _emittingModuleMembers = node.IsModule;
+        try
+        {
+            return EmitTypeDeclaration(node);
+        }
+        finally
+        {
+            _emittingModuleMembers = previous;
+        }
+    }
+
+    private string EmitTypeDeclaration(ClassDefinitionNode node)
     {
         EmitDocComment(node);
         var modifiers = new List<string>();
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
         if (node.IsPartial) modifiers.Add("partial");
-        if (node.IsStatic) modifiers.Add("stat");
+        if (node.IsStatic && !node.IsModule) modifiers.Add("static");
         if (node.IsStruct) modifiers.Add("struct");
         if (node.IsReadOnly) modifiers.Add("readonly");
 
-        var vis = GetVisibilityShorthand(node.Visibility);
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        var vis = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        AppendLine($"§CL{{{node.Id}:{node.Name}{typeParams}:{vis}{modStr}}}{attrs}");
+        var declarationTag = node.IsModule ? "M" : "CL";
+        if (node.IsRecord)
+        {
+            var positional = node.RecordParameters == null ? "" :
+                " (" + TryFormatInlineParams(node.RecordParameters) + ")";
+            var baseCall = node.RecordBaseArguments == null ? "" :
+                $" : {TypeMapper.ToSurfaceType(node.BaseClass!)}({string.Join(", ", node.RecordBaseArguments.Select(argument => argument.Accept(this)))})";
+            AppendEffectRowDeclaration(node, $"record {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}{positional}{baseCall}");
+        }
+        else
+            AppendEffectRowDeclaration(node, $"{(node.IsModule ? "module" : "class")} {EscapeCalorIdentifier(node.Name)}{typeParams}{vis}{modStr}{attrs}");
         Indent();
+        // 0.30 (D1): the implicit static initialization row is the type's first header clause.
+        EmitEffects(node.StaticInitializerEffects);
 
         // Emit type parameter constraints
         EmitTypeParameterConstraints(node.TypeParameters);
 
         // Emit base class as §EXT tag (not positional)
-        if (node.BaseClass != null)
+        if (node.BaseClass != null && node.RecordBaseArguments == null)
         {
-            AppendLine($"§EXT{{{node.BaseClass}}}");
+            AppendLine($"extends {TypeMapper.ToSurfaceType(node.BaseClass)}");
         }
 
         // Emit implemented interfaces
         foreach (var iface in node.ImplementedInterfaces)
         {
-            AppendLine($"§IMPL{{{iface}}}");
+            AppendLine($"implements {TypeMapper.ToSurfaceType(iface)}");
         }
         if (node.BaseClass != null || node.ImplementedInterfaces.Count > 0 || node.TypeParameters.Any(tp => tp.Constraints.Count > 0))
             AppendLine();
@@ -941,7 +709,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Items.Count > 0)
         {
             foreach (var item in node.Items)
-                EmitClassItem(item);
+            {
+                if (!ReferenceEquals(item, node.RecordPrimaryConstructor)
+                    && !ReferenceEquals(item, node.RecordCopyConstructor)
+                    && !node.RecordPositionalProperties.Contains(item))
+                    EmitClassItem(item);
+            }
         }
         else
         {
@@ -954,7 +727,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (node.Events.Count > 0)
                 AppendLine();
             foreach (var prop in node.Properties)
+            {
+                if (node.RecordPositionalProperties.Contains(prop))
+                    continue;
                 Visit(prop);
+            }
             if (node.Properties.Count > 0)
                 AppendLine();
             foreach (var indexer in node.Indexers)
@@ -963,6 +740,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 AppendLine();
             foreach (var ctor in node.Constructors)
             {
+                if (ReferenceEquals(ctor, node.RecordPrimaryConstructor) || ReferenceEquals(ctor, node.RecordCopyConstructor))
+                    continue;
                 Visit(ctor);
                 AppendLine();
             }
@@ -1009,7 +788,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/CL{{{node.Id}}}");
 
         return "";
     }
@@ -1077,8 +855,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ClassFieldNode node)
     {
-        var visibility = GetVisibilityShorthand(node.Visibility);
-        var typeName = TypeMapper.CSharpToCalor(node.TypeName);
+        EmitDocComment(node);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
+        var typeName = TypeMapper.ToSurfaceType(node.TypeName);
         // #1595: a collection default (§LIST/§HSET/§DICT) is written inline with its closer. It
         // used to become "= default" (null), silently dropping the collection and its elements.
         string defaultVal;
@@ -1089,14 +868,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var modifiers = new List<string>();
-        if (node.IsRequired) modifiers.Add("req");
-        if (node.Modifiers.HasFlag(MethodModifiers.Static)) modifiers.Add("stat");
+        if (node.IsRequired) modifiers.Add("required");
+        if (node.Modifiers.HasFlag(MethodModifiers.Static)) modifiers.Add("static");
         if (node.Modifiers.HasFlag(MethodModifiers.Const)) modifiers.Add("const");
         if (node.Modifiers.HasFlag(MethodModifiers.Readonly)) modifiers.Add("readonly");
         if (node.IsVolatile) modifiers.Add("volatile");
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
-        AppendLine($"§FLD{{{typeName}:{EscapeCalorIdentifier(node.Name)}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+        AppendLine($"field {typeName}:{EscapeCalorIdentifier(node.Name)}{visibility}{modStr}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
 
         return "";
     }
@@ -1121,109 +900,43 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
     }
 
-    /// <summary>
-    /// #1541/#1595: a collection in expression position (a member default, or an element of another
-    /// collection) is written on one line with its closer: <c>§LIST{id:T} e1 e2 §/LIST{id}</c>. The
-    /// statement form appends its own lines and returns nothing, which in expression position left
-    /// the value empty and put a §LIST statement in the class body.
-    /// </summary>
-    private string RenderInlineCollection(string open, string close, IEnumerable<string> items) =>
-        $"{open}{string.Concat(items.Select(item => " " + item))} {close}";
-
-    /// <summary>
-    /// An element (or §KV key/value) of a collection block. A nested collection is written inline on
-    /// its element line (#1595); anything else as an inline sibling.
-    /// </summary>
-    private string AcceptCollectionElement(ExpressionNode element)
-    {
-        if (element is ListCreationNode or SetCreationNode or DictionaryCreationNode)
-            return AcceptInlineCollection(element);
-        // #1541: an object-initializer element stays on its line (`§NEW{T} A = 1 §/NEW`), so it is
-        // created in element order instead of being hoisted ahead of the earlier elements.
-        _inlineObjectInitializers++;
-        try
-        {
-            return AcceptInInlineSibling(element);
-        }
-        finally
-        {
-            _inlineObjectInitializers--;
-        }
-    }
-
-    private string AcceptInlineCollection(ExpressionNode collection)
-    {
-        _inlineCollections++;
-        try
-        {
-            return collection.Accept(this);
-        }
-        finally
-        {
-            _inlineCollections--;
-        }
-    }
-
-    private List<string> RenderInlineCollectionItems(IEnumerable<ExpressionNode> elements)
-    {
-        var values = new List<string>();
-        foreach (var element in elements)
-        {
-            var value = AcceptCollectionElement(element);
-            if (value.Contains('\n') || string.IsNullOrWhiteSpace(value))
-                throw new InvalidOperationException(
-                    "An inline collection element must render on one line (#1541); the converter keeps such collections as C#.");
-            values.Add(value);
-        }
-        return values;
-    }
-
     public string Visit(PropertyNode node)
     {
         EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
-        var typeName = TypeMapper.CSharpToCalor(node.TypeName);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
+        var typeName = TypeMapper.ToSurfaceType(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var modifiers = new List<string>();
-        if (node.IsRequired) modifiers.Add("req");
-        if (node.IsVirtual) modifiers.Add("virt");
-        if (node.IsOverride) modifiers.Add("over");
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
-        if (node.IsStatic) modifiers.Add("stat");
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        if (node.IsRequired) modifiers.Add("required");
+        if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
+        if (node.IsStatic) modifiers.Add("static");
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
         // Compact auto-property shorthand. #1524: a default with an object initializer stays on
         // the header line too (see AcceptMemberDefault).
         if (node.IsAutoProperty && (node.Getter != null || node.Setter != null || node.Initer != null))
         {
-            var accessors = new List<string>();
-            if (node.Getter != null)
-                accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
-                              node.Getter.Visibility == Visibility.Private ? "priget" :
-                              node.Getter.Visibility == Visibility.Internal ? "intget" :
-                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
-            if (node.Setter != null)
-                accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
-                              node.Setter.Visibility == Visibility.Private ? "priset" :
-                              node.Setter.Visibility == Visibility.Internal ? "intset" :
-                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
-            if (node.Initer != null)
-                accessors.Add("init");
-            var accessorStr = string.Join(",", accessors);
             var defaultVal = node.DefaultValue != null ? $" = {AcceptMemberDefault(node.DefaultValue)}" : "";
             // v0.17 S1, round-4 finding — the row goes here, before the
             // default value, because that is where the parser reads it
             // (Parser.cs TryParseSameLineRow(EffectRowPosition.Property)).
             // Omitting it let a Calor -> Calor re-emit silently strip a
             // hand-written `§PROP{...} §E{cw}` and reopen the escape S1 closed.
-            AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+            AppendLine($"property {typeName}:{EscapeCalorIdentifier(node.Name)}{visibility}{modStr}{attrs}{FormatEffectRow(node.Row)}{defaultVal}");
+            Indent();
+            if (node.Getter != null) Visit(node.Getter);
+            if (node.Setter != null) Visit(node.Setter);
+            if (node.Initer != null) Visit(node.Initer);
+            Dedent();
             return "";
         }
 
         // Full property syntax with body and closing tag
-        AppendLine($"§PROP{{{node.Id}:{EscapeCalorIdentifier(node.Name)}:{typeName}:{visibility}{modStr}}}{attrs}{FormatEffectRow(node.Row)}");
+        AppendLine($"property {typeName}:{EscapeCalorIdentifier(node.Name)}{visibility}{modStr}{attrs}{FormatEffectRow(node.Row)}");
         Indent();
 
         if (node.Getter != null) Visit(node.Getter);
@@ -1236,67 +949,32 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/PROP{{{node.Id}}}");
 
         return "";
     }
 
     public string Visit(IndexerNode node)
     {
-        var visibility = GetVisibilityShorthand(node.Visibility);
-        var typeName = TypeMapper.CSharpToCalor(node.TypeName);
+        EmitDocComment(node);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
+        var typeName = TypeMapper.ToSurfaceType(node.TypeName);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         var modifiers = new List<string>();
-        if (node.IsVirtual) modifiers.Add("virt");
-        if (node.IsOverride) modifiers.Add("over");
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
-
-        // Compact auto-indexer shorthand
-        if (node.IsAutoIndexer && (node.Getter != null || node.Setter != null || node.Initer != null))
-        {
-            var accessors = new List<string>();
-            if (node.Getter != null)
-                accessors.Add(node.Getter.Visibility == Visibility.PrivateProtected ? "privprotget" :
-                              node.Getter.Visibility == Visibility.Private ? "priget" :
-                              node.Getter.Visibility == Visibility.Internal ? "intget" :
-                              node.Getter.Visibility == Visibility.Protected ? "proget" : "get");
-            if (node.Setter != null)
-                accessors.Add(node.Setter.Visibility == Visibility.PrivateProtected ? "privprotset" :
-                              node.Setter.Visibility == Visibility.Private ? "priset" :
-                              node.Setter.Visibility == Visibility.Internal ? "intset" :
-                              node.Setter.Visibility == Visibility.Protected ? "proset" : "set");
-            if (node.Initer != null)
-                accessors.Add("init");
-            var accessorStr = string.Join(",", accessors);
-            var paramParts = node.Parameters.Select(p =>
-            {
-                var pType = TypeMapper.CSharpToCalor(p.TypeName);
-                return $"{pType}:{p.Name}";
-            });
-            var paramStr = string.Join(", ", paramParts);
-            AppendLine($"§IXER{{{node.Id}:{typeName}:{visibility}{modStr}:{accessorStr}}}{attrs} ({paramStr})");
-            return "";
-        }
-
-        // Full indexer syntax with body and closing tag
-        AppendLine($"§IXER{{{node.Id}:{typeName}:{visibility}{modStr}}}{attrs}");
+        if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
+        var parameters = TryFormatInlineParams(node.Parameters)
+            ?? throw new InvalidOperationException("Canonical indexer parameters require an inline signature.");
+        AppendLine($"this[{parameters}] → {typeName}{visibility}{modStr}{attrs}");
         Indent();
-
-        foreach (var param in node.Parameters)
-        {
-            Visit(param);
-        }
-
         if (node.Getter != null) Visit(node.Getter);
         if (node.Setter != null) Visit(node.Setter);
         if (node.Initer != null) Visit(node.Initer);
 
         Dedent();
-        EmitBlockEnd($"§/IXER{{{node.Id}}}");
-
         return "";
     }
 
@@ -1304,25 +982,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var keyword = node.Kind switch
         {
-            PropertyAccessorNode.AccessorKind.Get => "GET",
-            PropertyAccessorNode.AccessorKind.Set => "SET",
-            PropertyAccessorNode.AccessorKind.Init => "INIT",
-            _ => "GET"
+            PropertyAccessorNode.AccessorKind.Get => "get",
+            PropertyAccessorNode.AccessorKind.Set => "set",
+            PropertyAccessorNode.AccessorKind.Init => "init",
+            _ => throw new InvalidOperationException($"Unsupported accessor kind: {node.Kind}.")
         };
 
         // Add visibility if different from property visibility
-        var visStr = node.Visibility.HasValue ? $"{{{GetVisibilityShorthand(node.Visibility.Value)}}}" : "";
+        var visStr = node.Visibility.HasValue ? $" {GetVisibilityShorthand(node.Visibility.Value)}" : "";
 
         if (node.IsAutoImplemented)
         {
             // Auto-implemented: just §GET or §GET{{pri}} for restricted visibility
-            AppendLine($"§{keyword}{visStr}");
+            AppendLine($"{keyword}{visStr}");
         }
         else
         {
             // Full body: §GET ... §/GET
-            AppendLine($"§{keyword}{visStr}");
+            AppendEffectRowDeclaration(node, $"{keyword}{visStr}");
             Indent();
+            EmitEffects(node.Effects);
             _memberBodyDepth++;
             foreach (var stmt in node.Body)
             {
@@ -1330,7 +1009,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
             _memberBodyDepth--;
             Dedent();
-            EmitBlockEnd($"§/{keyword}");
         }
 
         return "";
@@ -1338,16 +1016,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ConstructorNode node)
     {
-        var visibility = node.IsStatic ? "stat" : GetVisibilityShorthand(node.Visibility);
+        EmitDocComment(node);
+        var visibility = node.IsStatic ? " stat"
+            : node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        // Inline params: §CTOR{id:vis} (type:name, type:name)
+        // Inline params: §CTOR{vis} (type:name, type:name)
         var inlineFmt = TryFormatInlineParams(node.Parameters);
-        if (inlineFmt != null && node.Parameters.Count > 0)
-            AppendLine($"§CTOR{{{node.Id}:{visibility}}}{attrs} ({inlineFmt})");
-        else
-            AppendLine($"§CTOR{{{node.Id}:{visibility}}}{attrs}");
+        if (inlineFmt == null)
+            throw new InvalidOperationException("Canonical constructor parameters require an inline signature.");
+        AppendEffectRowDeclaration(node, $"ctor{visibility}{attrs} ({inlineFmt})");
         Indent();
+        EmitEffects(node.Effects);
 
         if (inlineFmt == null)
             EmitParameterLines(node.Parameters);
@@ -1374,15 +1054,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 FlushHoistedLines();
                 evalArgs.Add(argExpr);
             }
-            var initKeyword = node.Initializer.IsBaseCall ? "§BASE" : "§THIS";
-            AppendLine(initKeyword);
-            Indent();
-            foreach (var argExpr in evalArgs)
-            {
-                AppendLine($"§A {argExpr}");
-            }
-            Dedent();
-            AppendLine(node.Initializer.IsBaseCall ? "§/BASE" : "§/THIS");
+            AppendLine($"{(node.Initializer.IsBaseCall ? "base" : "this")}({string.Join(", ", evalArgs)})");
         }
 
         // Emit body statements
@@ -1394,32 +1066,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/CTOR{{{node.Id}}}");
 
         return "";
     }
 
     public string Visit(OperatorOverloadNode node)
     {
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        EmitDocComment(node);
+        if (node.Visibility != Visibility.Public)
+            throw new InvalidOperationException("Native operators require public visibility.");
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
-        var inlineFmt = TryFormatInlineParams(node.Parameters);
-        if (inlineFmt != null)
-        {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {TypeMapper.CSharpToCalor(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}{inlineParams}{inlineReturn}");
-        }
-        else
-        {
-            AppendLine($"§OP{{{node.Id}:{node.OperatorToken}:{visibility}}}{attrs}");
-            Indent();
-            EmitParameterLines(node.Parameters);
-            EmitOutputLine(node.Output);
-            Dedent();
-        }
+        var inlineFmt = TryFormatInlineParams(node.Parameters)
+            ?? throw new InvalidOperationException("Canonical operator parameters require an inline signature.");
+        var output = node.Output
+            ?? throw new InvalidOperationException("Canonical operators require a return type.");
+        AppendEffectRowDeclaration(node, $"op {node.OperatorToken}{attrs} ({inlineFmt}) → {TypeMapper.ToSurfaceType(output.TypeName)}{FormatEffectRow(output.Row)}");
         Indent();
+        EmitEffects(node.Effects);
 
         // Emit preconditions
         foreach (var pre in node.Preconditions)
@@ -1442,7 +1106,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/OP{{{node.Id}}}");
 
         return "";
     }
@@ -1456,39 +1119,42 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MethodNode node)
     {
-        EmitDocComment(node);
-        var visibility = GetVisibilityShorthand(node.Visibility);
+        EmitCallableDocumentation(node, node.Since, node.Deprecated, node.BreakingChanges);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var modifiers = new List<string>();
 
-        if (node.IsPartial) modifiers.Add("part");
-        if (node.IsVirtual) modifiers.Add("virt");
-        if (node.IsOverride) modifiers.Add("over");
-        if (node.IsAbstract) modifiers.Add("abs");
-        if (node.IsSealed) modifiers.Add("seal");
-        if (node.IsStatic) modifiers.Add("stat");
+        if (node.IsPartial) modifiers.Add("partial");
+        if (node.IsVirtual) modifiers.Add("virtual");
+        if (node.IsOverride) modifiers.Add("override");
+        if (node.IsAbstract) modifiers.Add("abstract");
+        if (node.IsSealed) modifiers.Add("sealed");
+        if (node.IsStatic && !_emittingModuleMembers) modifiers.Add("static");
+        if (node.IsAsync) modifiers.Add("async");
         if (node.IsUnsafe) modifiers.Add("unsafe");
-        if (node.IsExtern) modifiers.Add("ext");
+        if (node.IsExtern) modifiers.Add("extern");
 
-        var modStr = modifiers.Count > 0 ? $":{string.Join(",", modifiers)}" : "";
+        var modStr = modifiers.Count > 0 ? $" {string.Join(" ", modifiers)}" : "";
 
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
 
-        var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
+        var output = node.Output != null ? TypeMapper.ToSurfaceType(node.Output.TypeName) : "void";
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
 
         // Use §AMT for async methods, §MT for regular methods
-        var methodTag = node.IsAsync ? "AMT" : "MT";
+        var methodTag = _emittingModuleMembers
+            ? (node.IsAsync ? "AF" : "F")
+            : (node.IsAsync ? "AMT" : "MT");
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            var inlineParams = $" ({inlineFmt})";
+            var inlineReturn = node.Output != null ? $" → {output}{FormatEffectRow(node.Output.Row)}" : "";
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(node.Name)}{attrs}{typeParams}{typeParamsAfterGroup}{visibility}{modStr}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{methodTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}{modStr}}}{attrs}{typeParamsAfterGroup}");
+            throw new InvalidOperationException("Canonical function parameters must be representable in an inline signature.");
         }
         Indent();
 
@@ -1502,7 +1168,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         // Effects
-        EmitEffects(node.Effects);
+        // A private/internal body infers its row; ! unknown is the one own row it may carry.
+        if (node.IsAbstract || node.IsExtern
+            || node.Visibility is not (Visibility.Private or Visibility.Internal))
+            EmitEffects(node.Effects, required: true);
+        else if (node.Effects is { IsUnknown: true, EffectVariables.Count: 0 })
+            EmitEffects(node.Effects, required: true);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -1524,7 +1195,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             {
                 // Empty method body — emit a void return placeholder so the parser
                 // doesn't see EndMethod immediately after the opening tag
-                AppendLine("§R");
+                AppendLine("return");
             }
             foreach (var stmt in node.Body)
             {
@@ -1534,29 +1205,50 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/{methodTag}{{{node.Id}}}");
 
         return "";
     }
 
-    /// <summary>
-    /// 0.25 F3 (#847): a local function is a nested <c>§F{id:Name}</c> with no
-    /// visibility segment, written in place at the current indentation.
-    /// </summary>
     public string Visit(LocalFunctionStatementNode node)
+        => throw new InvalidOperationException("Local functions must be lowered to §B lambda bindings before Calor emission");
+
+    private void EmitCallableDocumentation(AstNode node, SinceNode? since, DeprecatedNode? deprecated,
+        IReadOnlyList<BreakingChangeNode> breakingChanges)
     {
-        _nextFunctionIsLocal = true;
-        return Visit(node.Function);
+        if (node.DocComment != null)
+        {
+            foreach (var line in node.DocComment.Split('\n'))
+            {
+                var text = line.TrimStart();
+                if (since != null && text.StartsWith("since ", StringComparison.Ordinal)
+                    || deprecated != null && text.StartsWith("deprecated ", StringComparison.Ordinal)
+                    || breakingChanges.Count > 0 && text.StartsWith("breaking ", StringComparison.Ordinal))
+                    continue;
+                EmitDocumentationText(line);
+            }
+        }
+        if (since != null) Visit(since);
+        if (deprecated != null) Visit(deprecated);
+        foreach (var breaking in breakingChanges) Visit(breaking);
     }
 
-    private bool _nextFunctionIsLocal;
+    private void EmitRetiredFunctionMetadata(FunctionNode node)
+    {
+        foreach (var issue in node.Issues) Visit(issue);
+        if (node.Uses != null) Visit(node.Uses);
+        if (node.UsedBy != null) Visit(node.UsedBy);
+        if (node.Complexity != null) Visit(node.Complexity);
+        if (node.Lock != null) Visit(node.Lock);
+        if (node.Author != null) Visit(node.Author);
+        if (node.TaskRef != null) Visit(node.TaskRef);
+    }
 
     public string Visit(FunctionNode node)
     {
+        EmitCallableDocumentation(node, node.Since, node.Deprecated, node.BreakingChanges);
+        EmitRetiredFunctionMetadata(node);
         var visibility = GetVisibilityShorthand(node.Visibility);
-        var isLocal = _nextFunctionIsLocal;
-        _nextFunctionIsLocal = false;
-        var visibilitySegment = isLocal ? "" : ":" + visibility;
+        var visibilitySegment = node.Visibility == Visibility.Public ? "" : " " + visibility;
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var functionName = node.Name;
@@ -1568,20 +1260,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
             functionName = functionName[..genericStart];
         }
 
-        var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
+        var output = node.Output != null ? TypeMapper.ToSurfaceType(node.Output.TypeName) : "void";
 
         // Use §AF for async functions, §F for regular functions
         var funcTag = node.IsAsync ? "AF" : "F";
         var inlineFmt = TryFormatInlineParams(node.Parameters);
         if (inlineFmt != null)
         {
-            var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
-            var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            var inlineParams = $" ({inlineFmt})";
+            var inlineReturn = node.Output != null ? $" → {output}{FormatEffectRow(node.Output.Row)}" : "";
+            AppendEffectRowDeclaration(node, $"func {EscapeCalorIdentifier(functionName)}{typeParams}{typeParamsAfterGroup}{visibilitySegment}{(node.IsAsync ? " async" : "")}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}");
+            throw new InvalidOperationException("Canonical function parameters must be representable in an inline signature.");
         }
         Indent();
 
@@ -1594,8 +1286,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             EmitOutputLine(node.Output);
         }
 
-        // Effects
-        EmitEffects(node.Effects);
+        // Effects (a private/internal body may carry only ! unknown)
+        if (node.Visibility is not (Visibility.Private or Visibility.Internal)
+            || node.Effects is { IsUnknown: true, EffectVariables.Count: 0 })
+            EmitEffects(node.Effects, required: true);
 
         // Preconditions
         foreach (var pre in node.Preconditions)
@@ -1609,11 +1303,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Visit(post);
         }
 
+        foreach (var example in node.Examples) Visit(example);
+        foreach (var assumption in node.Assumptions) Visit(assumption);
+        foreach (var property in node.Properties) Visit(property);
+
         // Body
         _memberBodyDepth++;
         if (node.Body.Count == 0)
         {
-            AppendLine("§R");
+            AppendLine("return");
         }
         foreach (var stmt in node.Body)
         {
@@ -1622,13 +1320,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _memberBodyDepth--;
 
         Dedent();
-        EmitBlockEnd($"§/{funcTag}{{{node.Id}}}");
 
         return "";
     }
 
     public string Visit(OutputNode node)
-        => $"§O{{{TypeMapper.CSharpToCalor(node.TypeName)}}}{FormatEffectRow(node.Row)}";
+        => $"§O{{{TypeMapper.ToSurfaceType(node.TypeName)}}}{FormatEffectRow(node.Row)}";
 
     public string Visit(EffectsNode node)
     {
@@ -1640,7 +1337,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ParameterNode node)
     {
-        var typeName = TypeMapper.CSharpToCalor(node.TypeName);
+        var typeName = TypeMapper.ToSurfaceType(node.TypeName);
         var modifiers = new List<string>();
         if (node.Modifier.HasFlag(ParameterModifier.This)) modifiers.Add("this");
         if (node.Modifier.HasFlag(ParameterModifier.Ref)) modifiers.Add("ref");
@@ -1665,24 +1362,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(RequiresNode node)
     {
         var condition = node.Condition.Accept(this);
-        var head = node.Message != null ? $"§Q{{\"{node.Message}\"}}" : "§Q";
-        AppendLine($"{head} {condition}");
+        if (node.Message != null)
+            throw new InvalidOperationException("Canonical precondition message syntax has not been selected.");
+        AppendLine($"requires {condition}");
         return "";
     }
 
     public string Visit(EnsuresNode node)
     {
         var condition = node.Condition.Accept(this);
-        var head = node.Message != null ? $"§S{{\"{node.Message}\"}}" : "§S";
-        AppendLine($"{head} {condition}");
+        if (node.Message != null)
+            throw new InvalidOperationException("Canonical postcondition message syntax has not been selected.");
+        AppendLine($"=> {condition}");
         return "";
     }
 
     public string Visit(InvariantNode node)
     {
         var condition = node.Condition.Accept(this);
-        var message = node.Message != null ? $" \"{node.Message}\"" : "";
-        AppendLine($"§IV {condition}{message}");
+        if (node.Message != null)
+            throw new InvalidOperationException("Canonical invariant message syntax has not been selected.");
+        AppendLine($"invariant {condition}");
         return "";
     }
 
@@ -1692,8 +1392,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.Expression != null)
         {
-            // If the expression is a match expression, emit it as a statement block
-            // since each case already contains a return statement
+            // Match arms need their own lines under the return expression.
             if (node.Expression is MatchExpressionNode matchExpr)
             {
                 EmitMatchExpressionAsStatement(matchExpr);
@@ -1725,28 +1424,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     }
                 }
 
-                AppendLine($"§R {expr}");
+                if (string.IsNullOrWhiteSpace(expr))
+                    throw new InvalidOperationException("A returned expression must emit a native value.");
+                AppendLine($"return {expr}");
             }
         }
         else
         {
-            AppendLine("§R");
+            AppendLine("return");
         }
         return "";
     }
 
     /// <summary>
-    /// Emits a MatchExpressionNode as a statement block instead of inline expression.
+    /// Emits a multiline returned match expression.
     /// Used when the match expression is the direct child of a return statement.
-    /// Uses :expr suffix to distinguish from match statements when parsing back.
     /// </summary>
     private void EmitMatchExpressionAsStatement(MatchExpressionNode node)
     {
         var target = node.Target.Accept(this);
-        var id = string.IsNullOrEmpty(node.Id) ? $"sw{_switchCounter++}" : node.Id;
 
-        // Add :expr suffix to indicate this is a match expression (not statement)
-        AppendLine($"§W{{{id}:expr}} {target}");
+        AppendLine($"return match {target}");
         Indent();
 
         foreach (var matchCase in node.Cases)
@@ -1755,12 +1453,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/W{{{id}}}");
     }
 
     /// <summary>
-    /// Emits a MatchExpressionNode as the initializer of a §B binding. The §B header
-    /// and §W{...:expr} target sit on the same line; case arms are emitted via
+    /// Emits a match expression after the native binding's equals sign.
+    /// The binding and match target sit on the same line; case arms are emitted via
     /// AppendLine + Indent so their indentation respects the current binding's
     /// indent (rather than the multi-line hardcoded indent produced by
     /// Visit(MatchExpressionNode), which is only correct in pure expression contexts).
@@ -1768,9 +1465,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void EmitMatchExpressionAsBindingInitializer(string bindHeader, MatchExpressionNode node)
     {
         var target = node.Target.Accept(this);
-        var id = string.IsNullOrEmpty(node.Id) ? $"sw{_switchCounter++}" : node.Id;
 
-        AppendLine($"{bindHeader} §W{{{id}:expr}} {target}");
+        AppendLine($"{bindHeader} = match {target}");
         Indent();
 
         foreach (var matchCase in node.Cases)
@@ -1779,155 +1475,40 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/W{{{id}}}");
     }
 
     /// <summary>
-    /// Emits a hoisted block-bodied lambda as a binding in explicit block form:
-    /// <c>§B{...} §LAM{header}</c> on the opener line, body statements indented one
-    /// level under it, and <c>§/LAM{id}</c> at the binding's own column. This mirrors
-    /// the match-expression binding path and, crucially, routes body statements
-    /// through the normal statement visitor so their indentation tracks the current
-    /// scope instead of a fixed column (the #705 defect).
+    /// Emits a native block lambda beneath its statement header without lifting it.
     /// </summary>
-    private void EmitBlockLambdaAsBindingInitializer(string bindHeader, LambdaExpressionNode lambda)
+    private void EmitBlockLambdaWithHeader(string statementHeader, LambdaExpressionNode lambda)
     {
-        var header = BuildLambdaHeader(lambda);
-
-        AppendLine($"{bindHeader} §LAM{{{header}}}{(lambda.Effects != null ? " " + FormatEffectsTag(lambda.Effects) : "")}");
-        Indent();
-        // Review m12: this is a lambda BODY like any other, so it bumps the depth
-        // that stops a nested block lambda being hoisted out of scope. Benign
-        // today (the statements are emitted at the correct indent right here), but
-        // the invariant should not depend on that happening to be true.
-        _lambdaBodyDepth++;
-        try
-        {
-            foreach (var stmt in lambda.StatementBody!)
-            {
-                stmt.Accept(this);
-            }
-        }
-        finally
-        {
-            _lambdaBodyDepth--;
-        }
-        Dedent();
-        AppendLine($"§/LAM{{{lambda.Id}}}");
+        AppendLine($"{statementHeader} {lambda.Accept(this)}");
     }
 
     public string Visit(CallStatementNode node)
     {
-        // Emit named argument labels as §A[name] value when present.
-        // Argument expressions are visited in inline-sibling context so that
-        // nested zero-arg calls keep their explicit §/C (else the parser
-        // would absorb the following §A as the nested call's inline arg —
-        // RFC v0.6 call-closer-elision §3.2, v0.6.1 BLOCKER fix).
-        // Hoist only args that span multiple lines (e.g. §NEW with object
-        // initializers that emit `\n  Prop = val\n§/NEW`); single-line
-        // inline forms like `§NEW{T} §/NEW` and `§NEW{T} §A x §/NEW` are
-        // safe to embed directly — the parser tracks nested §NEW/§/NEW
-        // via HasEndNewBeforeEndCall, and nested §C/§/C balance the same
-        // way. Hoisting those would needlessly introduce §B{~_hoist000}
-        // temps that re-shape the source.
-        var rendered = node.Arguments.Select((a, i) =>
-        {
-            var argValue = AcceptInInlineSibling(a);
-            if (argValue.Contains('\n'))
-                argValue = HoistToTempVar(argValue);
-            bool named = node.ArgumentNames != null
-                      && i < node.ArgumentNames.Count
-                      && node.ArgumentNames[i] != null;
-            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
-                ? node.ArgumentModifiers[i] : null;
-            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
-            var standardWrapped = named
-                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"{marker} {argValue}";
-            return (named, modifier, standardWrapped, argValue);
-        }).ToList();
-
-        var target = ConvertVerbatimStringsInTarget(NormalizeCallTarget(node.Target).Replace("->", "."));
-        if (node.TypeArguments is { Count: > 0 })
-            target += $"<{string.Join(", ", node.TypeArguments)}>";
-
-        // RFC v0.6 call-closer-elision §3.2 / §4 — statement-context elision.
-        // Stmt-context calls normally end at a newline (AppendLine adds \n),
-        // so §/C is safe to elide. Two elision shapes:
-        //   • Zero-arg: §C{target}<EOL>  (Parser.cs:1409-1413 path)
-        //   • One-arg positional: §C{target} <expr><EOL>  (Parser.cs:1398-1403 path)
-        // Named args, multi-arg, or args whose first token is not in
-        // IsExpressionStart() keep the standard §A ... §/C form.
-        // Also held back inside _inInlineSiblingContext (e.g. when a lambda
-        // short-body emits two statements space-joined on one line): there
-        // the next-sibling-statement opener IS on the same line, so eliding
-        // would risk absorption — mirrors the expression-context discipline
-        // at Visit(CallExpressionNode) line ~2380.
-        // Flag defaults to true as of v0.6.1 (was false in v0.6.0); set
-        // ConversionContext.UseImplicitCallCloser = false to opt out.
-        bool canElide = _context?.UseImplicitCallCloser != false
-                     && _inInlineSiblingContext == 0;
-
-        if (canElide && rendered.Count == 0)
-        {
-            AppendLine($"§C{{{target}}}");
-            return "";
-        }
-
-        if (canElide && rendered.Count == 1 && !rendered[0].named && rendered[0].modifier == null
-            && StartsWithExpressionStarter(rendered[0].argValue))
-        {
-            AppendLine($"§C{{{target}}} {rendered[0].argValue}");
-            return "";
-        }
-
-        var argsStr = rendered.Count > 0
-            ? $" {string.Join(" ", rendered.Select(r => r.standardWrapped))}"
-            : "";
-        AppendLine($"§C{{{target}}}{argsStr} §/C");
+        AppendLine(new CallExpressionNode(node.Span, node.Target, node.Arguments,
+            node.ArgumentNames, node.ArgumentModifiers, node.TypeArguments).Accept(this));
         return "";
-    }
-
-    /// <summary>
-    /// Conservative whitelist for rendered expressions that are safe for
-    /// stmt-context one-arg §/C elision. Braced collection initializers are
-    /// valid expression starters, but retain the explicit §A/§/C form to avoid
-    /// ambiguity with adjacent structural brace payloads in migrated text.
-    /// </summary>
-    private static bool StartsWithExpressionStarter(string rendered)
-    {
-        if (string.IsNullOrEmpty(rendered)) return false;
-        char c = rendered[0];
-        // §  → section markers (§C, §NEW, §ARR, §SOME, §IF, …)
-        // letter/_ → identifier or typed-literal prefix (INT:, STR:, BOOL:, …)
-        // digit → bare numeric literal
-        // (  → Lisp-style expression or inline lambda
-        // "  → string literal
-        // @  → verbatim identifier (@keyword)
-        // #  → self-reference (refinement predicates)
-        return c == '§'
-            || char.IsLetter(c) || c == '_'
-            || char.IsDigit(c)
-            || c == '(' || c == '"' || c == '@' || c == '#';
     }
 
     public string Visit(PrintStatementNode node)
     {
         var expr = node.Expression.Accept(this);
-        var tag = node.IsWriteLine ? "§P" : "§Pf";
-        AppendLine($"{tag} {expr}");
+        var method = node.IsWriteLine ? "WriteLine" : "Write";
+        AppendLine($"System.Console.{method}({expr})");
         return "";
     }
 
     public string Visit(ContinueStatementNode node)
     {
-        AppendLine("§CN");
+        AppendLine("continue");
         return "";
     }
 
     public string Visit(BreakStatementNode node)
     {
-        AppendLine("§BK");
+        AppendLine("break");
         return "";
     }
 
@@ -1935,105 +1516,47 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         if (node.CaseLabel != null)
         {
-            AppendLine($"§GOTO{{CASE:{node.CaseLabel.Accept(this)}}}");
+            AppendLine($"goto case {node.CaseLabel.Accept(this)}");
         }
         else if (node.IsDefault)
         {
-            AppendLine("§GOTO{DEFAULT}");
+            AppendLine("goto default");
         }
         else
         {
-            AppendLine($"§GOTO{{{node.Label}}}");
+            AppendLine($"goto {EscapeCalorIdentifier(node.Label)}");
         }
         return "";
     }
 
     public string Visit(LabelStatementNode node)
     {
-        AppendLine($"§LABEL{{{node.Label}}}");
+        AppendLine($"{EscapeCalorIdentifier(node.Label)}:");
         return "";
     }
 
     public string Visit(YieldReturnStatementNode node)
     {
-        if (node.Expression != null)
-        {
-            var expr = node.Expression.Accept(this);
-            AppendLine($"§YIELD {expr}");
-        }
-        else
-        {
-            AppendLine("§YIELD");
-        }
+        if (node.Expression == null)
+            throw new InvalidOperationException("Use 'yield value' or 'yield break'; a valueless yield is invalid.");
+        var expr = node.Expression.Accept(this);
+        AppendLine($"yield {expr}");
         return "";
     }
 
     public string Visit(YieldBreakStatementNode node)
     {
-        AppendLine("§YBRK");
+        AppendLine("yield break");
         return "";
     }
 
     public string Visit(BindStatementNode node)
     {
-        // Handle collection initializers specially - emit as collection block syntax
-        if (node.Initializer is ListCreationNode listNode)
-        {
-            EmitListCreationWithName(listNode, node.Name);
-            return "";
-        }
-        if (node.Initializer is DictionaryCreationNode dictNode)
-        {
-            EmitDictionaryCreationWithName(dictNode, node.Name);
-            return "";
-        }
-        if (node.Initializer is SetCreationNode setNode)
-        {
-            EmitSetCreationWithName(setNode, node.Name);
-            return "";
-        }
-        // #1132: `object[] xs = new[] { "a" }` creates a string[] but declares object[]; the
-        // block form would declare string[] (overloads and effects follow the static type).
-        if (node.Initializer is ArrayCreationNode arrNode
-            && (node.TypeName is null or "var" || node.TypeName.StartsWith("ARRAY[", StringComparison.Ordinal)
-                || OneDimensional(node.TypeName) == OneDimensional(arrNode.ElementType + "[]")))
-        {
-            EmitArrayCreationWithName(arrNode, node.Name, node.IsMutable);
-            return "";
-        }
-        if (node.Initializer is MultiDimArrayCreationNode mdArrNode)
-        {
-            EmitMultiDimArrayCreationWithName(mdArrNode, node.Name, node.TypeName, node.IsMutable);
-            return "";
-        }
-
-        // Simplify function pointer types (delegate* unmanaged[...]<...>) that break attribute parsing
-        var mappedType = node.TypeName != null ? TypeMapper.CSharpToCalor(node.TypeName) : null;
-        if (mappedType != null && mappedType.Contains("delegate*"))
-            mappedType = "nint"; // function pointers are pointer-sized; use nint as safe placeholder
-        // Compact OPTION[inner=T] → ?T to avoid bracket issues in attribute blocks.
-        // Stop capture at ) or > to avoid swallowing tuple/generic closers.
-        while (mappedType != null && mappedType.Contains("OPTION["))
-            mappedType = System.Text.RegularExpressions.Regex.Replace(mappedType, @"OPTION\[inner=([^\]\)>]+)\]", "?$1");
-
-        // Build the §B{...} header (without trailing initializer) so we can emit it
-        // either inline-with-initializer (default) or inline-with-§W{...:expr} target
-        // (when the initializer is a match expression that must respect block indent).
-        string bindHeader;
-        if (node.IsMutable)
-        {
-            var typePostfix = mappedType != null ? $":{mappedType}" : "";
-            bindHeader = $"§B{{~{EscapeCalorIdentifier(node.Name)}{typePostfix}}}";
-        }
-        else
-        {
-            // #1635: a one-letter or all-caps type (`T item`) spelled type-first read back as a
-            // variable `T` of type `item`; pick the header spelling the parser reads correctly.
-            var escapedName = EscapeCalorIdentifier(node.Name);
-            bindHeader = mappedType != null
-                ? $"§B{{{AttributeHelper.FormatImmutableBindHeader(escapedName, mappedType)}}}"
-                : $"§B{{{escapedName}}}";
-        }
+        var mappedType = node.TypeName != null ? TypeMapper.ToSurfaceType(node.TypeName) : null;
+        var typedName = mappedType is null or "var"
+            ? EscapeCalorIdentifier(node.Name)
+            : $"{mappedType}:{EscapeCalorIdentifier(node.Name)}";
+        var bindHeader = $"{(node.IsMutable ? "var" : "let")} {typedName}";
 
         // Position 7 (§3.3): the row sits between the header group and the initializer.
         bindHeader += FormatEffectRow(node.Row);
@@ -2048,292 +1571,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return "";
         }
 
-        // Block-bodied lambda initializer must use block form so its statements are
-        // emitted at the correct nested indent and §/LAM lands at the §B column.
-        // The naive `Initializer.Accept(this)` returns a multi-line string with a
-        // fixed indent that gets jammed onto the §B line and dedents below the
-        // enclosing scope, producing unparseable output (#705).
-        if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } blockLambda
-            && !(blockLambda.StatementBody.Count <= 2 && !blockLambda.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)))
-        {
-            EmitBlockLambdaAsBindingInitializer(bindHeader, blockLambda);
-            return "";
-        }
-
-        // Short (1-2 statement) block lambda: inline when its statements render on
-        // one line; otherwise block form under the binding's OWN name (#903 cluster
-        // 1). Routing through the generic path would hoist a §B{_hoistLamNNN}
-        // alias and bind the name to a reference instead of the lambda.
-        if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } shortLambda)
-        {
-            var lamHeader = BuildLambdaHeader(shortLambda);
-            var lamRow = shortLambda.Effects != null ? " " + FormatEffectsTag(shortLambda.Effects) : "";
-            if (TryRenderStatementLambdaInline(shortLambda, lamHeader, lamRow, out var inline, out var stmts))
-            {
-                AppendLine($"{bindHeader} {inline}");
-                return "";
-            }
-            foreach (var line in BuildBlockLambdaLines($"{bindHeader} ", lamHeader, lamRow, shortLambda.Id, stmts))
-                AppendLine(line);
-            return "";
-        }
-
-        // Parser expects: §B[type:name] expression (no = sign)
-        var initPart = node.Initializer != null ? $" {node.Initializer.Accept(this)}" : "";
+        var initializer = node.Initializer is ReferenceNode { Name: "default", IsVerbatim: false }
+            && mappedType is not null and not "var"
+                ? mappedType is "string?" or "object?"
+                    ? $"(({mappedType})null)"
+                    : $"default({mappedType})"
+                : node.Initializer?.Accept(this);
+        var initPart = initializer is not null ? $" = {initializer}" : "";
         AppendLine($"{bindHeader}{initPart}");
         return "";
-    }
-
-    private void EmitListCreationWithName(ListCreationNode node, string variableName)
-    {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-
-        // Sanitize variable names containing section markers
-        var originalTarget = variableName;
-        if (ContainsSectionMarker(variableName))
-            variableName = FreshTemp("_hoist");
-
-        // Pre-evaluate all elements to collect hoisted bindings before the list block.
-        // AcceptInInlineSibling: each element line is parsed as a sibling expression
-        // and a one-arg closer-less §C inside an element would absorb the next
-        // sibling (or §/LIST) as its inline argument (v0.6.3 RFC §3.2 case B).
-        // Mirrors §DICT entries, §HSET elements, and §ARR inline elements.
-        var evaluatedElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedElements.Add(val);
-        }
-
-        // Emit hoisted bindings before the list
-        foreach (var hoisted in allHoisted)
-            AppendLine(hoisted);
-
-        AppendLine($"§LIST{{{variableName}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evaluatedElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/LIST{{{variableName}}}");
-        if (originalTarget != variableName)
-            AppendLine($"§ASSIGN {originalTarget} {variableName}");
-    }
-
-    private void EmitDictionaryCreationWithName(DictionaryCreationNode node, string variableName)
-    {
-        var keyType = TypeMapper.CSharpToCalor(node.KeyType);
-        var valueType = TypeMapper.CSharpToCalor(node.ValueType);
-
-        // Pre-evaluate entries to collect hoisted bindings before the dict block
-        var evaluatedEntries = new List<(string Key, string Value)>();
-        var allHoisted = new List<string>();
-        foreach (var entry in node.Entries)
-        {
-            // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C —
-            // otherwise the parser would absorb the value (or next §KV) as the call's arg.
-            var key = AcceptCollectionElement(entry.Key);
-            var value = AcceptCollectionElement(entry.Value);
-            // Review M3: the KEY needs the same guard as the value - a dictionary
-            // whose key is an object initializer is multi-line too.
-            if (key.Contains('\n'))
-                key = HoistToTempVar(key);
-            if (value.Contains('\n'))
-                value = HoistToTempVar(value);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedEntries.Add((key, value));
-        }
-
-        // Emit hoisted bindings before the dict
-        foreach (var hoisted in allHoisted)
-            AppendLine(hoisted);
-
-        AppendLine($"§DICT{{{variableName}:{keyType}:{valueType}}}");
-        Indent();
-
-        foreach (var (key, value) in evaluatedEntries)
-        {
-            AppendLine($"§KV {key} {value}");
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/DICT{{{variableName}}}");
-    }
-
-    private void EmitSetCreationWithName(SetCreationNode node, string variableName)
-    {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-
-        // AcceptInInlineSibling: each §HSET element is emitted on its own line,
-        // but the parser treats elements as sibling expressions and a one-arg
-        // closer-less §C inside an element would absorb the next §C / §/HSET
-        // as its inline argument (v0.6.3 RFC §3.2 case B). Mirrors §DICT entries
-        // (line ~1346) and §ROW elements (line ~1474). Pre-evaluate to flush
-        // any hoisted bindings BEFORE the §HSET opener so they sit at the parent
-        // scope, not inside the set body.
-        var evalElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evalElements.Add(val);
-        }
-
-        foreach (var hoisted in allHoisted)
-            AppendLine(hoisted);
-
-        AppendLine($"§HSET{{{variableName}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evalElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/HSET{{{variableName}}}");
-    }
-
-    /// <summary>
-    /// #1550/#1635: the fields of a typed <c>§B</c> header. A mutable binding is name-first
-    /// with <c>~</c>; an immutable one uses the spelling the parser reads back unchanged.
-    /// </summary>
-    private static string BindHeaderFields(string name, string type, bool isMutable) =>
-        isMutable ? $"~{name}:{type}" : AttributeHelper.FormatImmutableBindHeader(name, type);
-
-    private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName, bool isMutable = false)
-    {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        // #1132: `[T]` cannot spell an array of arrays (`[i32[]]` does not parse).
-        var arrayType = elementType.Contains('[') ? ArrayOf(elementType, "[]") : $"[{elementType}]";
-
-        // Sanitize variable names containing section markers (e.g., §IDX §THIS §C{GetInt} §/C)
-        // These can't appear inside {…} attribute blocks. Use a hoisted temp var instead.
-        var originalTarget = variableName;
-        if (ContainsSectionMarker(variableName))
-        {
-            variableName = FreshTemp("_hoist");
-        }
-
-        if (node.Initializer.Count > 0)
-        {
-            // Pre-evaluate elements so hoisted bindings land before the §ARR block
-            var evalElements = RenderInPlace(node.Initializer);
-            AppendLine($"§ARR{{{variableName}:{elementType}}}");
-            Indent();
-            foreach (var val in evalElements)
-            {
-                AppendLine(val.Replace("\n", "\n  ")); // a multi-line element moves with its line
-            }
-            Dedent();
-            EmitBlockEnd($"§/ARR{{{variableName}}}");
-            // If we sanitized the name, assign the result to the original target
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else if (node.Size != null)
-        {
-            // #1132: a complex size is quoted in place, not hoisted (a hoisted size ran
-            // before the statement's earlier reads).
-            var size = EmitSizeAttribute(node.Size);
-            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §ARR{{{elementType}:{variableName}:{size}}}");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else
-        {
-            AppendLine($"§B{{{BindHeaderFields(variableName, arrayType, isMutable)}}} §C{{Array.Empty<{elementType}>}} §/C");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-    }
-
-    private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName, bool isMutable = false)
-    {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : ArrayOf(elementType, $"[{new string(',', Math.Max(node.Rank - 1, 0))}]");
-
-        // Sanitize variable names containing section markers
-        var originalTarget = variableName;
-        if (ContainsSectionMarker(variableName))
-            variableName = FreshTemp("_hoist");
-
-        if (node.Initializer.Count > 0)
-        {
-            // Review N1: pre-evaluate every row BEFORE the §ARR2D opener so hoisted
-            // bindings land ahead of it; the §ARR2D body accepts only §ROW (Calor0100).
-            // #1132: the sized form carries the rank (and shape) of a rank-3+ or sized
-            // initializer; the rows are its innermost vectors in source order.
-            var dims = node.DimensionSizes.Count > 0
-                ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
-                : "";
-            var rows = RenderMultiDimRows(node);
-            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{node.Id}:{variableName}:{elementType}{dims}}}");
-            Indent();
-            foreach (var row in rows)
-                AppendLine($"§ROW {row}");
-            Dedent();
-            EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else if (node.DimensionSizes.Count > 0)
-        {
-            // #1132: complex sizes are quoted in place, in order; hoisting only some of
-            // them ran a call before an earlier size was read (`new int[n, Next()]`).
-            var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
-            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
-            if (originalTarget != variableName)
-                AppendLine($"§ASSIGN {originalTarget} {variableName}");
-        }
-        else
-        {
-            var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
-            AppendLine($"§B{{{BindHeaderFields(variableName, mappedType, isMutable)}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{zeros}}}");
-        }
-    }
-
-    /// <summary>#1132: a mapped array type with Calor's `[T]` spelled `T[]`, for comparison.</summary>
-    private static string OneDimensional(string type)
-    {
-        var mapped = TypeMapper.CSharpToCalor(type);
-        return mapped.Length > 2 && mapped[0] == '[' && mapped[^1] == ']' ? mapped[1..^1] + "[]" : mapped;
-    }
-
-    /// <summary>
-    /// #1132: the type of an array of <paramref name="elementType"/>. The new array's own
-    /// rank comes first, as in C# source: a 2-D array of i32[] is i32[,][], not i32[][,].
-    /// </summary>
-    private static string ArrayOf(string elementType, string rank)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(elementType, @"^(.+?)((?:\[,*\])+)$");
-        return match.Success ? match.Groups[1].Value + rank + match.Groups[2].Value : elementType + rank;
     }
 
     /// <summary>
@@ -2374,24 +1620,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var literal = node is IntLiteralNode or StringLiteralNode or BoolLiteralNode
                 or FloatLiteralNode or DecimalLiteralNode
                 // `null`/`default` take their type from the target; a temp would lose it.
-                or ReferenceNode { Name: "null" or "default" };
+                or ReferenceNode { IsNullLiteral: true }
+                or ReferenceNode { Name: "default", IsVerbatim: false };
             values.Add(hoistAll && !literal ? HoistToTempVar(value) : value);
         }
         return values;
-    }
-
-    /// <summary>The §ROW lines (innermost vectors, row-major).</summary>
-    private List<string> RenderMultiDimRows(MultiDimArrayCreationNode node)
-    {
-        var values = RenderInPlace(node.Initializer.SelectMany(row => row));
-        var rows = new List<string>(node.Initializer.Count);
-        var next = 0;
-        foreach (var row in node.Initializer)
-        {
-            rows.Add(string.Join(" ", values.Skip(next).Take(row.Count)));
-            next += row.Count;
-        }
-        return rows;
     }
 
     /// <summary>#1132: array elements, never hoisted (a hoist ran an element or its conversion early).</summary>
@@ -2414,12 +1647,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// lost; a block lambda bound to an untyped temp, which loses its delegate type) and,
     /// unless <paramref name="allowMultiline"/>, one line (a §ROW holds no block).
     /// </summary>
-    internal static bool WritesInPlace(ExpressionNode element, bool allowMultiline)
+    internal static bool WritesInPlace(ExpressionNode element)
     {
         var probe = new CalorEmitter { _memberBodyDepth = 1 };
         var value = probe.RenderInPlace([element])[0];
         return probe._builder.Length == 0 && probe._pendingHoistedLines.Count == 0
-            && (allowMultiline || !value.Contains('\n'));
+            && !value.Contains('\n');
     }
 
     internal static bool HoistsInExpression(ExpressionNode expression)
@@ -2431,84 +1664,43 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(AssignmentStatementNode node)
     {
-        // AcceptInInlineSibling: §ASSIGN target value emits two space-separated
-        // expressions. In practice target is an lvalue (ref/member/index) — never
-        // a call — but if a future converter path produces a call-shaped target,
-        // a naked zero-arg §C{...} would absorb value as its inline arg. Defensive
-        // wrap; cheap and aligned with the inline-sibling discipline used elsewhere.
         var target = AcceptInInlineSibling(node.Target);
 
-        // Collection/array creation on the RHS of an ASSIGNMENT is a reassignment, not a
-        // declaration — but the *-WithName helpers emit a creation *block* (§ARR{arr:…},
-        // §LIST{arr:…}, …) that round-trips to a fresh `T[] arr = …` declaration. If `arr`
-        // was already declared (the converter's `arr = new int[]{…}` shape, #731) that is a
-        // duplicate declaration → CS0128. Emit the creation into a fresh temp and then
-        // `§ASSIGN target temp`, so the target is reassigned rather than re-declared. (This
-        // reuses the temp-then-§ASSIGN path the helpers already take for sanitized names.)
-        if (node.Value is ListCreationNode or DictionaryCreationNode or SetCreationNode
-                       or ArrayCreationNode or MultiDimArrayCreationNode)
+        if (node.Value is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } lambda)
         {
-            var temp = FreshTemp("_reassign");
-            switch (node.Value)
-            {
-                case ListCreationNode listNode: EmitListCreationWithName(listNode, temp); break;
-                case DictionaryCreationNode dictNode: EmitDictionaryCreationWithName(dictNode, temp); break;
-                case SetCreationNode setNode: EmitSetCreationWithName(setNode, temp); break;
-                case ArrayCreationNode arrNode: EmitArrayCreationWithName(arrNode, temp); break;
-                case MultiDimArrayCreationNode mdArrNode: EmitMultiDimArrayCreationWithName(mdArrNode, temp, null); break;
-            }
-            AppendLine($"§ASSIGN {target} {temp}");
+            EmitBlockLambdaWithHeader($"set {target}", lambda);
             return "";
         }
 
         var value = node.Value.Accept(this);
-
-        // Skip empty assigns (can happen when value was hoisted as a side effect)
         if (string.IsNullOrWhiteSpace(value))
-            return "";
-
-        // Parser expects: §ASSIGN <target> <value>
-        AppendLine($"§ASSIGN {target} {value}");
+            throw new InvalidOperationException("Assignment value must emit a native expression.");
+        AppendLine($"set {target} {value}");
         return "";
     }
 
+    /// <summary>
+    /// A compound store that reached the emitter unlowered (the converter lowers it itself when
+    /// it has a semantic model) is written as the native plain store <c>set t (t op v)</c>. The
+    /// target text is repeated, as the retired <c>§ASSIGN</c> form also did.
+    /// </summary>
     public string Visit(CompoundAssignmentStatementNode node)
     {
-        var target = node.Target.Accept(this);
-        var value = node.Value.Accept(this);
-        var opSymbol = node.Operator switch
-        {
-            CompoundAssignmentOperator.Add => "+",
-            CompoundAssignmentOperator.Subtract => "-",
-            CompoundAssignmentOperator.Multiply => "*",
-            CompoundAssignmentOperator.Divide => "/",
-            CompoundAssignmentOperator.Modulo => "%",
-            CompoundAssignmentOperator.BitwiseAnd => "&",
-            CompoundAssignmentOperator.BitwiseOr => "|",
-            CompoundAssignmentOperator.BitwiseXor => "^",
-            CompoundAssignmentOperator.LeftShift => "<<",
-            CompoundAssignmentOperator.RightShift => ">>",
-            CompoundAssignmentOperator.NullCoalesce => "??",
-            // #774: no silent fallback to "+" — exhaustive over the enum.
-            _ => throw new ArgumentOutOfRangeException(nameof(node),
-                $"Unhandled compound assignment operator: {node.Operator}")
-        };
-        // Parser expects: §ASSIGN <target> <value>
         if (node.Operator == CompoundAssignmentOperator.NullCoalesce)
-            AppendLine($"§ASSIGN {target} (?? {target} {value})");
-        else
-            AppendLine($"§ASSIGN {target} ({opSymbol} {target} {value})");
-        return "";
+            throw new NotSupportedException(
+                "Null-coalescing stores require declaration-proven lowering before Calor emission.");
+
+        return Visit(new AssignmentStatementNode(node.Span, node.Target,
+            new BinaryOperationNode(node.Span, RoslynSyntaxVisitor.ToBinaryOperator(node.Operator),
+                node.Target, node.Value)));
     }
 
     public string Visit(UsingStatementNode node)
     {
-        var id = node.Id ?? $"use{_usingCounter++}";
-        var namePart = node.VariableName ?? "_";
-        var typePart = node.VariableType != null ? ":" + TypeMapper.CSharpToCalor(node.VariableType) : "";
         var resource = node.Resource.Accept(this);
-
-        AppendLine($"§USE{{{id}:{namePart}{typePart}}} {resource}");
+        var binder = node.VariableType == null || node.VariableType == "var" ? node.VariableName
+            : $"{TypeMapper.ToSurfaceType(node.VariableType)}:{node.VariableName}";
+        AppendLine(node.VariableName == null ? $"using {resource}" : $"using {binder} = {resource}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2517,16 +1709,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/USE{{{id}}}");
         return "";
     }
-    private int _usingCounter = 0;
 
     public string Visit(IfStatementNode node)
     {
+        if (_canonicalLiteralReturns.TryGetValue(node, out var canonicalReturn))
+            return Visit(canonicalReturn);
+
         var condition = node.Condition.Accept(this);
-        EmitIfChain(node.Id, condition, node.ThenBody, node.ElseIfClauses, 0, node.ElseBody);
-        EmitBlockEnd($"§/I{{{node.Id}}}");
+        EmitIfChain(condition, node.ThenBody, node.ElseIfClauses, 0, node.ElseBody);
         return "";
     }
 
@@ -2538,22 +1730,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// closing the if-chain before the clause was read (Calor0117, #903 cluster
     /// 3). Such a clause is re-nested instead: <c>§EL</c>, the hoisted binding,
     /// and a fresh <c>§IF</c> carrying the rest of the chain
-    /// (review m8: the synthesised id is <c>{id}e{n}</c>. Converter ids are
-    /// generated as <c>if</c> + a counter, so <c>if007e1</c> cannot collide with a
-    /// generated <c>if…</c>; a HAND-WRITTEN <c>§IF{if007e1}</c> in the same module
-    /// could, which the id scanner reports as a duplicate rather than silently
-    /// merging - and this path only ever runs on converter output) — the C# meaning of
+    /// — the C# meaning of
     /// <c>else if</c> is exactly that nesting, so the emitted program is unchanged.
     /// </summary>
     private void EmitIfChain(
-        string id,
         string condition,
         IReadOnlyList<StatementNode> thenBody,
         IReadOnlyList<ElseIfClauseNode> elseIfs,
         int firstElseIf,
         IReadOnlyList<StatementNode>? elseBody)
     {
-        AppendLine($"§IF{{{id}}} {condition}");
+        AppendLine($"if {condition}");
         Indent();
         foreach (var stmt in thenBody)
             stmt.Accept(this);
@@ -2570,15 +1757,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 // them flush INSIDE the else body ahead of the nested §IF.
                 var conditionHoists = _pendingHoistedLines.Skip(pendingBefore).ToList();
                 _pendingHoistedLines.RemoveRange(pendingBefore, conditionHoists.Count);
-                AppendLine("§EL");
+                AppendLine("else");
                 Indent();
                 _pendingHoistedLines.AddRange(conditionHoists);
-                EmitIfChain($"{id}e{i + 1}", elseIfCondition, elseIf.Body, elseIfs, i + 1, elseBody);
+                EmitIfChain(elseIfCondition, elseIf.Body, elseIfs, i + 1, elseBody);
                 Dedent();
                 return;
             }
 
-            AppendLine($"§EI {elseIfCondition}");
+            AppendLine($"else if {elseIfCondition}");
             Indent();
             foreach (var stmt in elseIf.Body)
                 stmt.Accept(this);
@@ -2587,7 +1774,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (elseBody != null)
         {
-            AppendLine("§EL");
+            AppendLine("else");
             Indent();
             foreach (var stmt in elseBody)
                 stmt.Accept(this);
@@ -2597,7 +1784,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ElseIfClauseNode node)
     {
-        AppendLine($"§EI {node.Condition.Accept(this)}");
+        AppendLine($"else if {node.Condition.Accept(this)}");
         Indent();
         foreach (var stmt in node.Body)
         {
@@ -2610,19 +1797,23 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ForStatementNode node)
     {
         var from = node.From.Accept(this);
-        var to = node.To.Accept(this);
-        var step = node.Step?.Accept(this) ?? "1";
-
-        // Hoist loop bounds that contain section markers or hex literals out of the braces
-        // (hex literals like 0x100 break the ParseValue fallback inside attribute blocks)
-        if (ContainsSectionMarker(from) || from.Contains("0x") || from.Contains(':'))
-            from = HoistToTempVar(from);
-        if (ContainsSectionMarker(to) || to.Contains("0x") || to.Contains(':'))
-            to = HoistToTempVar(to);
-        if (ContainsSectionMarker(step) || step.Contains("0x") || step.Contains(':'))
-            step = HoistToTempVar(step);
-
-        AppendLine($"§L{{{node.Id}:{node.VariableName}:{from}:{to}:{step}}}");
+        var variableName = EscapeCalorIdentifier(node.VariableName);
+        var binder = node.VariableType == "int" ? variableName
+            : $"{TypeMapper.ToSurfaceType(node.VariableType)}:{variableName}";
+        if (node.Condition != null && node.Update != null)
+        {
+            var update = node.Update switch
+            {
+                AssignmentStatementNode assignment =>
+                    $"{assignment.Target.Accept(this)} = {assignment.Value.Accept(this)}",
+                ExpressionStatementNode expression => expression.Expression.Accept(this),
+                _ => throw new InvalidOperationException("For update must be an assignment or invocation.")
+            };
+            AppendLine($"for {binder} = {from}; {node.Condition.Accept(this)}; " +
+                update);
+        }
+        else
+            AppendLine($"for {binder} from {from} to {node.To.Accept(this)} step {node.Step?.Accept(this) ?? "1"}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2631,7 +1822,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/L{{{node.Id}}}");
         return "";
     }
 
@@ -2639,7 +1829,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var condition = node.Condition.Accept(this);
 
-        AppendLine($"§WH{{{node.Id}}} {condition}");
+        AppendLine($"while {condition}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2648,7 +1838,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/WH{{{node.Id}}}");
         return "";
     }
 
@@ -2656,7 +1845,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var condition = node.Condition.Accept(this);
 
-        AppendLine($"§DO{{{node.Id}}}");
+        AppendLine("do");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2665,18 +1854,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        AppendLine($"§/DO{{{node.Id}}} {condition}");
+        AppendLine($"while {condition}");
         return "";
     }
 
     public string Visit(ForeachStatementNode node)
     {
         var collection = node.Collection.Accept(this);
-        var varType = TypeMapper.CSharpToCalor(node.VariableType);
+        var varType = TypeMapper.ToSurfaceType(node.VariableType);
 
-        // Emit as §EACH{id:variable:type} or §EACH{id:variable:type:index}
-        var indexPart = node.IndexVariableName != null ? $":{node.IndexVariableName}" : "";
-        AppendLine($"§EACH{{{node.Id}:{node.VariableName}:{varType}{indexPart}}} {collection}");
+        if (node.IndexVariableName != null)
+            throw new InvalidOperationException("Indexed foreach is removed; use an explicit counter with each.");
+        var variableName = EscapeCalorIdentifier(node.VariableName);
+        var binder = varType == "var" ? variableName : $"{varType}:{variableName}";
+        AppendLine($"each {binder} in {collection}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2685,7 +1876,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EACH{{{node.Id}}}");
         return "";
     }
 
@@ -2693,106 +1883,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ListCreationNode node)
     {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        if (_inlineCollections > 0 || node.RenderInline)
-            return RenderInlineCollection($"§LIST{{{node.Id}:{elementType}}}", $"§/LIST{{{node.Id}}}",
-                RenderInlineCollectionItems(node.Elements));
-
-        // Evaluate all elements first, collecting any hoisted bindings before the list.
-        // AcceptInInlineSibling: each element line is parsed as a sibling expression
-        // and a one-arg closer-less §C would absorb the next sibling (v0.6.3 RFC §3.2 B).
-        var evaluatedElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            // #1595: a nested collection element is written inline, on its element line.
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            // Collect any hoisted lines generated during element evaluation
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedElements.Add(val);
-        }
-
-        // Emit hoisted bindings before the list
-        foreach (var hoisted in allHoisted)
-        {
-            AppendLine(hoisted);
-        }
-
-        AppendLine($"§LIST{{{node.Id}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evaluatedElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/LIST{{{node.Id}}}");
-        return "";
+        return Visit(new NewExpressionNode(node.Span, "System.Collections.Generic.List",
+            [node.ElementType], [], [],
+            collectionInitializers: node.Elements.Select(element =>
+                new CallExpressionNode(element.Span, "Add", [element])).ToArray()));
     }
 
     public string Visit(DictionaryCreationNode node)
     {
-        var keyType = TypeMapper.CSharpToCalor(node.KeyType);
-        var valueType = TypeMapper.CSharpToCalor(node.ValueType);
-        if (_inlineCollections > 0)
-        {
-            var entries = new List<string>();
-            foreach (var entry in node.Entries)
-            {
-                var pair = RenderInlineCollectionItems([entry.Key, entry.Value]);
-                entries.Add($"§KV {pair[0]} {pair[1]}");
-            }
-            return RenderInlineCollection($"§DICT{{{node.Id}:{keyType}:{valueType}}}", $"§/DICT{{{node.Id}}}", entries);
-        }
-
-        // Pre-evaluate entries to flush hoisted bindings before the §DICT block
-        var evaluatedEntries = new List<(string key, string value)>();
-        var allHoisted = new List<string>();
-        foreach (var entry in node.Entries)
-        {
-            // See sibling DictionaryNode visitor: AcceptInInlineSibling protects nested zero-arg calls.
-            var key = AcceptCollectionElement(entry.Key);
-            var value = AcceptCollectionElement(entry.Value);
-            // Review M3: the KEY needs the same guard as the value - a dictionary
-            // whose key is an object initializer is multi-line too.
-            if (key.Contains('\n'))
-                key = HoistToTempVar(key);
-            if (value.Contains('\n'))
-                value = HoistToTempVar(value);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedEntries.Add((key, value));
-        }
-
-        // Emit hoisted bindings before the dict
-        foreach (var hoisted in allHoisted)
-        {
-            AppendLine(hoisted);
-        }
-
-        AppendLine($"§DICT{{{node.Id}:{keyType}:{valueType}}}");
-        Indent();
-
-        foreach (var (key, value) in evaluatedEntries)
-        {
-            AppendLine($"§KV {key} {value}");
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/DICT{{{node.Id}}}");
-        return "";
+        return Visit(new NewExpressionNode(node.Span, "System.Collections.Generic.Dictionary",
+            [node.KeyType, node.ValueType], [], [],
+            collectionInitializers: node.Entries.Select(entry =>
+                new CallExpressionNode(entry.Span, "Add", [entry.Key, entry.Value])).ToArray()));
     }
 
     public string Visit(KeyValuePairNode node)
@@ -2807,115 +1909,55 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(SetCreationNode node)
     {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        if (_inlineCollections > 0 || node.RenderInline)
-            return RenderInlineCollection($"§HSET{{{node.Id}:{elementType}}}", $"§/HSET{{{node.Id}}}",
-                RenderInlineCollectionItems(node.Elements));
-
-        // Pre-evaluate elements to flush hoisted bindings before the §HSET block.
-        // AcceptInInlineSibling: each element line is parsed as a sibling expression
-        // and a one-arg closer-less §C would absorb the next sibling (v0.6.3 RFC §3.2 B).
-        var evaluatedElements = new List<string>();
-        var allHoisted = new List<string>();
-        foreach (var element in node.Elements)
-        {
-            // #1595: a nested collection element is written inline, on its element line.
-            var val = AcceptCollectionElement(element);
-            // #903: a multi-line element (an object initializer) cannot sit on an
-            // element line; hoist it so the block lands at the enclosing indent.
-            if (val.Contains('\n'))
-                val = HoistToTempVar(val);
-            if (_pendingHoistedLines.Count > 0)
-            {
-                allHoisted.AddRange(_pendingHoistedLines);
-                _pendingHoistedLines.Clear();
-            }
-            evaluatedElements.Add(val);
-        }
-
-        foreach (var hoisted in allHoisted)
-        {
-            AppendLine(hoisted);
-        }
-
-        AppendLine($"§HSET{{{node.Id}:{elementType}}}");
-        Indent();
-
-        foreach (var val in evaluatedElements)
-        {
-            AppendLine(val);
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/HSET{{{node.Id}}}");
-        return "";
+        return Visit(new NewExpressionNode(node.Span, "System.Collections.Generic.HashSet",
+            [node.ElementType], [], [],
+            collectionInitializers: node.Elements.Select(element =>
+                new CallExpressionNode(element.Span, "Add", [element])).ToArray()));
     }
 
     public string Visit(CollectionPushNode node)
-    {
-        var value = node.Value.Accept(this);
-        AppendLine($"§PUSH{{{node.CollectionName}}} {value}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Add", [node.Value])));
 
     public string Visit(DictionaryPutNode node)
-    {
-        // AcceptInInlineSibling: nested zero-arg calls in key/value must keep §/C
-        // or the parser would absorb the value as the call's inline arg.
-        var key = AcceptInInlineSibling(node.Key);
-        var value = AcceptInInlineSibling(node.Value);
-        AppendLine($"§PUT{{{node.DictionaryName}}} {key} {value}");
-        return "";
-    }
+        => Visit(new AssignmentStatementNode(node.Span,
+            new ArrayAccessNode(node.Span, new ReferenceNode(node.Span, node.DictionaryName), node.Key),
+            node.Value));
 
     public string Visit(CollectionRemoveNode node)
-    {
-        var keyOrValue = node.KeyOrValue.Accept(this);
-        AppendLine($"§REM{{{node.CollectionName}}} {keyOrValue}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Remove", [node.KeyOrValue])));
 
     public string Visit(CollectionSetIndexNode node)
-    {
-        // AcceptInInlineSibling: see DictionaryPutNode.
-        var index = AcceptInInlineSibling(node.Index);
-        var value = AcceptInInlineSibling(node.Value);
-        AppendLine($"§SETIDX{{{node.CollectionName}}} {index} {value}");
-        return "";
-    }
+        => Visit(new AssignmentStatementNode(node.Span,
+            new ArrayAccessNode(node.Span, new ReferenceNode(node.Span, node.CollectionName), node.Index),
+            node.Value));
 
     public string Visit(CollectionClearNode node)
-    {
-        AppendLine($"§CLR{{{node.CollectionName}}}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Clear", [])));
 
     public string Visit(CollectionInsertNode node)
-    {
-        // AcceptInInlineSibling: see DictionaryPutNode.
-        var index = AcceptInInlineSibling(node.Index);
-        var value = AcceptInInlineSibling(node.Value);
-        AppendLine($"§INS{{{node.CollectionName}}} {index} {value}");
-        return "";
-    }
+        => Visit(new ExpressionStatementNode(node.Span,
+            new CallExpressionNode(node.Span, $"{EscapeCalorIdentifier(node.CollectionName)}.Insert", [node.Index, node.Value])));
 
     public string Visit(CollectionContainsNode node)
     {
-        var keyOrValue = node.KeyOrValue.Accept(this);
-        var modePrefix = node.Mode switch
+        var method = node.Mode switch
         {
-            ContainsMode.Key => "§KEY ",
-            ContainsMode.DictValue => "§VAL ",
-            _ => ""
+            ContainsMode.Key => "ContainsKey",
+            ContainsMode.DictValue => "ContainsValue",
+            _ => "Contains"
         };
-        return $"§HAS{{{node.CollectionName}}} {modePrefix}{keyOrValue}";
+        return Visit(new CallExpressionNode(node.Span,
+            $"{EscapeCalorIdentifier(node.CollectionName)}.{method}", [node.KeyOrValue]));
     }
 
     public string Visit(DictionaryForeachNode node)
     {
         var dictionary = node.Dictionary.Accept(this);
 
-        AppendLine($"§EACHKV{{{node.Id}:{node.KeyName}:{node.ValueName}}} {dictionary}");
+        AppendLine($"each {EscapeCalorIdentifier(node.KeyName)}, {EscapeCalorIdentifier(node.ValueName)} in {dictionary}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2924,19 +1966,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EACHKV{{{node.Id}}}");
         return "";
     }
 
     public string Visit(CollectionCountNode node)
-    {
-        var collection = node.Collection.Accept(this);
-        return $"§CNT {collection}";
-    }
+        => Visit(new FieldAccessNode(node.Span, node.Collection, "Count"));
 
     public string Visit(TryStatementNode node)
     {
-        AppendLine($"§TR{{{node.Id}}}");
+        AppendLine("try");
         Indent();
 
         foreach (var stmt in node.TryBody)
@@ -2953,7 +1991,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.FinallyBody != null)
         {
-            AppendLine("§FI");
+            AppendLine("finally");
             Indent();
 
             foreach (var stmt in node.FinallyBody)
@@ -2964,17 +2002,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
             Dedent();
         }
 
-        EmitBlockEnd($"§/TR{{{node.Id}}}");
         return "";
     }
 
     public string Visit(CatchClauseNode node)
     {
-        var exType = node.ExceptionType ?? "Exception";
-        var varPart = node.VariableName != null ? $":{node.VariableName}" : "";
-        var filterPart = node.Filter != null ? $" §WHEN {node.Filter.Accept(this)}" : "";
+        var exType = node.ExceptionType;
+        var varPart = !string.IsNullOrEmpty(node.VariableName)
+            ? $":{EscapeCalorIdentifier(node.VariableName)}" : "";
+        var filterPart = node.Filter != null ? $" when {node.Filter.Accept(this)}" : "";
 
-        AppendLine($"§CA{{{exType}{varPart}}}{filterPart}");
+        AppendLine($"catch{(exType == null ? "" : $" {exType}{varPart}")}{filterPart}");
         Indent();
 
         foreach (var stmt in node.Body)
@@ -2991,11 +2029,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Exception != null)
         {
             var expr = node.Exception.Accept(this);
-            AppendLine($"§TH {expr}");
+            AppendLine($"throw {expr}");
         }
         else
         {
-            AppendLine("§RT");
+            AppendLine("throw");
         }
         return "";
     }
@@ -3003,38 +2041,37 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ThrowExpressionNode node)
     {
         var expr = node.Exception.Accept(this);
-        return $"§TH {expr}";
+        return $"throw {expr}";
     }
 
     public string Visit(RethrowStatementNode node)
     {
-        AppendLine("§RT");
+        AppendLine("throw");
         return "";
     }
 
     public string Visit(MatchStatementNode node)
     {
         var target = node.Target.Accept(this);
-        var id = string.IsNullOrEmpty(node.Id) ? $"sw{_switchCounter++}" : node.Id;
 
-        AppendLine($"§W{{{id}}} {target}");
+        AppendLine($"match {target}");
         Indent();
 
         foreach (var matchCase in node.Cases)
         {
-            Visit(matchCase);
+            EmitMatchCase(matchCase, expressionContext: false);
         }
 
         Dedent();
-        EmitBlockEnd($"§/W{{{id}}}");
         return "";
     }
-    private int _switchCounter = 0;
 
-    public string Visit(MatchCaseNode node)
+    public string Visit(MatchCaseNode node) => EmitMatchCase(node, expressionContext: true);
+
+    private string EmitMatchCase(MatchCaseNode node, bool expressionContext)
     {
         var pattern = EmitPattern(node.Pattern);
-        var guard = node.Guard != null ? $" §WHEN {node.Guard.Accept(this)}" : "";
+        var guard = node.Guard != null ? $" when {node.Guard.Accept(this)}" : "";
 
         // Collect any hoisted lines from guard evaluation before emitting the case
         var guardHoisted = new List<string>();
@@ -3047,21 +2084,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // If guard produced hoisted bindings, always use block syntax
         if (guardHoisted.Count > 0)
         {
-            AppendLine($"§K {pattern}{guard}");
+            AppendLine($"case {pattern}{guard}");
             Indent();
             foreach (var h in guardHoisted)
                 AppendLine(h);
             foreach (var stmt in node.Body)
                 stmt.Accept(this);
             Dedent();
-            AppendLine("§/K");
             return "";
         }
 
         // Check if this is a single-return case suitable for arrow syntax.
         // Block-level collection nodes (List, Dict, Set) emit via AppendLine and return "",
         // so they must use block syntax to avoid empty arrow expressions.
-        if (node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null
+        if (expressionContext && node.Body.Count == 1 && node.Body[0] is ReturnStatementNode returnStmt && returnStmt.Expression != null
             && returnStmt.Expression is not ListCreationNode
             && returnStmt.Expression is not DictionaryCreationNode
             && returnStmt.Expression is not SetCreationNode)
@@ -3073,28 +2109,27 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (_pendingHoistedLines.Count == 0)
             {
                 // Use arrow syntax: §K pattern → expression
-                AppendLine($"§K {pattern}{guard} → {expr}");
+                AppendLine($"case {pattern}{guard} → {expr}");
             }
             else
             {
                 // Hoisted bindings exist — must use block syntax so they appear inside the arm
                 var hoisted = new List<string>(_pendingHoistedLines);
                 _pendingHoistedLines.Clear();
-                AppendLine($"§K {pattern}{guard}");
+                AppendLine($"case {pattern}{guard}");
                 Indent();
                 foreach (var line in hoisted)
                 {
                     AppendLine(line);
                 }
-                AppendLine($"§R {expr}");
+                AppendLine($"return {expr}");
                 Dedent();
-                AppendLine("§/K");
             }
         }
         else
         {
-            // Use block syntax with §/K closing tag
-            AppendLine($"§K {pattern}{guard}");
+            // Statement arms end at dedent; expression payloads may still need a closer.
+            AppendLine($"case {pattern}{guard}");
             Indent();
 
             foreach (var stmt in node.Body)
@@ -3103,7 +2138,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
 
             Dedent();
-            AppendLine("§/K");
         }
 
         return "";
@@ -3121,21 +2155,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.IsUnsigned)
             return node.IsLong
-                ? $"ULONG:{value}"
-                : $"UINT:{value}";
+                ? $"{value}UL"
+                : $"{value}U";
         if (node.IsLong)
-            return $"LONG:{value}";
+            return $"{value}L";
         return value;
     }
 
     public string Visit(FloatLiteralNode node)
     {
-        // #774: preserve single-precision via a SINGLE: typed literal so the C#
-        // emitter re-emits `f` instead of widening to double.
+        if (!double.IsFinite(node.Value) || (node.IsSingle && !float.IsFinite((float)node.Value)))
+            throw new InvalidOperationException("A non-finite value cannot be emitted as a bare numeric literal.");
         if (node.IsSingle)
-            return $"SINGLE:{((float)node.Value).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            return $"{((float)node.Value).ToString(System.Globalization.CultureInfo.InvariantCulture)}f";
         if (node.IsDecimal)
-            return $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            return $"{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}m";
         // #1528: the lexer reads a bare literal as a double only when it has a
         // fraction or an exponent. A whole-number double such as 2.0 prints as "2",
         // which would re-parse as an int and turn x / 2.0 into integer division.
@@ -3147,7 +2181,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(DecimalLiteralNode node)
     {
-        return "DEC:" + node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var text = node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var negativeZero = node.Value == 0 && (decimal.GetBits(node.Value)[3] & int.MinValue) != 0;
+        return (negativeZero ? "-" : "") + text + "m";
     }
 
     public string Visit(StringLiteralNode node)
@@ -3156,18 +2192,38 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.IsMultiline && node.Value.Contains('\n'))
         {
             var multilineSuffix = node.IsUtf8 ? "u8" : "";
-            return $"\"\"\"\n{node.Value}\"\"\"{multilineSuffix}";
+            return $"\"\"\"\n{EscapeStringText(node.Value, multiline: true)}\"\"\"{multilineSuffix}";
         }
 
-        var escaped = node.Value
-            .Replace("\\", "\\\\")
-            .Replace("\"", "\\\"")
-            .Replace("\n", "\\n")
-            .Replace("\r", "\\r")
-            .Replace("\t", "\\t")
-            .Replace("${", "\\${");  // Escape ${ to prevent Calor string interpolation
+        var escaped = EscapeStringText(node.Value, multiline: false);
         var suffix = node.IsUtf8 ? "u8" : "";
         return $"\"{escaped}\"{suffix}";
+    }
+
+    private static string EscapeStringText(string text, bool multiline)
+    {
+        var escaped = new StringBuilder();
+        foreach (var character in text)
+        {
+            escaped.Append(character switch
+            {
+                '\\' => "\\\\",
+                '"' => "\\\"",
+                '\n' when multiline => "\n",
+                '\n' => "\\n",
+                '\r' => "\\r",
+                '\t' => "\\t",
+                '\0' => "\\0",
+                '\a' => "\\a",
+                '\b' => "\\b",
+                '\f' => "\\f",
+                '\v' => "\\v",
+                _ when char.IsControl(character) || char.IsSurrogate(character) =>
+                    "\\u" + ((int)character).ToString("X4", System.Globalization.CultureInfo.InvariantCulture),
+                _ => character.ToString()
+            });
+        }
+        return escaped.ToString().Replace("${", "\\${", StringComparison.Ordinal);
     }
 
     public string Visit(BoolLiteralNode node)
@@ -3177,29 +2233,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ConditionalExpressionNode node)
     {
-        // AcceptInInlineSibling: condition/branches in Lisp (? c t f) form are space-separated,
-        // so a nested zero-arg call without explicit §/C would absorb the next operand.
-        // For the §IF expression form we keep it too — the condition slot is followed by
-        // " → whenTrue", and a bare §C{X} could absorb the → as a primary token.
         var condition = AcceptInConditionalRegion(node.Condition);
         var whenTrue = AcceptInConditionalRegion(node.WhenTrue);
         var whenFalse = AcceptInConditionalRegion(node.WhenFalse);
 
-        // If either branch contains section markers (§C, §NEW, §LAM, etc.) or commas
-        // (tuple literals), decompose into §IF/§EL/§/I expression form.
-        // Section markers and commas are invalid inside Lisp (?) expressions
-        // but valid in §IF expression branches.
-        if (ContainsSectionMarker(whenTrue) || ContainsSectionMarker(whenFalse)
-            || whenTrue.Contains(',') || whenFalse.Contains(','))
-        {
-            var id = $"tern{_ternaryCounter++:D3}";
-            // Phase 4d: omit the legacy §/I{id} closer — ParseIfExpression
-            // treats the closer as optional and recognizes the inline form
-            // from §IF{id} … §EL → alone.
-            return $"§IF{{{id}}} {condition} → {whenTrue} §EL → {whenFalse}";
-        }
-
-        return $"(? {condition} {whenTrue} {whenFalse})";
+        return $"({condition} ? {whenTrue} : {whenFalse})";
     }
 
     private static bool ContainsSectionMarker(string expr)
@@ -3232,6 +2270,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
     }
 
+    private string AcceptArgument(ExpressionNode expression)
+    {
+        var rendered = AcceptInConditionalRegion(expression);
+        // Dedent before the next argument's lambda head, without hoisting its closure.
+        return expression is LambdaExpressionNode { ExpressionBody: null }
+            ? $"({rendered}\n)" : rendered;
+    }
+
     /// <summary>
     /// Hoists an expression containing section markers to a temp variable.
     /// Adds a §B{~tempVar} expr line to _pendingHoistedLines and returns the temp var name.
@@ -3262,7 +2308,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // `//` comment everything after it is swallowed. Drop comments first; if
         // anything comment-like survives (an unterminated block comment, a `//`
         // inside a string literal in the target) refuse to normalise and hand the
-        // original back, so the §CS{...} / §CSHARP fallbacks preserve the member
+        // original back, so the raw-frame fallbacks preserve the member
         // instead of the emitter shipping a corrupt one.
         var stripped = System.Text.RegularExpressions.Regex.Replace(
             target, @"/\*.*?\*/", " ", System.Text.RegularExpressions.RegexOptions.Singleline);
@@ -3290,12 +2336,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private string HoistToTempVar(string expr)
     {
         // Don't hoist outside of executable bodies (methods, ctors, operators, property accessors).
-        // Hoisting at class/module scope would leak §B bindings between members.
+        // Hoisting at class/module scope would leak bindings between members.
         if (_memberBodyDepth == 0 || _conditionalExpressionDepth > 0)
             return expr;
 
         var varName = FreshTemp("_hoist");
-        _pendingHoistedLines.Add($"§B{{~{varName}}} {expr}");
+        _pendingHoistedLines.Add($"var {varName} = {expr}");
         return varName;
     }
 
@@ -3313,13 +2359,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(ReferenceNode node)
     {
-        // Strip @ from verbatim identifiers (both simple and dotted like this.@object)
         var name = node.Name.Replace("@", "");
-        // Don't escape literal keywords (true, false, null) when used as expression values —
-        // they're valid Calor expressions, not identifiers needing backtick escaping.
-        if (name is "true" or "false" or "null")
+        if (node.IsNullLiteral)
             return name;
-        return EscapeCalorIdentifier(name);
+        // The default literal: native source spells it `default`, and escaping it would turn
+        // it into a reference to a member named `@default`.
+        if (node.Name == "default" && !node.IsVerbatim)
+            return "default";
+        if (node.IsVerbatim)
+            return $"@{name}";
+        if (TypeMapper.IsPrimitiveType(name) && TypeMapper.ToSurfaceType(name) == name)
+            return name;
+        return EscapeCalorIdentifier(name.Contains('<') ? AttributeHelper.ToSurfaceSpelling(name) : name);
     }
 
     public string Visit(BinaryOperationNode node)
@@ -3331,28 +2382,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var right = AcceptInConditionalRegion(node.Right);
         var opSymbol = GetCalorOperatorSymbol(node.Operator);
 
-        return $"({opSymbol} {left} {right})";
+        return $"({left} {opSymbol} {right})";
     }
 
     public string Visit(UnaryOperationNode node)
     {
+        if (node.Operator is UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
+            or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
+            throw new InvalidOperationException("Increment/decrement expressions must be lowered to §ASSIGN before Calor emission");
         var operand = node.Operand.Accept(this);
         var opSymbol = node.Operator switch
         {
             UnaryOperator.Negate => "-",
             UnaryOperator.Not => "!",
             UnaryOperator.BitwiseNot => "~",
-            UnaryOperator.PreIncrement => "inc",
-            UnaryOperator.PreDecrement => "dec",
-            UnaryOperator.PostIncrement => "post-inc",
-            UnaryOperator.PostDecrement => "post-dec",
             _ => throw new ArgumentOutOfRangeException(nameof(node.Operator), node.Operator, null)
         };
 
-        if (ContainsSectionMarker(operand))
-            operand = HoistToTempVar(operand);
-
-        return $"({opSymbol} {operand})";
+        return $"({opSymbol}{operand})";
     }
 
     public string Visit(FieldAccessNode node)
@@ -3361,14 +2408,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (!_inInterpolation && node.Target is ArrayAccessNode or MultiDimArrayAccessNode)
         {
             var element = AcceptInConditionalRegion(node.Target);
-            return $"({element}).{(node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName)}";
+            return $"({element}).{EscapeCalorIdentifier(node.FieldName)}";
         }
         // `new T[,] { … }.Length` in place: the inline creation ends at its closer.
         if (!_inInterpolation && node.Target is ArrayCreationNode { Initializer.Count: > 0 }
                 or MultiDimArrayCreationNode { Initializer.Count: > 0 })
         {
             var creation = AcceptInConditionalRegion(node.Target);
-            return $"{creation}.{(node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName)}";
+            return $"{creation}.{EscapeCalorIdentifier(node.FieldName)}";
         }
 
         var conditional = IsConditionalCallTarget(node.Target);
@@ -3383,218 +2430,107 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // would copy the value-type step and lose by-reference and store identity.
         else if (!conditional && ContainsSectionMarker(target) && _memberBodyDepth > 0 && !IsElementFieldPath(node.Target))
             target = HoistToTempVar(target);
-        var fieldName = node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName;
+        var fieldName = EscapeCalorIdentifier(node.FieldName);
+        // 0.30 member access is C# punctuation, written unspaced. After a receiver that ends a
+        // token on its own (`f().X`, `a[0].X`, `this.X`, `"s".Length`) the `.` reparses as the
+        // same member access. After an identifier the lexer folds `x.F` into one dotted name,
+        // which the parser reads as this member access when its root is a value in scope or a
+        // source class of the module with that member (Parser.FindMemberAccessRoots), and as a
+        // qualified name otherwise (`Math.PI`). A longer chain on any other root would read
+        // back as one dotted name (`Console.Out.NewLine` names neither a type nor a value), so
+        // its receiver is parenthesized: `(Console.Out).NewLine`. A numeric literal receiver
+        // is parenthesized so `1.F` cannot lex as a number.
+        if (EndsInIdentifier(target) && IsUnrootedMemberChain(node.Target))
+            target = $"({target})";
+        else if (node.Target is IntLiteralNode or FloatLiteralNode or DecimalLiteralNode)
+            target = $"({target})";
         return $"{target}.{fieldName}";
     }
 
+    /// <summary>
+    /// True when <paramref name="receiver"/> prints as a dotted identifier path whose root the
+    /// parser does not read as a member-access root (see <see cref="Parser.FindMemberAccessRoots"/>).
+    /// </summary>
+    private bool IsUnrootedMemberChain(ExpressionNode receiver)
+    {
+        switch (receiver)
+        {
+            case ReferenceNode reference:
+                return reference.Name.Contains('.');
+            case FieldAccessNode member:
+                var root = member.Target;
+                while (root is FieldAccessNode inner)
+                    root = inner.Target;
+                return root is ReferenceNode rootReference
+                    && (rootReference.Name.Contains('.') || _memberAccessRoots?.Contains(rootReference) != true);
+            default:
+                return false;
+        }
+    }
+
+    private static bool EndsInIdentifier(string target)
+        => target.Length > 0 && (char.IsLetterOrDigit(target[^1]) || target[^1] == '_')
+            && target is not ("this" or "base");
+
     public string Visit(NewExpressionNode node)
     {
-        var typeArgs = node.TypeArguments.Count > 0
-            ? $"<{string.Join(",", node.TypeArguments)}>"
-            : "";
-
-        // Inside interpolation, use C# new() syntax instead of §NEW tags
-        if (_inInterpolation)
-        {
-            var inlineArgs = node.Arguments.Select(a => a.Accept(this));
-            return $"new {node.TypeName}{typeArgs}({string.Join(", ", inlineArgs)})";
-        }
-
-        // Arguments need §A prefix for parser to recognize them
-        // Hoist arguments containing section markers (e.g., §C calls) to avoid nested §A conflicts.
-        // Use AcceptInInlineSibling so nested zero-arg §C{...} keeps explicit §/C —
-        // the v0.6.1 emitter default would otherwise let the next §A be absorbed
-        // as the nested call's inline argument (silent AST corruption).
-        // #1132: if one argument is hoisted, every non-literal argument is, in order
-        // (`new Cell(x, Next())` read x after Next() ran).
-        var args = RenderArrayElements(node.Arguments, hoistSectionMarkers: true).Select(val => $"§A {val}");
-        var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
-
-        // Handle object initializers (multi-line block format)
-        if (node.Initializers.Count > 0)
-        {
-            // Pre-evaluate initializer values to collect hoisted bindings
-            var evalInits = new List<(string PropName, string Value)>();
-            // #1524: a nested object initializer value stays on its line (`A = §NEW{U} B = 1 §/NEW`).
-            _inlineObjectInitializers++;
-            try
-            {
-                foreach (var init in node.Initializers)
-                {
-                    var valueStr = init.Value is ListCreationNode or SetCreationNode or DictionaryCreationNode
-                        ? AcceptInlineCollection(init.Value)
-                        // A one-argument §C must keep its §/C, or it reads the next `Name =` as its argument.
-                        : AcceptInInlineSibling(init.Value);
-                    // An empty rendering used to drop the assignment silently (#1524).
-                    if (string.IsNullOrWhiteSpace(valueStr))
-                        throw new InvalidOperationException(
-                            $"Object initializer value for '{init.PropertyName}' rendered empty (#1524).");
-                    evalInits.Add((init.PropertyName, valueStr));
-                }
-            }
-            finally
-            {
-                _inlineObjectInitializers--;
-            }
-
-            // #1132: an array element stays on its line (`§NEW{T} A = x §/NEW`), not hoisted early.
-            if (_inlineObjectInitializers > 0 && evalInits.All(i => !i.Value.Contains('\n')))
-            {
-                var inits = string.Concat(evalInits.Select(i =>
-                    $" {(i.PropName.StartsWith('@') ? i.PropName[1..] : i.PropName)} = {i.Value}"));
-                return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}{inits} §/NEW";
-            }
-
-            var indent = new string(' ', _indentLevel * 2);
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}");
-            foreach (var (propName, valueStr) in evalInits)
-            {
-                var safeName = propName.StartsWith("@") ? propName[1..] : propName;
-                sb.Append($"\n{indent}  {safeName} = {valueStr}");
-            }
-            sb.Append($"\n{indent}§/NEW");
-            return sb.ToString();
-        }
-
-        return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr} §/NEW";
+        var types = node.TypeArguments.Count == 0 ? ""
+            : $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>";
+        var arguments = node.Arguments.Select((argument, index) =>
+            (node.ArgumentNames?.ElementAtOrDefault(index) is { } name
+                ? $"{EscapeCalorIdentifier(name)}: " : "")
+            + AcceptArgument(argument));
+        var initializers = node.Initializers.Count == 0 ? ""
+            : " { " + string.Join(", ", node.Initializers.Select(initializer =>
+                $"{EscapeCalorIdentifier(initializer.PropertyName)} = {AcceptInConditionalRegion(initializer.Value)}")) + " }";
+        if (node.CollectionInitializers.Count > 0)
+            initializers = " { " + string.Join(", ", node.CollectionInitializers.Select(entry =>
+                entry.Arguments.Count == 1 ? AcceptInConditionalRegion(entry.Arguments[0])
+                : "{ " + string.Join(", ", entry.Arguments.Select(AcceptInConditionalRegion)) + " }")) + " }";
+        return $"new {TypeMapper.ToSurfaceType(node.TypeName)}{types}({string.Join(", ", arguments)}){initializers}";
     }
 
     public string Visit(AnonymousObjectCreationNode node)
     {
-        var indent = new string(' ', _indentLevel * 2);
-        var sb = new System.Text.StringBuilder();
-        sb.Append("§ANON");
-        // Values containing section markers are hoisted. #1541 review: when one is, every
-        // non-literal value is, in order, so none runs ahead of an earlier member's value.
         var values = RenderArrayElements(node.Initializers.Select(init => init.Value), hoistSectionMarkers: true);
-        foreach (var (init, value) in node.Initializers.Zip(values))
-        {
-            // Strip @ prefix from verbatim C# identifiers (e.g., @class, @checked, @Version)
-            var propName = init.PropertyName.StartsWith("@") ? init.PropertyName[1..] : init.PropertyName;
-            sb.Append($"\n{indent}  {propName} = {value}");
-        }
-        sb.Append($"\n{indent}§/ANON");
-        return sb.ToString();
+        return $"new {{ {string.Join(", ", node.Initializers.Zip(values,
+            (init, value) => $"{EscapeCalorIdentifier(init.PropertyName)} = {value}"))} }}";
     }
 
     public string Visit(CallExpressionNode node)
     {
-        // Build type arguments suffix for generic method calls
-        var typeArgsSuffix = node.TypeArguments is { Count: > 0 }
-            ? $"<{string.Join(", ", node.TypeArguments)}>"
+        var types = node.TypeArguments is { Count: > 0 }
+            ? $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
             : "";
-
-        // Inside interpolation expressions, section markers (§C, §A, §/C) would be
-        // treated as literal text by the parser. Use function-call syntax instead.
-        if (_inInterpolation)
+        var target = NormalizeCallTarget(node.Target);
+        if (target.IndexOfAny(['(', ')', '[', ']']) >= 0)
+            throw new InvalidOperationException("A computed call requires an expression-valued callee.");
+        if (!target.Contains('.'))
+            target = EscapeCalorIdentifier(target);
+        else
         {
-            if (node.Arguments.Count == 0)
-                return $"{node.Target}{typeArgsSuffix}()";
-
-            if (node.ArgumentModifiers?.Any(modifier => modifier != null) == true)
-                RecordEmitterFallback(node, "interpolation-call-modifiers",
-                    "Modified call arguments are preserved using C# interpolation expression syntax");
-            var inlineArgs = node.Arguments.Select((a, i) =>
-            {
-                var argValue = a.Accept(this);
-                if (node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
-                    && node.ArgumentModifiers[i] is { } modifier)
-                    argValue = $"{modifier} {argValue}";
-                if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
-                    return $"{node.ArgumentNames[i]}: {argValue}";
-                return argValue;
-            });
-            return $"{node.Target}{typeArgsSuffix}({string.Join(", ", inlineArgs)})";
+            var separator = target.LastIndexOf('.');
+            target = target[..(separator + 1)] + EscapeCalorIdentifier(target[(separator + 1)..]);
         }
-
-        // If the target contains characters that would break §C{} attribute parsing
-        // (parentheses, brackets from raw C# chains the converter couldn't decompose),
-        // emit the entire expression as raw §CS{...} to avoid cascading parse errors.
-        if (node.Target.IndexOfAny(['(', ')', '[', ']']) >= 0)
+        var arguments = node.Arguments.Select((argument, index) =>
         {
-            var rawArgs = node.Arguments.Count > 0
-                ? $"({string.Join(", ", node.Arguments.Select(a => a.Accept(this)))})"
-                : "()";
-            // §CS{...} uses balanced-brace scanning with string/char literal awareness.
-            // Strip // comments (which may contain apostrophes that confuse the char scanner).
-            var innerCode = (node.Target + typeArgsSuffix + rawArgs)
-                .Replace("\r\n", "\n");
-            innerCode = System.Text.RegularExpressions.Regex.Replace(innerCode, @"//[^\n]*", " ");
-            innerCode = innerCode.Replace("\n", " ");
-            RecordEmitterFallback(
-                node,
-                "raw-call-target",
-                "Call target could not be represented natively and was preserved as §CS");
-            return $"§CS{{{innerCode}}}";
-        }
+            var name = node.ArgumentNames?.ElementAtOrDefault(index);
+            var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
+            return (name is null ? "" : $"{EscapeCalorIdentifier(name)}: ")
+                + (modifier is null ? "" : $"{modifier} ")
+                + AcceptArgument(argument);
+        });
+        return $"{target}{types}({string.Join(", ", arguments)})";
+    }
 
-        // Escape braces in target to avoid conflicts with Calor tag syntax,
-        // but preserve braces inside quoted string portions (e.g. "text {0}".FormatWith)
-        var escapedTarget = EscapeBracesInIdentifier(NormalizeCallTarget(node.Target).Replace("->", "."));
-        var fullTarget = escapedTarget + typeArgsSuffix;
+    public string Visit(ThisExpressionNode node)
+    {
+        return "this";
+    }
 
-        if (node.Arguments.Count == 0)
-        {
-            // Phase 2 (RFC v0.6 call-closer-elision): zero-arg form may drop §/C
-            // when emitted at a "leaf" expression position (immediately
-            // followed by a newline / indent boundary / structural close).
-            // It is NOT safe inside an inline-sibling context (§A arg chain,
-            // §ARR / §ROW / §SALLOC initializer): the parser would absorb the
-            // next same-line sibling as this call's inline argument and
-            // silently corrupt the AST (e.g. `§ARR{...} §C{A} §C{B}` would
-            // parse as ONE element `A(B())` instead of TWO elements `A(), B()`).
-            // Flag defaults to true as of v0.6.1 (was false in v0.6.0). Set
-            // ConversionContext.UseImplicitCallCloser = false to restore the
-            // explicit closer form everywhere.
-            bool canElide = _context?.UseImplicitCallCloser != false
-                         && _inInlineSiblingContext == 0;
-            return canElide
-                ? $"§C{{{fullTarget}}}"
-                : $"§C{{{fullTarget}}} §/C";
-        }
-
-        // Emit named argument labels as §A[name] value when present.
-        // Argument expressions are visited in inline-sibling context so that
-        // nested zero-arg calls keep their explicit §/C (see comment above).
-        var args = node.Arguments.Select((a, i) =>
-        {
-            var argValue = AcceptInInlineSibling(a);
-            bool named = node.ArgumentNames != null
-                      && i < node.ArgumentNames.Count
-                      && node.ArgumentNames[i] != null;
-            var modifier = node.ArgumentModifiers != null && i < node.ArgumentModifiers.Count
-                ? node.ArgumentModifiers[i] : null;
-            var marker = modifier == null ? "§A" : $"§A{{{modifier}}}";
-            var wrapped = named
-                ? $"{marker}[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
-                : $"{marker} {argValue}";
-            return (named, modifier, wrapped, argValue);
-        }).ToList();
-
-        // RFC v0.6 call-closer-elision §2.1 / §2.2 — expression-context
-        // one-arg elision. Mirrors the stmt-context path at Visit(CallStatementNode).
-        // Parser side: Parser.cs `ParseCallExpression` accepts `§C{target} primary_expr`
-        // (no §A, no §/C) when followed by a syntactic terminator (RFC §2).
-        // Held back inside _inInlineSiblingContext (§A chain / §ARR / §ROW / §SALLOC
-        // initializer / §NEW arg) — there a same-line sibling would be absorbed as
-        // this call's inline argument and silently corrupt the AST (e.g.
-        // `§ARR{...} §C{f} x §C{g} y §/ARR` would re-parse as one element `f(x, g(y))`
-        // instead of two elements `f(x), g(y)`). Trailing-postfix safety (RFC §3.2
-        // case A: `§C{Box.unwrap} y.Length`) is handled by FieldAccessNode and
-        // peers detecting section markers in the inner emission and hoisting via
-        // HoistToTempVar — the same mechanism that protects zero-arg elision.
-        // Named args, multi-arg, or args whose first token is not in
-        // IsExpressionStart() keep the standard §A ... §/C form.
-        if (args.Count == 1 && !args[0].named && args[0].modifier == null)
-        {
-            bool canElide = _context?.UseImplicitCallCloser != false
-                         && _inInlineSiblingContext == 0
-                         && StartsWithExpressionStarter(args[0].argValue);
-            if (canElide)
-                return $"§C{{{fullTarget}}} {args[0].argValue}";
-        }
-        return $"§C{{{fullTarget}}} {string.Join(" ", args.Select(a => a.wrapped))} §/C";
+    public string Visit(BaseExpressionNode node)
+    {
+        return "base";
     }
 
     /// <summary>
@@ -3693,16 +2629,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return sb.ToString();
     }
 
-    public string Visit(ThisExpressionNode node)
-    {
-        return "§THIS";
-    }
-
-    public string Visit(BaseExpressionNode node)
-    {
-        return "§BASE";
-    }
-
     public string Visit(TupleLiteralNode node)
     {
         // Hoist elements that start with '(' to avoid tuple/lisp ambiguity
@@ -3721,94 +2647,39 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(MatchExpressionNode node)
     {
-        // Use block syntax that the Calor parser can understand
-        // §W{id} target
-        // §K pattern
-        //     body statements
-        // §/W{id}
-        var target = node.Target.Accept(this);
-        var id = string.IsNullOrEmpty(node.Id) ? $"sw{_switchCounter++}" : node.Id;
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"§W{{{id}}} {target}");
-
-        foreach (var matchCase in node.Cases)
+        var savedBuilder = _builder;
+        var savedIndent = _indentLevel;
+        var savedPending = _pendingHoistedLines.ToList();
+        _builder = new StringBuilder();
+        _indentLevel = 0;
+        _pendingHoistedLines.Clear();
+        try
         {
-            var pattern = EmitPattern(matchCase.Pattern);
-            sb.AppendLine($"  §K {pattern}");
-
-            foreach (var stmt in matchCase.Body)
-            {
-                var stmtStr = CaptureStatementOutput(stmt);
-                if (!string.IsNullOrWhiteSpace(stmtStr))
-                {
-                    // Indent ALL lines of multi-line statements (e.g., §LIST blocks)
-                    var trimmed = stmtStr.Trim();
-                    var lines = trimmed.Split('\n');
-                    foreach (var line in lines)
-                    {
-                        sb.AppendLine($"    {line.TrimEnd()}");
-                    }
-                }
-            }
-            sb.AppendLine("  §/K");
+            AppendLine($"match {node.Target.Accept(this)}");
+            Indent();
+            foreach (var matchCase in node.Cases)
+                EmitMatchCase(matchCase, expressionContext: true);
+            Dedent();
+            return RawCSharpFrame.RewriteOutsideFrames(_builder.ToString(),
+                text => text.TrimEnd('\r', '\n'));
         }
-
-        sb.Append($"§/W{{{id}}}");
-        return sb.ToString();
-    }
-
-    public string Visit(SomeExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return $"§SM {value}";
-    }
-
-    public string Visit(NoneExpressionNode node)
-    {
-        var typePart = node.TypeName != null ? $"{{{TypeMapper.CSharpToCalor(node.TypeName)}}}" : "";
-        return $"§NN{typePart}";
-    }
-
-    public string Visit(OkExpressionNode node)
-    {
-        var value = node.Value.Accept(this);
-        return $"§OK {value}";
-    }
-
-    public string Visit(ErrExpressionNode node)
-    {
-        var error = node.Error.Accept(this);
-        return $"§ERR {error}";
+        finally
+        {
+            _builder = savedBuilder;
+            _indentLevel = savedIndent;
+            _pendingHoistedLines.Clear();
+            _pendingHoistedLines.AddRange(savedPending);
+        }
     }
 
     public string Visit(ArrayCreationNode node)
     {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        var id = string.IsNullOrEmpty(node.Name) ? "_arr" : node.Name;
-
-        if (node.Initializer.Count > 0)
-        {
-            // Return inline format so this works in expression context (return, call args, etc.)
-            // Multi-line format is handled by EmitArrayCreationWithName for bind-statement context.
-            // Visit elements in inline-sibling context so that nested zero-arg
-            // calls keep explicit §/C (otherwise `§ARR{...} §C{A} §C{B}` would
-            // parse as ONE element `A(B())` instead of TWO `A(), B()`).
-            var elements = string.Join(" ", RenderInPlace(node.Initializer));
-            return $"§ARR{{{id}:{elementType}}} {elements} §/ARR{{{id}}}";
-        }
-        else if (node.Size != null)
-        {
-            var size = EmitSizeAttribute(node.Size);
-            // #1132: closed (a sized element cannot take its parent's closer); id first unless the parser reads the type first.
-            var head = AttributeHelper.IsLikelyType(elementType) && !AttributeHelper.IsLikelyType(id) ? $"{elementType}:{id}" : $"{id}:{elementType}";
-            return $"§ARR{{{head}:{size}}} §/ARR{{{id}}}";
-        }
-        else
-        {
-            // Empty array — use Array.Empty<T>() to avoid nested array parsing issues
-            return $"§C{{Array.Empty<{elementType}>}} §/C";
-        }
+        var (elementType, elementRanks) = CodeGen.CSharpEmitter.SplitArrayRanks(
+            TypeMapper.ToSurfaceType(node.ElementType));
+        var size = node.Size is null ? "" : AcceptInConditionalRegion(node.Size);
+        var initializer = node.Size is null || node.Initializer.Count > 0
+            ? $" {{ {string.Join(", ", RenderInPlace(node.Initializer))} }}" : "";
+        return $"new {elementType}[{size}]{elementRanks}{initializer}";
     }
 
     public string Visit(ArrayAccessNode node)
@@ -3818,110 +2689,45 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // or for the index, the next outer §A) as the call's inline argument.
         var array = AcceptInInlineSibling(node.Array);
         var index = AcceptInInlineSibling(node.Index);
-        if (_inInterpolation)
-            return $"{array}[{index}]";
-        if (node.Array is ReferenceNode)
-            return $"§IDX{{{array}}} {index}";
-        return $"§IDX {array} {index}";
+        return $"{EmitPostfixOperand(node.Array)}[{index}]";
     }
 
     public string Visit(ArrayLengthNode node)
     {
         var array = node.Array.Accept(this);
-        return $"{array}.len";
+        return $"{array}.Length";
     }
 
     public string Visit(LambdaExpressionNode node)
     {
-        // Build §LAM{id:p1:t1:p2:t2} header
-        var header = BuildLambdaHeader(node);
-
-        // Position 2 (§3.3 / §5): §LAM{lam1:x:i32} §E{…}. The parser has always read
-        // this tag; the emitter never wrote it back, so a lambda row did not survive a
-        // round trip. An EMPTY §E{} is emitted too — §3.5 gives "declared pure" and
-        // "no row" different meanings.
-        var lambdaRow = node.Effects != null ? " " + FormatEffectsTag(node.Effects) : "";
-
-        if (node.IsExpressionLambda && node.ExpressionBody != null)
-        {
-            // Inline-sibling context: the body is space-joined between §LAM{...}
-            // and §/LAM{...} on a single emitted line, so any one-arg §C{...} arg
-            // inside the body (v0.6.3 RFC §2.1) would absorb the §/LAM as its
-            // inline argument and corrupt the AST. Mirrors the v0.6.1 zero-arg
-            // discipline at all other sibling-context sites.
-            _lambdaBodyDepth++;
-            string body;
-            try { body = AcceptInInlineSibling(node.ExpressionBody); }
-            finally { _lambdaBodyDepth--; }
-            return $"§LAM{{{header}}}{lambdaRow} {body} §/LAM{{{node.Id}}}";
-        }
-        else if (node.StatementBody != null && node.StatementBody.Count > 0)
-        {
-            // Short lambdas (1-2 statements) are space-joined on one line. The
-            // statements are captured in inline-sibling context so any nested
-            // zero-arg §C{...} keeps §/C — otherwise the next statement's leading
-            // token is absorbed as the call's inline argument (v0.6.1 loop-4
-            // devil's-advocate finding #1). The capture is reused for the block
-            // form below, so the body is visited exactly once.
-            if (TryRenderStatementLambdaInline(node, header, lambdaRow, out var inline, out var stmts))
-                return inline;
-
-            // Longer (or multi-line) lambdas in expression position — a §R operand,
-            // an object-initializer value, a call argument, an assignment RHS —
-            // are hoisted to a §B{_hoistLamNNN} block at the enclosing statement's
-            // indent and referenced by name (#903 cluster 1). The block's lines are
-            // queued exactly like any other hoisted binding, so they flush ahead of
-            // the statement that uses the lambda and inherit its column.
-            // NOT while inside another lambda's body (review C1): the hoisted §B
-            // would land ahead of the enclosing statement, outside the outer
-            // lambda's parameter scope, and the emitted Calor would reference a
-            // parameter that is not in scope there. In that case fall through to
-            // the in-place block form below, which stays inside the body.
-            if (_memberBodyDepth > 0 && _lambdaBodyDepth == 0)
-            {
-                var name = FreshTemp("_hoistLam");
-                _pendingHoistedLines.AddRange(
-                    BuildBlockLambdaLines($"§B{{{name}}} ", header, lambdaRow, node.Id, stmts));
-                return name;
-            }
-
-            // Rendered in place at the CURRENT indent when there is no statement to
-            // hoist ahead of (a field initializer at type scope, e.g. a collection
-            // initializer of lambdas) or when hoisting would escape an enclosing
-            // lambda's scope (C1) —
-            // body one level deeper, §/LAM at the opener's column — the same
-            // absolute-indent convention Visit(NewExpressionNode) uses for its own
-            // continuation lines. (The old string fixed the body at column 2 and the
-            // closer at column 0, which the lexer rejected with Calor0099.)
-            var indent = new string(' ', _indentLevel * 2);
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"§LAM{{{header}}}{lambdaRow}");
-            foreach (var line in BuildBlockLambdaLines("", header, lambdaRow, node.Id, stmts).Skip(1))
-                sb.Append('\n').Append(line.Length == 0 ? "" : indent).Append(line);
-            return sb.ToString();
-        }
-        else
-        {
-            // Empty lambda
-            return $"§LAM{{{header}}}{lambdaRow} §/LAM{{{node.Id}}}";
-        }
+        var parameters = string.Join(", ", node.Parameters.Select(parameter =>
+            (parameter.TypeName is null ? "" : $"{TypeMapper.ToSurfaceType(parameter.TypeName)}:")
+            + EscapeCalorIdentifier(parameter.Name)));
+        var head = (node.IsStatic ? "static " : "") + (node.IsAsync ? "async " : "")
+            + $"({parameters}){FormatEffectRow(node.Effects)} =>";
+        if (node.ExpressionBody is not null)
+            return head + " " + AcceptInConditionalRegion(node.ExpressionBody);
+        var statements = CaptureLambdaStatements(node, inlineSibling: false);
+        return head + "\n" + string.Join("\n", statements.Select(statement =>
+            RawCSharpFrame.RewriteOutsideFrames(statement,
+                text => "  " + text.Replace("\n", "\n  ", StringComparison.Ordinal))));
     }
 
     public string Visit(LambdaParameterNode node)
     {
         if (node.TypeName != null)
         {
-            return $"{TypeMapper.CSharpToCalor(node.TypeName)}:{node.Name}";
+            return $"{TypeMapper.ToSurfaceType(node.TypeName)}:{node.Name}";
         }
         return node.Name;
     }
 
     public string Visit(AwaitExpressionNode node)
     {
-        var awaited = node.Awaited.Accept(this);
-        if (_inInterpolation)
-            return $"await {awaited}";
-        return $"§AWAIT {awaited}";
+        var awaited = node.ConfigureAwait is { } configure
+            ? $"{EmitPostfixOperand(node.Awaited)}.ConfigureAwait({(configure ? "true" : "false")})"
+            : AcceptInConditionalRegion(node.Awaited);
+        return $"await {awaited}";
     }
 
     public string Visit(InterpolatedStringNode node)
@@ -3933,51 +2739,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             if (part is InterpolatedStringTextNode textPart)
             {
-                var escaped = node.IsMultiline
-                    ? textPart.Text
-                        .Replace("\\", "\\\\")
-                        .Replace("\"", "\\\"")
-                        .Replace("${", "\\${")
-                    : textPart.Text
-                        .Replace("\\", "\\\\")
-                        .Replace("\"", "\\\"")
-                        .Replace("\n", "\\n")
-                        .Replace("\r", "\\r")
-                        .Replace("\t", "\\t")
-                        .Replace("${", "\\${");
-                parts.Append(escaped);
+                parts.Append(EscapeStringText(textPart.Text, node.IsMultiline));
             }
             else if (part is InterpolatedStringExpressionNode exprPart)
             {
-                parts.Append("${");
-                if (exprPart.Intent == InterpolationPartIntent.LiteralPlaceholder
-                    && !string.IsNullOrEmpty(exprPart.SourceText))
-                {
-                    parts.Append(exprPart.SourceText);
-                    parts.Append("}");
-                    continue;
-                }
-
-                var savedInterpolation = _inInterpolation;
-                _inInterpolation = true;
-                var holeText = exprPart.Expression.Accept(this);
-                _inInterpolation = savedInterpolation;
-                // 0.25 F2 (#906): `${1}` reads back as literal placeholder text, so a digit-only
-                // int hole is written as the typed literal `${INT:1}`.
-                if (exprPart.Expression is IntLiteralNode && holeText.Length > 0 && holeText.All(char.IsAsciiDigit))
-                    holeText = "INT:" + holeText;
-                parts.Append(holeText);
-                if (!string.IsNullOrEmpty(exprPart.AlignmentClause))
-                {
-                    parts.Append(",");
-                    parts.Append(exprPart.AlignmentClause);
-                }
-                if (!string.IsNullOrEmpty(exprPart.FormatSpecifier))
-                {
-                    parts.Append(":");
-                    parts.Append(exprPart.FormatSpecifier);
-                }
-                parts.Append("}");
+                parts.Append(Visit(exprPart));
             }
         }
 
@@ -3996,42 +2762,35 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var savedInterpolation = _inInterpolation;
         _inInterpolation = true;
-        var alignment = !string.IsNullOrEmpty(node.AlignmentClause) ? $",{node.AlignmentClause}" : "";
-        var format = !string.IsNullOrEmpty(node.FormatSpecifier) ? $":{node.FormatSpecifier}" : "";
-        var result = $"${{{node.Expression.Accept(this)}{alignment}{format}}}";
-        _inInterpolation = savedInterpolation;
-        return result;
+        try
+        {
+            var alignment = !string.IsNullOrEmpty(node.AlignmentClause) ? $",{node.AlignmentClause}" : "";
+            var format = !string.IsNullOrEmpty(node.FormatSpecifier) ? $":{node.FormatSpecifier}" : "";
+            var hole = $"{node.Expression.Accept(this)}{alignment}{format}";
+            return node.Intent == InterpolationPartIntent.LiteralPlaceholder
+                ? "\\${" + EscapeStringText(node.SourceText ?? hole, multiline: false) + "}"
+                : "${" + hole + "}";
+        }
+        finally
+        {
+            _inInterpolation = savedInterpolation;
+        }
     }
 
     public string Visit(NullCoalesceNode node)
     {
-        // AcceptInInlineSibling: operands in Lisp (?? a b) form are space-separated,
-        // so a nested zero-arg call without explicit §/C would absorb b as its inline arg.
         var left = AcceptInConditionalRegion(node.Left);
         var right = AcceptInConditionalRegion(node.Right);
-        return $"(?? {left} {right})";
+        return $"({left} ?? {right})";
     }
 
     public string Visit(NullConditionalNode node)
     {
-        // AcceptInInlineSibling: in Lisp (?. target "member") form, target is space-separated
-        // from the member string literal. A naked zero-arg §C{Get} target would absorb the
-        // string literal as its inline argument on re-parse (Parser.IsExpressionStart accepts
-        // StrLiteral). Defect: v0.6.1 loop-5 devil's-advocate finding.
-        var target = AcceptInConditionalRegion(node.Target);
         // Sanitize member name: collapse whitespace/newlines to single space
         // (multi-line C# chains from converter can produce newlines in member names)
         var memberName = System.Text.RegularExpressions.Regex.Replace(node.MemberName, @"\s+", " ").Trim();
 
-        // Inside interpolation, use C# syntax to avoid nested quote conflicts
-        if (_inInterpolation)
-        {
-            return $"{target}?.{memberName}";
-        }
-
-        // Escape quotes and backslashes in member name for safe embedding in string literal
-        var escaped = memberName.Replace("\\", "\\\\").Replace("\"", "\\\"");
-        return $"(?. {target} \"{escaped}\")";
+        return $"{EmitPostfixOperand(node.Target)}?.{EscapeCalorIdentifier(memberName)}";
     }
 
     // Pattern-related methods
@@ -4041,13 +2800,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return pattern switch
         {
             WildcardPatternNode => "_",
-            VariablePatternNode vp => $"§VAR{{{vp.Name}}}",
+            VariablePatternNode vp => Visit(vp),
             LiteralPatternNode lp => lp.Literal.Accept(this),
-            SomePatternNode sp => $"§SM {EmitPattern(sp.InnerPattern)}",
-            NonePatternNode => "§NN",
-            OkPatternNode op => $"§OK {EmitPattern(op.InnerPattern)}",
-            ErrPatternNode ep => $"§ERR {EmitPattern(ep.InnerPattern)}",
-            VarPatternNode varp => $"§VAR{{{varp.Name}}}",
+            VarPatternNode varp => Visit(varp),
             TypePatternNode tp => Visit(tp),
             ConstantPatternNode cp => cp.Value.Accept(this),
             RelationalPatternNode rp => EmitRelationalPattern(rp),
@@ -4066,34 +2821,25 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private string EmitRelationalPattern(RelationalPatternNode node)
     {
-        // Map C# operator back to Calor keyword
-        var opKeyword = node.Operator switch
+        var operation = node.Operator switch
         {
-            ">=" => "gte",
-            "<=" => "lte",
-            ">" => "gt",
-            "<" => "lt",
-            "gte" => "gte",
-            "lte" => "lte",
-            "gt" => "gt",
-            "lt" => "lt",
-            _ => "gte"
+            ">=" or "gte" => ">=",
+            "<=" or "lte" => "<=",
+            ">" or "gt" => ">",
+            "<" or "lt" => "<",
+            _ => throw new ArgumentOutOfRangeException(nameof(node), $"Unknown relational pattern operator: {node.Operator}")
         };
         var value = node.Value.Accept(this);
-        return $"§PREL{{{opKeyword}}} {value}";
+        return $"{operation} {value}";
     }
 
     public string Visit(WildcardPatternNode node) => "_";
     public string Visit(TypePatternNode node) => node.BindingName is { } name
-        ? $"§PTYPE{{{node.TypeName}:{name}}}"
-        : $"§PTYPE{{{node.TypeName}}}";
-    public string Visit(VariablePatternNode node) => $"§VAR{{{node.Name}}}";
+        ? $"{TypeMapper.ToSurfaceType(node.TypeName)} {EscapeCalorIdentifier(name)}"
+        : $"{TypeMapper.ToSurfaceType(node.TypeName)} _";
+    public string Visit(VariablePatternNode node) => $"var {EscapeCalorIdentifier(node.Name)}";
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
-    public string Visit(SomePatternNode node) => $"§SM {EmitPattern(node.InnerPattern)}";
-    public string Visit(NonePatternNode node) => "§NN";
-    public string Visit(OkPatternNode node) => $"§OK {EmitPattern(node.InnerPattern)}";
-    public string Visit(ErrPatternNode node) => $"§ERR {EmitPattern(node.InnerPattern)}";
-    public string Visit(VarPatternNode node) => $"§VAR{{{node.Name}}}";
+    public string Visit(VarPatternNode node) => $"var {EscapeCalorIdentifier(node.Name)}";
     public string Visit(ConstantPatternNode node) => node.Value.Accept(this);
     public string Visit(NegatedPatternNode node) => $"(not {EmitPattern(node.Inner)})";
     public string Visit(OrPatternNode node) => $"(or {EmitPattern(node.Left)} {EmitPattern(node.Right)})";
@@ -4103,13 +2849,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(PositionalPatternNode node)
     {
         var patterns = string.Join(", ", node.Patterns.Select(EmitPattern));
-        return $"{node.TypeName}({patterns})";
+        return $"{TypeMapper.ToSurfaceType(node.TypeName)}({patterns})";
     }
 
     public string Visit(PropertyPatternNode node)
     {
         var matches = string.Join(", ", node.Matches.Select(m => m.Accept(this)));
-        var typePart = string.IsNullOrEmpty(node.TypeName) ? "" : $"{node.TypeName} ";
+        var typePart = string.IsNullOrEmpty(node.TypeName) ? "" : $"{TypeMapper.ToSurfaceType(node.TypeName)} ";
         return $"{typePart}{{ {matches} }}";
     }
 
@@ -4126,27 +2872,30 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ListPatternNode node)
     {
         var parts = new List<string>();
+        var slice = node.SlicePattern == null ? null
+            : node.SlicePattern.Name == "_" ? ".."
+            : $".. {Visit(node.SlicePattern)}";
         for (int i = 0; i < node.Patterns.Count; i++)
         {
-            if (node.SlicePattern != null && i == node.SliceIndex)
+            if (slice != null && i == node.SliceIndex)
             {
-                parts.Add($"§REST{{{node.SlicePattern.Name}}}");
+                parts.Add(slice);
             }
             parts.Add(EmitPattern(node.Patterns[i]));
         }
         // Slice at end (or no non-slice patterns before it)
-        if (node.SlicePattern != null && node.SliceIndex >= node.Patterns.Count)
+        if (slice != null && node.SliceIndex >= node.Patterns.Count)
         {
-            parts.Add($"§REST{{{node.SlicePattern.Name}}}");
+            parts.Add(slice);
         }
-        return $"§PLIST {string.Join(" ", parts)}";
+        return $"[{string.Join(", ", parts)}]";
     }
 
     // Type system nodes
     public string Visit(RecordDefinitionNode node)
     {
         var fields = string.Join(", ", node.Fields.Select(f =>
-            $"{TypeMapper.CSharpToCalor(f.TypeName)}:{f.Name}"));
+            $"{TypeMapper.ToSurfaceType(f.TypeName)}:{f.Name}"));
         AppendLine($"§D{{{node.Name}}} ({fields})");
         return "";
     }
@@ -4154,7 +2903,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(FieldDefinitionNode node)
     {
         var defaultValue = node.DefaultValue is null ? "" : $" = {node.DefaultValue.Accept(this)}";
-        return $"{TypeMapper.CSharpToCalor(node.TypeName)}:{node.Name}{defaultValue}";
+        return $"{TypeMapper.ToSurfaceType(node.TypeName)}:{node.Name}{defaultValue}";
     }
 
     public string Visit(UnionTypeDefinitionNode node)
@@ -4165,7 +2914,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var variant in node.Variants)
         {
             var fields = variant.Fields.Count > 0
-                ? $"({string.Join(", ", variant.Fields.Select(f => $"{TypeMapper.CSharpToCalor(f.TypeName)}:{f.Name}"))})"
+                ? $"({string.Join(", ", variant.Fields.Select(f => $"{TypeMapper.ToSurfaceType(f.TypeName)}:{f.Name}"))})"
                 : "";
             AppendLine($"§V{{{variant.Name}}}{fields}");
         }
@@ -4184,7 +2933,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TypeReferenceNode node)
     {
-        var typeName = TypeMapper.CSharpToCalor(node.Name);
+        var typeName = TypeMapper.ToSurfaceType(node.Name);
         return node.TypeArguments.Count == 0
             ? typeName
             : $"{typeName}<{string.Join(",", node.TypeArguments.Select(Visit))}>";
@@ -4193,12 +2942,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(EnumDefinitionNode node)
     {
         EmitDocComment(node);
-        // Format: §EN{id:Name:vis} or §EN{id:Name:vis:underlyingType}
-        var vis = GetVisibilityShorthand(node.Visibility);
+        // Format: §EN{Name:vis} or §EN{Name:vis:underlyingType}
+        var vis = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
         var attrs = EmitCSharpAttributes(node.CSharpAttributes);
         var header = node.UnderlyingType != null
-            ? $"§EN{{{node.Id}:{node.Name}:{vis}:{node.UnderlyingType}}}{attrs}"
-            : $"§EN{{{node.Id}:{node.Name}:{vis}}}{attrs}";
+            ? $"enum {EscapeCalorIdentifier(node.Name)}{vis} {TypeMapper.ToSurfaceType(node.UnderlyingType)}{attrs}"
+            : $"enum {EscapeCalorIdentifier(node.Name)}{vis}{attrs}";
         AppendLine(header);
         Indent();
 
@@ -4208,7 +2957,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         Dedent();
-        EmitBlockEnd($"§/EN{{{node.Id}}}");
         return "";
     }
 
@@ -4241,42 +2989,74 @@ public sealed class CalorEmitter : IAstVisitor<string>
             }
         }
         var line = value != null
-            ? $"{node.Name} = {value}"
-            : node.Name;
+            ? $"{EscapeCalorIdentifier(node.Name)} = {value}"
+            : EscapeCalorIdentifier(node.Name);
         AppendLine(line);
         return "";
     }
 
     public string Visit(EnumExtensionNode node)
     {
-        // Format: §EEXT{id:EnumName} (note: §EXT is for class inheritance)
-        AppendLine($"§EEXT{{{node.Id}:{node.EnumName}}}");
-        Indent();
+        return Visit(LowerEnumExtension(node));
+    }
 
-        foreach (var method in node.Methods)
+    internal static ClassDefinitionNode LowerEnumExtension(EnumExtensionNode node)
+    {
+        var enumName = CodeGen.CSharpEmitter.SanitizeIdentifier(node.EnumName);
+        if (enumName.Contains('.') || enumName.Contains(':'))
+            throw new InvalidOperationException("An enum extension requires an unqualified enum name.");
+        var methods = node.Methods.Select(function =>
         {
-            Visit(method);
-            AppendLine();
-        }
-
-        Dedent();
-        EmitBlockEnd($"§/EEXT{{{node.Id}}}");
-        return "";
+            if (function.Examples.Count > 0 || function.Assumptions.Count > 0 || function.Properties.Count > 0)
+                throw new InvalidOperationException("Enum extension metadata requires native method metadata support.");
+            var receiver = function.Parameters.FirstOrDefault(parameter =>
+                parameter.TypeName.Equals(enumName, StringComparison.OrdinalIgnoreCase)
+                || parameter.Name.Equals("self", StringComparison.OrdinalIgnoreCase));
+            if (receiver != null && !ReferenceEquals(receiver, function.Parameters[0]))
+                throw new InvalidOperationException("An enum extension receiver must be the first parameter.");
+            var parameters = function.Parameters.Select(parameter =>
+                ReferenceEquals(parameter, receiver)
+                    ? parameter.CopyMetadataTo(new ParameterNode(parameter.Span, parameter.Name, parameter.TypeName,
+                        parameter.Modifier | ParameterModifier.This, parameter.Attributes, parameter.CSharpAttributes,
+                        parameter.DefaultValue, parameter.InlineRefinement, parameter.IdentifierSpan,
+                        parameter.TypeNameSpan, parameter.Row))
+                    : parameter).ToArray();
+            var method = function.CopyMetadataTo(new MethodNode(function.Span, function.LocalId, function.Name,
+                function.Visibility, MethodModifiers.Static, function.TypeParameters, parameters, function.Output,
+                function.Effects, function.Preconditions, function.Postconditions, function.Body, function.Attributes,
+                [], function.IsAsync, function.IdentifierSpan, function.Since, function.Deprecated,
+                function.BreakingChanges)
+            {
+                EffectParameters = function.EffectParameters
+            });
+            var guidance = new CalorEmitter();
+            guidance.EmitRetiredFunctionMetadata(function);
+            method.DocComment = string.Join("\n", new[] { function.DocComment }
+                .Concat(guidance._builder.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => line.StartsWith("/// ", StringComparison.Ordinal) ? line[4..] : line[3..]))
+                .Where(line => line != null));
+            if (function.ToolingId != null) method.ToolingIdAllocationKind = function.ToolingIdAllocationKind ?? Ids.IdKind.Function;
+            return method;
+        }).ToArray();
+        var result = node.CopyMetadataTo(new ClassDefinitionNode(node.Span, node.LocalId,
+            (enumName + "Extensions").TrimStart('@'), false, false, false, true, null,
+            [], [], [], [], [], methods, [], [], node.Attributes, [],
+            visibility: Visibility.Public, isModule: true));
+        if (node.ToolingId != null) result.ToolingIdAllocationKind = Ids.IdKind.EnumExtension;
+        return result;
     }
 
     public string Visit(RecordCreationNode node)
     {
-        var fields = string.Join(
-            " ",
-            node.Fields.Select(f =>
-                $"§FL{{{f.FieldName}}} {f.Value.Accept(this)}"));
-        return fields.Length == 0
-            ? $"§D{{{node.TypeName}}}"
-            : $"§D{{{node.TypeName}}} {fields}";
+        return Visit(new NewExpressionNode(
+            node.Span, node.TypeName, [],
+            node.Fields.Select(field => field.Value).ToArray(), [],
+            typeNameSpan: node.TypeNameSpan,
+            argumentNames: node.Fields.Select(field => (string?)field.FieldName).ToArray()));
     }
 
     public string Visit(FieldAssignmentNode node)
-        => $"§FL{{{node.FieldName}}} {node.Value.Accept(this)}";
+        => $"§A[{node.FieldName}] {node.Value.Accept(this)}";
 
     // Generic type nodes
     public string Visit(TypeParameterNode node)
@@ -4297,9 +3077,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             TypeConstraintKind.Class => "class",
             TypeConstraintKind.Struct => "struct",
             TypeConstraintKind.New => "new",
-            TypeConstraintKind.Interface => node.TypeName ?? "",
-            TypeConstraintKind.BaseClass => node.TypeName ?? "",
-            TypeConstraintKind.TypeName => node.TypeName ?? "",
+            TypeConstraintKind.Interface => TypeMapper.ToSurfaceType(node.TypeName ?? ""),
+            TypeConstraintKind.BaseClass => TypeMapper.ToSurfaceType(node.TypeName ?? ""),
+            TypeConstraintKind.TypeName => TypeMapper.ToSurfaceType(node.TypeName ?? ""),
             TypeConstraintKind.NotNull => "notnull",
             TypeConstraintKind.Unmanaged => "unmanaged",
             TypeConstraintKind.ClassNullable => "class?",
@@ -4320,7 +3100,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (tp.Constraints.Count > 0)
             {
                 var constraints = string.Join(", ", tp.Constraints.Select(c => Visit(c)));
-                AppendLine($"§WHERE {tp.Name} : {constraints}");
+                AppendLine($"where {EscapeCalorIdentifier(tp.Name)} : {constraints}");
             }
         }
     }
@@ -4328,78 +3108,67 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(GenericTypeNode node)
     {
         if (node.TypeArguments.Count == 0)
-            return TypeMapper.CSharpToCalor(node.TypeName);
-        var args = string.Join(", ", node.TypeArguments.Select(TypeMapper.CSharpToCalor));
-        return $"{TypeMapper.CSharpToCalor(node.TypeName)}<{args}>";
+            return TypeMapper.ToSurfaceType(node.TypeName);
+        var args = string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType));
+        return $"{TypeMapper.ToSurfaceType(node.TypeName)}<{args}>";
     }
 
     // Delegate and event nodes
     public string Visit(DelegateDefinitionNode node)
     {
-        AppendLine($"§DEL{{{node.Id}:{node.Name}}}");
+        EmitDocComment(node);
+        var parameters = TryFormatInlineParams(node.Parameters)
+            ?? throw new InvalidOperationException("Native delegates require inline parameters.");
+        var output = node.Output == null ? "" : $" → {TypeMapper.ToSurfaceType(node.Output.TypeName)}{FormatEffectRow(node.Output.Row)}";
+        AppendLine($"delegate {EscapeCalorIdentifier(node.Name)} ({parameters}){output}");
         Indent();
-
-        foreach (var param in node.Parameters)
-        {
-            AppendLine(Visit(param));
-        }
-        if (node.Output != null)
-        {
-            AppendLine(Visit(node.Output));
-        }
-        if (node.Effects != null)
-        {
-            // Was `string.Join(",", node.Effects.Effects)`, which stringifies
-            // KeyValuePairs and emits `§E{[console, write]}` — a §DEL row did not
-            // survive a round trip at all. P4 pins position 3, so it does now.
-            AppendLine(FormatEffectsTag(node.Effects));
-        }
+        AppendLine(node.Effects == null ? "! unknown" : FormatEffectsTag(node.Effects));
 
         Dedent();
-        EmitBlockEnd($"§/DEL{{{node.Id}}}");
         return "";
     }
 
     public string Visit(EventDefinitionNode node)
     {
-        var visibility = GetVisibilityShorthand(node.Visibility);
-        var delegateType = TypeMapper.CSharpToCalor(node.DelegateType);
+        EmitDocComment(node);
+        var visibility = node.Visibility == Visibility.Public ? "" : " " + GetVisibilityShorthand(node.Visibility);
+        var modifiers = node.IsStatic ? " static" : "";
+        var delegateType = TypeMapper.ToSurfaceType(node.DelegateType);
 
         if (node.HasAccessors)
         {
-            AppendLine($"§EVT{{{node.Id}:{node.Name}:{visibility}:{delegateType}}}");
+            AppendLine($"event {delegateType}:{EscapeCalorIdentifier(node.Name)}{visibility}{modifiers}");
             Indent();
+            _memberBodyDepth++;
 
             if (node.AddBody != null)
             {
-                AppendLine("§EADD");
+                AppendLine("add");
                 Indent();
                 foreach (var stmt in node.AddBody)
                 {
                     stmt.Accept(this);
                 }
                 Dedent();
-                EmitBlockEnd("§/EADD");
             }
 
             if (node.RemoveBody != null)
             {
-                AppendLine("§EREM");
+                AppendLine("remove");
                 Indent();
                 foreach (var stmt in node.RemoveBody)
                 {
                     stmt.Accept(this);
                 }
                 Dedent();
-                EmitBlockEnd("§/EREM");
             }
 
+            _memberBodyDepth--;
             Dedent();
-            EmitBlockEnd($"§/EVT{{{node.Id}}}");
         }
         else
         {
-            AppendLine($"§EVT{{{node.Id}:{node.Name}:{visibility}:{delegateType}}}");
+            AppendLine($"event {delegateType}:{EscapeCalorIdentifier(node.Name)}{visibility}{modifiers}");
         }
 
         return "";
@@ -4424,68 +3193,47 @@ public sealed class CalorEmitter : IAstVisitor<string>
     // Modern operator nodes
     public string Visit(RangeExpressionNode node)
     {
-        var parts = new List<string> { "§RANGE" };
-        if (node.Start != null)
-        {
-            // AcceptInInlineSibling: §RANGE start end emits space-separated operands;
-            // a naked zero-arg §C{Foo} start would absorb end as inline arg on re-parse.
-            // Defect: v0.6.1 loop-4 devil's-advocate finding #3.
-            var start = AcceptInInlineSibling(node.Start);
-            if (ContainsSectionMarker(start))
-                start = HoistToTempVar(start);
-            parts.Add(start);
-        }
-        if (node.End != null)
-        {
-            var end = AcceptInInlineSibling(node.End);
-            // Don't hoist §^ expressions — they're lightweight range operands
-            if (ContainsSectionMarker(end) && !end.StartsWith("§^"))
-                end = HoistToTempVar(end);
-            parts.Add(end);
-        }
-        return string.Join(" ", parts);
+        var start = node.Start is null ? "" : AcceptInConditionalRegion(node.Start);
+        var end = node.End is null ? "" : AcceptInConditionalRegion(node.End);
+        return $"({start}..{end})";
     }
 
     public string Visit(IndexFromEndNode node)
     {
-        var offset = node.Offset.Accept(this);
-        if (ContainsSectionMarker(offset))
-            offset = HoistToTempVar(offset);
-        return $"§^ {offset}";
+        var offset = AcceptInConditionalRegion(node.Offset);
+        return $"(^{offset})";
     }
 
     public string Visit(WithExpressionNode node)
     {
-        // Inline-sibling context for the target: §WITH target ... §/WITH is
-        // emitted on a single line, so an elided one-arg §C{f} target form
-        // (v0.6.3 RFC §2.1) would absorb the following §SET / §/WITH as its
-        // inline argument.
-        var target = AcceptInInlineSibling(node.Target);
-        var assignments = string.Join(" ", node.Assignments.Select(a => AcceptInInlineSibling(a)));
-        if (assignments.Length > 0)
-            return $"§WITH {target} {assignments} §/WITH";
-        return $"§WITH {target} §/WITH";
+        var target = AcceptInConditionalRegion(node.Target);
+        var assignments = string.Join(", ", node.Assignments.Select(a => a.Accept(this)));
+        return $"({target} with {{ {assignments} }})";
     }
 
     public string Visit(WithPropertyAssignmentNode node)
     {
-        var value = AcceptInInlineSibling(node.Value);
-        return $"§SET{{{node.PropertyName}}} {value}";
+        var value = AcceptInConditionalRegion(node.Value);
+        return $"{EscapeCalorIdentifier(node.PropertyName)} = {value}";
     }
 
-    // Extended metadata nodes - emit as comments
+    // Retained semantic metadata keeps its current syntax until its replacement is measured.
     public string Visit(ExampleNode node)
     {
         var expr = node.Expression.Accept(this);
         var expected = node.Expected.Accept(this);
-        AppendLine($"§EX{{{node.Id ?? ""}}} {expr} == {expected}");
+        var message = node.Message != null ? $":{Visit(new StringLiteralNode(node.Span, node.Message))}" : "";
+        var attributes = node.Id != null || node.Message != null
+            ? $"{{{Visit(new StringLiteralNode(node.Span, node.Id ?? ""))}{message}}}"
+            : "";
+        AppendLine($"§EX{attributes} {expr} -> {expected}");
         return "";
     }
 
     public string Visit(IssueNode node)
     {
         var id = node.Id != null ? $"{node.Id}:" : "";
-        AppendLine($"§{node.Kind.ToString().ToUpper()}{{{id}{node.Category ?? ""}}} {node.Description}");
+        EmitDocumentationText($"{node.Kind} {id}{node.Category ?? ""} ({node.Priority}): {node.Description}");
         return "";
     }
 
@@ -4499,7 +3247,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(UsesNode node)
     {
         var deps = string.Join(", ", node.Dependencies.Select(d => d.Accept(this)));
-        AppendLine($"§USES {deps}");
+        EmitDocumentationText($"Uses: {deps}");
         return "";
     }
 
@@ -4507,14 +3255,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var deps = string.Join(", ", node.Dependents.Select(d => d.Accept(this)));
         var external = node.HasUnknownCallers ? ", [external]" : "";
-        AppendLine($"§USEDBY {deps}{external}");
+        EmitDocumentationText($"Used by: {deps}{external}");
         return "";
     }
 
     public string Visit(AssumeNode node)
     {
-        var category = node.Category.HasValue ? $"{{{node.Category.Value.ToString().ToLower()}}}" : "";
-        AppendLine($"§ASSUME{category} {node.Description}");
+        var category = node.Category.HasValue ? $"{{{node.Category.Value.ToString().ToLowerInvariant()}}}" : "";
+        AppendLine($"§AS{category} {Visit(new StringLiteralNode(node.Span, node.Description))}");
         return "";
     }
 
@@ -4525,50 +3273,59 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.SpaceComplexity.HasValue) parts.Add($"space:{FormatComplexity(node.SpaceComplexity.Value)}");
         if (node.CustomExpression != null) parts.Add(node.CustomExpression);
         var worst = node.IsWorstCase ? "worst:" : "";
-        AppendLine($"§COMPLEXITY{{{worst}{string.Join(",", parts)}}}");
+        EmitDocumentationText($"Complexity: {worst}{string.Join(",", parts)}");
         return "";
     }
 
     public string Visit(SinceNode node)
     {
-        AppendLine($"§SINCE{{{node.Version}}}");
+        AppendLine($"/// since {node.Version}");
         return "";
     }
 
     public string Visit(DeprecatedNode node)
     {
-        var replacement = node.Replacement != null ? $":use={node.Replacement}" : "";
-        var removed = node.RemovedInVersion != null ? $":removed={node.RemovedInVersion}" : "";
-        AppendLine($"§DEPRECATED{{{node.SinceVersion}{replacement}{removed}}}");
+        if (node.Reason != null || node.RemovedInVersion != null)
+            throw new InvalidOperationException(
+                "The selected documentation syntax cannot preserve deprecation reason/removal fields. " +
+                "A measured structured-documentation replacement is required before formatting these fields.");
+        var replacement = node.Replacement != null
+            ? $" {node.Replacement}" : "";
+        if (node.Replacement?.Any(char.IsWhiteSpace) == true)
+            throw new InvalidOperationException("The selected deprecation replacement must be one word.");
+        AppendLine($"/// deprecated {node.SinceVersion}{replacement}");
         return "";
     }
 
     public string Visit(BreakingChangeNode node)
     {
-        AppendLine($"§BREAKING{{{node.Version}}} {node.Description}");
+        AppendLine($"/// breaking {node.Version} "
+            + Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(node.Description, quote: true));
         return "";
     }
 
     public string Visit(DecisionNode node)
     {
-        AppendLine($"§DECISION{{{node.Id}:{node.Title}}}");
-        Indent();
-        AppendLine($"chosen: {node.ChosenOption}");
+        EmitDocumentationText($"Decision {node.Id}: {node.Title}");
+        EmitDocumentationText($"Chosen: {node.ChosenOption}");
         foreach (var reason in node.ChosenReasons)
         {
-            AppendLine($"reason: {reason}");
+            EmitDocumentationText($"Reason: {reason}");
         }
-        Dedent();
-        EmitBlockEnd("§/DECISION");
+        foreach (var rejected in node.RejectedOptions) Visit(rejected);
+        if (node.Context != null) EmitDocumentationText($"Context: {node.Context}");
+        if (node.Date != null)
+            EmitDocumentationText($"Date: {node.Date.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}");
+        if (node.Author != null) EmitDocumentationText($"Author: {node.Author}");
         return "";
     }
 
     public string Visit(RejectedOptionNode node)
     {
-        AppendLine($"rejected: {node.Name}");
+        EmitDocumentationText($"Rejected: {node.Name}");
         foreach (var reason in node.Reasons)
         {
-            AppendLine($"  reason: {reason}");
+            EmitDocumentationText($"Reason: {reason}");
         }
         return "";
     }
@@ -4576,21 +3333,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ContextNode node)
     {
         var partial = node.IsPartial ? ":partial" : "";
-        AppendLine($"§CONTEXT{partial}");
+        EmitDocumentationText($"Context{partial}");
+        foreach (var file in node.VisibleFiles) EmitDocumentationText($"Visible: {Visit(file)}");
+        foreach (var file in node.HiddenFiles) EmitDocumentationText($"Hidden: {Visit(file)}");
+        if (node.FocusTarget != null) EmitDocumentationText($"Focus: {node.FocusTarget}");
         return "";
     }
 
     public string Visit(FileRefNode node)
     {
         var desc = node.Description != null ? $" ({node.Description})" : "";
-        return $"§FILE{{{node.FilePath}}}{desc}";
+        return $"{node.FilePath}{desc}";
     }
 
     public string Visit(PropertyTestNode node)
     {
-        var quantifiers = node.Quantifiers.Count > 0 ? $"∀{string.Join(",", node.Quantifiers)}: " : "";
+        var quantifiers = node.Quantifiers.Count > 0 ? $"forall {string.Join(",", node.Quantifiers)}: " : "";
         var predicate = node.Predicate.Accept(this);
-        AppendLine($"§PROP{{{quantifiers}{predicate}}}");
+        AppendLine($"§PT {quantifiers}{predicate}");
         return "";
     }
 
@@ -4598,20 +3358,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var acquired = node.Acquired.HasValue ? $":acquired={node.Acquired.Value:O}" : "";
         var expires = node.Expires.HasValue ? $":expires={node.Expires.Value:O}" : "";
-        AppendLine($"§LOCK{{agent={node.AgentId}{acquired}{expires}}}");
+        EmitDocumentationText($"Lock: agent={node.AgentId}{acquired}{expires}");
         return "";
     }
 
     public string Visit(AuthorNode node)
     {
         var task = node.TaskId != null ? $":task={node.TaskId}" : "";
-        AppendLine($"§AUTHOR{{agent={node.AgentId}:date={node.Date:yyyy-MM-dd}{task}}}");
+        var date = node.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        EmitDocumentationText($"Author: agent={node.AgentId}:date={date}{task}");
         return "";
     }
 
     public string Visit(TaskRefNode node)
     {
-        AppendLine($"§TASK{{{node.TaskId}}} {node.Description}");
+        EmitDocumentationText($"Task {node.TaskId}: {node.Description}");
         return "";
     }
 
@@ -4621,13 +3382,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         return visibility switch
         {
-            Visibility.Public => "pub",
-            Visibility.ProtectedInternal => "prot-int",
-            Visibility.PrivateProtected => "priv-prot",
-            Visibility.Protected => "prot",
-            Visibility.Internal => "int",
-            Visibility.Private => "priv",
-            _ => "priv"
+            Visibility.Public => "public",
+            Visibility.ProtectedInternal => "protected internal",
+            Visibility.PrivateProtected => "private protected",
+            Visibility.Protected => "protected",
+            Visibility.Internal => "internal",
+            Visibility.Private => "private",
+            _ => throw new InvalidOperationException($"Unsupported visibility: {visibility}.")
         };
     }
 
@@ -4659,45 +3420,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         "true", "false", "null"
     };
 
-    /// <summary>
-    /// Wraps a name in backticks if it's a C# reserved word.
-    /// This is the inverse of CSharpEmitter.SanitizeIdentifier which adds @ prefix.
-    /// Handles both bare names ("class") and @-prefixed names ("@class") from Roslyn.
-    /// </summary>
-    /// <summary>
-    /// Converts C# verbatim string literals (@"...") in raw passthrough targets
-    /// to properly escaped regular string literals for Calor.
-    /// </summary>
-    private static string ConvertVerbatimStringsInTarget(string target)
-    {
-        // Find @"..." patterns and convert them
-        var result = System.Text.RegularExpressions.Regex.Replace(target, @"@""((?:""""|[^""])*)""", match =>
-        {
-            // Decode verbatim string: "" → " and everything else is literal
-            var content = match.Groups[1].Value.Replace("\"\"", "\"");
-            // Re-escape for Calor regular strings
-            content = content
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\n", "\\n")
-                .Replace("\r", "\\r")
-                .Replace("\t", "\\t");
-            return $"\"{content}\"";
-        });
-        return result;
-    }
-
     private static string EscapeCalorIdentifier(string name)
     {
         // Strip @ prefix if present (Roslyn's Identifier.Text includes it for verbatim identifiers)
         var bareName = name.StartsWith('@') ? name[1..] : name;
-        return CSharpReservedWords.Contains(bareName) ? $"`{bareName}`" : bareName;
+        return CSharpReservedWords.Contains(bareName) || Lexer.KeywordNames.Contains(bareName)
+            ? $"@{bareName}" : bareName;
     }
 
-    private void EmitEffects(EffectsNode? effects)
+    private void EmitEffects(EffectsNode? effects, bool required = false)
     {
-        if (effects == null || (effects.Effects.Count == 0 && effects.EffectVariables.Count == 0))
+        if (effects == null)
+        {
+            if (required)
+                AppendLine("!");
             return;
+        }
 
         AppendLine(FormatEffectsTag(effects));
     }
@@ -4709,11 +3447,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     /// </summary>
     private static string FormatEffectsTag(EffectsNode effects)
     {
+        if (effects.IsUnknown)
+            return "! unknown";
         var effectCodes = effects.Effects
             .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
             .Distinct()
             .Concat(effects.EffectVariables);
-        return $"§E{{{string.Join(",", effectCodes)}}}";
+        var codes = string.Join(", ", effectCodes);
+        return codes.Length == 0 ? "!" : $"! {codes}";
     }
 
     /// <summary>
@@ -4747,7 +3488,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         IReadOnlyList<EffectParameterInfo> effectParameters)
     {
         var rendered = FormatTypeParameterList(typeParameters, effectParameters);
-        return effectParameters.Count > 0 ? ("", rendered) : (rendered, "");
+        return effectParameters.Count > 0 ? ("", " " + rendered) : (rendered, "");
     }
 
     /// <summary>
@@ -4766,7 +3507,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var binder in effectParameters)
         {
             if (binder.Ordinal >= 0 && binder.Ordinal < slots.Length && slots[binder.Ordinal] is null)
-                slots[binder.Ordinal] = $"eff {binder.Name}";
+                slots[binder.Ordinal] = $"! {EscapeCalorIdentifier(binder.Name)}";
         }
 
         var next = 0;
@@ -4807,35 +3548,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _ => throw new ArgumentOutOfRangeException(nameof(op),
             $"Unhandled binary operator in Calor emitter: {op}")
     };
-
-    private static string GetCalorOperatorKind(BinaryOperator op)
-    {
-        return op switch
-        {
-            BinaryOperator.Add => "add",
-            BinaryOperator.Subtract => "sub",
-            BinaryOperator.Multiply => "mul",
-            BinaryOperator.Divide => "div",
-            BinaryOperator.Modulo => "mod",
-            BinaryOperator.Power => "pow",
-            BinaryOperator.Equal => "eq",
-            BinaryOperator.NotEqual => "neq",
-            BinaryOperator.LessThan => "lt",
-            BinaryOperator.LessOrEqual => "lte",
-            BinaryOperator.GreaterThan => "gt",
-            BinaryOperator.GreaterOrEqual => "gte",
-            BinaryOperator.And => "and",
-            BinaryOperator.Or => "or",
-            BinaryOperator.BitwiseAnd => "band",
-            BinaryOperator.BitwiseOr => "bor",
-            BinaryOperator.BitwiseXor => "xor",
-            BinaryOperator.LeftShift => "shl",
-            BinaryOperator.RightShift => "shr",
-            // #774: no silent fallback to "add" — exhaustive over BinaryOperator.
-            _ => throw new ArgumentOutOfRangeException(nameof(op),
-                $"Unhandled binary operator in Calor emitter: {op}")
-        };
-    }
 
     private static string FormatComplexity(ComplexityClass c)
     {
@@ -4883,7 +3595,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private static string FormatAttributeArgument(CalorAttributeArgument arg)
     {
-        var value = arg.GetCalorFormattedValue();
+        var value = arg.Value is string text
+            ? $"\"{EscapeStringText(text, multiline: false)}\""
+            : arg.GetCalorFormattedValue();
 
         if (arg.IsNamed)
         {
@@ -4896,62 +3610,100 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(QuantifierVariableNode node)
     {
-        return $"({node.Name} {node.TypeName})";
+        return $"{TypeMapper.ToSurfaceType(node.TypeName)}:{EscapeCalorIdentifier(node.Name)}";
     }
 
     public string Visit(ForallExpressionNode node)
-    {
-        // AcceptInInlineSibling: body in Lisp (forall (vars) body) is space-separated
-        // from the var list; a nested zero-arg call without §/C would absorb the trailing ')'.
-        var vars = string.Join(" ", node.BoundVariables.Select(v => v.Accept(this)));
-        var body = AcceptInInlineSibling(node.Body);
-        return $"(forall ({vars}) {body})";
-    }
+        => node.Body is ImplicationExpressionNode implication
+            ? EmitNativeQuantifier("forall", node.BoundVariables, implication.Antecedent, implication.Consequent)
+            : EmitNativeQuantifier("forall", node.BoundVariables, new BoolLiteralNode(node.Span, true), node.Body);
 
     public string Visit(ExistsExpressionNode node)
+        => node.Body is BinaryOperationNode { Operator: BinaryOperator.And } conjunction
+            ? EmitNativeQuantifier("exists", node.BoundVariables, conjunction.Left, conjunction.Right)
+            : EmitNativeQuantifier("exists", node.BoundVariables, new BoolLiteralNode(node.Span, true), node.Body);
+
+    private string EmitNativeQuantifier(string kind, IReadOnlyList<QuantifierVariableNode> variables,
+        ExpressionNode guard, ExpressionNode predicate)
     {
-        // See ForallExpressionNode.
-        var vars = string.Join(" ", node.BoundVariables.Select(v => v.Accept(this)));
-        var body = AcceptInInlineSibling(node.Body);
-        return $"(exists ({vars}) {body})";
+        var bounds = new List<ExpressionNode>();
+        void Collect(ExpressionNode expression)
+        {
+            if (expression is BinaryOperationNode { Operator: BinaryOperator.And } conjunction)
+            {
+                Collect(conjunction.Left);
+                Collect(conjunction.Right);
+            }
+            else
+                bounds.Add(expression);
+        }
+        Collect(guard);
+        var ranges = new List<(QuantifierVariableNode Variable, ExpressionNode Lower, ExpressionNode Upper)>();
+        for (var index = 0; index < variables.Count && bounds.Count == variables.Count * 2; index++)
+        {
+            var variable = variables[index];
+            if (bounds[index * 2] is not BinaryOperationNode
+                {
+                    Operator: BinaryOperator.GreaterOrEqual,
+                    Left: ReferenceNode lowerVariable
+                } lower
+                || lowerVariable.IsNullLiteral || lowerVariable.Name != variable.Name
+                || bounds[index * 2 + 1] is not BinaryOperationNode
+                {
+                    Operator: BinaryOperator.LessThan,
+                    Left: ReferenceNode upperVariable
+                } upper
+                || upperVariable.IsNullLiteral || upperVariable.Name != variable.Name)
+                break;
+            ranges.Add((variable, lower.Right, upper.Right));
+        }
+        var bindings = ranges.Count == variables.Count
+            ? string.Join(", ", ranges.Select(range =>
+                $"{range.Variable.Accept(this)} in {AcceptInConditionalRegion(range.Lower)}"
+                + $"..{AcceptInConditionalRegion(range.Upper)}"))
+            : string.Join(", ", variables.Select(variable => variable.Accept(this)))
+                + $" where {AcceptInConditionalRegion(guard)}";
+        return $"({kind} {bindings} : {AcceptInConditionalRegion(predicate)})";
     }
 
     public string Visit(ImplicationExpressionNode node)
     {
-        // AcceptInInlineSibling: operands in Lisp (-> a b) form are space-separated,
-        // so a nested zero-arg antecedent without §/C would absorb the consequent.
-        var ante = AcceptInInlineSibling(node.Antecedent);
-        var cons = AcceptInInlineSibling(node.Consequent);
-        return $"(-> {ante} {cons})";
+        var ante = AcceptInConditionalRegion(node.Antecedent);
+        var cons = AcceptInConditionalRegion(node.Consequent);
+        return $"(!({ante}) || {cons})";
     }
 
     // Native String Operations
 
     public string Visit(StringOperationNode node)
     {
-        var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a =>
+        var arguments = node.Arguments.Select(AcceptInConditionalRegion).ToList();
+        var method = node.Operation switch
         {
-            // AcceptInInlineSibling: args in Lisp (op a b ...) form are space-separated,
-            // so a nested zero-arg call without §/C would absorb the next arg.
-            var val = AcceptInInlineSibling(a);
-            // Hoist values with section markers or unquoted commas (tuples)
-            if (ContainsSectionMarker(val))
-                val = HoistToTempVar(val);
-            else if (val.Contains(',') && !val.StartsWith("\""))
-                val = HoistToTempVar(val);
-            return val;
-        });
-        var argsStr = string.Join(" ", args);
-
-        // Append comparison mode keyword if present
-        if (node.ComparisonMode.HasValue)
-        {
-            var keyword = node.ComparisonMode.Value.ToKeyword();
-            return $"({opName} {argsStr} :{keyword})";
-        }
-
-        return $"({opName} {argsStr})";
+            StringOp.SubstringFrom => "Substring",
+            StringOp.ToUpper => "ToUpper",
+            StringOp.ToLower => "ToLower",
+            StringOp.RegexTest => "IsMatch",
+            StringOp.RegexMatch => "Match",
+            StringOp.RegexReplace => "Replace",
+            StringOp.RegexSplit => "Split",
+            _ => node.Operation.ToString()
+        };
+        var staticString = node.Operation is StringOp.Join or StringOp.Format or StringOp.Concat
+            or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace;
+        var regex = node.Operation is StringOp.RegexTest or StringOp.RegexMatch
+            or StringOp.RegexReplace or StringOp.RegexSplit;
+        var receiver = staticString ? "string"
+            : regex ? "System.Text.RegularExpressions.Regex" : $"({arguments[0]})";
+        if (node.Operation == StringOp.Length && node.Arguments[0] is ReferenceNode)
+            receiver = arguments[0];
+        if (!staticString && !regex)
+            arguments.RemoveAt(0);
+        if (node.Operation == StringOp.Length)
+            return $"{receiver}.Length";
+        if (node.ComparisonMode is { } comparison)
+            arguments.Add(comparison.ToCSharpName());
+        return $"{receiver}.{method}({string.Join(", ", arguments)})";
     }
 
     public string Visit(CharOperationNode node)
@@ -4960,59 +3712,43 @@ public sealed class CalorEmitter : IAstVisitor<string>
             && node.Arguments is [StringLiteralNode { Value.Length: 1 } literal])
             return Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(literal.Value[0], quote: true);
 
-        // AcceptInInlineSibling: args in Lisp (op a b) form are space-separated,
-        // so a nested zero-arg call without §/C would absorb the next arg.
-        var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a => AcceptInInlineSibling(a));
-        return $"({opName} {string.Join(" ", args)})";
+        var arguments = node.Arguments.Select(AcceptInConditionalRegion).ToArray();
+        return node.Operation switch
+        {
+            CharOp.CharAt => $"({arguments[0]})[{arguments[1]}]",
+            CharOp.CharCode => $"((int){arguments[0]})",
+            CharOp.CharFromCode => $"((char){arguments[0]})",
+            CharOp.ToUpperChar => $"char.ToUpper({arguments[0]})",
+            CharOp.ToLowerChar => $"char.ToLower({arguments[0]})",
+            CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace or CharOp.IsUpper or CharOp.IsLower
+                => $"char.{node.Operation}({string.Join(", ", arguments)})",
+            _ => throw new NotSupportedException($"Unsupported native char operation {node.Operation}.")
+        };
     }
 
     public string Visit(StringBuilderOperationNode node)
     {
-        // See CharOperationNode.
-        var opName = node.Operation.ToCalorName();
-        var args = node.Arguments.Select(a => AcceptInInlineSibling(a));
-        var argsStr = string.Join(" ", args);
-        return args.Any() ? $"({opName} {argsStr})" : $"({opName})";
+        var arguments = node.Arguments.Select(AcceptInConditionalRegion).ToList();
+        if (node.Operation == StringBuilderOp.New)
+            return $"new System.Text.StringBuilder({string.Join(", ", arguments)})";
+        var receiver = arguments[0];
+        arguments.RemoveAt(0);
+        return node.Operation == StringBuilderOp.Length ? $"({receiver}).Length"
+            : $"({receiver}).{node.Operation}({string.Join(", ", arguments)})";
     }
 
     public string Visit(TypeOperationNode node)
     {
         var operand = AcceptInInlineSibling(node.Operand);
+        if (node.Operation == TypeOp.Cast && node.Operand is LambdaExpressionNode)
+            operand = $"({operand})";
         return node.Operation switch
         {
-            TypeOp.Cast => $"(cast {StripNullableAnnotation(node.TargetType)} {operand})",
-            TypeOp.Is => $"(is {operand} {node.TargetType})",
-            TypeOp.As => $"(as {operand} {node.TargetType})",
+            TypeOp.Cast => $"(({TypeMapper.ToSurfaceType(node.TargetType)}){operand})",
+            TypeOp.Is => $"({operand} is {TypeMapper.ToSurfaceType(node.TargetType)})",
+            TypeOp.As => $"({operand} as {TypeMapper.ToSurfaceType(node.TargetType)})",
             _ => throw new NotSupportedException($"Unknown type operation: {node.Operation}")
         };
-    }
-
-    /// <summary>
-    /// Strips nullable annotation from cast types. For reference types (arrays, classes),
-    /// the nullable `?` is a compile-time annotation with no runtime effect. Removing it
-    /// prevents parser errors from `?` tokens inside Lisp expressions.
-    /// </summary>
-    private static string StripNullableAnnotation(string typeName)
-    {
-        if (typeName.StartsWith('?'))
-            return typeName[1..];
-        if (typeName.EndsWith('?'))
-            return typeName[..^1];
-        return typeName;
-    }
-
-    /// <summary>
-    /// Converts Calor nullable prefix notation (?T) to postfix (T?) for cast expressions,
-    /// so the parser can handle it via the existing postfix nullable path.
-    /// </summary>
-    private static string NullablePrefixToPostfix(string typeName)
-    {
-        if (typeName.StartsWith('?'))
-        {
-            return typeName[1..] + "?";
-        }
-        return typeName;
     }
 
     public string Visit(IsPatternNode node)
@@ -5023,31 +3759,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Defect: v0.6.1 loop-4 devil's-advocate finding #2.
         var operand = AcceptInInlineSibling(node.Operand);
         return node.VariableName != null
-            ? $"(is {operand} {node.TargetType} {node.VariableName})"
-            : $"(is {operand} {node.TargetType})";
+            ? $"({operand} is {TypeMapper.ToSurfaceType(node.TargetType)} {EscapeCalorIdentifier(node.VariableName)})"
+            : $"({operand} is {TypeMapper.ToSurfaceType(node.TargetType)})";
     }
 
     // Fallback nodes for unsupported C# constructs
 
     public string Visit(FallbackExpressionNode node)
-    {
-        // Emit as §ERR "TODO: feature -- C#: code"
-        // Uses §ERR followed by a string literal so the parser handles it
-        // as ErrExpressionNode(StringLiteralNode) without cascading parse errors.
-        var escapedCode = node.OriginalCSharp
-            .Replace("\\", "\\\\")  // Escape backslashes first
-            .Replace("\"", "'")     // Replace double quotes
-            .Replace("\n", " ")     // Collapse newlines
-            .Replace("\r", "");     // Remove carriage returns
-
-        // Truncate very long code to avoid overly long error messages
-        if (escapedCode.Length > 100)
-        {
-            escapedCode = escapedCode.Substring(0, 97) + "...";
-        }
-
-        return $"§ERR \"TODO: {node.FeatureName} -- C#: {escapedCode}\"";
-    }
+        => EmitRawCSharpExpression(node.OriginalCSharp, nameof(FallbackExpressionNode));
 
     public string Visit(ExpressionStatementNode node)
     {
@@ -5080,7 +3799,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TypeOfExpressionNode node)
     {
-        return $"(typeof {node.TypeName})";
+        return $"typeof({TypeMapper.ToSurfaceType(node.TypeName)})";
+    }
+
+    public string Visit(OverflowContextExpressionNode node)
+    {
+        var keyword = node.IsChecked ? "checked" : "unchecked";
+        return $"{keyword}({AcceptInConditionalRegion(node.Operand)})";
     }
 
     public string Visit(NameOfExpressionNode node)
@@ -5094,97 +3819,136 @@ public sealed class CalorEmitter : IAstVisitor<string>
             if (lastDot >= 0)
                 name = name[(lastDot + 1)..];
         }
-        return $"(nameof {name})";
+        return $"nameof({name})";
     }
 
     public string Visit(ExpressionCallNode node)
     {
-        // Args go through inline-sibling context so that nested zero-arg
-        // calls keep their explicit §/C closer — see Visit(CallExpressionNode)
-        // for the rationale.
-        var conditional = IsConditionalCallTarget(node.TargetExpression);
-        var target = conditional
-            ? AcceptInConditionalRegion(node.TargetExpression)
-            : node.TargetExpression.Accept(this);
-        var args = node.Arguments.Select(a =>
-            $" §A {(conditional ? AcceptInConditionalRegion(a) : AcceptInInlineSibling(a))}").ToList();
-        return $"§C {target}{string.Join("", args)} §/C";
+        if (IsConditionalCallTarget(node.TargetExpression) && node.TypeArguments is { Count: > 0 })
+            throw new NotSupportedException("Null-conditional computed generic calls remain staged.");
+
+        var callee = EmitPostfixOperand(node.TargetExpression);
+        var types = node.TypeArguments is { Count: > 0 }
+            ? $"<{string.Join(", ", node.TypeArguments.Select(TypeMapper.ToSurfaceType))}>"
+            : "";
+        var arguments = node.Arguments.Select((argument, index) =>
+        {
+            var name = node.ArgumentNames?.ElementAtOrDefault(index);
+            var modifier = node.ArgumentModifiers?.ElementAtOrDefault(index);
+            return (name is null ? "" : $"{EscapeCalorIdentifier(name.TrimStart('@'))}: ")
+                + (modifier is null ? "" : $"{modifier} ") + AcceptArgument(argument);
+        });
+        return $"{callee}{types}({string.Join(", ", arguments)})";
     }
+
+    private string EmitPostfixOperand(ExpressionNode node) => node switch
+    {
+        FieldAccessNode field =>
+            $"{EmitPostfixOperand(field.Target)}.{EscapeCalorIdentifier(field.FieldName.TrimStart('@'))}",
+        ArrayAccessNode array =>
+            $"{EmitPostfixOperand(array.Array)}[{AcceptInConditionalRegion(array.Index)}]",
+        MultiDimArrayAccessNode array =>
+            $"{EmitPostfixOperand(array.Array)}[{string.Join(", ", array.Indices.Select(AcceptInConditionalRegion))}]",
+        ReferenceNode or ExpressionCallNode or NullConditionalNode => AcceptInConditionalRegion(node),
+        _ => $"({AcceptInConditionalRegion(node)})"
+    };
 
     private static bool IsConditionalCallTarget(ExpressionNode expression) => expression switch
     {
         NullConditionalNode => true,
         FieldAccessNode field => IsConditionalCallTarget(field.Target),
+        ArrayAccessNode array => IsConditionalCallTarget(array.Array),
+        MultiDimArrayAccessNode array => IsConditionalCallTarget(array.Array),
         ExpressionCallNode call => IsConditionalCallTarget(call.TargetExpression),
         _ => false
     };
 
     public string Visit(RawCSharpNode node)
     {
-        FlushHoistedLines();
-        _builder.Append(new string(' ', _indentLevel * 2));
-        _builder.AppendLine("§RAW");
-        _builder.Append(node.CSharpCode);
-        if (node.CSharpCode.Length == 0
-            || node.CSharpCode[^1] is not '\r' and not '\n')
-        {
-            _builder.AppendLine();
-        }
-        _builder.Append(new string(' ', _indentLevel * 2));
-        _builder.AppendLine("§/RAW");
+        if (_context.CapturePreservationContext
+            && RawCSharpFrame.TryParseReason(node.FramingReason ?? "statement", out var frame))
+            _context.RecordPreservationEmission(node, frame with { Code = node.CSharpCode });
+        EmitRawFrame(node.FramingReason ?? "statement", node.CSharpCode);
         return "";
+    }
+
+    private void EmitRawFrame(string reason, string code)
+    {
+        var byteCount = new UTF8Encoding(false, true).GetByteCount(code);
+        AppendLine($"raw {reason} {byteCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        _builder.Append(code);
+        // This separator belongs to the Calor envelope, never to the payload.
+        _builder.AppendLine();
     }
 
     public string Visit(CompilerDirectiveNode node)
     {
-        var encoded = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes(node.Code))
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
-        AppendLine($"§CDIR{{{node.Feature}:{encoded}}}");
+        var frame = new RawCSharpFrame(node.Code, node.Feature, IsCompilerDirective: true);
+        if (!frame.TryValidateCompilerDirective(out var error))
+            throw new InvalidOperationException(error);
+        EmitRawFrame(frame.ReasonMarker, node.Code);
         return "";
     }
 
     public string Visit(RawCSharpExpressionNode node)
+        => EmitRawCSharpExpression(node.CSharpCode, nameof(RawCSharpExpressionNode));
+
+    /// <summary>
+    /// 0.30 has no inline raw C# expression form: the retired <c>§CS{…}</c> marker is a lexer
+    /// error. An interpolation hole is itself C# source (the parser reads <c>${…}</c> as a C#
+    /// expression), so a raw hole is written back verbatim. Anywhere else a raw expression
+    /// cannot be spelled; the converter preserves the enclosing statement or member instead
+    /// (<c>raw reason N</c>), so reaching this is an emitter contract violation, not output.
+    /// </summary>
+    private string EmitRawCSharpExpression(string code, string nodeKind)
     {
-        return $"§CS{{{node.CSharpCode}}}";
+        if (_inInterpolation)
+            return code;
+        throw new InvalidOperationException(
+            $"{nodeKind} has no native 0.30 spelling outside an interpolation hole; "
+            + "preserve the enclosing statement or member as a raw frame instead.");
     }
 
     public string Visit(PreprocessorDirectiveNode node)
     {
-        AppendLine($"§PP{{{node.Condition}}}");
-        foreach (var stmt in node.Body)
-            stmt.Accept(this);
-        if (node.ElseBody != null && node.ElseBody.Count > 0)
+        var first = true;
+        for (var branch = node; ; first = false)
         {
-            AppendLine("§PPE");
-            foreach (var stmt in node.ElseBody)
+            AppendLine(first ? $"pp {branch.Condition}" : $"pp elif {branch.Condition}");
+            Indent();
+            foreach (var stmt in branch.Body)
                 stmt.Accept(this);
+            Dedent();
+            if (branch.ElseBody is { Count: 1 } && branch.ElseBody[0] is PreprocessorDirectiveNode next)
+            {
+                branch = next;
+                continue;
+            }
+            if (branch.ElseBody is { Count: > 0 })
+            {
+                AppendLine("pp else");
+                Indent();
+                foreach (var stmt in branch.ElseBody)
+                    stmt.Accept(this);
+                Dedent();
+            }
+            break;
         }
-        AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 
     public string Visit(MemberPreprocessorBlockNode node)
     {
-        AppendLine($"§PP{{{node.Condition}}}");
-        EmitMemberPreprocessorMembers(node);
-        if (node.ElseBranch != null)
+        var first = true;
+        for (var branch = node; branch != null; branch = branch.ElseBranch)
         {
-            AppendLine("§PPE");
-            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
-            {
-                // #elif chain — emit as nested §PP{cond} inside the else
-                Visit(node.ElseBranch);
-            }
-            else
-            {
-                // #else — emit members directly
-                EmitMemberPreprocessorMembers(node.ElseBranch);
-            }
+            AppendLine(first ? $"pp {branch.Condition}"
+                : branch.Condition.Length == 0 ? "pp else" : $"pp elif {branch.Condition}");
+            Indent();
+            EmitMemberPreprocessorMembers(branch);
+            Dedent();
+            first = false;
         }
-        AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 
@@ -5250,25 +4014,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(TypePreprocessorBlockNode node)
     {
-        AppendLine($"§PP{{{node.Condition}}}");
-        Indent();
-        EmitTypePreprocessorTypes(node);
-        Dedent();
-        if (node.ElseBranch != null)
+        var first = true;
+        for (var branch = node; branch != null; branch = branch.ElseBranch)
         {
-            AppendLine("§PPE");
+            AppendLine(first ? $"pp {branch.Condition}"
+                : branch.Condition.Length == 0 ? "pp else" : $"pp elif {branch.Condition}");
             Indent();
-            if (!string.IsNullOrEmpty(node.ElseBranch.Condition))
-            {
-                Visit(node.ElseBranch);
-            }
-            else
-            {
-                EmitTypePreprocessorTypes(node.ElseBranch);
-            }
+            EmitTypePreprocessorTypes(branch);
             Dedent();
+            first = false;
         }
-        AppendLine($"§/PP{{{node.Condition}}}");
         return "";
     }
 
@@ -5313,43 +4068,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
     }
 
-    private void RecordEmitterFallback(AstNode node, string feature, string description)
-    {
-        _context?.RecordLoss(
-            ConversionLossKind.EmitterFallback,
-            feature,
-            description,
-            node.Span.Line);
-    }
-
     public string Visit(CSharpInteropBlockNode node)
     {
-        FlushHoistedLines();
-        _builder.Append(new string(' ', _indentLevel * 2));
-        _builder.Append("§CSHARP{");
-        if (node.IsCompilationUnitPassthrough)
-            _builder.Append(
-                CSharpInteropBlockNode.CompilationUnitPassthroughMarker);
-        _builder.Append(node.CSharpCode);
-        if (node.CSharpCode.EndsWith('\n')
-            || node.CSharpCode.EndsWith('\r'))
-        {
-            _builder.Append(new string(' ', _indentLevel * 2));
-        }
-        else if (node.CSharpCode[
-                     (node.CSharpCode.LastIndexOfAny(['\r', '\n']) + 1)..]
-                 .Contains("//", StringComparison.Ordinal))
-        {
-            _builder.AppendLine();
-            _builder.Append(new string(' ', _indentLevel * 2));
-        }
-        _builder.AppendLine("}§/CSHARP");
+        var frame = new RawCSharpFrame(node.CSharpCode, node.FeatureName,
+            node.Reason, node.MemberKind, node.IsCompilationUnitPassthrough);
+        _context.RecordPreservationEmission(node, frame);
+        EmitRawFrame(frame.ReasonMarker, frame.Code);
         return "";
     }
 
     public string Visit(StackAllocNode node)
     {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        var elementType = TypeMapper.ToSurfaceType(node.ElementType);
         if (node.Size != null)
         {
             var size = EmitSizeAttribute(node.Size);
@@ -5365,40 +4095,34 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(UnsafeBlockNode node)
     {
-        AppendLine($"§UNSAFE{{{node.Id}}}");
+        AppendLine("unsafe");
         Indent();
         foreach (var stmt in node.Body)
             stmt.Accept(this);
         Dedent();
-        EmitBlockEnd($"§/UNSAFE{{{node.Id}}}");
         return "";
     }
 
     public string Visit(SyncBlockNode node)
     {
         var lockExpr = node.LockExpression.Accept(this);
-        AppendLine($"§SYNC{{{node.Id}}} ({lockExpr})");
+        AppendLine($"lock {lockExpr}");
         Indent();
         foreach (var stmt in node.Body)
             stmt.Accept(this);
         Dedent();
-        EmitBlockEnd($"§/SYNC{{{node.Id}}}");
         return "";
     }
 
     public string Visit(FixedStatementNode node)
     {
-        var pointerType = TypeMapper.CSharpToCalor(node.PointerType);
+        var pointerType = TypeMapper.ToSurfaceType(node.PointerType);
         var init = node.Initializer.Accept(this);
-        // Hoist complex initializers (e.g., §ADDR, §IDX) out of the braces
-        if (ContainsSectionMarker(init) || init.Contains(':'))
-            init = HoistToTempVar(init);
-        AppendLine($"§FIXED{{{node.Id}:{node.PointerName}:{pointerType}:{init}}}");
+        AppendLine($"fixed {pointerType}:{node.PointerName} = {init}");
         Indent();
         foreach (var stmt in node.Body)
             stmt.Accept(this);
         Dedent();
-        EmitBlockEnd($"§/FIXED{{{node.Id}}}");
         return "";
     }
 
@@ -5416,47 +4140,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(SizeOfNode node)
     {
-        var typeName = TypeMapper.CSharpToCalor(node.TypeName);
-        return $"§SIZEOF{{{typeName}}}";
+        var typeName = TypeMapper.ToSurfaceType(node.TypeName);
+        return $"sizeof({typeName})";
     }
 
     public string Visit(MultiDimArrayCreationNode node)
-    {
-        var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-
-        if (node.Initializer.Count > 0)
-        {
-            // #1132: inline, where the C# had it. The old block bound an undeclared name
-            // (CS0103/CS0201) and ran hoisted elements early, even in an unselected branch.
-            var dims = node.DimensionSizes.Count > 0
-                ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
-                : "";
-            var rows = RenderMultiDimRows(node);
-            return $"§ARR2D{{{node.Id}:{node.Id}:{elementType}{dims}}} "
-                + string.Concat(rows.Select(row => $"§ROW {row} "))
-                + $"§/ARR2D{{{node.Id}}}";
-        }
-        else if (node.DimensionSizes.Count > 0)
-        {
-            var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
-            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{dims}}} §/ARR2D{{{node.Id}}}";
-        }
-        else
-        {
-            var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
-            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{zeros}}} §/ARR2D{{{node.Id}}}";
-        }
-    }
+        => CodeGen.CSharpEmitter.EmitMultiDimArrayCreation(node, AcceptInConditionalRegion,
+            TypeMapper.ToSurfaceType(node.ElementType));
 
     public string Visit(MultiDimArrayAccessNode node)
     {
-        var array = AcceptInInlineSibling(node.Array);
-        var indices = string.Join(" ", node.Indices.Select(i => AcceptInInlineSibling(i)));
-        // For 3D+ arrays, the parser can't distinguish index count from surrounding args.
-        // Encode dimension count in attributes: §IDX2D{3} for 3D access.
-        if (node.Indices.Count > 2)
-            return $"§IDX2D{{{node.Indices.Count}}} {array} {indices}";
-        return $"§IDX2D {array} {indices}";
+        var indices = string.Join(", ", node.Indices.Select(AcceptInConditionalRegion));
+        return $"{EmitPostfixOperand(node.Array)}[{indices}]";
     }
 
     // Dependent Types: Refinement Types and Proof Obligations
@@ -5464,7 +4159,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(RefinementTypeNode node)
     {
         var predicate = node.Predicate.Accept(this);
-        AppendLine($"§RTYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}}} {predicate}");
+        AppendLine($"§RTYPE{{{node.Name}:{TypeMapper.ToSurfaceType(node.BaseTypeName)}}} {predicate}");
         return "";
     }
 
@@ -5476,15 +4171,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(ProofObligationNode node)
     {
         var condition = node.Condition.Accept(this);
-        var desc = node.Description != null ? $":{node.Description}" : "";
-        AppendLine($"§PROOF{{{node.Id}{desc}}} {condition}");
+        var header = node.Description == null
+            ? "proof"
+            : $"proof{{{Visit(new StringLiteralNode(node.Span, node.Description))}}}";
+        AppendLine($"{header} {condition}");
         return "";
     }
 
     public string Visit(IndexedTypeNode node)
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append($"§ITYPE{{{node.Id}:{node.Name}:{node.BaseTypeName}:{node.SizeParam}}}");
+        sb.Append($"§ITYPE{{{node.Name}:{TypeMapper.ToSurfaceType(node.BaseTypeName)}:{node.SizeParam}}}");
         if (node.Constraint != null)
         {
             var constraint = node.Constraint.Accept(this);

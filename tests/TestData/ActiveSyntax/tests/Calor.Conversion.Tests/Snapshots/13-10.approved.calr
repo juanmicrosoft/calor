@@ -1,0 +1,14 @@
+module Test_13_10 Test_13_10 overflow unchecked
+  using System.Collections.Generic
+
+  class MatchListDemo public
+    func GetItems public (int:category) → List<string>
+      ! alloc
+      return match category
+        case 1
+          let List<string>:_listStr005 = new List<string>() {"a", "b"}
+          return _listStr005
+        case 2
+          let List<string>:_listStr007 = new List<string>() {"c", "d", "e"}
+          return _listStr007
+        case _ → new List<string>()

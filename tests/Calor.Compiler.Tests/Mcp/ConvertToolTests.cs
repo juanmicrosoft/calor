@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Mcp.Tools;
 using Microsoft.CodeAnalysis;
@@ -50,7 +51,7 @@ public class ConvertToolTests
         Assert.True(props.TryGetProperty("source", out _));
         Assert.True(props.TryGetProperty("moduleName", out _));
         Assert.True(props.TryGetProperty("fidelity", out _));
-        Assert.True(props.TryGetProperty(
+        Assert.False(props.TryGetProperty(
             "selectActivePreprocessorBranchLossy",
             out _));
         Assert.True(props.TryGetProperty("definedSymbols", out _));
@@ -151,13 +152,13 @@ public class ConvertToolTests
             source = "public interface IEvents { event System.EventHandler Changed; }",
             moduleName = "Events",
             mode = "validate",
-            fidelity = "lossy"
+            fidelity = "lossless"
         });
 
         var result = await _tool.ExecuteAsync(args);
 
         var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
-        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        Assert.Equal("lossless", root.GetProperty("fidelity").GetString());
         var lossSummary = root.GetProperty("lossSummary");
         Assert.Equal(0, lossSummary.GetProperty("drops").GetInt32());
         Assert.Equal(
@@ -168,7 +169,7 @@ public class ConvertToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_SelectedBranch_ReportsEffectiveMetadata()
+    public async Task ExecuteAsync_AllBranches_ReportsEffectiveMetadata()
     {
         var args = JsonSerializer.SerializeToElement(new
         {
@@ -179,7 +180,6 @@ public class ConvertToolTests
                 public class Fallback { }
                 #endif
                 """,
-            selectActivePreprocessorBranchLossy = true,
             definedSymbols = new[] { "FEATURE" },
             configuration = "Release",
             targetFramework = "net10.0",
@@ -193,7 +193,7 @@ public class ConvertToolTests
 
         Assert.False(result.IsError);
         var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
-        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        Assert.Equal("lossless", root.GetProperty("fidelity").GetString());
         var metadata = root.GetProperty("metadata");
         Assert.Equal("Release", metadata.GetProperty("configuration").GetString());
         Assert.Equal("net10.0", metadata.GetProperty("targetFramework").GetString());
@@ -211,11 +211,11 @@ public class ConvertToolTests
             metadata.GetProperty("features")
                 .GetProperty("test_feature").GetString());
         Assert.Contains("Selected", root.GetProperty("calorSource").GetString());
-        Assert.DoesNotContain("Fallback", root.GetProperty("calorSource").GetString());
+        Assert.Contains("Fallback", root.GetProperty("calorSource").GetString());
     }
 
     [Fact]
-    public async Task ExecuteAsync_LegacyStripTrue_ForcesEffectiveLossyFidelity()
+    public async Task ExecuteAsync_LegacyStripTrue_IsRejectedInsteadOfDroppingBranches()
     {
         var args = JsonSerializer.SerializeToElement(new
         {
@@ -231,11 +231,19 @@ public class ConvertToolTests
 
         var result = await _tool.ExecuteAsync(args);
 
-        Assert.False(result.IsError);
-        var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
-        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
-        Assert.Contains("Live", root.GetProperty("calorSource").GetString());
-        Assert.DoesNotContain("Dead", root.GetProperty("calorSource").GetString());
+        Assert.True(result.IsError);
+        Assert.Contains("Removed conversion parameter: stripPreprocessor", result.Content[0].Text);
+    }
+
+    [Theory]
+    [InlineData("""{"source":"public class C {}","fidelity":"lossy"}""", "Only lossless")]
+    [InlineData("""{"source":"public class C {}","selectActivePreprocessorBranchLossy":true}""",
+        "Removed conversion parameter")]
+    public async Task ExecuteAsync_DestructiveModes_AreRejected(string json, string reason)
+    {
+        var result = await _tool.ExecuteAsync(JsonDocument.Parse(json).RootElement);
+        Assert.True(result.IsError);
+        Assert.Contains(reason, result.Content[0].Text);
     }
 
     [Fact]
@@ -457,8 +465,8 @@ public class ConvertToolTests
     public async Task ExecuteAsync_WithNonCapturingLocalFunction_ConvertsInPlace()
     {
         // #777 (WS-W4 D4): never hoisted to a module-level function (the hoist orphans
-        // the call site — build break or silent rebind). 0.25 F3 (#847): a
-        // non-capturing local function converts in place to a nested §F.
+        // the call site — build break or silent rebind). A safe non-capturing
+        // local function converts in place to a lambda binding.
         var args = JsonDocument.Parse("""
             {
                 "source": "public class Example { public int Calculate(int x) { int Square(int n) => n * n; return Square(x); } }",
@@ -473,8 +481,16 @@ public class ConvertToolTests
         var json = JsonDocument.Parse(text);
         var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
         Assert.DoesNotContain("\u00A7CSHARP", calorSource);
-        // Nested inside Calculate (indented under its §MT), not a module-level §F.
-        Assert.Matches(@"\n {6,}\u00A7F\{f\d+:Square\} \(i32:n\) -> i32", calorSource);
+        var compiled = Program.Compile(calorSource, "local-function.calr");
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+        var module = Assert.IsType<ModuleNode>(compiled.Ast);
+        Assert.Empty(module.Functions);
+        var method = Assert.Single(Assert.Single(module.Classes).Methods);
+        Assert.Equal("Calculate", method.Name);
+        var binding = Assert.IsType<BindStatementNode>(method.Body[0]);
+        Assert.Equal("Square", binding.Name);
+        var lambda = Assert.IsType<LambdaExpressionNode>(binding.Initializer);
+        Assert.Equal("n", Assert.Single(lambda.Parameters).Name);
     }
 
     [Fact]
@@ -532,7 +548,7 @@ public class ConvertToolTests
         var text = result.Content[0].Text!;
         var json = JsonDocument.Parse(text);
         var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
-        Assert.Contains("\u00A7CSHARP", calorSource);
+        RawFrameAssertions.AssertFramed(calorSource);
         Assert.Contains("Multiply", calorSource);
         Assert.Contains("multiplier", calorSource);
         Assert.DoesNotContain("\u00A7F{", calorSource);

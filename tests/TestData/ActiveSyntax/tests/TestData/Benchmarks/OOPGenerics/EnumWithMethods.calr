@@ -1,0 +1,16 @@
+module EnumWithMethods EnumWithMethods
+  module EnumWithMethodsModule
+    func Priority public (int:level) → int
+      !
+      if level == 0
+        return 1
+      else if level == 1
+        return 2
+      else if level == 2
+        return 3
+      else
+        return 4
+
+    func IsUrgent public (int:level) → bool
+      !
+      return level >= 2

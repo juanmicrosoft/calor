@@ -7,6 +7,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3.KInduction;
 
 namespace Calor.Compiler.Analysis;
@@ -220,13 +221,14 @@ public sealed class VerificationAnalysisPass
 
         foreach (var func in module.Functions)
         {
-            if (func.Preconditions.Count == 0)
+            var preconditions = ContractVerifier.EffectivePreconditions(func.Parameters, func.Preconditions);
+            if (preconditions.Count == 0)
                 continue;
 
             var paramNames = func.Parameters.Select(p => p.Name).ToHashSet();
             var guardedNames = new HashSet<string>();
 
-            foreach (var pre in func.Preconditions)
+            foreach (var pre in preconditions)
             {
                 CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
             }
@@ -240,10 +242,11 @@ public sealed class VerificationAnalysisPass
         {
             foreach (var method in cls.Methods)
             {
-                if (method.Preconditions.Count == 0) continue;
+                var preconditions = ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions);
+                if (preconditions.Count == 0) continue;
                 var paramNames = method.Parameters.Select(p => p.Name).ToHashSet();
                 var guardedNames = new HashSet<string>();
-                foreach (var pre in method.Preconditions)
+                foreach (var pre in preconditions)
                     CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
                 if (guardedNames.Count > 0)
                     result[$"{cls.Name}.{method.Name}"] = guardedNames;
@@ -251,10 +254,11 @@ public sealed class VerificationAnalysisPass
 
             foreach (var ctor in cls.Constructors)
             {
-                if (ctor.Preconditions.Count == 0) continue;
+                var preconditions = ContractVerifier.EffectivePreconditions(ctor.Parameters, ctor.Preconditions);
+                if (preconditions.Count == 0) continue;
                 var paramNames = ctor.Parameters.Select(p => p.Name).ToHashSet();
                 var guardedNames = new HashSet<string>();
-                foreach (var pre in ctor.Preconditions)
+                foreach (var pre in preconditions)
                     CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
                 if (guardedNames.Count > 0)
                     result[$"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}"] = guardedNames;
@@ -262,10 +266,11 @@ public sealed class VerificationAnalysisPass
 
             foreach (var op in cls.OperatorOverloads)
             {
-                if (op.Preconditions.Count == 0) continue;
+                var preconditions = ContractVerifier.EffectivePreconditions(op.Parameters, op.Preconditions);
+                if (preconditions.Count == 0) continue;
                 var paramNames = op.Parameters.Select(p => p.Name).ToHashSet();
                 var guardedNames = new HashSet<string>();
-                foreach (var pre in op.Preconditions)
+                foreach (var pre in preconditions)
                     CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
                 if (guardedNames.Count > 0)
                     result[$"{cls.Name}.op_{op.Kind}"] = guardedNames;
@@ -297,10 +302,11 @@ public sealed class VerificationAnalysisPass
     {
         foreach (var method in cls.Methods)
         {
-            if (method.Preconditions.Count == 0) continue;
+            var preconditions = ContractVerifier.EffectivePreconditions(method.Parameters, method.Preconditions);
+            if (preconditions.Count == 0) continue;
             var paramNames = method.Parameters.Select(p => p.Name).ToHashSet();
             var guardedNames = new HashSet<string>();
-            foreach (var pre in method.Preconditions)
+            foreach (var pre in preconditions)
                 CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
             if (guardedNames.Count > 0)
                 result[$"{cls.Name}.{method.Name}"] = guardedNames;
@@ -308,10 +314,11 @@ public sealed class VerificationAnalysisPass
 
         foreach (var ctor in cls.Constructors)
         {
-            if (ctor.Preconditions.Count == 0) continue;
+            var preconditions = ContractVerifier.EffectivePreconditions(ctor.Parameters, ctor.Preconditions);
+            if (preconditions.Count == 0) continue;
             var paramNames = ctor.Parameters.Select(p => p.Name).ToHashSet();
             var guardedNames = new HashSet<string>();
-            foreach (var pre in ctor.Preconditions)
+            foreach (var pre in preconditions)
                 CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
             if (guardedNames.Count > 0)
                 result[$"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}"] = guardedNames;
@@ -617,6 +624,7 @@ public sealed class VerificationAnalysisPass
             IReadOnlyList<ParameterNode> parameters,
             IReadOnlyList<RequiresNode> preconditions)
         {
+            preconditions = ContractVerifier.EffectivePreconditions(parameters, preconditions);
             if (preconditions.Count == 0)
                 return;
 

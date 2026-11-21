@@ -1,0 +1,8 @@
+module Test_12_01 Test_12_01 overflow unchecked
+  class Formatter public
+    func Format private (int:value) → string
+      return value.ToString()
+
+    func Describe public (int:x, string[]:labels) → string
+      !
+      return "The value is ${Format(x)} with label ${labels[0]}"

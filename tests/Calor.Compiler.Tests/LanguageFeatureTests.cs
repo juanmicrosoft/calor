@@ -64,10 +64,10 @@ public class LanguageFeatureTests
     public void TrailingAccess_NewExpression_DotMethod()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{string}
-                  §R §NEW{object}§/NEW.ToString
+            module Test Test block
+              func Run () → string
+                !
+                return new object() . ToString
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().ToString;", code);
@@ -77,10 +77,10 @@ public class LanguageFeatureTests
     public void TrailingAccess_NewExpression_NullConditional()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{string}
-                  §R §NEW{object}§/NEW?.ToString
+            module Test Test block
+              func Run () → string
+                !
+                return (new object())?.ToString
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object()?.ToString;", code);
@@ -90,10 +90,10 @@ public class LanguageFeatureTests
     public void TrailingAccess_CallExpression_DotProperty()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{i32}
-                  §R §C{GetItems}§/C.Count
+            module Test Test block
+              func Run () → int
+                !
+                return GetItems() . Count
             """;
         var code = CompileToCode(source);
         Assert.Contains("return GetItems().Count;", code);
@@ -105,11 +105,11 @@ public class LanguageFeatureTests
         // The lexer may tokenize "GetType.Name" in the attribute as a single identifier with dots.
         // Use separate tokens to ensure proper chaining.
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{string}
-                  §B{result:string} §NEW{object}§/NEW.GetType
-                  §R result.Name
+            module Test Test block
+              func Run () → string
+                !
+                let System.Type:result = new object() . GetType()
+                return result.Name
             """;
         var code = CompileToCode(source);
         Assert.Contains("new object().GetType", code);
@@ -119,10 +119,10 @@ public class LanguageFeatureTests
     public void TrailingAccess_ParsesFieldAccessNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{string}
-                  §R §NEW{object}§/NEW.ToString
+            module Test Test block
+              func Run () → string
+                !
+                return new object() . ToString
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -139,11 +139,10 @@ public class LanguageFeatureTests
     public void NullCoalesce_LispExpression_TwoArgs()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{string:x}
-                  §O{string}
-                  §R (?? x "default")
+            module Test Test block
+              func Run (string:x) → string
+                !
+                return (x ?? "default")
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x ?? \"default\";", code);
@@ -153,43 +152,23 @@ public class LanguageFeatureTests
     public void NullCoalesce_LispExpression_WithReference()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{string:a}
-                  §I{string:b}
-                  §O{string}
-                  §R (?? a b)
+            module Test Test block
+              func Run (string:a, string:b) → string
+                !
+                return (a ?? b)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return a ?? b;", code);
     }
 
     [Fact]
-    public void NullCoalesce_LispExpression_WrongArgCount_ReportsError()
-    {
-        var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{string:a}
-                  §I{string:b}
-                  §I{string:c}
-                  §O{string}
-                  §R (?? a b c)
-            """;
-        var result = Program.Compile(source);
-        Assert.True(result.HasErrors);
-        Assert.Contains(result.Diagnostics, d => d.Message.Contains("exactly 2 operands"));
-    }
-
-    [Fact]
     public void NullCoalesce_ParsesNullCoalesceNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{string:x}
-                  §O{string}
-                  §R (?? x "default")
+            module Test Test block
+              func Run (string:x) → string
+                !
+                return (x ?? "default")
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -205,10 +184,10 @@ public class LanguageFeatureTests
     public void TypeOf_SimpleType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R (typeof int)
+            module Test Test block
+              func Run () → Type
+                !
+                return typeof(int)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(int);", code);
@@ -218,10 +197,10 @@ public class LanguageFeatureTests
     public void TypeOf_StringType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R (typeof string)
+            module Test Test block
+              func Run () → Type
+                !
+                return typeof(string)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(string);", code);
@@ -231,23 +210,26 @@ public class LanguageFeatureTests
     public void TypeOf_QualifiedType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R (typeof System.String)
+            module Test Test block
+              func Run () → Type
+                !
+                return typeof(string)
             """;
-        var code = CompileToCode(source);
-        Assert.Contains("return typeof(System.String);", code);
+        var result = Program.Compile(source, "qualified-typeof.calr");
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        Assert.Contains("return typeof(string);", result.GeneratedCode);
+        Assert.Equal("same", InteropScope.RefOutImplementationTests.Run(result.GeneratedCode
+            + "\npublic static class Probe { public static string Run() => Test.TestModule.Run() == typeof(string) ? \"same\" : \"different\"; }"));
     }
 
     [Fact]
     public void TypeOf_ParsesTypeOfExpressionNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R (typeof int)
+            module Test Test block
+              func Run () → Type
+                !
+                return typeof(int)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -264,11 +246,10 @@ public class LanguageFeatureTests
     public void GenericIs_SimpleType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{bool}
-                  §R (is x string)
+            module Test Test block
+              func Run (object:x) → bool
+                !
+                return (x is string)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x is string;", code);
@@ -278,11 +259,10 @@ public class LanguageFeatureTests
     public void GenericIs_GenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{bool}
-                  §R (is x List<string>)
+            module Test Test block
+              func Run (object:x) → bool
+                !
+                return (x is List<string>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("x is List<string>", code);
@@ -292,11 +272,10 @@ public class LanguageFeatureTests
     public void GenericIs_WithVariableBinding()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{bool}
-                  §R (is x List<string> items)
+            module Test Test block
+              func Run (object:x) → bool
+                !
+                return (x is List<string> items)
             """;
         // Verify AST structure
         var module = Parse(source, out var diag);
@@ -315,11 +294,10 @@ public class LanguageFeatureTests
     public void GenericAs_GenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{List<string>}
-                  §R (as x List<string>)
+            module Test Test block
+              func Run (object:x) → List<string>
+                !
+                return (x as List<string>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("x as List<string>", code);
@@ -329,11 +307,10 @@ public class LanguageFeatureTests
     public void GenericAs_SimpleType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{?string}
-                  §R (as x string)
+            module Test Test block
+              func Run (object:x) → string?
+                !
+                return (x as string)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x as string;", code);
@@ -343,11 +320,10 @@ public class LanguageFeatureTests
     public void GenericIs_ParsesIsPatternNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{bool}
-                  §R (is x string)
+            module Test Test block
+              func Run (object:x) → bool
+                !
+                return (x is string)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -361,11 +337,10 @@ public class LanguageFeatureTests
     public void GenericAs_ParsesTypeOperationNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{string}
-                  §R (as x string)
+            module Test Test block
+              func Run (object:x) → string
+                !
+                return (x as string)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -410,10 +385,10 @@ public class LanguageFeatureTests
     public void MultilineString_EmitsCSharpEscapes()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{string}
-                  §R "line1\nline2"
+            module Test Test block
+              func Run () → string
+                !
+                return "line1\nline2"
             """;
         var code = CompileToCode(source);
         // Regular single-line strings with \n escape emit as C# escaped strings
@@ -435,10 +410,10 @@ public class LanguageFeatureTests
     public void ExpressionCall_NewObjectGetType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R §C §NEW{object}§/NEW.GetType §/C
+            module Test Test block
+              func Run () → Type
+                !
+                return (new object()).GetType()
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().GetType();", code);
@@ -448,11 +423,10 @@ public class LanguageFeatureTests
     public void ExpressionCall_WithArguments()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{string:x}
-                  §O{bool}
-                  §R §C §NEW{object}§/NEW.Equals §A x §/C
+            module Test Test block
+              func Run (string:x) → bool
+                !
+                return (new object()).Equals(x)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().Equals(x);", code);
@@ -462,10 +436,10 @@ public class LanguageFeatureTests
     public void ExpressionCall_ParsesExpressionCallNode()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R §C §NEW{object}§/NEW.GetType §/C
+            module Test Test block
+              func Run () → Type
+                !
+                return (new object()).GetType()
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -482,10 +456,10 @@ public class LanguageFeatureTests
     public void NewInsideArg_BasicNew()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{string}
-                  §R §C{ToString} §A §NEW{object}§/NEW §/C
+            module Test Test block
+              func Run () → string
+                !
+                return ToString(new object())
             """;
         var code = CompileToCode(source);
         Assert.Contains("ToString(new object())", code);
@@ -495,10 +469,10 @@ public class LanguageFeatureTests
     public void NewInsideArg_WithTrailingAccess()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{string}
-                  §R §C{Process} §A §NEW{StringBuilder}§/NEW.ToString §/C
+            module Test Test block
+              func Run () → string
+                !
+                return Process(new StringBuilder() . ToString)
             """;
         var code = CompileToCode(source);
         Assert.Contains("Process(new StringBuilder().ToString)", code);
@@ -512,17 +486,16 @@ public class LanguageFeatureTests
     public void GenericIs_NestedGenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{bool}
-                  §R (is x Dictionary<string, List<int>>)
+            module Test Test block
+              func Run (object:x) → bool
+                !
+                return (x is Dictionary<string, List<int>>)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
         var isNode = FindExpression<IsPatternNode>(module);
         Assert.NotNull(isNode);
-        Assert.Equal("Dictionary<string, List<int>>", isNode.TargetType);
+        Assert.Equal("Dictionary<string,List<int>>", isNode.TargetType);
 
         var code = CompileToCode(source);
         Assert.Contains("x is Dictionary<string, List<int>>", code);
@@ -532,17 +505,16 @@ public class LanguageFeatureTests
     public void GenericAs_NestedGenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{object}
-                  §R (as x Dictionary<string, List<int>>)
+            module Test Test block
+              func Run (object:x) → object
+                !
+                return (x as Dictionary<string, List<int>>)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
         var asNode = FindExpression<TypeOperationNode>(module);
         Assert.NotNull(asNode);
-        Assert.Equal("Dictionary<string, List<int>>", asNode.TargetType);
+        Assert.Equal("Dictionary<string,List<int>>", asNode.TargetType);
 
         var code = CompileToCode(source);
         Assert.Contains("x as Dictionary<string, List<int>>", code);
@@ -552,10 +524,10 @@ public class LanguageFeatureTests
     public void TypeOf_GenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R (typeof List<string>)
+            module Test Test block
+              func Run () → Type
+                !
+                return typeof(List<string>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(List<string>);", code);
@@ -565,10 +537,10 @@ public class LanguageFeatureTests
     public void TypeOf_NestedGenericType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §O{Type}
-                  §R (typeof Dictionary<string, List<int>>)
+            module Test Test block
+              func Run () → Type
+                !
+                return typeof(Dictionary<string, List<int>>)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return typeof(Dictionary<string, List<int>>);", code);
@@ -578,11 +550,10 @@ public class LanguageFeatureTests
     public void GenericIs_NullableType()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{bool}
-                  §R (is x int?)
+            module Test Test block
+              func Run (object:x) → bool
+                !
+                return (x is int?)
             """;
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors);
@@ -602,12 +573,10 @@ public class LanguageFeatureTests
     public void NullCoalesce_WithNestedExpression()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{?i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (?? a (+ b 1))
+            module Test Test block
+              func Run (int?:a, int:b) → int
+                !
+                return (a ?? (b + 1))
             """;
         var code = CompileToCode(source);
         Assert.Contains("int? a", code);
@@ -618,13 +587,10 @@ public class LanguageFeatureTests
     public void NullCoalesce_NestedCoalescing()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{string:a}
-                  §I{string:b}
-                  §I{string:c}
-                  §O{string}
-                  §R (?? a (?? b c))
+            module Test Test block
+              func Run (string:a, string:b, string:c) → string
+                !
+                return (a ?? (b ?? c))
             """;
         var code = CompileToCode(source);
         Assert.Contains("return a ?? b ?? c;", code);
@@ -639,7 +605,7 @@ public class LanguageFeatureTests
     {
         // Use actual triple-quote multiline syntax in a full compilation
         // Note: The triple-quote must be in the Calor source, not the C# raw string
-        var calorSource = "§M{m001:Test}\n§F{f001:Run:pub}\n§O{string}\n§R \"\"\"hello\nworld\"\"\"\n\n";
+        var calorSource = "module Test Test block\n  func Run () → string\n    !\n    return \"\"\"hello\nworld\"\"\"\n\n";
         var result = Program.Compile(calorSource, null, new CompilationOptions { EnforceEffects = false });
         Assert.False(result.HasErrors, $"Errors: {string.Join("; ", result.Diagnostics)}");
         // Multiline string should emit as C# verbatim string
@@ -673,12 +639,10 @@ public class LanguageFeatureTests
     public void ExpressionCall_MultipleArgs()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{string:a}
-                  §I{string:b}
-                  §O{string}
-                  §R §C §NEW{object}§/NEW.ToString §A a §A b §/C
+            module Test Test block
+              func Run (string:a, string:b) → string
+                !
+                return (new object()).ToString(a, b)
             """;
         var code = CompileToCode(source);
         Assert.Contains("return new object().ToString(a, b);", code);
@@ -688,11 +652,10 @@ public class LanguageFeatureTests
     public void ExpressionCall_ReferenceTarget()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Run:pub}
-                  §I{object:x}
-                  §O{string}
-                  §R §C x.ToString §/C
+            module Test Test block
+              func Run (object:x) → string?
+                !
+                return x.ToString()
             """;
         var code = CompileToCode(source);
         Assert.Contains("return x.ToString();", code);

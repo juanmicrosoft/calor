@@ -34,11 +34,11 @@ public class EffectsSuggestTests
     public void Collector_FindsExternalCalls()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §C{Console.WriteLine} §A STR:""test"" §/C
-      §C{MyService.Process} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    Console.WriteLine(""test"")
+    MyService.Process()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -51,12 +51,12 @@ public class EffectsSuggestTests
     public void Collector_DeduplicatesCalls()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §C{Console.WriteLine} §A STR:""a"" §/C
-      §C{Console.WriteLine} §A STR:""b"" §/C
-      §C{Console.WriteLine} §A STR:""c"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    Console.WriteLine(""a"")
+    Console.WriteLine(""b"")
+    Console.WriteLine(""c"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -68,11 +68,11 @@ public class EffectsSuggestTests
     public void Collector_ExpandsShortNames()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §C{File.ReadAllText} §A STR:""test.txt"" §/C
-      §C{HttpClient.GetAsync} §A STR:""url"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    File.ReadAllText(""test.txt"")
+    HttpClient.GetAsync(""url"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -85,11 +85,11 @@ public class EffectsSuggestTests
     public void Collector_WalksClassMethods()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:MyClass:pub}
-      §MT{mt001:DoWork:pub}
-          §O{void}
-          §C{ExternalService.Call} §/C
+module Test Test block
+  class MyClass
+    func DoWork () → void
+      !
+      ExternalService.Call()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -101,11 +101,11 @@ public class EffectsSuggestTests
     public void Collector_ResolvesVariableTypes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{r} §NEW{Random} §/NEW
-      §C{r.Next} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let r = new Random()
+    r.Next()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -118,14 +118,14 @@ public class EffectsSuggestTests
     public void Collector_UsesBoundReceiverIdentityForShadowedNames()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{r} §NEW{Random} §/NEW
-      §IF{if1} BOOL:true
-          §B{r} §NEW{HttpClient} §/NEW
-          §C{r.GetAsync} §A STR:""/"" §/C
-      §C{r.Next} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let r = new Random()
+    if true
+      let r = new HttpClient()
+      r.GetAsync(""/"")
+    r.Next()
 ";
         var module = Parse(source);
 
@@ -182,13 +182,13 @@ public class EffectsSuggestTests
     public void E1_ExitPin_ReceiverTypeKnownOnlyThroughMetadata_Resolves()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{g} §C{System.Guid.NewGuid} §/C
-      §C{g.ToString} §/C
-      §B{line} §C{System.Console.ReadLine} §/C
-      §C{line.Trim} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let g = System.Guid.NewGuid()
+    g.ToString()
+    let line = System.Console.ReadLine()
+    line.Trim()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -211,11 +211,11 @@ public class EffectsSuggestTests
     public void Collector_InferredBinding_ResolvesReceiverFromBoundType()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
-      §C{sb.Append} §A STR:""x"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let sb = new System.Text.StringBuilder()
+    sb.Append(""x"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -245,18 +245,19 @@ public class EffectsSuggestTests
     public void Collector_UnresolvedReceiver_IsReportedWithoutGuessedType()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.Chain} §/C
-      §C{foo.Bar} §/C
-  §CL{c001:Holder:pub}
-      §MT{mt001:Write:pub}
-          §O{void}
-          §C{this.sb.Append} §A STR:""x"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let x = Unknown.Make()
+    x.Run()
+    let a = new Random()
+    a.b.Chain()
+    foo.Bar()
+
+  class Holder
+    func Write () → void
+      !
+      this.sb.Append(""x"")
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -301,11 +302,11 @@ public class EffectsSuggestTests
     public void Collector_FunctionTypedReceiver_IsUnresolved()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
-      §C{f.Invoke} §A INT:1 §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let f = (int:x) => (x + 1)
+    f.Invoke(1)
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -324,11 +325,10 @@ public class EffectsSuggestTests
     public void Collector_ArrayReceiver_ResolvesToSystemArray()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §I{i32[]:arr}
-      §O{void}
-      §C{arr.Clone} §/C
+module Test Test block
+  func DoWork (int[]:arr) → void
+    !
+    arr.Clone()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -351,14 +351,16 @@ public class EffectsSuggestTests
     public void Collector_CalorClassStaticReceiver_ResolvesThroughTypeSymbol()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Helper:pub}
-      §MT{mt001:Run:pub}
-          §O{void}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §C{Helper.Run} §/C
-      §C{OrderRepo.Save} §/C
+module Test Test block
+  class Helper
+    func Run () → void
+      !
+      return
+
+  func DoWork () → void
+    !
+    Helper.Run()
+    OrderRepo.Save()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -393,55 +395,96 @@ public class EffectsSuggestTests
         }
     }
 
-    /// <summary>The receiver the binder attached to the call whose target is
-    /// <paramref name="target"/>. Fails the test if no such call node exists, so
-    /// a null return means "the binder attached no receiver", never "not found".</summary>
-    private static BoundExpression? ReceiverOf(BoundNode root, string target)
+    /// <summary>The receiver the binder attached to the call written as
+    /// <paramref name="target"/>. A native <c>x.M()</c> binds as an expression
+    /// call (<c>Target == "&lt;expression-call&gt;"</c>), so it is found by its
+    /// receiver and callee spans in <paramref name="source"/>. Fails the test if
+    /// no such call node exists, so a null return means "the binder attached no
+    /// receiver", never "not found".</summary>
+    private static BoundExpression? ReceiverOf(BoundNode root, string source, string target) =>
+        CallOf(root, source, target) switch
+        {
+            BoundCallStatement statement => statement.Receiver,
+            BoundCallExpression expression => expression.Receiver,
+            _ => null
+        };
+
+    private static BoundNode CallOf(BoundNode root, string source, string target)
     {
         foreach (var node in Descendants(root))
         {
             switch (node)
             {
                 case BoundCallStatement statement when statement.Target == target:
-                    return statement.Receiver;
-                case BoundCallExpression expression when expression.Target == target:
-                    return expression.Receiver;
+                    return statement;
+                case BoundCallExpression expression when expression.Target == target
+                    || WrittenTarget(source, expression) == target:
+                    return expression;
             }
         }
 
         Assert.Fail($"No bound call node with target '{target}'.");
-        return null;
+        return null!;
     }
 
+    private static string? WrittenTarget(string source, BoundCallExpression call) =>
+        call.ReceiverSpan is { } receiver
+            ? $"{source.Substring(receiver.Start, receiver.Length)}.{source.Substring(call.CalleeSpan.Start, call.CalleeSpan.Length)}"
+            : null;
+
+    /// <summary>The Calor0270s the binder reports for an unresolved call
+    /// RECEIVER (<c>Binder.UnresolvedReceiver</c>) — not the metadata
+    /// member-resolution Calor0270 the same code also carries.</summary>
+    private static List<Diagnostic> ReceiverUnresolvedDiagnostics(DiagnosticBag diagnostics) =>
+        diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved
+            && d.Message.Contains("so the call's receiver type is unresolved", StringComparison.Ordinal)).ToList();
+
     /// <summary>
-    /// E1 slice 2a pin (a): a dotted head the binder cannot bind gets NO receiver
-    /// expression at all — the binder says nothing rather than guessing — and the
-    /// collector reports the call unresolved. <c>foo</c> is not a bound variable
-    /// and is not written as a type reference; <c>this.sb</c> is a chain through
-    /// <c>this</c>, which is not a bound variable either.
+    /// E1 slice 2a pin (a): a dotted head the binder cannot bind is never given a
+    /// type, and the collector reports the call unresolved. <c>foo</c> is not a
+    /// bound variable and is not written as a type reference; <c>this.sb</c> is a
+    /// chain through <c>this</c> to a member <c>Holder</c> does not declare.
+    ///
+    /// <para>0.30 native syntax: <c>foo.Bar()</c> binds as an expression call
+    /// whose receiver is bound as an ordinary expression, so the binder no longer
+    /// attaches NO receiver — it attaches its undefined-name variable for
+    /// <c>foo</c> (typed <see cref="UnresolvedBoundType"/>) and the
+    /// <c>OBJECT</c>-fallback member access for <c>this.sb</c> (marked
+    /// <c>HasUnknownInferredType</c>). Neither is a type the collector may
+    /// report.</para>
     /// </summary>
     [Fact]
-    public void E1_Slice2a_UnboundDottedHead_YieldsNullReceiverAndUnresolvedCall()
+    public void E1_Slice2a_UnboundDottedHead_YieldsUnresolvedReceiverAndUnresolvedCall()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §C{foo.Bar} §/C
-  §CL{c001:Holder:pub}
-      §MT{mt001:Write:pub}
-          §O{void}
-          §C{this.sb.Append} §A STR:""x"" §/C
+module Test Test block
+  func DoWork () → void
+    !
+    foo.Bar()
+
+  class Holder
+    func Write () → void
+      !
+      this.sb.Append(""x"")
 ";
         var module = Parse(source);
         var (bound, _) = Bind(module);
 
-        Assert.Null(ReceiverOf(bound, "foo.Bar"));
-        Assert.Null(ReceiverOf(bound, "this.sb.Append"));
+        var foo = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, source, "foo.Bar"));
+        Assert.True(foo.Variable.Id.IsNone);
+        Assert.IsType<UnresolvedBoundType>(foo.Type);
+
+        var sb = Assert.IsType<BoundFieldAccessExpression>(ReceiverOf(bound, source, "this.sb.Append"));
+        Assert.IsType<BoundThisExpression>(sb.Target);
+        Assert.True(sb.HasUnknownInferredType);
 
         var calls = ExternalCallCollector.Collect(module);
-        Assert.False(Assert.Single(calls, c => c.MethodName == "Bar").ReceiverResolved);
-        Assert.False(Assert.Single(calls, c => c.MethodName == "Append").ReceiverResolved);
+        var bar = Assert.Single(calls, c => c.MethodName == "Bar");
+        Assert.False(bar.ReceiverResolved);
+        Assert.Equal("foo", bar.TypeName);
+        var append = Assert.Single(calls, c => c.MethodName == "Append");
+        Assert.False(append.ReceiverResolved);
+        Assert.Equal("this.sb", append.TypeName);
     }
 
     /// <summary>
@@ -457,16 +500,16 @@ public class EffectsSuggestTests
     public void E1_Slice2a_MetadataOnlyReceiver_CarriesNominalBoundTypeOnReceiver()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{g} §C{System.Guid.NewGuid} §/C
-      §C{g.ToString} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let g = System.Guid.NewGuid()
+    g.ToString()
 ";
         var module = Parse(source);
         var (bound, _) = Bind(module);
 
-        var receiver = ReceiverOf(bound, "g.ToString");
+        var receiver = ReceiverOf(bound, source, "g.ToString");
         var variable = Assert.IsType<BoundVariableExpression>(receiver);
         var nominal = Assert.IsType<NominalBoundType>(variable.Type);
         Assert.Equal("System.Guid", nominal.QualifiedName);
@@ -505,16 +548,16 @@ public class EffectsSuggestTests
     public void E1_Slice2a_UnresolvedReceiver_ReportsCalor0270OnceAndIsNeverResolved()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let x = Unknown.Make()
+    x.Run()
 ";
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
 
-        var receiver = ReceiverOf(bound, "x.Run");
+        var receiver = ReceiverOf(bound, source, "x.Run");
         var unresolved = Assert.IsType<UnresolvedBoundType>(
             Assert.IsType<BoundVariableExpression>(receiver).Type);
         Assert.Equal(
@@ -538,34 +581,42 @@ public class EffectsSuggestTests
     /// chain the binder does not type, a type reference, or nothing at all.
     /// A member chain reports ONE Calor0270 for the whole chain, not one per
     /// segment.
+    ///
+    /// <para>0.30 native syntax binds the receiver of <c>x.M()</c> as an ordinary
+    /// expression, so the chain and the unbound head take the shapes the
+    /// expression binder gives them: the chain is typed segment by segment (the
+    /// first unknown segment is <see cref="UnresolvedBoundType"/>, later ones the
+    /// <c>OBJECT</c> fallback marked <c>HasUnknownInferredType</c>), and the
+    /// unbound head is the binder's undefined-name variable, not null.</para>
     /// </summary>
     [Fact]
     public void E1_Slice2a_ReceiverShapes_AreTheFourDocumentedOnes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
-      §C{sb.Append} §A STR:""x"" §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.c.Chain} §/C
-      §C{System.Console.WriteLine} §A STR:""y"" §/C
-      §C{foo.Bar} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let sb = new System.Text.StringBuilder()
+    sb.Append(""x"")
+    let a = new Random()
+    a.b.c.Chain()
+    System.Console.WriteLine(""y"")
+    foo.Bar()
 ";
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
 
         // 1. bound local → BoundVariableExpression carrying the symbol's type.
-        var local = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, "sb.Append"));
+        var local = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, source, "sb.Append"));
         Assert.Equal("System.Text.StringBuilder", local.Type.DisplayString);
 
         // 2. member chain → a field-access chain over the typed head, unresolved.
-        var chain = Assert.IsType<BoundFieldAccessExpression>(ReceiverOf(bound, "a.b.c.Chain"));
-        Assert.IsType<UnresolvedBoundType>(chain.Type);
+        var chain = Assert.IsType<BoundFieldAccessExpression>(ReceiverOf(bound, source, "a.b.c.Chain"));
+        Assert.True(chain.HasUnknownInferredType);
         Assert.Equal("c", chain.FieldName);
         var inner = Assert.IsType<BoundFieldAccessExpression>(chain.Target);
         Assert.Equal("b", inner.FieldName);
+        Assert.IsType<UnresolvedBoundType>(inner.Type);
         var chainHead = Assert.IsType<BoundVariableExpression>(inner.Target);
         // The head keeps the binder's own spelling — short-BCL-name expansion is
         // the collector's step, not the binder's, and the binder must not be
@@ -574,18 +625,22 @@ public class EffectsSuggestTests
 
         // 3. static type receiver → BoundTypeReferenceExpression naming the type.
         var typeRef = Assert.IsType<BoundTypeReferenceExpression>(
-            ReceiverOf(bound, "System.Console.WriteLine"));
+            ReceiverOf(bound, source, "System.Console.WriteLine"));
         Assert.Equal("System.Console", typeRef.Name);
         Assert.Equal("System.Console", typeRef.Type.DisplayString);
 
-        // 4. unbound head → nothing.
-        Assert.Null(ReceiverOf(bound, "foo.Bar"));
+        // 4. unbound head → the binder's undefined-name variable, never typed.
+        var unbound = Assert.IsType<BoundVariableExpression>(ReceiverOf(bound, source, "foo.Bar"));
+        Assert.True(unbound.Variable.Id.IsNone);
+        Assert.IsType<UnresolvedBoundType>(unbound.Type);
 
-        // Marking is not reporting: every unresolved receiver above is MARKED
-        // UnresolvedBoundType, but a member chain is a binder limitation the
-        // author cannot act on, so it is silent. No shape in this fixture is
-        // reportable, so the whole module produces zero Calor0270.
-        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+        // Marking is not reporting: every unresolved receiver above is MARKED,
+        // but a member chain is a binder limitation the author cannot act on, so
+        // it is silent. No shape in this fixture is reportable, so the module
+        // produces zero receiver-unresolved Calor0270. (Native binding does report
+        // `Random` having no member `b` — a metadata member-resolution Calor0270
+        // about the member, not the receiver.)
+        Assert.Empty(ReceiverUnresolvedDiagnostics(diagnostics));
     }
 
     /// <summary>
@@ -601,15 +656,15 @@ public class EffectsSuggestTests
     public void E1_Slice2a_Calor0270_FiresOnlyForActionableReceiverShapes()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.Chain} §/C
-      §B{_chainIsValid042} §C{Unknown.Make} §/C
-      §C{_chainIsValid042.Run} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let x = Unknown.Make()
+    x.Run()
+    let a = new Random()
+    a.b.Chain()
+    let _chainIsValid042 = Unknown.Make()
+    _chainIsValid042.Run()
 ";
         var module = Parse(source);
         var (bound, diagnostics) = Bind(module);
@@ -618,56 +673,15 @@ public class EffectsSuggestTests
         // editor, never about what the type system claims.
         foreach (var target in new[] { "x.Run", "a.b.Chain", "_chainIsValid042.Run" })
         {
-            Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, target)!.Type);
+            Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, source, target)!.Type);
         }
 
-        // Only the inferred local the author actually wrote is reported.
-        var single = Assert.Single(
-            diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
+        // Only the inferred local the author actually wrote is reported as an
+        // unresolved receiver.
+        var single = Assert.Single(ReceiverUnresolvedDiagnostics(diagnostics));
         Assert.Contains("'x'", single.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("a.b", single.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("_chain", single.Message, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// Review round 1, finding 3: a direct pin for the
-    /// <c>catch (ArgumentException)</c> path. The C# → Calor converter emits a
-    /// bare <c>?</c> as a lambda parameter's type when it cannot infer one
-    /// (<c>TryInferLambdaParameterType</c>,
-    /// <c>Migration/RoslynSyntaxVisitor.cs:11774-11794</c>, called at <c>:11877</c>
-    /// and <c>:11885</c>, returns Roslyn's error-type spelling). <c>?</c> is not a
-    /// type <c>TypeIdentity.Canonicalize</c> can parse, so building the receiver
-    /// throws — and this slice must turn that into an unresolved receiver, not
-    /// into an internal-error diagnostic that abandons the rest of the member.
-    /// </summary>
-    [Fact]
-    public void E1_Slice2a_UninferredLambdaParameterReceiver_IsUnresolvedNotAnIce()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{f} §LAM{l1:ctx:?}
-          §C{ctx.Trim} §/C
-      §/LAM{l1}
-";
-        var module = Parse(source);
-        var (bound, diagnostics) = Bind(module);
-
-        var unresolved = Assert.IsType<UnresolvedBoundType>(ReceiverOf(bound, "ctx.Trim")!.Type);
-        // The catch-path reason, not the inferred-local one — this fixture must
-        // exercise the canonicalization failure specifically.
-        Assert.Equal(
-            "receiver 'ctx' carries a type string the binder cannot resolve to a type",
-            unresolved.Reason);
-
-        var single = Assert.Single(
-            diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
-        Assert.Contains("'ctx'", single.Message, StringComparison.Ordinal);
-
-        // The throw never surfaces as an internal error, which is what would
-        // abandon the rest of the member.
-        Assert.Empty(diagnostics.Where(d => d.Code == DiagnosticCode.AnalysisICE));
     }
 
     /// <summary>
@@ -676,23 +690,34 @@ public class EffectsSuggestTests
     /// later slice. When the receiver is a bound variable the two agree on the
     /// symbol; when the binder attached no receiver there is no receiver symbol
     /// either; and a type-reference receiver never carries a variable symbol.
+    ///
+    /// <para>0.30 native syntax: a member chain <c>a.b.Chain()</c> binds as an
+    /// expression call whose chain receiver is ALSO its evaluated receiver, a
+    /// child of the call node. <c>ReceiverSymbol</c> is then null — deliberately
+    /// not re-derived from the chain head: every reader of it
+    /// (<c>BoundNodeHelpers.GetUsedVariables*</c>, the bug-pattern receiver
+    /// dereference check, <c>CallGraphAnalysis</c>'s per-site record) also walks
+    /// the call's children, where the head variable is visited as an ordinary
+    /// <see cref="BoundVariableExpression"/> (and dereferenced by the chain's
+    /// field access), so nothing is lost. The pin is that the head is reachable
+    /// there.</para>
     /// </summary>
     [Fact]
     public void E1_Slice2a_ReceiverAndReceiverSymbol_DoNotDrift()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{sb} §NEW{System.Text.StringBuilder} §/NEW
-      §C{sb.Append} §A STR:""x"" §/C
-      §B{x} §C{Unknown.Make} §/C
-      §C{x.Run} §/C
-      §B{a} §NEW{Random} §/NEW
-      §C{a.b.Chain} §/C
-      §C{System.Console.WriteLine} §A STR:""y"" §/C
-      §C{foo.Bar} §/C
-      §C{Helper} §/C
+module Test Test block
+  func DoWork () → void
+    !
+    let sb = new System.Text.StringBuilder()
+    sb.Append(""x"")
+    let x = Unknown.Make()
+    x.Run()
+    let a = new Random()
+    a.b.Chain()
+    System.Console.WriteLine(""y"")
+    foo.Bar()
+    Helper()
 ";
         var module = Parse(source);
         var (bound, _) = Bind(module);
@@ -716,11 +741,23 @@ public class EffectsSuggestTests
                     Assert.Same(symbol, variable.Variable);
                     break;
                 case BoundFieldAccessExpression chain:
-                    // The chain's head is the receiver symbol.
                     var head = chain.Target;
                     while (head is BoundFieldAccessExpression inner)
                         head = inner.Target;
-                    Assert.Same(symbol, Assert.IsType<BoundVariableExpression>(head).Variable);
+                    var headVariable = Assert.IsType<BoundVariableExpression>(head).Variable;
+                    if (node is BoundCallExpression { EvaluatedReceiver: { } evaluated } native)
+                    {
+                        // Native: the chain is the evaluated receiver, so the
+                        // head reaches dataflow through the call's children.
+                        Assert.Same(chain, evaluated);
+                        Assert.Contains(chain, native.Children);
+                        Assert.Null(symbol);
+                    }
+                    else
+                    {
+                        // Legacy §C: the chain's head is the receiver symbol.
+                        Assert.Same(symbol, headVariable);
+                    }
                     break;
                 case BoundTypeReferenceExpression:
                     Assert.Null(symbol);
@@ -745,10 +782,10 @@ public class EffectsSuggestTests
     public void Collector_TagsConstructors()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{x} §NEW{HttpClient} §/NEW
+module Test Test block
+  func DoWork () → void
+    !
+    let x = new HttpClient()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -764,15 +801,15 @@ public class EffectsSuggestTests
     public void InternalFunction_NotIncludedWhenFiltered()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Helper:pub}
-      §O{void}
-      §C{Console.WriteLine} §A STR:""internal"" §/C
-  §F{f002:Main:pub}
-      §O{void}
-      §C{Helper}
-      §/C
-      §C{ExternalService.DoWork} §/C
+module Test Test block
+  func Helper () → void
+    !
+    Console.WriteLine(""internal"")
+
+  func Main () → void
+    !
+    Helper()
+    ExternalService.DoWork()
 ";
         var module = Parse(source);
         var callGraph = CallGraphAnalysis.Build(module);
@@ -802,8 +839,8 @@ public class EffectsSuggestTests
     public void AllResolved_ProducesEmptyList()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
+§M{Test}
+  §F{DoWork:pub}
       §O{void}
       §C{Console.WriteLine} §A STR:""test"" §/C
       §C{Math.Abs} §A INT:42 §/C
@@ -825,12 +862,10 @@ public class EffectsSuggestTests
     public void NoExternalCalls_ProducesEmptyList()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);
@@ -1002,12 +1037,11 @@ public class EffectsSuggestTests
     {
         // Step 1: Source with an unknown external call
         var source = @"
-§M{m001:Test}
-  §F{f001:ProcessOrder:pub}
-      §O{void}
-      §E{cw}
-      §C{Console.WriteLine} §A STR:""Starting"" §/C
-      §C{OrderRepo.Save} §/C
+module Test Test block
+  func ProcessOrder () → void
+    ! cw
+    Console.WriteLine(""Starting"")
+    OrderRepo.Save()
 ";
         // Step 2: Collect unresolved calls (simulating what suggest does)
         var module = Parse(source);
@@ -1053,12 +1087,11 @@ public class EffectsSuggestTests
 
         // Step 6: Full compilation should succeed with correct effect declarations
         var fullSource = @"
-§M{m001:Test}
-  §F{f001:ProcessOrder:pub}
-      §O{void}
-      §E{cw,db:w}
-      §C{Console.WriteLine} §A STR:""Starting"" §/C
-      §C{OrderRepo.Save} §/C
+module Test Test block
+  func ProcessOrder () → void
+    ! cw, db:w
+    Console.WriteLine(""Starting"")
+    OrderRepo.Save()
 ";
         var compileResult = TestHarness.CompileWithEffects(fullSource, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Permissive);
@@ -1084,19 +1117,18 @@ public class EffectsSuggestTests
     {
         // File A defines a helper function
         var sourceA = @"
-§M{m001:Helpers}
-  §F{f001:FormatName:pub}
-      §I{str:name}
-      §O{str}
-      §R name
+module Helpers Helpers block
+  func FormatName (string:name) → string
+    !
+    return name
 ";
         // File B calls the helper + an external type
         var sourceB = @"
-§M{m002:App}
-  §F{f002:ProcessUser:pub}
-      §O{void}
-      §C{FormatName} §A STR:""test"" §/C
-      §C{ExternalApi.Submit} §/C
+module App App block
+  func ProcessUser () → void
+    !
+    FormatName(""test"")
+    ExternalApi.Submit()
 ";
         var moduleA = Parse(sourceA);
         var moduleB = Parse(sourceB);
@@ -1133,11 +1165,11 @@ public class EffectsSuggestTests
     public void Constructor_CollectedWithTypeNameAndCtorKind()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DoWork:pub}
-      §O{void}
-      §B{svc} §NEW{OrderService} §/NEW
-      §B{client} §NEW{HttpClient} §/NEW
+module Test Test block
+  func DoWork () → void
+    !
+    let svc = new OrderService()
+    let client = new HttpClient()
 ";
         var module = Parse(source);
         var calls = ExternalCallCollector.Collect(module);

@@ -1,0 +1,12 @@
+module Test_13_03 Test_13_03 overflow unchecked
+  using System
+  using System.Collections.Generic
+
+  class NullableGenericDemo public
+    func GetPairs public () → KeyValuePair<string,object?>[]
+      ! alloc
+      return new KeyValuePair<string,object?>[] {new KeyValuePair<string,object?>("key", null), new KeyValuePair<string,object?>("key2", "value")}
+
+    func GetComparer public () → Func<object?,object?,bool> ! unknown
+      !
+      return (object?:a, object?:b) => Equals(a, b)

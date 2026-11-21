@@ -1,5 +1,9 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
@@ -11,6 +15,674 @@ namespace Calor.Compiler.Tests;
 
 public class ConditionalEvaluationMigrationTests
 {
+    [Theory]
+    [InlineData("Math")]
+    [InlineData("System.Math")]
+    public void NamedStaticPrimitiveProducer_RetainsExactMetadataForItsReceivingCall(string receiver)
+    {
+        var source = $$"""
+            module Probe Probe block
+              func Read () → int
+                !
+                return {{receiver}}.Max({{receiver}}.Min(8, 3), 7)
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(source, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var calls = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>().ToArray();
+        Assert.Equal(2, calls.Length);
+        Assert.All(calls, call =>
+        {
+            Assert.Null(call.ResolvedSymbol);
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.True(method.IsStatic);
+            Assert.Equal("System.Math", method.ContainingType.ToDisplayString());
+            Assert.Equal(SpecialType.System_Int32, method.ReturnType.SpecialType);
+            Assert.Equal(2, method.Parameters.Length);
+            Assert.All(method.Parameters, parameter => Assert.Equal(SpecialType.System_Int32, parameter.Type.SpecialType));
+            var result = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(call.Type);
+            Assert.Equal(SpecialType.System_Int32,
+                Assert.IsAssignableFrom<INamedTypeSymbol>(result.RoslynSymbol).SpecialType);
+        });
+        var compiled = Program.Compile(source, "named-math-producer.calr",
+            new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ToStringReturnAuthority_DistinguishesObjectMetadataFromTheSourceOverride(bool throughObject)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class Probe
+            {
+                private static int Calls;
+                public sealed class Text
+                {
+                    public override {{(throughObject ? "string?" : "string")}} ToString()
+                    {
+                        Calls++;
+                        return {{(throughObject ? "null" : "\"text\"")}};
+                    }
+                }
+                public static {{(throughObject ? "string?" : "string")}} Read({{(throughObject ? "object" : "Text")}} value)
+                {
+                    return value.ToString();
+                }
+                public static int Run()
+                {
+                    var rendered = Read(new Text());
+                    return Calls * 10 + (rendered == null ? 1 : 0);
+                }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        var diagnostics = new DiagnosticBag();
+        var reparsed = new Parsing.Parser(new Parsing.Lexer(conversion.CalorSource!, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(reparsed);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = NativeCall(bound, "value", "ToString");
+        var returnType = Assert.IsType<Calor.Compiler.Binding.BoundTypes.NominalBoundType>(call.Type);
+        Assert.Equal(throughObject ? "string?" : "string", returnType.QualifiedName);
+        if (throughObject)
+        {
+            Assert.Null(call.ResolvedSymbol);
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.Equal(SpecialType.System_Object, method.ContainingType.SpecialType);
+            Assert.Equal(SpecialType.System_String, method.ReturnType.SpecialType);
+            Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.Annotated, method.ReturnNullableAnnotation);
+            Assert.False(method.IsStatic);
+            Assert.True(method.IsVirtual);
+            Assert.Empty(method.Parameters);
+            Assert.NotNull(call.ResolvedParameterTypes);
+            Assert.Empty(call.ResolvedParameterTypes);
+            Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Annotated,
+                returnType.NullableAnnotation);
+        }
+        else
+        {
+            Assert.Null(call.ResolvedMetadataMethod);
+            Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Probe.Text.ToString").Symbol,
+                call.ResolvedSymbol);
+            Assert.Equal(Calor.Compiler.Binding.BoundTypes.NullableAnnotation.NotAnnotated,
+                returnType.NullableAnnotation);
+        }
+        var compiled = Program.Compile(conversion.CalorSource!, "to-string-return.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(throughObject ? 11 : 10, Execute(source));
+        Assert.Equal(throughObject ? 11 : 10, Execute(compiled.GeneratedCode));
+        if (throughObject)
+        {
+            // The converter declares the sound `! unknown` row; a pure row is rejected.
+            var enforced = Program.Compile(WithPureRows(conversion.CalorSource!), "object-virtual-effects.calr",
+                new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
+            Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+                && diagnostic.Message.Contains("ToString", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData(true, "Calor0272")]
+    [InlineData(false, "Calor0273")]
+    public void NamedObjectToString_DoesNotProveANonnullableResult(bool assign, string diagnosticCode)
+    {
+        var compiled = Program.Compile($$"""
+            module Probe Probe block
+              func Read (object:value) → string
+                !
+                {{(assign ? "let string:rendered = value.ToString()\n    return rendered" : "return value.ToString()")}}
+            """, "to-string-nullable.calr", new CompilationOptions
+            { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == diagnosticCode);
+    }
+
+    [Theory]
+    [InlineData("missing", false)]
+    [InlineData("other", true)]
+    public void NamedMetadataReceiver_RequiresAuthoritativeArgumentTypes(string argument, bool resolves)
+    {
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer($$"""
+            module Probe Probe block
+              func Read (object:value, object:other) → bool
+                !
+                let missing = Missing()
+                return value.Equals({{argument}})
+            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
+        var call = NativeCall(bound, "value", "Equals");
+        Assert.Null(call.ResolvedSymbol);
+        if (resolves)
+        {
+            var method = Assert.IsAssignableFrom<IMethodSymbol>(call.ResolvedMetadataMethod);
+            Assert.False(method.IsStatic);
+            Assert.Equal(SpecialType.System_Object, method.ContainingType.SpecialType);
+            Assert.Equal(SpecialType.System_Object, Assert.Single(method.Parameters).Type.SpecialType);
+        }
+        else
+        {
+            Assert.Null(call.ResolvedMetadataMethod);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, 123)]
+    [InlineData(true, false, 1)]
+    [InlineData(false, true, 123)]
+    public void SelectedPropertyReceiver_EvaluatesOnceBeforeArgumentsAndPreservesExceptions(
+        bool failGetter, bool failCall, int expected)
+    {
+        var members = $$"""
+            private static int Calls;
+            public static string Argument() { Calls = Calls * 10 + 2; return "x"; }
+            public sealed class Holder
+            {
+                public Box Child
+                {
+                    get
+                    {
+                        Calls = Calls * 10 + 1;
+                        if ({{(failGetter ? "true" : "false")}}) throw new System.Exception();
+                        return new Box();
+                    }
+                }
+            }
+            public sealed class Box
+            {
+                public bool Contains(string value)
+                {
+                    Calls = Calls * 10 + 3;
+                    if ({{(failCall ? "true" : "false")}}) throw new System.Exception();
+                    return true;
+                }
+            }
+            """;
+        const string body = """
+            var holder = new Holder();
+            try { bool ignored = holder.Child.Contains(Argument()); }
+            catch (System.Exception) { }
+            return Calls;
+            """;
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe { {{members}} public static int Run() { {{body}} } }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Contains(Descendants(conversion.Ast!).OfType<ExpressionCallNode>(), call =>
+            call.TargetExpression is FieldAccessNode
+                { FieldName: "Contains", Target: FieldAccessNode { FieldName: "Child" } });
+        AssertRoundTrip(body, expected, false, members: members);
+    }
+
+    [Fact]
+    public void MetadataValueMemberReceiver_RetainsTheUnsupportedReadAndUnknownCallEffects()
+    {
+        const string body = """
+            var s = new System.Diagnostics.Stopwatch();
+            string rendered = s.Elapsed.ToString();
+            return rendered == "00:00:00" ? 1 : 0;
+            """;
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe { public static int Run() { {{body}} } }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Contains(Descendants(conversion.Ast!).OfType<ExpressionCallNode>(),
+            call => call.TargetExpression is FieldAccessNode
+                { FieldName: "ToString", Target: FieldAccessNode { FieldName: "Elapsed" } });
+        var diagnostics = new DiagnosticBag();
+        var reparsed = new Parsing.Parser(new Parsing.Lexer(conversion.CalorSource!, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(reparsed);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var call = BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.ResolvedMethodName == "ToString");
+        var member = Assert.IsType<BoundFieldAccessExpression>(call.EvaluatedReceiver);
+        Assert.IsType<Calor.Compiler.Binding.BoundTypes.UnresolvedBoundType>(member.Type);
+        var property = Assert.IsAssignableFrom<IPropertySymbol>(member.UnsupportedMetadataMember);
+        Assert.Equal("System.Diagnostics.Stopwatch", property.ContainingType.ToDisplayString());
+        Assert.Equal("Elapsed", property.Name);
+        Assert.Equal("System.TimeSpan", property.Type.ToDisplayString());
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Null(call.ResolvedMetadataMethod);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "Calor0270"
+            && diagnostic.Span.Start == member.Span.Start && diagnostic.Span.Length == member.Span.Length
+            && diagnostic.Message.Contains("outside supported scalar reads", StringComparison.Ordinal));
+        var enforced = Program.Compile(WithPureRows(conversion.CalorSource!), "metadata-value-receiver.calr",
+            new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains("ToString", StringComparison.Ordinal));
+        AssertRoundTrip(body, 1, false);
+    }
+
+    [Theory]
+    [InlineData("string ignored = Receiver().ToString(); return Calls;", 13)]
+    [InlineData("bool ignored = Receiver().Contains(Argument()); return Calls;", 123)]
+    [InlineData("bool ignored = Receiver().ToString().Contains(Argument()); return Calls;", 132)]
+    [InlineData("try { bool ignored = Receiver().Contains(FailArgument()); } catch (System.Exception) { } return Calls;", 12)]
+    [InlineData("try { bool ignored = Receiver().Contains(\"throw\"); Calls = 9; } catch (System.Exception) { } return Calls;", 13)]
+    public void SameSpelledCustomStringMethods_RetainTheirCallIdentityAndRuntimeEffects(string body, int expected)
+    {
+        const string members = """
+            private static int Calls;
+            public static Box Receiver() { Calls = Calls * 10 + 1; return new Box(); }
+            public static string Argument() { Calls = Calls * 10 + 2; return "x"; }
+            public static string FailArgument() { Argument(); throw new System.Exception(); }
+            public sealed class Box
+            {
+                public override string ToString() { Calls = Calls * 10 + 3; return "x"; }
+                public bool Contains(string value)
+                {
+                    Calls = Calls * 10 + 3;
+                    if (value == "throw") throw new System.Exception();
+                    return true;
+                }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe
+            {
+                {{members}}
+                public static int Run() { {{body}} }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        var customCall = Descendants(conversion.Ast!).OfType<ExpressionCallNode>()
+            .FirstOrDefault(call => call.TargetExpression is FieldAccessNode
+                { Target: CallExpressionNode { Target: "Receiver" } });
+        Assert.NotNull(customCall);
+        var diagnostics = new DiagnosticBag();
+        var reparsed = new Parsing.Parser(new Parsing.Lexer(conversion.CalorSource!, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(reparsed);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var selected = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Where(call => call.ResolvedSymbol?.Name is "Probe.Box.ToString" or "Probe.Box.Contains"));
+        Assert.Same(bound.Functions.Single(function => function.Symbol == selected.ResolvedSymbol).Symbol,
+            selected.ResolvedSymbol);
+        Assert.Null(selected.ResolvedMetadataMethod);
+        AssertRoundTrip(body, expected, false, members: members);
+    }
+
+    [Theory]
+    [InlineData("ToString", "", "")]
+    [InlineData("Contains", "missing", ", object missing")]
+    [InlineData("Contains", "UnknownArgument()", "")]
+    [InlineData("StartsWith", "\"Address\"", "")]
+    public void UnresolvedStringNamedReceiver_PreservesTheOrdinaryCallAndIncompleteAnalysis(
+        string method, string argument, string parameter)
+    {
+        var conversion = new CSharpToCalorConverter(new ConversionOptions
+            { Fidelity = ConversionFidelity.Lossy }).Convert($$"""
+            public static class Probe
+            {
+                public static void Run(object expr{{parameter}})
+                {
+                    var chain = PropertyChain.FromExpression(expr);
+                    chain.{{method}}({{argument}}).ShouldEqual("Address.Id");
+                }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.True(Descendants(conversion.Ast!).OfType<CallExpressionNode>()
+            .Any(call => call.Target == $"chain.{method}"), conversion.CalorSource);
+        Assert.Empty(Descendants(conversion.Ast!).OfType<StringOperationNode>());
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parsing.Parser(new Parsing.Lexer(conversion.CalorSource!, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Calor.Compiler.Binding.Binder(diagnostics).Bind(ast);
+        var call = NativeCall(bound, "chain", method);
+        Assert.Null(call.ResolvedSymbol);
+        Assert.Null(call.ResolvedMetadataMethod);
+        if (argument == "UnknownArgument()")
+            Assert.Equal("UnknownArgument", Assert.IsType<BoundCallExpression>(Assert.Single(call.Arguments)).Target);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "Calor0270"
+            && diagnostic.Message.Contains("chain", StringComparison.Ordinal));
+        var enforced = Program.Compile(WithPureRows(conversion.CalorSource!), "custom-string-call.calr",
+            new CompilationOptions { EnforceEffects = true, StatusWriter = TextWriter.Null });
+        Assert.Contains(enforced.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
+            && diagnostic.Message.Contains($"chain.{method}", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("text.ToString()", StringOp.ToString)]
+    [InlineData("text.Trim()", StringOp.Trim)]
+    [InlineData("text.Contains(\"x\")", StringOp.Contains)]
+    [InlineData("text.StartsWith(\"x\", System.StringComparison.Ordinal)", StringOp.StartsWith)]
+    [InlineData("string.IsNullOrEmpty(text)", StringOp.IsNullOrEmpty)]
+    public void MetadataStringMethods_KeepTheirProvenNativeOperations(string expression, StringOp expected)
+    {
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe
+            {
+                public static object Run(string text) { return {{expression}}; }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Contains(Descendants(conversion.Ast!).OfType<StringOperationNode>(),
+            operation => operation.Operation == expected);
+    }
+
+    [Theory]
+    [InlineData("bool")]
+    [InlineData("char")]
+    [InlineData("sbyte")]
+    [InlineData("byte")]
+    [InlineData("short")]
+    [InlineData("ushort")]
+    [InlineData("int")]
+    [InlineData("uint")]
+    [InlineData("long")]
+    [InlineData("ulong")]
+    [InlineData("float")]
+    [InlineData("double")]
+    [InlineData("decimal")]
+    [InlineData("System.IntPtr")]
+    [InlineData("System.UIntPtr")]
+    public void ProvenClrScalarToString_RetainsItsNativeOperation(string type)
+    {
+        var tree = CSharpSyntaxTree.ParseText($$"""
+            public static class Probe
+            {
+                public static string Render({{type}} value) { return value.ToString(); }
+            }
+            """);
+        var compilation = CSharpCompilation.Create("ScalarIdentity", [tree],
+            GeneratedCSharpCompiler.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var context = new ConversionContext();
+        var ast = new RoslynSyntaxVisitor(context, compilation.GetSemanticModel(tree))
+            .Convert(tree.GetCompilationUnitRoot(), "Probe");
+        Assert.False(context.HasErrors, string.Join("\n", context.Issues));
+        Assert.Contains(Descendants(ast).OfType<StringOperationNode>(),
+            operation => operation.Operation == StringOp.ToString);
+    }
+
+    [Theory]
+    [InlineData("object")]
+    [InlineData("System.Exception")]
+    [InlineData("System.DateTime")]
+    public void NonWhitelistedMetadataToString_RemainsAnOrdinaryCall(string type)
+    {
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe
+            {
+                public static string? Render({{type}} value) { return value.ToString(); }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(Descendants(conversion.Ast!).OfType<StringOperationNode>());
+        Assert.Contains(Descendants(conversion.Ast!).OfType<CallExpressionNode>(),
+            call => call.Target == "value.ToString");
+    }
+
+    [Fact]
+    public void MetadataStringAndPrimitiveCalls_PreserveTheirRuntimeResults()
+    {
+        AssertRoundTrip("""
+            string text = " x ";
+            int value = 42;
+            return text.Trim().Contains("x") && value.ToString() == "42" ? 1 : 0;
+            """, 1, false);
+    }
+
+    [Fact]
+    public void SourceShadowedStringName_RemainsACallRatherThanAMetadataIntrinsic()
+    {
+        const string members = """
+            private static int Calls;
+            public static class String
+            {
+                public static bool IsNullOrEmpty(string value) { Calls += 1; return false; }
+            }
+            """;
+        const string body = "bool ignored = String.IsNullOrEmpty(\"x\"); return Calls;";
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            public static class Probe
+            {
+                {{members}}
+                public static int Run() { {{body}} }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(Descendants(conversion.Ast!).OfType<StringOperationNode>());
+        Assert.Contains(Descendants(conversion.Ast!).OfType<CallExpressionNode>(),
+            call => call.Target == "String.IsNullOrEmpty");
+        AssertRoundTrip(body, 1, false, members: members);
+    }
+
+    [Fact]
+    public void MetadataCollectionContains_IsNotAStringIntrinsic()
+    {
+        var conversion = new CSharpToCalorConverter().Convert("""
+            using System.Collections.Generic;
+            public static class Probe
+            {
+                public static bool Run(List<int> items) { return items.Contains(1); }
+            }
+            """);
+        Assert.True(conversion.Success, string.Join("\n", conversion.Issues));
+        Assert.Empty(Descendants(conversion.Ast!).OfType<StringOperationNode>());
+        Assert.Contains(Descendants(conversion.Ast!).OfType<CallExpressionNode>(),
+            call => call.Target == "items.Contains");
+        AssertRoundTrip("""
+            var items = new System.Collections.Generic.List<int>();
+            items.Add(1);
+            return items.Contains(1) ? 1 : 0;
+            """, 1, false);
+    }
+
+    [Fact]
+    public void SyntaxOnlyStringSpelling_DoesNotSupplyMethodIdentity()
+    {
+        var tree = CSharpSyntaxTree.ParseText("""
+            public static class Probe
+            {
+                public static string Run(string text) { return text.ToString(); }
+                public static bool Check(string text) { return text.Contains("x"); }
+            }
+            """);
+        var context = new ConversionContext();
+        var ast = new RoslynSyntaxVisitor(context).Convert(tree.GetCompilationUnitRoot(), "Probe");
+        Assert.False(context.HasErrors, string.Join("\n", context.Issues));
+        Assert.Empty(Descendants(ast).OfType<StringOperationNode>());
+        Assert.Contains(Descendants(ast).OfType<CallExpressionNode>(), call => call.Target == "text.ToString");
+        Assert.Contains(Descendants(ast).OfType<CallExpressionNode>(), call => call.Target == "text.Contains");
+    }
+
+    /// <summary>
+    /// A native member call binds with the computed target; select it by its
+    /// receiver variable and method name.
+    /// </summary>
+    private static BoundCallExpression NativeCall(BoundNode bound, string receiver, string method) =>
+        BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Single(call => call.ResolvedMethodName == method
+                && call.Receiver is BoundVariableExpression { Variable.Name: var name } && name == receiver);
+
+    /// <summary>Replaces each converter-written `! unknown` row with a pure row.</summary>
+    private static string WithPureRows(string calor)
+    {
+        Assert.Contains("! unknown", calor, StringComparison.Ordinal);
+        return calor.Replace("! unknown", "!", StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<AstNode> Descendants(AstNode node)
+    {
+        yield return node;
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
+    }
+
+    [Theory]
+    [InlineData("Receiver().Next().Take(Trace(3), Trace(4))", 1234)]
+    [InlineData("new Box().Next().Take(Trace(3), Trace(4))", 234)]
+    [InlineData("Items[Trace(0)].Next().Take(Trace(3), Trace(4))", 234)]
+    public void ComputedCalls_PreserveReceiverAndArgumentEvaluationOrder(string expression, int expected)
+    {
+        AssertRoundTrip($"return {expression};", expected, false, members: """
+            private static int Calls;
+            private static Box[] Items = new Box[] { new Box() };
+            public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+            public static Box Receiver() { Trace(1); return new Box(); }
+            public sealed class Box
+            {
+                public Box Next() { Trace(2); return this; }
+                public int Take(int first, int second) { return Calls; }
+            }
+            """);
+    }
+
+    [Theory]
+    [InlineData("false", 0)]
+    [InlineData("true", 123)]
+    public void ComputedCalls_ShortCircuitKeepsReceiverAndArgumentsLazy(string gate, int expected)
+    {
+        AssertRoundTrip($"bool gate = {gate}; bool ignored = gate && Receiver().Check(Trace(2), Trace(3)); return Calls;",
+            expected, false, members: """
+                private static int Calls;
+                public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+                public static Box Receiver() { Trace(1); return new Box(); }
+                public sealed class Box { public bool Check(int first, int second) { return true; } }
+                """);
+    }
+
+    [Theory]
+    [InlineData("FailReceiver().Take(Trace(2), Trace(3))", 1)]
+    [InlineData("Receiver().Take(FailArgument(), Trace(3))", 12)]
+    public void ComputedCalls_ExceptionsStopLaterEvaluation(string expression, int expected)
+    {
+        AssertRoundTrip($"try {{ int ignored = {expression}; }} catch (System.Exception) {{ }} return Calls;",
+            expected, false, members: """
+                private static int Calls;
+                public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+                public static Box Receiver() { Trace(1); return new Box(); }
+                public static Box FailReceiver() { Trace(1); throw new System.Exception(); }
+                public static int FailArgument() { Trace(2); throw new System.Exception(); }
+                public sealed class Box { public int Take(int first, int second) { return 0; } }
+                """);
+    }
+
+    [Fact]
+    public void ComputedCalls_PreserveNamedRefOutAndInArguments()
+    {
+        foreach (var modifier in new[] { "ref", "out", "in" })
+        {
+            var assignment = modifier == "in" ? "" : "item = 7;";
+            AssertRoundTrip(
+                $"int value = 2; Receiver().Update(item: {modifier} value); return Calls * 10 + value;",
+                modifier == "in" ? 132 : 137, false, members: $$"""
+                    private static int Calls;
+                    public static void Trace(int value) { Calls = Calls * 10 + value; }
+                    public static Box Receiver() { Trace(1); return new Box(); }
+                    public sealed class Box
+                    {
+                        public void Update({{modifier}} int item) { Trace(3); {{assignment}} }
+                    }
+                    """);
+        }
+    }
+
+    [Fact]
+    public void ComputedGenericCalls_RoundTripWithoutReceiverHoists()
+    {
+        AssertRoundTrip("int ignored = Receiver().Echo<int>(Trace(2)); return Calls;", 123, false, members: """
+            private static int Calls;
+            public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+            public static Box Receiver() { Trace(1); return new Box(); }
+            public sealed class Box
+            {
+                public T Echo<T>(T item) { Trace(3); return item; }
+            }
+            """);
+    }
+
+    [Fact]
+    public void ComputedCallOnStructElement_DoesNotMutateACopy()
+    {
+        AssertRoundTrip("Counter[] items = new Counter[1]; items[0].Bump(); return items[0].Value;",
+            1, false, members: """
+                public struct Counter
+                {
+                    public int Value;
+                    public void Bump() { Value += 1; }
+                }
+                """);
+    }
+
+    // 0.30: a C# const local becomes an ordinary Calor local, so its uses were no longer constant
+    // expressions and the generated C# called another overload: `G(k)` with `const int k = 1`
+    // calls G(byte) (constant conversion), `G(int local)` calls G(long). Uses of int and long
+    // const locals are now written as their values; a byte assignment of one compiles again.
+    [Fact]
+    public void ConstantLocals_KeepTheirConstantConversions()
+    {
+        AssertRoundTrip("const int k = 1; const long big = 5; const int neg = -1; byte b = k; "
+            + "return G(k) * 1000 + H(big) * 100 + G(neg) * 10 + b;",
+            1421, false, members: """
+                public static int G(byte x) => 1;
+                public static int G(long x) => 2;
+                public static int H(ulong x) => 3;
+                public static int H(long x) => 4;
+                """);
+    }
+
+    // 0.30: a compound update of a field of `this` inside a struct's own member is lowered to
+    // `set t (t op v)`, like a field of a struct local: `this` is the instance's storage (a
+    // reference, not a copy), so locating it again changes nothing. It was kept as raw C#
+    // (compound-assignment-order). The element is mutated in place, so the array sees it.
+    [Theory]
+    [InlineData("Value += 2;", 2)]
+    [InlineData("this.Value += 2;", 2)]
+    [InlineData("Value++;", 1)]
+    [InlineData("--this.Value;", -1)]
+    [InlineData("Inner.X += 3;", 3)]
+    [InlineData("this.Inner.X *= 3;", 0)]
+    public void StructThisFieldUpdate_LowersNatively_AndMutatesTheElement(string update, int expected)
+    {
+        AssertRoundTrip("Counter[] items = new Counter[1]; items[0].Bump(); return items[0].Value + items[0].Inner.X;",
+            expected, false, members: $$"""
+                public struct Cell { public int X; }
+                public struct Counter
+                {
+                    public int Value;
+                    public Cell Inner;
+                    public void Bump() { {{update}} }
+                }
+                """);
+    }
+
+    [Fact]
+    public void ReturnedDelegate_ReceiverAndArgumentsRunOnce()
+    {
+        AssertRoundTrip("int ignored = Factory()(Trace(2)); return Calls;", 123, false, members: """
+            private static int Calls;
+            public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+            public static System.Func<int,int> Factory() { Trace(1); return value => Trace(3); }
+            """);
+    }
+
+    [Theory]
+    [InlineData("true", 13)]
+    [InlineData("false", 23)]
+    public void ConditionalDelegateCallee_InvokesOnlyTheSelectedFactory(string gate, int expected)
+    {
+        AssertRoundTrip($"bool gate = {gate}; int ignored = (gate ? First() : Second())(Trace(3)); return Calls;",
+            expected, false, members: """
+                private static int Calls;
+                public static int Trace(int value) { Calls = Calls * 10 + value; return value; }
+                public static System.Func<int,int> First() { Trace(1); return value => value; }
+                public static System.Func<int,int> Second() { Trace(2); return value => value; }
+                """);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -33,7 +705,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             "int i = 0; bool gate = false; bool ignored = gate && i++ > 0; return i;",
-            0, expectInterop: false);
+            0, expectInterop: true);
     }
 
     [Fact]
@@ -58,8 +730,11 @@ public class ConditionalEvaluationMigrationTests
     [InlineData(ConversionFidelity.Lossy)]
     public void StackAllocationSize_RemainsInsideTheRightOperand(ConversionFidelity fidelity)
     {
+        // 0.30 native Calor has no stackalloc form: the statement is preserved as C#
+        // interop, which must still keep the size inside the right operand.
         AssertRoundTrip("int ignored = Trace(1) + Consume(stackalloc int[Size()]); return Calls;",
-            123, false, members: """
+            123, false, interopFeature: fidelity == ConversionFidelity.Lossless ? "stackalloc" : "method",
+            members: """
                 private static int Calls;
                 public static int Trace(int id) { Calls = Calls * 10 + id; return id; }
                 public static int Size() { return Trace(2); }
@@ -70,7 +745,7 @@ public class ConditionalEvaluationMigrationTests
     [Fact]
     public void FieldInitializers_RetainSourceOrder()
     {
-        AssertRoundTrip("return Snapshot;", 1, false, members: """
+        AssertRoundTrip("return Snapshot;", 1, true, members: """
             private static int Seed;
             private static int First = true ? Seed++ : 0;
             private static int Snapshot = Seed;
@@ -92,7 +767,7 @@ public class ConditionalEvaluationMigrationTests
     [Fact]
     public void AutoPropertyInitializers_RetainSourceOrder()
     {
-        AssertRoundTrip("return Snapshot;", 1, false, members: """
+        AssertRoundTrip("return Snapshot;", 1, true, members: """
             private static int Seed;
             private static int First { get; } = true ? Seed++ : 0;
             private static int Snapshot { get; } = Seed;
@@ -116,9 +791,9 @@ public class ConditionalEvaluationMigrationTests
     [Theory]
     [InlineData("Receiver()", false)]
     [InlineData("((Holder)Receiver())", false)]
-    [InlineData("new Holder()", true)]
-    [InlineData("Items[0]", true)]
-    [InlineData("Items[0].Self", true)]
+    [InlineData("new Holder()", false)]
+    [InlineData("Items[0]", false)]
+    [InlineData("Items[0].Self", false)]
     public void CapturedReceivers_PreserveNamedArguments(string receiver, bool expectInterop)
     {
         AssertRoundTrip($"bool gate = true; bool ignored = gate && {receiver}.Check(second: 1, first: 2); return Calls;",
@@ -238,39 +913,23 @@ public class ConditionalEvaluationMigrationTests
     }
 
     [Theory]
-    [InlineData("§C{Use} §A{readonly} value §/C")]
-    [InlineData("§C{Use} §A{ref:out} value §/C")]
-    [InlineData("§C{Use} §A{} value §/C")]
-    [InlineData("§B{result} §C §C{Get} §/C §A{ref} value §/C")]
-    [InlineData("§B{result} §NEW{Box} §A{ref} value")]
-    public void UnsupportedArgumentModifiers_AreDiagnosed(string statement)
-    {
-        var source = $$"""
-            §M{m:Probe}
-              §F{f:Run:pub} () -> void
-                {{statement}}
-            """;
-        var diagnostics = new DiagnosticBag();
-        new Calor.Compiler.Parsing.Parser(
-            new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.InvalidModifier);
-    }
-
-    [Theory]
-    [InlineData("true", "(+ n 1)", 3)]
-    [InlineData("false", "(+ n 1)", 0)]
-    [InlineData("true", "§C{Size} §/C", 3)]
-    [InlineData("false", "§C{Size} §/C", 0)]
+    [InlineData("true", "n + 1", 3)]
+    [InlineData("false", "n + 1", 0)]
+    [InlineData("true", "Size()", 3)]
+    [InlineData("false", "Size()", 0)]
     public void NativeConditionalArraySizes_SurvivePrettyRoundTrip(string gate, string size, int expected)
     {
         var source = $$"""
-            §M{m:Probe}
-              §F{s:Size:pub} () -> i32
-                §R 3
-              §F{r:Run:pub} () -> i32
-                §B{n:i32} 2
-                §B{values} (? {{gate}} §ARR{a:i32:"{{size}}"} §ARR{b:i32:0})
-                §R (len values)
+            module Probe Probe block
+              func Size () → int
+                !
+                return 3
+
+              func Run () → int
+                !
+                let int:n = 2
+                let values = ({{gate}} ? new int[{{size}}] : new int[0])
+                return values.Length
             """;
         var options = new Calor.Compiler.CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null };
         var first = Program.Compile(source, "native-array.calr", options);
@@ -295,7 +954,7 @@ public class ConditionalEvaluationMigrationTests
     [InlineData("true && (i++ > 0 || ++i > 0)", 2)]
     public void LogicalOperands_PreserveEvaluationCount(string expression, int expected)
     {
-        AssertRoundTrip($"int i = 0; bool ignored = {expression}; return i;", expected, false);
+        AssertRoundTrip($"int i = 0; bool ignored = {expression}; return i;", expected, true);
     }
 
     [Theory]
@@ -406,7 +1065,7 @@ public class ConditionalEvaluationMigrationTests
     public void Coalescing_PreservesConditionalIncrement(string value, int expected)
     {
         AssertRoundTrip($"int i = 0; int? value = {value}; int ignored = value ?? i++; return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -415,7 +1074,7 @@ public class ConditionalEvaluationMigrationTests
     public void ConditionalArms_PreserveOrderAndResult(string gate, int expected)
     {
         AssertRoundTrip($"int i = 1; bool gate = {gate}; int value = gate ? i++ : ++i; return value * 10 + i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -436,7 +1095,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; try {{ bool ignored = {expression}; }} catch (System.DivideByZeroException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -446,7 +1105,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; int? value = {value}; try {{ int ignored = value ?? 1 / i++; }} catch (System.DivideByZeroException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -456,7 +1115,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; bool gate = {gate}; try {{ int ignored = gate ? 1 / i++ : 42; }} catch (System.DivideByZeroException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -476,7 +1135,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string target = {target}; string ignored = target?.Substring(i++); return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -486,7 +1145,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 4; string target = {target}; try {{ string ignored = target?.Substring(i++); }} catch (System.ArgumentOutOfRangeException) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -495,7 +1154,7 @@ public class ConditionalEvaluationMigrationTests
     public void ConditionalCallStatement_PreservesSkippedArguments(string target, int expected)
     {
         AssertRoundTrip($"int i = 0; string target = {target}; target?.Substring(i++); return i;",
-            expected, false);
+            expected, true);
     }
 
     [Fact]
@@ -512,7 +1171,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string target = {target}; int? ignored = target?.Trim().Substring(i++).Length; return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -522,7 +1181,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string target = {target}; int? ignored = target?.Trim()?.Substring(i++)?.Length; return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -550,13 +1209,14 @@ public class ConditionalEvaluationMigrationTests
     [InlineData("dec", "--i", -1)]
     [InlineData("post-inc", "i++", 1)]
     [InlineData("post-dec", "i--", -1)]
-    public void NativeUnaryMutations_StayInTheirBranch(string operation, string expression, int expected)
+    public void RetiredUnaryMutations_StayPreservedInTheirBranch(string operation, string expression, int expected)
     {
-        AssertRoundTrip($"int i = 0; bool ignored = true && {expression} == 0; return i;", expected, false);
+        AssertRoundTrip($"int i = 0; bool ignored = true && {expression} == 0; return i;", expected, true);
         var node = new Calor.Compiler.Ast.UnaryOperationNode(default,
             Calor.Compiler.Ast.UnaryOperatorExtensions.FromString(operation)!.Value,
             new Calor.Compiler.Ast.ReferenceNode(default, "i"));
-        Assert.Equal($"({operation} i)", new CalorEmitter().Visit(node));
+        var error = Assert.Throws<InvalidOperationException>(() => new CalorEmitter().Visit(node));
+        Assert.Contains("§ASSIGN", error.Message);
     }
 
     [Theory]
@@ -566,7 +1226,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; string value = {value}; try {{ string ignored = value ?? throw new System.Exception((i++).ToString()); }} catch (System.Exception) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]
@@ -576,7 +1236,7 @@ public class ConditionalEvaluationMigrationTests
     {
         AssertRoundTrip(
             $"int i = 0; bool gate = {gate}; try {{ int ignored = gate ? 42 : throw new System.Exception((i++).ToString()); }} catch (System.Exception) {{ return 100 + i; }} return i;",
-            expected, false);
+            expected, true);
     }
 
     [Theory]

@@ -18,16 +18,16 @@ public class ContractSimplificationRuntimeTests
     public void QuantifierDiscovery_PreservesShortCircuitAndEndpointOrder(bool verify)
     {
         string Guarded(string predicate) => $$"""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (bool:guard, i32:x) -> i32
-                §E{}
-                §Q {{predicate}}
-                §R INT:7
+            module TypedContracts TypedContracts block
+              func Check (bool:guard, int:x) → int
+                !
+                requires {{predicate}}
+                return 7
             """;
         var all = Compile(Guarded(
-            "(forall ((i i32)) (-> (&& guard (&& (>= i (/ INT:1 x)) (< i INT:2))) true))"), verify);
+            "(forall int:i where (guard && ((i >= (1 / x)) && (i < 2))) : true)"), verify);
         var any = Compile(Guarded(
-            "(exists ((i i32)) (&& guard (&& (>= i (/ INT:1 x)) (< i INT:2))))"), verify);
+            "(exists int:i where guard : ((i >= (1 / x)) && (i < 2)))"), verify);
         Assert.Equal(7, InvokeArguments(all, false, 0));
         AssertContractViolation(() => InvokeArguments(any, false, 0));
         Assert.Equal(7, InvokeArguments(all, true, 1));
@@ -38,30 +38,30 @@ public class ContractSimplificationRuntimeTests
             Assert.IsType<DivideByZeroException>(error.InnerException);
         }
 
-        var emptyPrefix = Compile(Function("i32",
-            "(forall ((i i32)) (-> (&& (> i INT:2147483647) (< i (/ INT:1 x))) false))"), verify);
+        var emptyPrefix = Compile(Function("int",
+            "(forall int:i where ((i > 2147483647) && (i < (1 / x))) : false)"), verify);
         Assert.Equal(7, Invoke(emptyPrefix, 0));
-        var earlierThrow = Compile(Function("i32",
-            "(forall ((i i32)) (-> (&& (< i (/ INT:1 x)) (> i INT:2147483647)) false))"), verify);
+        var earlierThrow = Compile(Function("int",
+            "(forall int:i where ((i < (1 / x)) && (i > 2147483647)) : false)"), verify);
         Assert.IsType<DivideByZeroException>(
             Assert.Throws<TargetInvocationException>(() => Invoke(earlierThrow, 0)).InnerException);
 
         var betweenBounds = Compile(Guarded(
-            "(forall ((i i32)) (-> (&& (>= i INT:0) (&& guard (< i (/ INT:1 x)))) true))"), verify);
+            "(forall int:i where ((i >= 0) && (guard && (i < (1 / x)))) : true)"), verify);
         Assert.Equal(7, InvokeArguments(betweenBounds, false, 0));
         Assert.IsType<DivideByZeroException>(
             Assert.Throws<TargetInvocationException>(() => InvokeArguments(betweenBounds, true, 0)).InnerException);
-        var nested = Compile(Function("i32",
-            "(forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (&& (< i x) (&& (>= j (/ INT:1 x)) (< j (+ i INT:2))))) true))"), verify);
+        var nested = Compile(Function("int",
+            "(forall int:i, int:j where ((i >= 0) && ((i < x) && ((j >= (1 / x)) && (j < (i + 2))))) : true)"), verify);
         Assert.Equal(7, Invoke(nested, 0));
         Assert.Equal(7, Invoke(nested, 2));
         var nullableArray = Compile("""
-            §M{m1:TypedContracts}
-              §CL{c1:NullableDomain:pub}
-                §MT{mt1:Check:pub} (i32[]?:x) -> i32
-                  §E{}
-                  §Q (forall ((i i32)) (-> (&& (!= x null) (&& (>= i INT:0) (< i x.Length))) true))
-                  §R INT:7
+            module TypedContracts TypedContracts block
+              class NullableDomain
+                func Check (int[]?:x) → int
+                  !
+                  requires (forall int:i where ((x != null) && ((i >= 0) && (i < x.Length))) : true)
+                  return 7
             """, verify, rejectNullableWarnings: true);
         var domainType = nullableArray.GetType("TypedContracts.NullableDomain")!;
         var domain = Activator.CreateInstance(domainType);
@@ -72,230 +72,23 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void UncertifiedQuantifierPrefixes_AreRejectedExplicitly(bool verify)
-    {
-        foreach (var predicate in new[]
-        {
-            "(forall ((i i32)) (-> (&& (> Tick INT:0) (&& (>= i INT:0) (< i INT:3))) true))",
-            "(exists ((i i32)) (&& (>= i Tick) (< i INT:3)))"
-        })
-        {
-            var source = $$"""
-                §M{m1:ContractEffects}
-                  §CL{c1:Counter:pub}
-                    §FLD{i32:Value:pub}
-                    §PROP{p1:Tick:i32:pub}
-                      §GET
-                        §ASSIGN Value (+ Value INT:1)
-                        §R Value
-                    §MT{mt1:Check:pub} () -> i32
-                      §E{}
-                      §Q {{predicate}}
-                      §R INT:7
-                """;
-            var result = Program.Compile(source, "uncertified-quantifier.calr", Options(verify));
-            Assert.Contains(result.Diagnostics.Errors,
-                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-        }
-        var forwardDependent = Program.Compile(Function("i32",
-            "(forall ((i i32) (j i32)) (-> (&& (>= i INT:0) (&& (< i j) (&& (>= j INT:0) (< j x)))) true))"),
-            "forward-bound.calr", Options(verify));
-        Assert.Contains(forwardDependent.Diagnostics.Errors,
-            error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-        foreach (var predicate in new[]
-        {
-            "(forall ((i i32)) (-> (&& false x) false))",
-            "(forall ((i i8)) (-> (&& (&& (>= i INT:0) (< i INT:1)) x) (== i INT:0)))"
-        })
-        {
-            var overloaded = $$"""
-                §M{m1:TypedContracts}
-                  §CL{c1:Probe:pub}
-                    §OP{op1:implicit:pub}
-                      §I{bool:value}
-                      §O{Probe}
-                      §R §NEW{Probe}
-                    §OP{op2:implicit:pub}
-                      §I{Probe:value}
-                      §O{bool}
-                      §R true
-                    §OP{op3:true:pub}
-                      §I{Probe:value}
-                      §O{bool}
-                      §R true
-                    §OP{op4:false:pub}
-                      §I{Probe:value}
-                      §O{bool}
-                      §R false
-                    §OP{op5:&:pub}
-                      §I{Probe:a}
-                      §I{Probe:b}
-                      §O{Probe}
-                      §R a
-                  §F{f1:Check:pub} (Probe:x) -> i32
-                    §E{}
-                    §Q {{predicate}}
-                    §R INT:7
-                """;
-            var result = Program.Compile(overloaded, "overloaded-logic.calr", Options(verify));
-            Assert.Contains(result.Diagnostics.Errors,
-                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-            var scalar = predicate.Contains("i8", StringComparison.Ordinal)
-                ? "(-> (&& (&& (>= INT:-1 INT:0) (< INT:-1 INT:1)) x) (== INT:-1 INT:0))"
-                : "(-> (&& false x) false)";
-            var control = Compile(overloaded.Replace(predicate, scalar), verify);
-            AssertContractViolation(() => Invoke(control, null));
-
-            var lambdaHeader = overloaded.Replace("(Probe:x) -> i32", "(bool:x, object:o) -> Func<bool>")
-                .Replace("\n    §R INT:7", "");
-            var patternShadow = lambdaHeader.Replace($"§Q {predicate}",
-                $"§R §LAM{{l1}} §R (? (is o Probe x) {predicate} true) §/LAM{{l1}}");
-            var localShadow = lambdaHeader.Replace($"§Q {predicate}",
-                $"§R §LAM{{l1}} §B{{x:Probe}} §NEW{{Probe}} §R {predicate} §/LAM{{l1}}")
-                .Replace("§E{}", "§E{alloc}");
-            foreach (var shadowed in new[] { patternShadow, localShadow })
-            {
-                var rejected = Program.Compile(shadowed, "shadowed-logic.calr", Options(verify));
-                Assert.Contains(rejected.Diagnostics.Errors,
-                    error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-                var scalarControl = Compile(shadowed.Replace(predicate, scalar), verify);
-                var probe = Activator.CreateInstance(scalarControl.GetType("TypedContracts.Probe")!);
-                var closure = Assert.IsType<Func<bool>>(InvokeArguments(scalarControl, false, probe));
-                Assert.False(closure());
-            }
-
-            var initializer = overloaded[..overloaded.IndexOf("  §F{f1:Check:pub}", StringComparison.Ordinal)] + $$"""
-                  §CL{c2:Container:pub}
-                    §MT{mt1:Seed:pub} (bool:x) -> bool
-                      §E{}
-                      §R x
-                    §FLD{Probe:x:pub:static}
-                    §FLD{Func<bool>:Check:pub:static} §LAM{l1} §R {{predicate}} §/LAM{l1}
-                """;
-            var initializerResult = Program.Compile(initializer, "initializer-logic.calr", Options(verify));
-            Assert.Contains(initializerResult.Diagnostics.Errors,
-                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-            var initializerControl = Compile(initializer.Replace(predicate, scalar), verify);
-            var fieldClosure = Assert.IsType<Func<bool>>(initializerControl.GetType("TypedContracts.Container")!
-                .GetField("Check")!.GetValue(null));
-            Assert.False(fieldClosure());
-        }
-
-        foreach (var (endpoint, mutation) in new[]
-        {
-            ("n", "§ASSIGN n INT:3"), ("(+ n INT:0)", "§ASSIGN n INT:3"),
-            ("n", "§B{~n} INT:3"), ("(+ n INT:0)", "§B{~n} INT:3")
-        })
-        {
-            string Body(string variable) =>
-                $"(-> (&& (>= {variable} INT:0) (< {variable} {endpoint})) (&& (cast bool §C{{Invoke}} §A grow §/C) (== {variable} INT:0)))";
-            var quantifier = $"(forall ((i i32)) {Body("i")})";
-            var captured = $$"""
-                §M{m1:TypedContracts}
-                  §F{f2:Invoke:pub} (Func<bool>:action §E{}) -> bool
-                    §E{}
-                    §R §C{action} §/C
-                  §F{f1:Check:pub} () -> Func<i32,bool> §E{}
-                    §E{}
-                    §R §LAM{l1:n:i32} §E{}
-                      §B{grow:Func<bool>} §E{} §LAM{l2} §E{} {{mutation}} §R true §/LAM{l2}
-                      §R {{quantifier}}
-                    §/LAM{l1}
-                """;
-            var result = Program.Compile(captured, "captured-endpoint.calr", Options(verify));
-            Assert.Contains(result.Diagnostics.Errors,
-                error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-            var control = Compile(captured.Replace(quantifier, $"(&& {Body("INT:0")} {Body("INT:1")})"), verify);
-            var closure = Assert.IsType<Func<int, bool>>(InvokeArguments(control));
-            Assert.False(closure(1));
-
-            foreach (var contractMarker in new[] { "§Q", "§S" })
-            {
-                var contractCapture = $$"""
-                    §M{m1:TypedContracts}
-                      §CL{c1:Domain:pub}
-                        §MT{mt2:Invoke:pub} (Func<bool>:action §E{}) -> bool
-                          §E{}
-                          §R §C{action} §/C
-                        §MT{mt1:Check:pub} (i32:n) -> i32
-                          §E{}
-                          {{contractMarker}} (&& (is (cast Func<bool> §LAM{l1} §E{} {{mutation}} §R true §/LAM{l1}) Func<bool> grow) {{quantifier}})
-                          §R INT:7
-                    """;
-                var inheritedCapture = contractCapture
-                    .Replace("§CL{c1:Domain:pub}", "§CL{c0:Base:pub:abs}")
-                    .Replace("§MT{mt1:Check:pub}", "§MT{mt1:Check:pub:abs}")
-                    .Replace("\n      §R INT:7", "") + """
-
-                      §CL{c1:Domain:pub}
-                        §EXT{Base}
-                        §MT{mt3:Check:pub:over} (i32:n) -> i32
-                          §E{}
-                          §R INT:7
-                    """;
-                foreach (var source in new[] { contractCapture, inheritedCapture })
-                {
-                    var rejectedContract = Program.Compile(source, "contract-capture.calr", Options(verify));
-                    Assert.Contains(rejectedContract.Diagnostics.Errors,
-                        error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
-                    var scalarContract = Compile(source.Replace(quantifier,
-                        $"(&& {Body("INT:0")} {Body("INT:1")})"), verify);
-                    var domainType = scalarContract.GetType("TypedContracts.Domain")!;
-                    var domain = Activator.CreateInstance(domainType);
-                    AssertContractViolation(() => domainType.GetMethod("Check")!.Invoke(domain, [1]));
-                }
-            }
-
-            foreach (var initializer in new[]
-            {
-                $"§ANON Grow = (cast Func<bool> §LAM{{l2}} §E{{}} {mutation} §R true §/LAM{{l2}})"
-            })
-            {
-                var wrappedQuantifier = quantifier.Replace("§A grow", "§A box.Grow");
-                var wrapped = $$"""
-                    §M{m1:TypedContracts}
-                      §F{f2:Invoke:pub} (Func<bool>:action §E{}) -> bool
-                        §E{}
-                        §R §C{action} §/C
-                      §F{f1:Check:pub} () -> Func<i32,bool> §E{alloc}
-                        §E{alloc}
-                        §R §LAM{l1:n:i32} §E{alloc}
-                          §B{box} {{initializer}}
-                          §R {{wrappedQuantifier}}
-                        §/LAM{l1}
-                    """;
-                var rejected = Program.Compile(wrapped, "wrapped-capture.calr", Options(verify));
-                Assert.True(rejected.Diagnostics.Errors.Any(
-                    error => error.Code == Calor.Compiler.Diagnostics.DiagnosticCode.QuantifierRuntimeLoweringUnsupported),
-                    initializer + Environment.NewLine + string.Join(Environment.NewLine, rejected.Diagnostics.Errors));
-                var scalar = $"(&& {Body("INT:0")} {Body("INT:1")})".Replace("§A grow", "§A box.Grow");
-                var wrappedControl = Compile(wrapped.Replace(wrappedQuantifier, scalar), verify);
-                var wrappedClosure = Assert.IsType<Func<int, bool>>(InvokeArguments(wrappedControl));
-                Assert.False(wrappedClosure(1));
-            }
-        }
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
     public void Quantifiers_KeepEveryConjunctAndGroupedBounds(bool verify)
     {
-        var falseExists = Compile(Function("i32",
-            "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:1) (&& (== i i) false))))"), verify);
+        var falseExists = Compile(Function("int",
+            "(exists int:i where (i >= 0) : ((i < 1) && ((i == i) && false)))"), verify);
         AssertContractViolation(() => Invoke(falseExists, 0));
 
-        var throwingExists = Compile(Function("i32",
-            "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:1) (&& (== i i) (> (/ INT:1 x) INT:0)))))"), verify);
+        var throwingExists = Compile(Function("int",
+            "(exists int:i where (i >= 0) : ((i < 1) && ((i == i) && ((1 / x) > 0))))"), verify);
         var exception = Assert.Throws<TargetInvocationException>(() => Invoke(throwingExists, 0));
         Assert.IsType<DivideByZeroException>(exception.InnerException);
 
-        var forall = Compile(Function("i32",
-            "(forall ((i i32)) (-> (&& (>= i (- x x)) (< i INT:2)) (< i INT:1)))"), verify);
-        var exists = Compile(Function("i32",
-            "(exists ((i i32)) (&& (>= i (- x x)) (&& (< i INT:2) (== i INT:1))))"), verify);
-        var multi = Compile(Function("i32",
-            "(exists ((i i32) (j i32)) (&& (>= i (- x x)) (&& (< i INT:2) (&& (>= j (- x x)) (&& (< j INT:2) (&& (== i j) (== j INT:1)))))))"), verify);
+        var forall = Compile(Function("int",
+            "(forall int:i in (x - x)..2 : (i < 1))"), verify);
+        var exists = Compile(Function("int",
+            "(exists int:i where (i >= (x - x)) : ((i < 2) && (i == 1)))"), verify);
+        var multi = Compile(Function("int",
+            "(exists int:i, int:j where (i >= (x - x)) : ((i < 2) && ((j >= (x - x)) && ((j < 2) && ((i == j) && (j == 1))))))"), verify);
         foreach (var value in new[] { -2, 0, 1, 2 })
         {
             AssertContractViolation(() => Invoke(forall, value));
@@ -303,17 +96,17 @@ public class ContractSimplificationRuntimeTests
             Assert.Equal(7, Invoke(multi, value));
         }
 
-        var emptyAll = Compile(Function("i32",
-            "(forall ((i i32)) (-> (&& (>= i INT:1) (< i INT:0)) true))"), verify);
-        var emptyAny = Compile(Function("i32",
-            "(exists ((i i32)) (&& (>= i INT:1) (&& (< i INT:0) true)))"), verify);
+        var emptyAll = Compile(Function("int",
+            "(forall int:i in 1..0 : true)"), verify);
+        var emptyAny = Compile(Function("int",
+            "(exists int:i where (i >= 1) : ((i < 0) && true))"), verify);
         Assert.Equal(7, Invoke(emptyAll, 0));
         AssertContractViolation(() => Invoke(emptyAny, 0));
 
-        var shortAll = Compile(Function("i32",
-            "(forall ((i i32)) (-> (&& false (&& (>= i (/ INT:1 x)) (< i INT:2))) true))"), verify);
-        var shortAny = Compile(Function("i32",
-            "(exists ((i i32)) (&& false (&& (>= i (/ INT:1 x)) (< i INT:2))))"), verify);
+        var shortAll = Compile(Function("int",
+            "(forall int:i where (false && ((i >= (1 / x)) && (i < 2))) : true)"), verify);
+        var shortAny = Compile(Function("int",
+            "(exists int:i where false : ((i >= (1 / x)) && (i < 2)))"), verify);
         Assert.Equal(7, Invoke(shortAll, 0));
         AssertContractViolation(() => Invoke(shortAny, 0));
         Assert.Equal(new[] { int.MinValue, int.MinValue + 1, int.MinValue + 2 },
@@ -324,30 +117,30 @@ public class ContractSimplificationRuntimeTests
             Calor.Runtime.ContractQuantifier.Range(int.MaxValue, (long)int.MaxValue + 1));
         Assert.Empty(Calor.Runtime.ContractQuantifier.Range((long)int.MaxValue + 1, long.MaxValue));
 
-        var inclusive = Compile(Function("i32",
-            "(forall ((i i32)) (-> (&& (>= i x) (<= i x)) (< i INT:0)))"), verify);
+        var inclusive = Compile(Function("int",
+            "(forall int:i where ((i >= x) && (i <= x)) : (i < 0))"), verify);
         AssertContractViolation(() => Invoke(inclusive, int.MaxValue));
         AssertContractViolation(() => Invoke(inclusive, int.MaxValue - 1));
         Assert.Equal(7, Invoke(inclusive, int.MinValue));
-        var strict = Compile(Function("i32",
-            "(exists ((i i32)) (&& (> i x) (<= i INT:2147483647)))"), verify);
+        var strict = Compile(Function("int",
+            "(exists int:i where (i > x) : (i <= 2147483647))"), verify);
         AssertContractViolation(() => Invoke(strict, int.MaxValue));
         Assert.Equal(7, Invoke(strict, int.MaxValue - 1));
-        var wideEndpoint = Compile(Function("i64",
-            "(forall ((i i32)) (-> (&& (>= i INT:0) (<= i x)) (< i INT:0)))"), verify);
+        var wideEndpoint = Compile(Function("long",
+            "(forall int:i where ((i >= 0) && (i <= x)) : (i < 0))"), verify);
         AssertContractViolation(() => Invoke(wideEndpoint, long.MaxValue));
         Assert.Equal(7, Invoke(wideEndpoint, long.MinValue));
         (string Type, object Min, object Max)[] domains =
         [
-            ("i8", sbyte.MinValue, sbyte.MaxValue), ("u8", byte.MinValue, byte.MaxValue),
-            ("i16", short.MinValue, short.MaxValue), ("u16", ushort.MinValue, ushort.MaxValue),
-            ("i32", int.MinValue, int.MaxValue), ("u32", uint.MinValue, uint.MaxValue),
-            ("i64", long.MinValue, long.MaxValue), ("u64", ulong.MinValue, ulong.MaxValue)
+            ("sbyte", sbyte.MinValue, sbyte.MaxValue), ("byte", byte.MinValue, byte.MaxValue),
+            ("short", short.MinValue, short.MaxValue), ("ushort", ushort.MinValue, ushort.MaxValue),
+            ("int", int.MinValue, int.MaxValue), ("uint", uint.MinValue, uint.MaxValue),
+            ("long", long.MinValue, long.MaxValue), ("ulong", ulong.MinValue, ulong.MaxValue)
         ];
         foreach (var (type, min, max) in domains)
         {
             var singleton = Compile(Function(type,
-                $"(forall ((i {type})) (-> (&& (>= i x) (<= i x)) false))"), verify);
+                $"(forall {type}:i where ((i >= x) && (i <= x)) : false)"), verify);
             AssertContractViolation(() => Invoke(singleton, min));
             AssertContractViolation(() => Invoke(singleton, max));
         }
@@ -358,44 +151,35 @@ public class ContractSimplificationRuntimeTests
     [InlineData(true)]
     public void PatternOperand_ContainsCompleteEquality(bool verify)
     {
-        var assembly = Compile(Function("bool", "(== (is (== x x) bool) false)"), verify);
+        var assembly = Compile(Function("bool", "(((x == x) is bool) == false)"), verify);
         AssertContractViolation(() => Invoke(assembly, false));
         AssertContractViolation(() => Invoke(assembly, true));
-        var compound = Compile(Function("object", "(&& (== (|| (is x i32) false) true) false)"), verify);
+        var compound = Compile(Function("object", "((((x is int) || false) == true) && false)"), verify);
         AssertContractViolation(() => Invoke(compound, 5));
         AssertContractViolation(() => Invoke(compound, "text"));
 
         var overloaded = Compile("""
-            §M{m1:TypedContracts}
-              §CL{c1:Probe:pub}
-                §OP{op1:==:pub}
-                  §I{Probe:a}
-                  §I{Probe:b}
-                  §O{Probe}
-                  §R a
-                §OP{op2:!=:pub}
-                  §I{Probe:a}
-                  §I{Probe:b}
-                  §O{Probe}
-                  §R a
-                §OP{op3:==:pub}
-                  §I{Probe:a}
-                  §I{bool:b}
-                  §O{bool}
-                  §R false
-                §OP{op4:!=:pub}
-                  §I{Probe:a}
-                  §I{bool:b}
-                  §O{bool}
-                  §R true
-                §OP{op5:!:pub}
-                  §I{Probe:a}
-                  §O{bool}
-                  §R false
-              §F{f1:Check:pub} (Probe:x) -> i32
-                §E{}
-                §Q (== (== x (? (is x Probe candidate) x x)) true)
-                §R INT:7
+            module TypedContracts TypedContracts block
+              class Probe
+                op == (Probe:a, Probe:b) → Probe
+                  !
+                  return a
+                op != (Probe:a, Probe:b) → Probe
+                  !
+                  return a
+                op == (Probe:a, bool:b) → bool
+                  !
+                  return false
+                op != (Probe:a, bool:b) → bool
+                  !
+                  return true
+                op ! (Probe:a) → bool
+                  !
+                  return false
+              func Check (Probe:x) → int
+                !
+                requires ((x == ((x is Probe candidate) ? x : x)) == true)
+                return 7
             """, verify);
         var probe = Activator.CreateInstance(Assert.Single(overloaded.GetTypes(), type => type.Name == "Probe"));
         AssertContractViolation(() => Invoke(overloaded, probe));
@@ -404,61 +188,55 @@ public class ContractSimplificationRuntimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ResultPayloads_UseExpressionTypesNotLiteralShapes(bool verify)
+    public void NullablePayloads_UseExpressionTypesNotLiteralShapes(bool verify)
     {
         string[] predicates =
         [
-            "(is (cast object §OK (== x x)) Result<bool,str>)",
-            "(is (cast object §OK (- x x)) Result<i32,str>)",
-            "(is (cast object §ERR (== x x)) Result<object,bool>)",
-            "(is (cast object §OK INT:2147483648) Result<i64,str>)"
+            "(((object)(x == x)) is bool)",
+            "(((object)(x - x)) is int)",
+            "(((object)2147483648L) is long)"
         ];
         foreach (var predicate in predicates)
         {
-            var assembly = Compile(Function("i32", $"(== {predicate} true)"), verify);
+            var assembly = Compile(Function("int", $"({predicate} == true)"), verify);
             Assert.Equal(7, Invoke(assembly, 3));
         }
 
         foreach (var body in new[]
         {
-            "§R §OK x",
-            """§R (? (> x INT:0) §OK x §ERR "negative")"""
+            "return x",
+            "return ((x > 0) ? x : null)"
         })
         {
             var source = $$"""
-                §M{m1:TypedContracts}
-                  §F{f1:Check:pub} (i32:x) -> Result<object,str>
-                    §E{}
-                    §S true
+                module TypedContracts TypedContracts block
+                  func Check (int:x) → long?
+                    !
+                    => true
                     {{body}}
                 """;
             var assembly = Compile(source, verify);
-            Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<object, string>>(Invoke(assembly, 3)).Unwrap());
+            Assert.Equal(3L, Assert.IsType<long>(Invoke(assembly, 3)));
+            if (body != "return x")
+                Assert.Null(Invoke(assembly, -1));
         }
 
-        var nested = Compile("""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> Result<Result<object,str>,str>
-                §E{}
-                §R §OK §OK x
-            """, verify);
-        Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<Calor.Runtime.Result<object, string>, string>>(
-            Invoke(nested, 3)).Unwrap().Unwrap());
         var nullable = Compile("""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> Result<object,str>?
-                §E{}
-                §R §OK x
+            module TypedContracts TypedContracts block
+              func Check (int:x) → long?
+                !
+                return x
             """, verify);
-        Assert.Equal(3, Assert.IsType<Calor.Runtime.Result<object, string>>(Invoke(nullable, 3)).Unwrap());
+        Assert.Equal(3L, Assert.IsType<long>(Invoke(nullable, 3)));
         var lambda = Compile("""
-            §M{m1:TypedContracts}
-              §F{f1:Check:pub} (i32:x) -> Func<Result<object,str>>
-                §E{}
-                §R §LAM{l1} §R §OK x §/LAM{l1}
+            module TypedContracts TypedContracts block
+              func Check (int:x) → Func<long?> !
+                !
+                return () =>
+                  return x
             """, verify);
-        var factory = Assert.IsType<Func<Calor.Runtime.Result<object, string>>>(Invoke(lambda, 3));
-        Assert.Equal(3, factory().Unwrap());
+        var factory = Assert.IsType<Func<long?>>(Invoke(lambda, 3));
+        Assert.Equal(3L, factory());
     }
 
     [Theory]
@@ -468,21 +246,21 @@ public class ContractSimplificationRuntimeTests
     {
         string[] wrappers =
         [
-            "(== (is result i32 result) true)",
-            "(!= false (is result i32 result))",
-            "(! (== (is result i32 result) false))",
-            "(== (== (is result i32 result) true) true)",
-            "(== (&& (is result i32 result) (> result INT:0)) true)",
-            "(!= false (&& (is result i32 result) (== result INT:5)))"
+            "((result is int result) == true)",
+            "(false != (result is int result))",
+            "(!((result is int result) == false))",
+            "(((result is int result) == true) == true)",
+            "(((result is int result) && (result > 0)) == true)",
+            "(false != ((result is int result) && (result == 5)))"
         ];
         foreach (var wrapper in wrappers)
         {
             var source = $$"""
-                §M{m1:TypedContracts}
-                  §F{f1:Check:pub} (object:x) -> object
-                    §E{}
-                    §S (&& {{wrapper}} (> result INT:0))
-                    §R x
+                module TypedContracts TypedContracts block
+                  func Check (object:x) → object
+                    !
+                    => ({{wrapper}} && (result > 0))
+                    return x
                 """;
             var assembly = Compile(source, verify);
             Assert.Equal(5, Invoke(assembly, 5));
@@ -496,16 +274,16 @@ public class ContractSimplificationRuntimeTests
     [InlineData(true)]
     public void ReceiversAndIndices_GroupRetainedArithmetic(bool verify)
     {
-        var receiver = Compile(Function("i32?", "(== (+ x INT:0).Value INT:3)"), verify);
+        var receiver = Compile(Function("int?", "((x + 0) . Value == 3)"), verify);
         Assert.Equal(7, Invoke(receiver, 3));
         AssertContractViolation(() => Invoke(receiver, 2));
         var exception = Assert.Throws<TargetInvocationException>(() => Invoke(receiver, null));
         Assert.IsType<InvalidOperationException>(exception.InnerException);
 
-        var index = Compile(Function("i32", """(== §IDX "abcd" §^ (+ x INT:0) (cast char INT:98))"""), verify);
+        var index = Compile(Function("int", "((\"abcd\")[(^(x + 0))] == ((char)98))"), verify);
         Assert.Equal(7, Invoke(index, 3));
         AssertContractViolation(() => Invoke(index, 2));
-        var range = Compile(Function("i32", """(== §IDX "abcd" §RANGE (+ x INT:0) INT:4 "d")"""), verify);
+        var range = Compile(Function("int", "((\"abcd\")[((x + 0)..4)] == \"d\")"), verify);
         Assert.Equal(7, Invoke(range, 3));
         AssertContractViolation(() => Invoke(range, 2));
     }
@@ -516,18 +294,24 @@ public class ContractSimplificationRuntimeTests
     public void PrimaryReceivers_PreserveBaseAndConditionalChains(bool verify)
     {
         const string source = """
-            §M{m1:ReceiverChains}
-              §CL{c1:Parent:pub}
-                §FLD{i32:Value:pub}
-              §CL{c2:Derived:pub}
-                §EXT{Parent}
-                §MT{mt1:Read:pub} () -> i32
-                  §R §BASE.Value
-              §CL{c3:Node:pub}
-                §FLD{Node:Child:pub}
-                §FLD{i32:Value:pub}
-              §F{f1:Check:pub} (Node:x) -> i32?
-                §R x?.Child .Value
+            module ReceiverChains ReceiverChains block
+              class Parent
+                field int:Value
+
+              class Derived
+                extends Parent
+
+                func Read () → int
+                  !
+                  return base . Value
+
+              class Node
+                field Node:Child
+                field int:Value
+
+              func Check (Node:x) → int?
+                !
+                return x?.Child . Value
             """;
         const string harness = """
             public static class Caller
@@ -551,8 +335,8 @@ public class ContractSimplificationRuntimeTests
     [InlineData(true)]
     public void PreservedArithmetic_StaysInsideCast(bool verify)
     {
-        var equal = Compile(Function("f64", "(== (cast i32 (- x x)) INT:0)"), verify);
-        var unequal = Compile(Function("f64", "(!= (cast i32 (- x x)) INT:0)"), verify);
+        var equal = Compile(Function("double", "(((int)(x - x)) == 0)"), verify);
+        var unequal = Compile(Function("double", "(((int)(x - x)) != 0)"), verify);
         foreach (var value in new[] { 1.5, -1.5, 0.0, 10.0 })
         {
             Assert.Equal(7, Invoke(equal, value));
@@ -565,16 +349,16 @@ public class ContractSimplificationRuntimeTests
     [InlineData(true)]
     public void PreservedBinaryOperators_GroupNullableOperands(bool verify)
     {
-        var right = Compile(Function("bool?", "(&& true (?? x false))"), verify);
+        var right = Compile(Function("bool?", "(true && (x ?? false))"), verify);
         Assert.Equal(7, Invoke(right, true));
         AssertContractViolation(() => Invoke(right, false));
         AssertContractViolation(() => Invoke(right, null));
 
-        var left = Compile(Function("bool?", "(&& (?? x false) false)"), verify);
+        var left = Compile(Function("bool?", "((x ?? false) && false)"), verify);
         foreach (object? value in new object?[] { true, false, null })
             AssertContractViolation(() => Invoke(left, value));
 
-        var arithmetic = Compile(Function("i32?", "(== (+ (?? x INT:1) INT:2) INT:7)"), verify);
+        var arithmetic = Compile(Function("int?", "(((x ?? 1) + 2) == 7)"), verify);
         Assert.Equal(7, Invoke(arithmetic, 5));
         AssertContractViolation(() => Invoke(arithmetic, null));
     }
@@ -601,11 +385,11 @@ public class ContractSimplificationRuntimeTests
     [InlineData(true)]
     public void PreservedUnaryOperators_DoNotBecomeMutation(bool verify)
     {
-        var assembly = Compile(Function("i32", "(== (- (- x)) INT:5)"), verify);
+        var assembly = Compile(Function("int", "((-(-x)) == 5)"), verify);
         Assert.Equal(7, Invoke(assembly, 5));
         AssertContractViolation(() => Invoke(assembly, 6));
 
-        var longLiteral = Compile(Function("i32", "(== (- INT:-2147483649) INT:2147483649)"), verify);
+        var longLiteral = Compile(Function("int", "((-(-2147483649)) == 2147483649)"), verify);
         Assert.Equal(7, Invoke(longLiteral, 0));
     }
 
@@ -616,17 +400,17 @@ public class ContractSimplificationRuntimeTests
     {
         (string Predicate, Func<double, bool> Expected)[] predicates =
         [
-            ("(== x x)", x => x == Identity(x)),
-            ("(!= x x)", x => x != Identity(x)),
-            ("(== (- x x) FLOAT:0.0)", x => x - Identity(x) == 0),
-            ("(== (* x FLOAT:0.0) FLOAT:0.0)", x => x * 0 == 0),
-            ("(== (% x INT:1) FLOAT:0.0)", x => x % 1 == 0),
+            ("(x == x)", x => x == Identity(x)),
+            ("(x != x)", x => x != Identity(x)),
+            ("((x - x) == 0.0)", x => x - Identity(x) == 0),
+            ("((x * 0.0) == 0.0)", x => x * 0 == 0),
+            ("((x % 1) == 0.0)", x => x % 1 == 0),
         ];
         double[] values = [double.NaN, double.PositiveInfinity, double.NegativeInfinity,
             0, -0.0, 1, -1, 1.5, double.Epsilon];
         foreach (var (predicate, expected) in predicates)
         {
-            var assembly = Compile(Function("f64", predicate), verify);
+            var assembly = Compile(Function("double", predicate), verify);
             foreach (var value in values)
             {
                 if (expected(value))
@@ -644,16 +428,16 @@ public class ContractSimplificationRuntimeTests
     {
         string[] predicates =
         [
-            "(== (/ INT:1 x) (/ INT:1 x))",
-            "(== (* (/ INT:1 x) INT:0) INT:0)",
-            "(|| (> (/ INT:1 x) INT:0) true)",
-            "(&& (> (/ INT:1 x) INT:0) false)",
-            "(-> (> (/ INT:1 x) INT:0) true)",
-            "(== (? (> (/ INT:1 x) INT:0) INT:1 INT:1) INT:1)"
+            "((1 / x) == (1 / x))",
+            "(((1 / x) * 0) == 0)",
+            "(((1 / x) > 0) || true)",
+            "(((1 / x) > 0) && false)",
+            "(!((1 / x) > 0) || true)",
+            "((((1 / x) > 0) ? 1 : 1) == 1)"
         ];
         foreach (var predicate in predicates)
         {
-            var assembly = Compile(Function("i32", predicate), verify);
+            var assembly = Compile(Function("int", predicate), verify);
             var exception = Assert.Throws<TargetInvocationException>(() => Invoke(assembly, 0));
             Assert.IsType<DivideByZeroException>(exception.InnerException);
         }
@@ -665,17 +449,17 @@ public class ContractSimplificationRuntimeTests
     public void RepeatedGetterOperands_ExecuteTwice(bool verify)
     {
         const string source = """
-            §M{m1:ContractEffects}
-              §CL{c1:Counter:pub}
-                §FLD{i32:Value:pub}
-                §PROP{p1:Tick:i32:pub}
-                  §GET
-                    §ASSIGN Value (+ Value INT:1)
-                    §R Value
-                §MT{mt1:Check:pub} () -> i32
-                  §E{}
-                  §Q (== Tick Tick)
-                  §R INT:7
+            module ContractEffects ContractEffects block
+              class Counter
+                field int:Value
+                property int:Tick
+                  get
+                    set Value (Value + 1)
+                    return Value
+                func Check () → int
+                  !
+                  requires (Tick == Tick)
+                  return 7
             """;
         const string harness = """
             public static class Caller
@@ -692,12 +476,12 @@ public class ContractSimplificationRuntimeTests
             """;
         var assembly = Compile(source, verify, harness);
         Assert.Equal(2, assembly.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
-        var quantified = Compile(source.Replace("§Q (== Tick Tick)",
-            "§Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:3)) (> Tick INT:0)))"),
+        var quantified = Compile(source.Replace("requires (Tick == Tick)",
+            "requires (forall int:i in 0..3 : (Tick > 0))"),
             verify, harness.Replace("return -1;", "return counter.Value + 100;"));
         Assert.Equal(103, quantified.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
-        var quantifiedFailure = Compile(source.Replace("§Q (== Tick Tick)",
-            "§Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i INT:3)) (< Tick INT:2)))"),
+        var quantifiedFailure = Compile(source.Replace("requires (Tick == Tick)",
+            "requires (forall int:i in 0..3 : (Tick < 2))"),
             verify, harness.Replace("return -1;", "return counter.Value + 100;"));
         Assert.Equal(2, quantifiedFailure.GetType("Caller")!.GetMethod("Run")!.Invoke(null, null));
     }
@@ -741,11 +525,11 @@ public class ContractSimplificationRuntimeTests
     private static double Identity(double value) => value;
 
     private static string Function(string type, string predicate) => $$"""
-        §M{m1:TypedContracts}
-          §F{f1:Check:pub} ({{type}}:x) -> i32
-            §E{}
-            §Q {{predicate}}
-            §R INT:7
+        module TypedContracts TypedContracts block
+          func Check ({{type}}:x) → int
+            !
+            requires {{predicate}}
+            return 7
         """;
 
     private static Assembly Compile(string source, bool verify, string? harness = null, bool rejectNullableWarnings = false)

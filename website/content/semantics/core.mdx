@@ -5,9 +5,12 @@ order: 1
 ---
 
 
-Version: 1.0.0
+Semantics Version: 2.0.0
 
-This document defines the formal semantics of Calor. These semantics are **backend-independent**—any backend must conform to these rules.
+This page describes the intended evaluation rules and current native C# path.
+Complete programs below are checked through ordinary compilation and generated
+C# execution. The retained CNF prototype and historical semantics tests are
+separate evidence; neither establishes conformance for every source form.
 
 ---
 
@@ -26,7 +29,9 @@ Emitting C# can hide semantic gaps:
 | `inner.x = 1` | Does this shadow or mutate the outer `x`? |
 | `return` in `if` | Does this return from the function or just the block? |
 
-If these answers depend on C# implementation details, agents cannot reliably reason about their code. **If the semantics are not crisp, you get "works on this compiler version" behavior, and that kills trust.**
+C# specifies argument order and many other relevant behaviors. Calor can rely
+on those guarantees where they match its rules, and must generate additional
+code where they do not.
 
 ### 1.2 Backend Independence
 
@@ -51,7 +56,8 @@ Calor prioritizes safety and predictability:
 
 ### 2.1 Left-to-Right Evaluation
 
-All expressions with multiple sub-expressions are evaluated **strictly left-to-right**.
+Operands and call arguments evaluate left-to-right in source order. Conditional
+and short-circuit expressions evaluate only the selected branch.
 
 #### Function Arguments
 
@@ -125,21 +131,30 @@ condition ? whenTrue : whenFalse
 Calor uses **lexical scoping** with parent chain lookup.
 
 ```calor
-§B{x} INT:1
-§IF{if1} BOOL:true
-  §B{x} INT:2   // Shadows outer x
-  §P x          // Prints 2
-§P x            // Prints 1 (outer x unchanged)
+module CoreScopes
+  func Read (bool:enter) → int
+    !
+    let int:outer = 1
+    if enter
+      let int:inner = outer + 1
+      return inner
+    return outer
 ```
+
+`Read(true)` returns `2`; `Read(false)` returns `1`. The inner scope can read
+`outer`, but `inner` is not visible after that scope.
 
 ### 3.2 Shadowing
 
-Inner scope bindings **shadow** outer bindings with the same name.
+Name lookup selects the nearest visible declaration. This is not permission
+to reuse every spelling: duplicate declarations and C# local declaration-space
+rules can still reject a program. Use distinct names for nested locals; the
+complete example above tests outer reads, not unrestricted local shadowing.
 
 **Key Semantics:**
-- Inner binding takes precedence within its scope
-- Shadowing does NOT mutate the outer binding
-- When inner scope exits, outer binding is restored
+- A declaration is visible only in its applicable scope
+- Reading an outer binding does not mutate it
+- Leaving an inner scope does not change the outer binding
 
 **Test:** `S5: LexicalScoping_InnerReadsOuter`
 
@@ -155,9 +170,15 @@ Inner scope bindings **shadow** outer bindings with the same name.
 Return statements in nested scopes must correctly unwind to the function boundary.
 
 ```calor
-§IF{if1} BOOL:true
-  §R INT:42   // Returns from function, not just if block
+module CoreNestedReturn
+  func Read (bool:early) → int
+    !
+    if early
+      return 42
+    return 7
 ```
+
+`Read(true)` returns `42`, not `7`.
 
 **Test:** `S6: ReturnFromNestedScope`
 
@@ -170,16 +191,19 @@ Return statements in nested scopes must correctly unwind to the function boundar
 **Default Behavior:** TRAP (throw `OverflowException`)
 
 ```calor
-§B{max} INT:2147483647
-§B{result} (+ max INT:1)
-// Throws OverflowException
+module CoreOverflow
+  func Increment (int:value) → int
+    !
+    return value + 1
 ```
 
-**Rationale:** Safety-first philosophy aligns with the contracts design. Silent wraparound can hide bugs.
+`Increment(41)` returns `42`; `Increment(int.MaxValue)` throws
+`OverflowException`, including with contract mode `off`.
 
-**Compiler Flag:** `--overflow=[trap|wrap]`
-- `trap` (default): Overflow throws `OverflowException`
-- `wrap`: Overflow wraps around (two's complement)
+The CLI has no `--overflow` option. Native arithmetic uses the module's default
+checked policy. Migration can preserve an imported C# unchecked policy; that
+does not make it the native default. See
+[integer overflow policy](/docs/guides/verification-guarantees/#integer-overflow-policy).
 
 **Test:** `S7: IntegerOverflow_Traps`
 
@@ -187,15 +211,22 @@ Return statements in nested scopes must correctly unwind to the function boundar
 
 | Conversion | Behavior | Rationale |
 |:-----------|:---------|:----------|
-| INT to FLOAT | Implicit (widening) | No precision loss |
-| FLOAT to INT | Explicit required | Potential precision loss |
+| `int` to `double` | Implicit widening | Every 32-bit integer is representable |
+| `double` to `int` | Explicit cast required | Fractional part is discarded; checked range rules apply |
 | Narrowing | Explicit required | Data may be lost |
 
 ```calor
-§B{i:i32} 42
-§B{f:f64} i                  // OK: implicit widening
-§B{j:i32} (cast i32 f)       // Required: explicit narrowing
+module CoreConversions
+  func Value () → int
+    !
+    let int:whole = 42
+    let double:widened = whole
+    let int:narrowed = (int)3.75
+    return (int)widened + narrowed
 ```
+
+`Value()` returns `45`. Widening is not universally exact: for example, large
+`long` values can lose precision when converted to `double`.
 
 **Test:** `S8: NumericConversion_IntToFloat`
 
@@ -214,10 +245,14 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.1 Preconditions (REQUIRES)
 
 ```calor
-§Q (> x INT:0)
+module CoreRequires
+  func Positive (int:x) → int
+    !
+    requires x > 0
+    return x
 ```
 
-**Semantics:**
+**Semantics with runtime checks enabled:**
 1. Evaluated **before** function body execution
 2. Has access to all function parameters
 3. If condition is `false`, throws `ContractViolationException`
@@ -228,10 +263,14 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.2 Postconditions (ENSURES)
 
 ```calor
-§S (> result INT:0)
+module CoreEnsures
+  func Positive (int:x) → int
+    !
+    => result > 0
+    return x
 ```
 
-**Semantics:**
+**Semantics with runtime checks enabled:**
 1. Evaluated **after** function body, **before** return
 2. Has access to parameters and special `result` binding
 3. If condition is `false`, throws `ContractViolationException`
@@ -242,24 +281,44 @@ Contracts are semantic constructs that specify behavioral requirements.
 2. Function body
 3. All ENSURES clauses (in declaration order)
 
+`debug` and `release` both emit supported precondition and postcondition
+checks; `release` uses leaner exceptions. `off` emits no precondition or
+postcondition guards. Explicit `proof` statements retain their separate
+runtime checks unless eligible obligation verification discharges them. Optional
+verification may remove only eligible clean proven postcondition guards;
+it never removes preconditions based on satisfiability. Unsupported runtime
+lowering fails compilation instead of silently omitting requested checks.
+See [verification guarantees](/docs/guides/verification-guarantees/).
+
 ---
 
-## 6. Option and Result Types
+## 6. Nullable Values and Exceptions
 
-### 6.1 Option\<T\>
+The absence model is .NET nullability. `string?` permits a null reference;
+`int?` is a nullable value type. Use `??` to supply a fallback.
 
-Represents an optional value: either `Some(value)` or `None`.
+```calor
+module CoreNullableValues
+  func Fallback (string?:value) → string
+    !
+    return value ?? "none"
 
-**Semantics:**
-- `Some(v)` wraps a value
-- `None` represents absence of value
-- Must be pattern-matched or explicitly unwrapped
+  func Fail () → void
+    ! alloc,throw
+    throw new System.InvalidOperationException("missing")
+```
 
-**Test:** `S9: OptionNone_BehavesCorrectly`
+`Fallback(null)` returns `"none"`; `Fallback("abc")` returns `"abc"`.
+`Fail()` allocates and throws the declared exception rather than returning a
+special error wrapper.
 
-### 6.2 Result\<T,E\>
+Failure uses .NET exceptions: `throw` raises one, `try` / `catch` handle it,
+and `finally` runs cleanup. A bare `throw` in a catch rethrows. Explicit throw
+operations require the corresponding effect row. A pure row does not promise
+that checked arithmetic, indexing, or every other operation cannot throw.
 
-Represents a computation that may fail: either `Ok(value)` or `Err(error)`.
+Third-party generic types use ordinary library APIs, with no special language
+encoding or implicit conversion.
 
 ---
 
@@ -283,6 +342,11 @@ Effects track side-effect capabilities of functions.
 Functions may only:
 1. Perform effects they declare
 2. Call functions whose effects are subsets of their own
+
+That rule depends on selected-call coverage and effect contracts for external
+APIs; it is not whole-program proof of arbitrary library behavior. Unknown
+calls are rejected under ordinary enforcement rather than assumed pure.
+Review [effect coverage and manifests](/docs/guides/effect-manifests-dotnet-ecosystem/).
 
 ---
 

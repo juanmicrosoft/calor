@@ -1,0 +1,9 @@
+module Encapsulation Encapsulation
+  module EncapsulationModule
+    func GetBalance public (float:balance) → float
+      !
+      return balance
+
+    func IsValidDeposit public (float:amount) → bool
+      !
+      return amount > 0

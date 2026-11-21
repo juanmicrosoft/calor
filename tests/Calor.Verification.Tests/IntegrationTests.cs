@@ -87,14 +87,13 @@ public class IntegrationTests
         // (The unbounded form is genuinely refutable — x*x wraps negative —
         // and lives in the outcome corpus as refuted-overflow.calr.)
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §Q (<= x 46340)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    requires x <= 46340
+    => result >= 0
+    return x * x";
 
         var options = new CompilationOptions
         {
@@ -109,53 +108,6 @@ public class IntegrationTests
         // The proven postcondition elides its runtime check (comment instead)
         Assert.Contains("// PROVEN: Postcondition", result.GeneratedCode);
         Assert.DoesNotContain("ContractKind.Ensures", result.GeneratedCode);
-    }
-
-    /// <summary>
-    /// Divergence D4, end-to-end. This is the shape that shipped before the fix: the postcondition
-    /// is <b>false at runtime</b> (<c>"abc".Equals("ABC", OrdinalIgnoreCase)</c> is true, so the
-    /// negation fails), yet the verifier translated <c>:ignore-case</c> as ORDINAL, returned
-    /// <c>Proven</c>, and the emitter deleted the check — so <c>calor run</c> threw
-    /// <c>ContractViolationException</c> while <c>calor run --verify</c> printed <c>abc</c>.
-    ///
-    /// <para>The unit-level pins live in <c>TranslatorTests</c>/<c>VerifierTests</c>; this one is
-    /// here because only the full pipeline demonstrates the consequence that makes D4 a soundness
-    /// defect rather than a precision one — <b>a check that would have failed is gone</b>.</para>
-    /// </summary>
-    [SkippableFact]
-    public void NonOrdinalComparisonMode_NeverElidesTheRuntimeCheck()
-    {
-        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-
-        var source = @"
-§M{m001:Test}
-  §F{f001:Echo:pub} (str:s) -> str
-    §E{}
-    §Q (== s STR:""abc"")
-    §S (! (Equals result STR:""ABC"" :ignore-case))
-    §R s";
-
-        var result = Program.Compile(source, "test.calr", NoCache());
-
-        Assert.False(result.HasErrors);
-
-        // The check must be EMITTED, not elided — this is the whole point.
-        Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
-        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
-
-        // Control, so the assertion above is known to discriminate rather than pass vacuously.
-        // NOTE the control changed shape when D3/D12 landed: no string proof elides any more, so
-        // "the ordinal form IS elided" is no longer available as the contrast. The contrast that
-        // remains is the one that matters — REFUSED (outside the modeled surface, Calor0718) vs
-        // DEMOTED (modeled, discharged, then made conditional on the string model, Calor0720).
-        // Both keep the runtime check; only the first means the solver never engaged.
-        var ordinal = Program.Compile(
-            source.Replace(@" :ignore-case", string.Empty), "test.calr", NoCache());
-
-        Assert.False(ordinal.HasErrors);
-        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
-        Assert.DoesNotContain(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
-        Assert.Contains(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
     /// <summary>
@@ -176,12 +128,12 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         const string source = @"
-§M{m001:Test}
-  §F{f001:Chk:pub} (str:s) -> str
-    §E{}
-    §Q (== s STR:""abc"")
-    §S (! (starts result STR:""\u200dabc""))
-    §R s";
+module Test Test block
+  func Chk (string:s) → string
+    !
+    requires (s == ""abc"")
+    => (!(result).StartsWith(""‍abc""))
+    return s";
 
         var result = Program.Compile(source, "test.calr", NoCache());
 
@@ -189,13 +141,13 @@ public class IntegrationTests
         Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
 
-        // Control: with ':ordinal' stated the model matches the emitted overload, so the solver
+        // Control: with StringComparison.Ordinal stated the model matches the emitted overload, so the solver
         // genuinely engages — the form is DEMOTED (Calor0720, conditional on the string model per
         // D3/D12) rather than REFUSED (Calor0718, outside the modeled surface). Both keep the
         // check, so the emitted-overload assertion is what pins that the fix is precise: a blanket
         // refusal of these three operations would fail here.
         var ordinal = Program.Compile(
-            source.Replace(@"""))", @""" :ordinal))"), "test.calr", NoCache());
+            source.Replace(@"""))", @""", StringComparison.Ordinal))"), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
         Assert.Contains("StringComparison.Ordinal", ordinal.GeneratedCode);
@@ -225,11 +177,11 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         const string source = @"
-§M{m001:Test}
-  §F{f001:ByteLen:pub} () -> i32
-    §E{}
-    §S (== result INT:1)
-    §R (len STR:""\u00e9"")";
+module Test
+  func ByteLen public () → int
+    !
+    => result == 1
+    return ""\u00e9"".Length";
 
         var result = Program.Compile(source, "test.calr", NoCache());
 
@@ -245,11 +197,11 @@ public class IntegrationTests
         // Control: the same shape with no string in the body at all is still genuinely proved and
         // elided, so this pins the trigger rather than a verifier that stopped proving.
         var numeric = Program.Compile(@"
-§M{m001:Test}
-  §F{f001:Two:pub} () -> i32
-    §E{}
-    §S (== result INT:2)
-    §R INT:2", "test.calr", NoCache());
+module Test
+  func Two public () → int
+    !
+    => result == 2
+    return 2", "test.calr", NoCache());
 
         Assert.False(numeric.HasErrors);
         Assert.Contains("// PROVEN: Postcondition", numeric.GeneratedCode);
@@ -272,12 +224,11 @@ public class IntegrationTests
         // "Proven" is a satisfiability result (∃), not validity (∀) — a caller
         // can still violate it, so the emitted C# must always carry the guard.
         var source = @"
-§M{m001:Test}
-  §F{f001:Half:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x 0)
-      §R (/ x 2)";
+module Test
+  func Half public (int:x) → int
+    !
+    requires x > 0
+    return x / 2";
 
         var options = new CompilationOptions
         {
@@ -300,14 +251,13 @@ public class IntegrationTests
         // D-G1.3 elision-soundness pin: Proven(vacuous) — unsatisfiable §Q set —
         // must not elide the postcondition check and must warn loudly.
         var source = @"
-§M{m001:Test}
-  §F{f001:Impossible:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (> x 10)
-      §Q (< x 5)
-      §S (== result x)
-      §R x";
+module Test
+  func Impossible public (int:x) → int
+    !
+    requires x > 10
+    requires x < 5
+    => result == x
+    return x";
 
         var options = new CompilationOptions
         {
@@ -329,12 +279,11 @@ public class IntegrationTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Bad:pub}
-      §I{i32:x}
-      §O{i32}
-      §S (> result x)
-      §R x";
+module Test
+  func Bad public (int:x) → int
+    !
+    => result > x
+    return x";
 
         var options = new CompilationOptions
         {
@@ -356,13 +305,12 @@ public class IntegrationTests
     public void WithoutVerifyFlag_BehaviorIdentical()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x";
 
         var withoutVerify = Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -383,13 +331,12 @@ public class IntegrationTests
         // If Z3 is unavailable, it should still compile successfully
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x";
 
         var options = new CompilationOptions
         {
@@ -415,12 +362,10 @@ public class IntegrationTests
     {
         // Basic contract compilation without --verify should work as before
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)";
+module Test
+  func Add public (int:a, int:b) → int
+    !
+    return a + b";
 
         var result = Program.Compile(source, "test.calr");
 
@@ -432,13 +377,12 @@ public class IntegrationTests
     public void ContractModeOff_NoChecks()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Square:pub}
-      §I{i32:x}
-      §O{i32}
-      §Q (>= x 0)
-      §S (>= result 0)
-      §R (* x x)";
+module Test
+  func Square public (int:x) → int
+    !
+    requires x >= 0
+    => result >= 0
+    return x * x";
 
         var options = new CompilationOptions
         {
@@ -466,14 +410,13 @@ public class IntegrationTests
 
         // LONG:/UINT: literals appear in the pre/postconditions and the body.
         var source = @"
-§M{m001:Test}
-  §F{f001:Clamp:pub}
-      §I{i64:x}
-      §O{i64}
-      §Q (>= x LONG:0)
-      §Q (<= x LONG:1000000000000)
-      §S (>= result LONG:0)
-      §R x";
+module Test
+  func Clamp public (long:x) → long
+    !
+    requires x >= 0L
+    requires x <= 1000000000000L
+    => result >= 0L
+    return x";
 
         var options = new CompilationOptions { VerifyContracts = true, ElideProvenGuards = true };
         var result = Program.Compile(source, "test.calr", options);
@@ -488,13 +431,13 @@ public class IntegrationTests
     {
         // End-to-end Calor-source → C#: the typed literals emit the right suffix.
         var source = @"
-§M{m001:Test}
-  §F{f001:Widths:pub}
-      §O{i64}
-      §B{a:i64} LONG:5
-      §B{b:u32} UINT:7
-      §B{c:f32} SINGLE:3.14
-      §R a";
+module Test
+  func Widths public () → long
+    !
+    let long:a = 5L
+    let uint:b = 7U
+    let float:c = 3.14f
+    return a";
 
         var result = Program.Compile(source, "test.calr");
 

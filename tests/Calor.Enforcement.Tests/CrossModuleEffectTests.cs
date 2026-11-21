@@ -13,7 +13,8 @@ namespace Calor.Enforcement.Tests;
 ///
 /// Verifies the contract-based enforcement model (declared effects propagate,
 /// not inferred effects), bare-name resolution, qualified-name resolution,
-/// and the Calor0417 warning for undeclared public functions.
+/// and that an explicit pure row never raises Calor0417 (a public function with no
+/// row at all is a parse error, Calor0124, so Calor0417 has no positive case here).
 /// </summary>
 public class CrossModuleEffectTests
 {
@@ -68,16 +69,15 @@ public class CrossModuleEffectTests
     public void CrossModule_BareNameCall_UndeclaredEffect_Error()
     {
         // b.calr calls SaveOrder (bare name) without declaring db:w
-        var a = @"§M{m1:OrderService}
-  §F{f001:SaveOrder:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module OrderService OrderService block
+  func SaveOrder () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:HandleRequest:pub}
-      §O{void}
-      §C{SaveOrder}
-      §/C
+        var b = @"module Handler Handler block
+  func HandleRequest () → void
+    !
+    SaveOrder()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -92,16 +92,15 @@ public class CrossModuleEffectTests
     [Fact]
     public void CrossModule_QualifiedCall_UndeclaredEffect_Error()
     {
-        var a = @"§M{m1:OrderService}
-  §F{f001:SaveOrder:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module OrderService OrderService block
+  func SaveOrder () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:HandleRequest:pub}
-      §O{void}
-      §C{OrderService.SaveOrder}
-      §/C
+        var b = @"module Handler Handler block
+  func HandleRequest () → void
+    !
+    OrderService.SaveOrder()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -115,17 +114,15 @@ public class CrossModuleEffectTests
     [Fact]
     public void CrossModule_DeclaredEffect_Passes()
     {
-        var a = @"§M{m1:OrderService}
-  §F{f001:SaveOrder:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module OrderService OrderService block
+  func SaveOrder () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:HandleRequest:pub}
-      §O{void}
-      §E{db:w}
-      §C{SaveOrder}
-      §/C
+        var b = @"module Handler Handler block
+  func HandleRequest () → void
+    ! db:w
+    SaveOrder()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -137,24 +134,20 @@ public class CrossModuleEffectTests
     public void CrossModule_OneHopPerBoundary()
     {
         // A→B→C: each caller must declare its immediate callee's effects.
-        var a = @"§M{m1:AMod}
-  §F{f001:FromA:pub}
-      §O{void}
-      §E{db:w}
-      §C{FromB}
-      §/C
+        var a = @"module AMod AMod block
+  func FromA () → void
+    ! db:w
+    FromB()
 ";
-        var b = @"§M{m2:BMod}
-  §F{f001:FromB:pub}
-      §O{void}
-      §E{db:w}
-      §C{FromC}
-      §/C
+        var b = @"module BMod BMod block
+  func FromB () → void
+    ! db:w
+    FromC()
 ";
-        var c = @"§M{m3:CMod}
-  §F{f001:FromC:pub}
-      §O{void}
-      §E{db:w}
+        var c = @"module CMod CMod block
+  func FromC () → void
+    ! db:w
+    return
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b), ("c.calr", c));
@@ -166,11 +159,10 @@ public class CrossModuleEffectTests
     public void CrossModule_SingleFile_NoOp()
     {
         // Single module → cross-module pass does nothing (no boundaries).
-        var a = @"§M{m1:Alone}
-  §F{f001:Foo:pub}
-      §O{void}
-      §E{cw}
-      §P STR:""hi""
+        var a = @"module Alone Alone block
+  func Foo () → void
+    ! cw
+    Console.WriteLine(""hi"")
 ";
         var (modules, registryDiags) = CompileAll(("a.calr", a));
         var crossDiags = RunCrossModulePass(modules);
@@ -180,43 +172,19 @@ public class CrossModuleEffectTests
     }
 
     [Fact]
-    public void CrossModule_PrivateFunction_NotExported()
-    {
-        // Private functions are not in the registry — a caller using a private callee's
-        // name should not resolve cross-module.
-        var a = @"§M{m1:A}
-  §F{f001:Helper:priv}
-      §O{void}
-      §E{db:w}
-";
-        var b = @"§M{m2:B}
-  §F{f001:Caller:pub}
-      §O{void}
-      §C{Helper}
-      §/C
-";
-
-        var diags = RunFull(("a.calr", a), ("b.calr", b));
-
-        // Private callee is invisible cross-module — no forbidden-effect error from this pass.
-        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.ForbiddenEffect);
-    }
-
-    [Fact]
     public void CrossModule_ClassMethod_Propagation()
     {
         // Public class method effects propagate via ClassName.MethodName qualified call.
-        var a = @"§M{m1:Domain}
-  §CL{c1:OrderRepo:pub}
-    §MT{m001:Save:pub}
-        §O{void}
-        §E{db:w}
+        var a = @"module Domain Domain block
+  class OrderRepo
+    func Save static () → void
+      ! db:w
+      return
 ";
-        var b = @"§M{m2:Handler}
-  §F{f001:Handle:pub}
-      §O{void}
-      §C{OrderRepo.Save}
-      §/C
+        var b = @"module Handler Handler block
+  func Handle () → void
+    !
+    OrderRepo.Save()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -232,21 +200,20 @@ public class CrossModuleEffectTests
     {
         // Two modules both define a public function named 'Emit'. A caller using
         // the bare name should NOT resolve either (ambiguous → skipped).
-        var a = @"§M{m1:LoggerA}
-  §F{f001:Emit:pub}
-      §O{void}
-      §E{cw}
+        var a = @"module LoggerA LoggerA block
+  func Emit () → void
+    ! cw
+    return
 ";
-        var b = @"§M{m2:LoggerB}
-  §F{f001:Emit:pub}
-      §O{void}
-      §E{fs:w}
+        var b = @"module LoggerB LoggerB block
+  func Emit () → void
+    ! fs:w
+    return
 ";
-        var c = @"§M{m3:App}
-  §F{f001:Run:pub}
-      §O{void}
-      §C{Emit}
-      §/C
+        var c = @"module App App block
+  func Run () → void
+    !
+    Emit()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b), ("c.calr", c));
@@ -258,21 +225,20 @@ public class CrossModuleEffectTests
     [Fact]
     public void CrossModule_QualifiedName_ResolvesWhenBareAmbiguous()
     {
-        var a = @"§M{m1:LoggerA}
-  §F{f001:Emit:pub}
-      §O{void}
-      §E{cw}
+        var a = @"module LoggerA LoggerA block
+  func Emit () → void
+    ! cw
+    return
 ";
-        var b = @"§M{m2:LoggerB}
-  §F{f001:Emit:pub}
-      §O{void}
-      §E{fs:w}
+        var b = @"module LoggerB LoggerB block
+  func Emit () → void
+    ! fs:w
+    return
 ";
-        var c = @"§M{m3:App}
-  §F{f001:Run:pub}
-      §O{void}
-      §C{LoggerB.Emit}
-      §/C
+        var c = @"module App App block
+  func Run () → void
+    !
+    LoggerB.Emit()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b), ("c.calr", c));
@@ -288,16 +254,15 @@ public class CrossModuleEffectTests
     {
         // Caller does cross-module call + .NET call. The cross-module check fires only
         // for the cross-module call; the .NET call is handled by the per-module pass.
-        var a = @"§M{m1:Repo}
-  §F{f001:Save:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module Repo Repo block
+  func Save () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Run:pub}
-      §O{void}
-      §C{Save}
-      §/C
+        var b = @"module App App block
+  func Run () → void
+    !
+    Save()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -316,16 +281,15 @@ public class CrossModuleEffectTests
         // against a known Calor callee's declared effects — there is no uncertainty to
         // forgive — so it unconditionally reports errors regardless of the per-file policy
         // the caller was compiled with.
-        var a = @"§M{m1:A}
-  §F{f001:DoWrite:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module A A block
+  func DoWrite () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
-      §O{void}
-      §C{DoWrite}
-      §/C
+        var b = @"module B B block
+  func Run () → void
+    !
+    DoWrite()
 ";
 
         // Compile caller in Permissive mode to confirm per-file pass would treat unknowns
@@ -353,17 +317,15 @@ public class CrossModuleEffectTests
     public void CrossModule_EffectSuperset_Passes()
     {
         // Caller declares MORE effects than callee — still a valid subset relationship.
-        var a = @"§M{m1:A}
-  §F{f001:Write:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module A A block
+  func Write () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
-      §O{void}
-      §E{db:w, cw, fs:w}
-      §C{Write}
-      §/C
+        var b = @"module B B block
+  func Run () → void
+    ! db:w, cw, fs:w
+    Write()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -372,42 +334,19 @@ public class CrossModuleEffectTests
     }
 
     [Fact]
-    public void CrossModule_UndeclaredPublicFunction_Warning()
-    {
-        // Public function without §E declaration → Calor0417 warning.
-        var a = @"§M{m1:A}
-  §F{f001:Mystery:pub}
-      §O{void}
-";
-        var b = @"§M{m2:B}
-  §F{f001:Caller:pub}
-      §O{void}
-      §C{Mystery}
-      §/C
-";
-
-        var (_, registryDiags) = CompileAll(("a.calr", a), ("b.calr", b));
-
-        var warn = registryDiags.FirstOrDefault(d => d.Code == DiagnosticCode.UndeclaredPublicFunction);
-        Assert.NotNull(warn);
-        Assert.Contains("Mystery", warn!.Message);
-    }
-
-    [Fact]
     public void CrossModule_ParseErrorInOneFile_OthersChecked()
     {
         // If one file fails to compile, the cross-module pass should still run over
         // the files that did compile. We skip the broken file and check the rest.
-        var good = @"§M{m1:A}
-  §F{f001:Save:pub}
-      §O{void}
-      §E{db:w}
+        var good = @"module A A block
+  func Save () → void
+    ! db:w
+    return
 ";
-        var caller = @"§M{m2:B}
-  §F{f001:Run:pub}
-      §O{void}
-      §C{Save}
-      §/C
+        var caller = @"module B B block
+  func Run () → void
+    !
+    Save()
 ";
 
         var modules = new List<(ModuleNode, string)>();
@@ -434,17 +373,15 @@ public class CrossModuleEffectTests
     public void CrossModule_EffectSubtyping_RwEncompassesR_Passes()
     {
         // Caller declares fs:rw; callee declares fs:r. rw encompasses r → valid.
-        var a = @"§M{m1:A}
-  §F{f001:ReadFile:pub}
-      §O{void}
-      §E{fs:r}
+        var a = @"module A A block
+  func ReadFile () → void
+    ! fs:r
+    return
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
-      §O{void}
-      §E{fs:rw}
-      §C{ReadFile}
-      §/C
+        var b = @"module B B block
+  func Run () → void
+    ! fs:rw
+    ReadFile()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -456,17 +393,15 @@ public class CrossModuleEffectTests
     public void CrossModule_EffectSubtyping_RDoesNotEncompassW_Fails()
     {
         // Caller declares fs:r; callee declares fs:w. r does NOT encompass w → violation.
-        var a = @"§M{m1:A}
-  §F{f001:WriteFile:pub}
-      §O{void}
-      §E{fs:w}
+        var a = @"module A A block
+  func WriteFile () → void
+    ! fs:w
+    return
 ";
-        var b = @"§M{m2:B}
-  §F{f001:Run:pub}
-      §O{void}
-      §E{fs:r}
-      §C{WriteFile}
-      §/C
+        var b = @"module B B block
+  func Run () → void
+    ! fs:r
+    WriteFile()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -485,18 +420,18 @@ public class CrossModuleEffectTests
         // the bare-name extraction of "Save" would match B's internal name and
         // silently skip the cross-module check. Now the qualified registry match
         // is authoritative for dotted targets.
-        var a = @"§M{m1:OrderService}
-  §F{f001:Save:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module OrderService OrderService block
+  func Save () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Save:priv}
-      §O{void}
-  §F{f002:Run:pub}
-      §O{void}
-      §C{OrderService.Save}
-      §/C
+        var b = @"module App App block
+  func Save private () → void
+    return
+
+  func Run () → void
+    !
+    OrderService.Save()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -514,18 +449,18 @@ public class CrossModuleEffectTests
         // shadow cross-module exports (standard scoping). Module B has an internal
         // `Save` and calls `§C{Save}` (bare). It resolves to B's internal version,
         // NOT to A's cross-module `Save`, so no cross-module violation is reported.
-        var a = @"§M{m1:Writer}
-  §F{f001:Save:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module Writer Writer block
+  func Save () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Save:priv}
-      §O{void}
-  §F{f002:Run:pub}
-      §O{void}
-      §C{Save}
-      §/C
+        var b = @"module App App block
+  func Save private () → void
+    return
+
+  func Run () → void
+    !
+    Save()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -539,17 +474,15 @@ public class CrossModuleEffectTests
         // §E{} (empty declaration) is an explicit "no effects" contract — distinct from
         // having no §E at all. It should NOT trigger Calor0417 and SHOULD be registered
         // as a callable with EffectSet.Empty.
-        var a = @"§M{m1:PureLib}
-  §F{f001:Identity:pub}
-      §O{void}
-      §E{}
+        var a = @"module PureLib PureLib block
+  func Identity () → void
+    !
+    return
 ";
-        var b = @"§M{m2:Caller}
-  §F{f001:Run:pub}
-      §O{void}
-      §E{}
-      §C{Identity}
-      §/C
+        var b = @"module Caller Caller block
+  func Run () → void
+    !
+    Identity()
 ";
 
         var (_, registryDiags) = CompileAll(("a.calr", a), ("b.calr", b));
@@ -577,17 +510,16 @@ public class CrossModuleEffectTests
     {
         // Coverage for a class method (not a top-level function) being the CALLER of a
         // cross-module call. Diagnostic wording should say "Method" for dotted callers.
-        var a = @"§M{m1:Repo}
-  §F{f001:Persist:pub}
-      §O{void}
-      §E{db:w}
+        var a = @"module Repo Repo block
+  func Persist () → void
+    ! db:w
+    return
 ";
-        var b = @"§M{m2:Services}
-  §CL{c1:OrderService:pub}
-    §MT{m001:Handle:pub}
-        §O{void}
-        §C{Persist}
-        §/C
+        var b = @"module Services Services block
+  class OrderService
+    func Handle () → void
+      !
+      Persist()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -734,18 +666,17 @@ public class CrossModuleEffectTests
         // Both sides of the cross-module boundary are class methods: a method in module A
         // exposes db:w; a method in module B calls it (bare-qualified class name), must
         // declare db:w. Exercises both call-site directions for class methods simultaneously.
-        var a = @"§M{m1:Repo}
-  §CL{c1:OrderRepo:pub}
-    §MT{m001:Save:pub}
-        §O{void}
-        §E{db:w}
+        var a = @"module Repo Repo block
+  class OrderRepo
+    func Save static () → void
+      ! db:w
+      return
 ";
-        var b = @"§M{m2:Services}
-  §CL{c1:OrderService:pub}
-    §MT{m001:Handle:pub}
-        §O{void}
-        §C{OrderRepo.Save}
-        §/C
+        var b = @"module Services Services block
+  class OrderService
+    func Handle () → void
+      !
+      OrderRepo.Save()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -764,16 +695,15 @@ public class CrossModuleEffectTests
         // .NET manifest lookup — verified here by the fact that the pass produces
         // a cross-module diagnostic citing the Calor function's full declared effects
         // rather than any partial .NET-manifest-derived set.
-        var a = @"§M{m1:Worker}
-  §F{f001:Process:pub}
-      §O{void}
-      §E{db:w, net:w}
+        var a = @"module Worker Worker block
+  func Process () → void
+    ! db:w, net:w
+    return
 ";
-        var b = @"§M{m2:App}
-  §F{f001:Run:pub}
-      §O{void}
-      §C{Process}
-      §/C
+        var b = @"module App App block
+  func Run () → void
+    !
+    Process()
 ";
 
         var diags = RunFull(("a.calr", a), ("b.calr", b));
@@ -825,17 +755,15 @@ public class CrossModuleEffectTests
         // not fit the caller's is still Calor0410 — §6.2: this site is the
         // cross-module leg of the body-vs-declaration rule, so it keeps
         // Calor0410 semantics even though the relation underneath it changed.
-        var callee = @"§M{m1:Worker}
-  §F{f001:Process:pub}
-      §O{void}
-      §E{cw}
+        var callee = @"module Worker Worker block
+  func Process () → void
+    ! cw
+    return
 ";
-        var caller = @"§M{m2:App}
-  §F{f001:Run:pub}
-      §O{void}
-      §E{}
-      §C{Process}
-      §/C
+        var caller = @"module App App block
+  func Run () → void
+    !
+    Process()
 ";
 
         var diagnostics = RunFull(("a.calr", callee), ("b.calr", caller));
@@ -852,17 +780,15 @@ public class CrossModuleEffectTests
         // One relation means one answer: §4.1's family/narrow widening — a bare
         // `db` encompassing `db:w` — reaches the cross-module site because it
         // reaches EffectRow.Fits, without that site knowing anything about it.
-        var callee = @"§M{m1:Worker}
-  §F{f001:Process:pub}
-      §O{void}
-      §E{db:w}
+        var callee = @"module Worker Worker block
+  func Process () → void
+    ! db:w
+    return
 ";
-        var caller = @"§M{m2:App}
-  §F{f001:Run:pub}
-      §O{void}
-      §E{db}
-      §C{Process}
-      §/C
+        var caller = @"module App App block
+  func Run () → void
+    ! db
+    Process()
 ";
 
         var diagnostics = RunFull(("a.calr", callee), ("b.calr", caller));

@@ -22,8 +22,13 @@ public static class ConvertCommand
     /// </summary>
     internal static readonly AsyncLocal<Action<ConversionOptions>?> ConversionOptionsObserver = new();
 
+    // Test-only race/cancellation controls at the actual CLI conversion boundary.
+    internal static readonly AsyncLocal<Action<ConversionResult, CancellationTokenSource?>?> ConversionCompletedObserver = new();
+    // Can add a rejection, never suppress the independent mandatory validator.
+    internal static readonly AsyncLocal<Func<string, Diagnostic?>?> AdditionalValidationError = new();
+
     /// <summary>
-    /// #1514: exit code for a <c>--lossy</c> conversion whose output was written but
+    /// Exit code for preserved output that was written but
     /// failed the round-trip compile check (<c>conversionPaths.outcome: "unverified"</c>).
     /// </summary>
     internal const int UnverifiedExitCode = 2;
@@ -52,23 +57,20 @@ public static class ConvertCommand
 
         var noFallbackOption = new Option<bool>(
             aliases: new[] { "--no-fallback" },
-            description: "Fail conversion when encountering unsupported constructs (instead of emitting TODO comments)");
+            description: "Disable TODO fallback; default lossless conversion still preserves unsupported C#.");
 
         var validateOption = new Option<bool>(
             aliases: new[] { "--validate" },
             description: "Parse the generated Calor output and report any errors before writing");
 
+        var noImplicitSystemOption = new Option<bool>(
+            "--no-implicit-system",
+            "Use standalone C# validation without the default System-only project import");
+
         var passthroughOption = new Option<bool>(
             aliases: new[] { "--passthrough" },
-            description: "Preserve unconvertible members as §CSHARP interop blocks so the output always parses (C# → Calor). If a member's emitted Calor would be invalid, its original C# is kept verbatim instead of writing broken output.");
+            description: "Request member-level C# preservation on conversion errors (C# → Calor). Default lossless rescue also preserves unsupported code in converter-owned raw frames.");
 
-        var lossyOption = new Option<bool>(
-            aliases: new[] { "--lossy" },
-            description: "Explicitly allow reported semantic substitutions or drops. The default is lossless conversion.");
-
-        var selectBranchOption = new Option<bool>(
-            aliases: new[] { "--select-active-preprocessor-branch-lossy" },
-            description: "Explicitly lossy: evaluate conditional compilation with Roslyn and keep only the active branch.");
         var defineOption = new Option<string[]>(
             aliases: new[] { "--define" },
             description: "Conditional-compilation symbol. Repeat for multiple symbols.")
@@ -112,10 +114,6 @@ public static class ConvertCommand
             description: "Timeout in seconds for the conversion (0 = no timeout)",
             getDefaultValue: () => 0);
 
-        var explicitCallClosersOption = new Option<bool>(
-            aliases: new[] { "--explicit-call-closers" },
-            description: "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision");
-
         // No -f short alias (consistent with lint, where -f means --fix).
         var formatOption = new Option<string>(
             aliases: new[] { "--format" },
@@ -132,9 +130,8 @@ public static class ConvertCommand
             explainOption,
             noFallbackOption,
             validateOption,
+            noImplicitSystemOption,
             passthroughOption,
-            lossyOption,
-            selectBranchOption,
             defineOption,
             configurationOption,
             targetFrameworkOption,
@@ -144,7 +141,6 @@ public static class ConvertCommand
             featureOption,
             referenceOption,
             timeoutOption,
-            explicitCallClosersOption,
             formatOption
         };
 
@@ -158,8 +154,6 @@ public static class ConvertCommand
             var noFallback = ctx.ParseResult.GetValueForOption(noFallbackOption);
             var validate = ctx.ParseResult.GetValueForOption(validateOption);
             var passthrough = ctx.ParseResult.GetValueForOption(passthroughOption);
-            var lossy = ctx.ParseResult.GetValueForOption(lossyOption);
-            var selectBranch = ctx.ParseResult.GetValueForOption(selectBranchOption);
             var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
             var configuration = ctx.ParseResult.GetValueForOption(configurationOption);
             var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
@@ -169,16 +163,16 @@ public static class ConvertCommand
             var features = ctx.ParseResult.GetValueForOption(featureOption) ?? [];
             var references = ctx.ParseResult.GetValueForOption(referenceOption) ?? [];
             var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
-            var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
             var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
             // Exit code returned through ctx.ExitCode: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
             ctx.ExitCode = await ExecuteAsync(
                 input, output, benchmark, verbose, explain, noFallback, validate,
-                passthrough, lossy, selectBranch, definedSymbols, configuration,
+                passthrough, definedSymbols, configuration,
                 targetFramework, languageVersion, timeoutSeconds,
                 documentationMode, sourceKind, features,
-                references, explicitCallClosers, format);
+                references, format,
+                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
         });
 
         return command;
@@ -187,12 +181,12 @@ public static class ConvertCommand
     private static async Task<int> ExecuteAsync(
         FileInfo input, FileInfo? output, bool benchmark, bool verbose,
         bool explain, bool noFallback, bool validate, bool passthrough,
-        bool lossy, bool selectBranch, IReadOnlyCollection<string> definedSymbols,
+        IReadOnlyCollection<string> definedSymbols,
         string? configuration, string? targetFramework, string? languageVersion,
         int timeoutSeconds, string documentationMode, string sourceKind,
         IReadOnlyCollection<string> features,
         IReadOnlyCollection<string> references,
-        bool explicitCallClosers, string format)
+        string format, bool includeImplicitSystemUsing)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -247,11 +241,11 @@ public static class ConvertCommand
             {
                 (exitCode, conversionResult) = await ConvertCSharpToCalorAsync(
                     input.FullName, outputPath, benchmark, verbose, explain,
-                    noFallback, validate, passthrough, lossy, selectBranch,
+                    noFallback, validate, passthrough,
                     definedSymbols, configuration, targetFramework,
                     languageVersion, documentationMode, sourceKind,
-                    features, references, timeoutSeconds, explicitCallClosers,
-                    envelope);
+                    features, references, timeoutSeconds,
+                    envelope, includeImplicitSystemUsing);
             }
             else
             {
@@ -261,7 +255,7 @@ public static class ConvertCommand
                     // §CSHARP preservation fallback). Say so rather than silently ignoring it.
                     Console.Error.WriteLine("Note: --passthrough has no effect converting Calor → C#; it is ignored.");
                 }
-                exitCode = await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose, envelope);
+                exitCode = await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose, envelope, includeImplicitSystemUsing);
             }
 
             if (conversionResult != null && telemetry != null)
@@ -333,7 +327,7 @@ public static class ConvertCommand
     /// unit-testable without driving the full command handler.
     /// </summary>
     internal static ConversionOptions BuildCSharpToCalorOptions(
-        bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough, bool explicitCallClosers,
+        bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough,
         bool lossy = false,
         bool selectActivePreprocessorBranchLossy = false,
         IReadOnlyCollection<string>? definedSymbols = null,
@@ -343,8 +337,10 @@ public static class ConvertCommand
         string documentationMode = "parse",
         string sourceKind = "regular",
         IReadOnlyCollection<string>? features = null,
-        IReadOnlyCollection<string>? references = null) => new()
+        IReadOnlyCollection<string>? references = null,
+        bool includeImplicitSystemUsing = true) => new()
     {
+        IncludeImplicitSystemUsing = includeImplicitSystemUsing,
         Fidelity = lossy || selectActivePreprocessorBranchLossy
             ? ConversionFidelity.Lossy
             : ConversionFidelity.Lossless,
@@ -371,8 +367,7 @@ public static class ConvertCommand
         // Review C1(b)/N2: the CLI discards the output entirely when conversion
         // fails, so preserving one unusable member as §CSHARP beats writing
         // nothing. Library callers keep the native tree (option defaults false).
-        RescueUnusableMembers = true,
-        UseImplicitCallCloser = !explicitCallClosers
+        RescueUnusableMembers = true
     };
 
     private static Microsoft.CodeAnalysis.CSharp.CSharpParseOptions
@@ -458,21 +453,22 @@ public static class ConvertCommand
     private static async Task<(int ExitCode, ConversionResult? Result)> ConvertCSharpToCalorAsync(
         string inputPath, string outputPath, bool benchmark, bool verbose,
         bool explain, bool noFallback, bool validate, bool passthrough,
-        bool lossy, bool selectBranch,
         IReadOnlyCollection<string> definedSymbols,
         string? configuration, string? targetFramework, string? languageVersion,
         string documentationMode, string sourceKind,
         IReadOnlyCollection<string> features,
         IReadOnlyCollection<string> references,
-        int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
+        int timeoutSeconds, ConvertEnvelope? envelope,
+        bool includeImplicitSystemUsing)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
         var conversionOptions = BuildCSharpToCalorOptions(
             benchmark, verbose, explain, noFallback, passthrough,
-            explicitCallClosers, lossy, selectBranch, definedSymbols,
-            configuration, targetFramework, languageVersion,
-            documentationMode, sourceKind, features, references);
+            definedSymbols: definedSymbols,
+            configuration: configuration, targetFramework: targetFramework, languageVersion: languageVersion,
+            documentationMode: documentationMode, sourceKind: sourceKind, features: features, references: references,
+            includeImplicitSystemUsing: includeImplicitSystemUsing);
         // Envelope mode: the converter's --verbose progress lines go to stderr
         // with the rest of the human-readable report, so stdout stays one
         // JSON document. Text mode keeps them on stdout.
@@ -484,6 +480,7 @@ public static class ConvertCommand
             ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds))
             : null;
         var cancellationToken = timeoutCts?.Token ?? CancellationToken.None;
+        using var generation = converter.CreateGeneration(inputPath, outputPath);
 
         ConversionResult result;
         if (timeoutCts != null)
@@ -494,7 +491,7 @@ public static class ConvertCommand
                 // interrupt even CPU-bound conversion hangs (e.g. infinite loops
                 // in preprocessor region extraction).
                 result = await Task.Run(
-                    () => converter.ConvertFileAsync(inputPath, cancellationToken),
+                    () => generation.ConvertAsync(cancellationToken),
                     cancellationToken);
             }
             catch (OperationCanceledException)
@@ -506,8 +503,9 @@ public static class ConvertCommand
         }
         else
         {
-            result = await converter.ConvertFileAsync(inputPath, cancellationToken);
+            result = await generation.ConvertAsync(cancellationToken);
         }
+        ConversionCompletedObserver.Value?.Invoke(result, timeoutCts);
 
         if (envelope != null)
         {
@@ -520,6 +518,7 @@ public static class ConvertCommand
             envelope.Data.LanguageVersion = result.Metadata.LanguageVersion;
             envelope.Data.DocumentationMode = result.Metadata.DocumentationMode;
             envelope.Data.SourceCodeKind = result.Metadata.SourceCodeKind;
+            envelope.Data.ImplicitSystem = result.Metadata.IncludeImplicitSystemUsing;
             envelope.Data.Features = result.Metadata.Features;
             envelope.Data.DefinedSymbols = result.Metadata.DefinedSymbols;
             var explanation = result.Context.GetExplanation();
@@ -567,6 +566,8 @@ public static class ConvertCommand
         if (result.CalorSource != null)
         {
             validationErrors = ValidateCalorSource(result.CalorSource);
+            if (AdditionalValidationError.Value?.Invoke(result.CalorSource) is { } additionalError)
+                validationErrors.Add(additionalError);
             if (envelope != null)
             {
                 envelope.Data.Validated = true;
@@ -599,14 +600,13 @@ public static class ConvertCommand
 
         // #1144: record losses before writing, so a write failure still reports them.
         envelope?.SetConversionSummary(result);
-        var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
         try
         {
-            await ConversionFileWriter.WriteAtomicAsync(
-                outputPath,
-                result.CalorSource!,
-                writeEncoding,
-                cancellationToken);
+            await generation.WriteAsync(result, cancellationToken, outputWritten: () =>
+            {
+                if (envelope != null)
+                    envelope.OutputWritten = true;
+            });
         }
         catch (OperationCanceledException)
         {
@@ -619,9 +619,6 @@ public static class ConvertCommand
             return (1, result);
         }
 
-        if (envelope != null)
-            envelope.OutputWritten = true;
-
         // #770: structured loss accounting. The unconditional "✓ Conversion
         // successful" line was a false-success vector — it is now printed ONLY
         // when the conversion is fully native (zero recorded losses) and any
@@ -629,8 +626,7 @@ public static class ConvertCommand
         // locations is printed instead.
         var losses = result.Context.Losses;
         envelope?.SetConversionSummary(result);
-        // #1514: under --lossy the converter keeps output whose generated C# failed
-        // the round-trip compile check. It is written, but never reported as clean.
+        // Writing exact preserved source is independent of standalone compilation.
         var unverified = result.Context.RoundTrip == ConversionRoundTrip.Failed;
         if (losses.Count == 0 && validationErrors.Count == 0 && !unverified)
         {
@@ -664,12 +660,12 @@ public static class ConvertCommand
                 .ToList();
             statusOut.WriteLine(
                 $"✗ Round-trip check failed: the generated C# does not compile ({roundTripFailures.Count} error(s)). " +
-                "The output was written because --lossy was passed; it is unverified (exit 2).");
+                "Exact original C# was preserved; its build is unverified (exit 2).");
             foreach (var failure in roundTripFailures.Take(5))
                 statusOut.WriteLine($"    {failure.Message}");
             if (roundTripFailures.Count > 5)
                 statusOut.WriteLine($"    ... and {roundTripFailures.Count - 5} more");
-            statusOut.WriteLine("  Fix the output by hand, or rerun without --lossy: lossless mode keeps a failing type as C# where it can.");
+            statusOut.WriteLine("  Validate with the original project references and configuration.");
         }
 
         // #736/#717: report §CSHARP interop blocks in the output — members preserved as
@@ -683,7 +679,7 @@ public static class ConvertCommand
         if (interopCount > 0)
         {
             statusOut.WriteLine(
-                $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as §CSHARP interop " +
+                $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as raw C# " +
                 "block(s) — the output parses, but this C# still needs migrating.");
         }
         if (ConversionPathSummary.Describe(losses, "--passthrough") is { } pathLine)
@@ -736,15 +732,20 @@ public static class ConvertCommand
         return (unverified ? UnverifiedExitCode : 0, result);
     }
 
-    private static async Task<int> ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose, ConvertEnvelope? envelope)
+    private static async Task<int> ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose, ConvertEnvelope? envelope, bool includeImplicitSystemUsing)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
+        if (envelope != null)
+            envelope.Data.ImplicitSystem = includeImplicitSystemUsing;
 
         var source = await File.ReadAllTextAsync(inputPath);
         // In envelope mode verbose phase messages must not pollute stdout.
-        var result = envelope != null
-            ? Program.Compile(source, inputPath, new CompilationOptions { Verbose = verbose, StatusWriter = Console.Error })
-            : Program.Compile(source, inputPath, verbose);
+        var result = Program.Compile(source, inputPath, new CompilationOptions
+        {
+            Verbose = verbose,
+            StatusWriter = envelope != null ? Console.Error : null,
+            IncludeImplicitSystemUsing = includeImplicitSystemUsing
+        });
 
         // The compiler's own diagnostics (with their real codes) flow into the
         // envelope directly.
@@ -949,6 +950,7 @@ public static class ConvertCommand
         public string? OutputPath { get; set; }
         public bool Success { get; set; }
         public string? Fidelity { get; set; }
+        public bool? ImplicitSystem { get; set; }
         public string? Configuration { get; set; }
         public string? TargetFramework { get; set; }
         public string? LanguageVersion { get; set; }

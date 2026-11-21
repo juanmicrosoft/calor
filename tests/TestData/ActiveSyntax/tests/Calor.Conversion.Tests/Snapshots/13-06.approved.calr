@@ -1,0 +1,10 @@
+module Test_13_06 Test_13_06 overflow unchecked
+  using System
+
+  enum ThreadAccess public uint [@Flags]
+    TERMINATE = (0x0001)
+    SUSPEND_RESUME = (0x0002)
+    GET_CONTEXT = (0x0008)
+    ALL_ACCESS = (0xFFFF)
+    MEDIUM = 2 * 1024
+    LARGE = 4 * 1024

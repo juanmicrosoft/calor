@@ -4,6 +4,7 @@ using Calor.Compiler.Binding.BoundTypes;
 using Calor.Compiler.Binding.Metadata;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
 using Microsoft.CodeAnalysis;
 using Xunit;
 using NullableAnnotation = Calor.Compiler.Binding.BoundTypes.NullableAnnotation;
@@ -35,11 +36,12 @@ public partial class BclMemberAnnotationTests
     {
         var value = depth == 1 ? "first" : "second";
         var source = $$"""
-            §M{m1:JointLocals}
-              §F{probe:Probe:pub} ({{parameters}}) -> {{(boundary == "return" ? receivingType : "void")}}
-                §B{first} {{expression}}
-                {{(depth == 2 ? "§B{second} first" : "")}}
-                {{(boundary == "return" ? "§R" : $"§B{{result:{receivingType}}}")}} {{value}}
+            module JointLocals
+              func Probe public ({{parameters}}) → {{(boundary == "return" ? TypeMapper.ToSurfaceType(receivingType) : "void")}}
+                !
+                let first = {{expression}}
+                {{(depth == 2 ? "let second = first" : "")}}
+                {{(boundary == "return" ? "return" : $"let {TypeMapper.ToSurfaceType(receivingType)}:result =")}} {{value}}
             """;
         var (module, diagnostics, binder) = Bind(source, fixture ? FixtureContext.Value : null);
         var body = Assert.Single(module.Functions).Body;
@@ -80,13 +82,15 @@ public partial class BclMemberAnnotationTests
     public void JointNativeNamedInput_UsesRetainedMemberIdentity(bool expression, bool nullable)
     {
         var source = $$"""
-            §M{m1:JointNativeMap}
-              §F{take:Take:pub} (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) -> i32
-                §R 1
-              §F{probe:Probe:pub} (System.IO.DirectoryInfo:directory) -> void
-                §B{first} directory.{{(nullable ? "Parent" : "Root")}}
-                §B{second} first
-                {{(expression ? "§B{result} " : "")}}§C{Take} §A[safe] directory §A[required] second §/C
+            module JointNativeMap
+              func Take public (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) → int
+                !
+                return 1
+              func Probe public (System.IO.DirectoryInfo:directory) → void
+                !
+                let first = directory.{{(nullable ? "Parent" : "Root")}}
+                let second = first
+                {{(expression ? "let result = " : "")}}Take(safe: directory, required: second)
             """;
         var (module, diagnostics, binder) = Bind(source);
         var body = module.Functions.Single(f => f.Symbol.Name == "Probe").Body;
@@ -116,14 +120,15 @@ public partial class BclMemberAnnotationTests
         bool expression, bool expanded, bool nullable)
     {
         var arguments = expanded
-            ? "§A STR:\"a\" §A STR:\"b\" §A STR:\"c\" §A STR:\"d\" §A second"
-            : "§A[path2] STR:\"safe\" §A[path1] second";
+            ? "\"a\", \"b\", \"c\", \"d\", second"
+            : "path2: \"safe\", path1: second";
         var source = $$"""
-            §M{m1:JointBclMap}
-              §F{probe:Probe:pub} () -> void
-                §B{first} {{(nullable ? "System.Environment.ProcessPath" : "System.String.Empty")}}
-                §B{second} first
-                {{(expression ? "§B{result} " : "")}}§C{System.IO.Path.Combine} {{arguments}} §/C
+            module JointBclMap
+              func Probe public () → void
+                !
+                let first = {{(nullable ? "System.Environment.ProcessPath" : "System.String.Empty")}}
+                let second = first
+                {{(expression ? "let result = " : "")}}System.IO.Path.Combine({{arguments}})
             """;
         var (module, diagnostics, binder) = Bind(source);
         var body = Assert.Single(module.Functions).Body;
@@ -165,11 +170,12 @@ public partial class BclMemberAnnotationTests
     public void JointControlledReferenceContext_IsSharedByMemberAndSelectedCall(bool expression, bool nullable)
     {
         var source = $$"""
-            §M{m1:JointContext}
-              §F{probe:Probe:pub} (N5Fixture.Derived:value) -> void
-                §B{first} value.{{(nullable ? "Nullable" : "NonNull")}}DirectoryField
-                §B{second} first
-                {{(expression ? "§B{result} " : "")}}§C{System.N5MemberSink.Take} §A[optional] first §A[required] second §/C
+            module JointContext
+              func Probe public (N5Fixture.Derived:value) → void
+                !
+                let first = value.{{(nullable ? "Nullable" : "NonNull")}}DirectoryField
+                let second = first
+                {{(expression ? "let result = " : "")}}System.N5MemberSink.Take(optional: first, required: second)
             """;
         var context = FixtureContext.Value;
         var (module, diagnostics, binder) = Bind(source, context);
@@ -199,11 +205,12 @@ public partial class BclMemberAnnotationTests
     public void JointActualBclMember_PreservesSelectedTaintRoles(bool expression, bool taintedPath)
     {
         var source = $$"""
-            §M{m1:JointTaint}
-              §F{probe:Probe:pub} (string:user_input) -> void
-                §B{first} System.Text.Encoding.UTF8
-                §B{second} first
-                {{(expression ? "§B{result} " : "")}}§C{System.IO.File.ReadAllText} §A[encoding] second §A[path] {{(taintedPath ? "user_input" : "STR:\"safe.txt\"")}} §/C
+            module JointTaint
+              func Probe public (string:user_input) → void
+                !
+                let first = System.Text.Encoding.UTF8
+                let second = first
+                {{(expression ? "let result = " : "")}}System.IO.File.ReadAllText(encoding: second, path: {{(taintedPath ? "user_input" : "\"safe.txt\"")}})
             """;
         var (module, diagnostics, binder) = Bind(source);
         var body = Assert.Single(module.Functions).Body;
@@ -255,7 +262,7 @@ public partial class BclMemberAnnotationTests
             var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer);
             return (call.Arguments, call.ArgumentParameterIndices, call.ResolvedParameterTypes, call.SelectedOverloadMatches);
         }
-        var callStatement = Assert.IsType<BoundCallStatement>(statement);
-        return (callStatement.Arguments, callStatement.ArgumentParameterIndices, callStatement.ResolvedParameterTypes, callStatement.SelectedOverloadMatches);
+        var statementCall = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundExpressionStatement>(statement).Expression);
+        return (statementCall.Arguments, statementCall.ArgumentParameterIndices, statementCall.ResolvedParameterTypes, statementCall.SelectedOverloadMatches);
     }
 }

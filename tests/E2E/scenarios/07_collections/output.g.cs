@@ -14,21 +14,32 @@ namespace Collections
     {
         public static void Main()
         {
-            List<int> numbers = new List<int>() { 1, 2, 3 };
+            var numbers = new List<int>() { 1, 2, 3 };
             Console.WriteLine("Created list with elements");
+
             numbers.Add(4);
-            Dictionary<string, int> ages = new Dictionary<string, int>() { { "alice", 30 }, { "bob", 25 } };
+
+            var ages = new Dictionary<string, int>() { { "alice", 30 }, { "bob", 25 } };
             Console.WriteLine("Created dictionary with entries");
+
             ages["charlie"] = 35;
-            HashSet<string> fruits = new HashSet<string>() { "apple", "banana" };
+            var fruits = new HashSet<string>() { "apple", "banana" };
             Console.WriteLine("Created set with fruits");
+
             fruits.Add("cherry");
+
             numbers.Insert(0, 0);
+
             numbers[1] = 10;
             fruits.Remove("apple");
+
             ages.Clear();
+
             Console.WriteLine("All collection tests passed!");
+
         }
 
     }
+
 }
+

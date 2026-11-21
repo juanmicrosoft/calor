@@ -1,0 +1,25 @@
+module Loyalty Loyalty block
+  module LoyaltyModule partial
+    func BasePoints (int:spend) → int
+      !
+      return (spend * 2)
+
+    func BonusPoints (int:visits) → int
+      !
+      return (visits * 5)
+
+    func AwardWithFloor (int:earned, int:bonus, int:minPoints) → int
+      !
+      => (result >= minPoints)
+      let int:total = (earned + bonus)
+      if ((total + 10) < minPoints)
+        return minPoints
+      return total
+
+    func TotalAward (int:spend, int:visits, int:minPoints) → int
+      !
+      let int:earned = BasePoints(spend)
+      let int:bonus = BonusPoints(visits)
+      return AwardWithFloor(earned, bonus, minPoints)
+
+

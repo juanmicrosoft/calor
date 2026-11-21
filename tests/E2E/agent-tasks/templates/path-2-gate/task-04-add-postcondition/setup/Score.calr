@@ -1,15 +1,12 @@
-§M{m001:Scoring}
+module Scoring Scoring block
+  func ClampScore (int:score, int:max) → int
+    !
+    if (score > max)
+      return max
+    return score
 
-  §F{f001:ClampScore:pub}
-    §I{i32:score}
-    §I{i32:max}
-    §O{i32}
-    §IF{i1} (> score max) → §R max
-    §R score
-
-  §F{f002:ClampLowerBound:pub}
-    §I{i32:val}
-    §O{i32}
-    §IF{i2} (< val 0) → §R 0
-    §R val
-
+  func ClampLowerBound (int:val) → int
+    !
+    if (val < 0)
+      return 0
+    return val

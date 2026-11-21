@@ -210,8 +210,7 @@ internal sealed class TypedBugPatternAnalysis
             var value = bind.Initializer == null
                 ? UnknownForVariable(bind.Variable)
                 : Evaluate(bind.Initializer, state)
-                    .Retype(bind.Variable)
-                    .WithFreshIdentityWhenNeeded(bind.Variable, bind.Span);
+                    .Retype(bind.Variable);
             if (bind.Initializer != null)
                 state = InvalidateRefArguments(bind.Initializer, state);
             return state.StrongUpdate(
@@ -224,8 +223,7 @@ internal sealed class TypedBugPatternAnalysis
             && assignment.Target is BoundVariableExpression target)
         {
             var value = Evaluate(assignment.Value, state)
-                .Retype(target.Variable)
-                .WithFreshIdentityWhenNeeded(target.Variable, assignment.Span);
+                .Retype(target.Variable);
             state = InvalidateRefArguments(assignment.Target, state);
             state = InvalidateRefArguments(assignment.Value, state);
             return state.StrongUpdate(
@@ -238,8 +236,7 @@ internal sealed class TypedBugPatternAnalysis
             && compound.Target is BoundVariableExpression compoundTarget)
         {
             var result = EvaluateCompound(compound, state)
-                .Retype(compoundTarget.Variable)
-                .WithFreshIdentityWhenNeeded(compoundTarget.Variable, compound.Span);
+                .Retype(compoundTarget.Variable);
             state = InvalidateRefArguments(compound.Target, state);
             state = InvalidateRefArguments(compound.Value, state);
             return state.StrongUpdate(compoundTarget.Variable, result);
@@ -257,10 +254,7 @@ internal sealed class TypedBugPatternAnalysis
             var value = operation.Expression == null
                 ? UnknownForVariable(operation.DefinedVariable)
                 : Evaluate(operation.Expression, state)
-                    .Retype(operation.DefinedVariable)
-                    .WithFreshIdentityWhenNeeded(
-                        operation.DefinedVariable,
-                        operation.Span);
+                    .Retype(operation.DefinedVariable);
             if (operation.Expression != null)
                 state = InvalidateRefArguments(operation.Expression, state);
             return state.StrongUpdate(
@@ -292,10 +286,7 @@ internal sealed class TypedBugPatternAnalysis
             var value = operation.Expression == null
                 ? UnknownForVariable(operation.DefinedVariable)
                 : Evaluate(operation.Expression, state)
-                    .Retype(operation.DefinedVariable)
-                    .WithFreshIdentityWhenNeeded(
-                        operation.DefinedVariable,
-                        operation.Span);
+                    .Retype(operation.DefinedVariable);
             if (operation.Expression != null)
                 state = InvalidateRefArguments(operation.Expression, state);
             return state.StrongUpdate(
@@ -420,18 +411,6 @@ internal sealed class TypedBugPatternAnalysis
             return RefineForCondition(loop, assumeTrue, evaluatedState);
         }
 
-        if (TryGetOptionPredicate(
-                condition,
-                out var optionVariable,
-                out var trueVariant,
-                out var falseVariant))
-        {
-            return RefineVariant(
-                evaluatedState,
-                optionVariable,
-                assumeTrue ? trueVariant : falseVariant);
-        }
-
         if (condition is not BoundBinaryExpression comparison
             || !IsComparison(comparison.Operator))
         {
@@ -460,16 +439,6 @@ internal sealed class TypedBugPatternAnalysis
                     return FlowState.Unreachable;
                 return evaluatedState.StrongUpdate(reference.Variable, current.WithPresence(presence));
             }
-        }
-
-        if (TryGetNoneComparison(
-                comparison.Left,
-                comparison.Right,
-                op,
-                out var option,
-                out var variant))
-        {
-            return RefineVariant(evaluatedState, option, variant);
         }
 
         evaluatedState = RefineNumericComparison(
@@ -576,6 +545,8 @@ internal sealed class TypedBugPatternAnalysis
         bool assumeTrue,
         FlowState state)
     {
+        if (loop.Condition != null)
+            return state;
         if (!LoopStepSemantics.TryEvaluate(loop.Step, out var step)
             || step.IsZero)
             return state;
@@ -783,41 +754,6 @@ internal sealed class TypedBugPatternAnalysis
         return state;
     }
 
-    private FlowState RefineVariant(
-        FlowState state,
-        VariableSymbol variable,
-        VariantState variant)
-    {
-        if (!state.TryGet(variable.Id, out var current))
-            current = UnknownForVariable(variable);
-
-        if (current.Variant is not (VariantState.Unknown or VariantState.Maybe)
-            && current.Variant != variant)
-        {
-            return FlowState.Unreachable;
-        }
-
-        if (current.ValueIdentity == null)
-        {
-            return state.StrongUpdate(
-                variable,
-                current.WithVariant(variant),
-                preserveDependentFacts: true);
-        }
-
-        var result = state;
-        foreach (var pair in state.Values)
-        {
-            if (pair.Value.ValueIdentity == current.ValueIdentity)
-            {
-                result = result.Set(
-                    pair.Key,
-                    pair.Value.WithVariant(variant));
-            }
-        }
-        return result;
-    }
-
     private void Inspect(
         ControlFlowGraph cfg,
         IReadOnlyDictionary<BasicBlock, FlowState> entries)
@@ -894,9 +830,8 @@ internal sealed class TypedBugPatternAnalysis
 
         if (statement is BoundCallStatement callStatement)
         {
-            InspectCall(
+            InspectReceiverDereference(
                 callStatement.ReceiverSymbol,
-                callStatement.ResolvedMethodName,
                 callStatement.Span,
                 state);
         }
@@ -1075,9 +1010,8 @@ internal sealed class TypedBugPatternAnalysis
         }
         else if (expression is BoundCallExpression call)
         {
-            InspectCall(
+            InspectReceiverDereference(
                 call.ReceiverSymbol,
-                call.ResolvedMethodName,
                 call.Span,
                 state);
         }
@@ -1346,7 +1280,7 @@ internal sealed class TypedBugPatternAnalysis
                 ReportUnknown(
                     TypedBugPatternKind.IntegerOverflow,
                     unary.Span,
-                    "Unary negation is not defined for u64");
+                    "Unary negation is not defined for ulong");
             }
             return;
         }
@@ -1713,61 +1647,14 @@ internal sealed class TypedBugPatternAnalysis
         return offset == null ? null : length.Value.Subtract(offset.Value);
     }
 
-    private void InspectCall(
+    private void InspectReceiverDereference(
         VariableSymbol? receiver,
-        string? methodName,
         TextSpan span,
         FlowState state)
     {
         if (!_enabled.HasFlag(TypedBugPatternKind.NullDereference)
             || receiver == null)
         {
-            return;
-        }
-
-        if (!state.TryGet(receiver.Id, out var value))
-            value = UnknownForVariable(receiver);
-
-        var optionKind = GetOptionKind(receiver.TypeName);
-        if (optionKind != OptionKind.None)
-        {
-            if (methodName == null)
-            {
-                ReportUnknown(
-                    TypedBugPatternKind.NullDereference,
-                    span,
-                    "Option/Result call lacks resolved method identity");
-                return;
-            }
-
-            if (IsSafeOptionOperation(optionKind, methodName)
-                || IsOptionPredicate(optionKind, methodName, out _, out _))
-            {
-                return;
-            }
-
-            if (!TryGetUnsafeOptionRequirement(
-                    optionKind,
-                    methodName,
-                    out var requiredVariant))
-                return;
-
-            if (value.Variant == requiredVariant)
-                return;
-            if (value.Variant is not (VariantState.Unknown or VariantState.Maybe))
-            {
-                Report(
-                    span,
-                    DiagnosticCode.UnsafeUnwrap,
-                    DiagnosticSeverity.Error,
-                    $"Unsafe {methodName} is invalid for {value.Variant}");
-                return;
-            }
-            Report(
-                span,
-                DiagnosticCode.UnsafeUnwrap,
-                DiagnosticSeverity.Warning,
-                $"Unsafe {methodName} can observe the wrong {optionKind} variant");
             return;
         }
 
@@ -2032,34 +1919,6 @@ internal sealed class TypedBugPatternAnalysis
             return AbstractValue.DecimalValue(
                 expression.Type.DisplayString,
                 DecimalDomain.Constant(decimalLiteral.Value));
-        }
-        if (expression is BoundNoneLiteral)
-        {
-            return AbstractValue.VariantValue(
-                expression.Type.DisplayString,
-                VariantState.OptionNone,
-                $"none:{expression.Span.Start}");
-        }
-        if (expression is BoundSomeExpression)
-        {
-            return AbstractValue.VariantValue(
-                expression.Type.DisplayString,
-                VariantState.OptionSome,
-                $"some:{expression.Span.Start}");
-        }
-        if (expression is BoundOkExpression)
-        {
-            return AbstractValue.VariantValue(
-                expression.Type.DisplayString,
-                VariantState.ResultOk,
-                $"ok:{expression.Span.Start}");
-        }
-        if (expression is BoundErrExpression)
-        {
-            return AbstractValue.VariantValue(
-                expression.Type.DisplayString,
-                VariantState.ResultErr,
-                $"err:{expression.Span.Start}");
         }
         if (expression is BoundStringLiteral text)
         {
@@ -2358,15 +2217,6 @@ internal sealed class TypedBugPatternAnalysis
                 NumericDomain.ForType(variable.TypeName));
         }
 
-        var optionKind = GetOptionKind(canonical);
-        if (optionKind != OptionKind.None)
-        {
-            return AbstractValue.VariantValue(
-                variable.TypeName,
-                VariantState.Maybe,
-                $"value:{variable.Id.Value}");
-        }
-
         if (canonical == "DECIMAL")
         {
             return AbstractValue.DecimalValue(
@@ -2485,6 +2335,13 @@ internal sealed class TypedBugPatternAnalysis
                 call.ArgumentModifiers,
                 result);
         }
+        else if (expression is BoundExpressionCall expressionCall)
+        {
+            result = InvalidateCallArguments(
+                expressionCall.Arguments,
+                expressionCall.ArgumentModifiers,
+                result);
+        }
         return result;
     }
 
@@ -2551,198 +2408,6 @@ internal sealed class TypedBugPatternAnalysis
         return false;
     }
 
-    private static bool TryGetNoneComparison(
-        BoundExpression left,
-        BoundExpression right,
-        BinaryOperator op,
-        out VariableSymbol variable,
-        out VariantState variant)
-    {
-        if (left is BoundVariableExpression candidate
-            && right is BoundNoneLiteral
-            && GetOptionKind(candidate.Variable.TypeName) == OptionKind.Option
-            && op is BinaryOperator.Equal or BinaryOperator.NotEqual)
-        {
-            variable = candidate.Variable;
-            variant = op == BinaryOperator.Equal
-                ? VariantState.OptionNone
-                : VariantState.OptionSome;
-            return true;
-        }
-        if (right is BoundVariableExpression reversedCandidate
-            && left is BoundNoneLiteral
-            && GetOptionKind(reversedCandidate.Variable.TypeName) == OptionKind.Option
-            && op is BinaryOperator.Equal or BinaryOperator.NotEqual)
-        {
-            variable = reversedCandidate.Variable;
-            variant = op == BinaryOperator.Equal
-                ? VariantState.OptionNone
-                : VariantState.OptionSome;
-            return true;
-        }
-        variable = null!;
-        variant = VariantState.Unknown;
-        return false;
-    }
-
-    private static bool TryGetOptionPredicate(
-        BoundExpression expression,
-        out VariableSymbol variable,
-        out VariantState trueVariant,
-        out VariantState falseVariant)
-    {
-        if (expression is BoundCallExpression call
-            && call.ReceiverSymbol != null
-            && call.ResolvedMethodName != null
-            && IsOptionPredicate(
-                GetOptionKind(call.ReceiverSymbol.TypeName),
-                call.ResolvedMethodName,
-                out trueVariant,
-                out falseVariant))
-        {
-            variable = call.ReceiverSymbol;
-            return true;
-        }
-        if (expression is BoundFieldAccessExpression
-            {
-                Target: BoundVariableExpression target,
-            } field
-            && IsOptionPredicate(
-                GetOptionKind(target.Variable.TypeName),
-                field.FieldName,
-                out trueVariant,
-                out falseVariant))
-        {
-            variable = target.Variable;
-            return true;
-        }
-        variable = null!;
-        trueVariant = VariantState.Unknown;
-        falseVariant = VariantState.Unknown;
-        return false;
-    }
-
-    private static bool IsOptionPredicate(
-        OptionKind kind,
-        string methodName,
-        out VariantState trueVariant,
-        out VariantState falseVariant)
-    {
-        trueVariant = VariantState.Unknown;
-        falseVariant = VariantState.Unknown;
-        if (kind == OptionKind.Option
-            && MatchesExact(methodName, "IsSome", "is_some", "HasValue", "has_value"))
-        {
-            trueVariant = VariantState.OptionSome;
-            falseVariant = VariantState.OptionNone;
-            return true;
-        }
-        if (kind == OptionKind.Option
-            && MatchesExact(methodName, "IsNone", "is_none"))
-        {
-            trueVariant = VariantState.OptionNone;
-            falseVariant = VariantState.OptionSome;
-            return true;
-        }
-        if (kind == OptionKind.Result
-            && MatchesExact(methodName, "IsOk", "is_ok"))
-        {
-            trueVariant = VariantState.ResultOk;
-            falseVariant = VariantState.ResultErr;
-            return true;
-        }
-        if (kind == OptionKind.Result
-            && MatchesExact(methodName, "IsErr", "is_err"))
-        {
-            trueVariant = VariantState.ResultErr;
-            falseVariant = VariantState.ResultOk;
-            return true;
-        }
-        return false;
-    }
-
-    private static bool TryGetUnsafeOptionRequirement(
-        OptionKind kind,
-        string methodName,
-        out VariantState requiredVariant)
-    {
-        requiredVariant = VariantState.Unknown;
-        if (kind == OptionKind.Option
-            && MatchesExact(
-                methodName,
-                "Unwrap",
-                "unwrap",
-                "UnwrapUnchecked",
-                "unwrap_unchecked",
-                "Expect",
-                "expect",
-                "GetUnchecked",
-                "get_unchecked"))
-        {
-            requiredVariant = VariantState.OptionSome;
-            return true;
-        }
-        if (kind == OptionKind.Result
-            && MatchesExact(
-                methodName,
-                "Unwrap",
-                "unwrap",
-                "UnwrapUnchecked",
-                "unwrap_unchecked",
-                "Expect",
-                "expect",
-                "GetUnchecked",
-                "get_unchecked"))
-        {
-            requiredVariant = VariantState.ResultOk;
-            return true;
-        }
-        if (kind == OptionKind.Result
-            && MatchesExact(methodName, "UnwrapErr", "unwrap_err"))
-        {
-            requiredVariant = VariantState.ResultErr;
-            return true;
-        }
-        if (kind == OptionKind.None)
-            return false;
-        return false;
-    }
-
-    private static bool IsSafeOptionOperation(
-        OptionKind kind,
-        string methodName)
-    {
-        if (kind == OptionKind.None)
-            return false;
-        return MatchesExact(
-            methodName,
-            "UnwrapOr",
-            "unwrap_or",
-            "UnwrapOrDefault",
-            "unwrap_or_default",
-            "UnwrapOrElse",
-            "unwrap_or_else",
-            "GetOrInsert",
-            "get_or_insert",
-            "MapOr",
-            "map_or",
-            "MapOrElse",
-            "map_or_else");
-    }
-
-    private static bool MatchesExact(string value, params string[] candidates) =>
-        candidates.Contains(value, StringComparer.OrdinalIgnoreCase);
-
-    private static OptionKind GetOptionKind(string typeName)
-    {
-        var canonical = TypeIdentity.Canonicalize(typeName);
-        if (canonical.StartsWith("OPTION<", StringComparison.Ordinal))
-            return OptionKind.Option;
-        if (canonical.StartsWith("Result<", StringComparison.OrdinalIgnoreCase))
-            return OptionKind.Result;
-        return OptionKind.None;
-    }
-
     private static bool TryGetSequenceKind(
         string canonicalType,
         out SequenceKind kind,
@@ -2779,14 +2444,14 @@ internal sealed class TypedBugPatternAnalysis
         var canonical = TypeIdentity.Canonicalize(typeName);
         type = canonical switch
         {
-            "INT[bits=8][signed=true]" => IntegralType.Create(8, true, canonical, "i8"),
-            "INT[bits=8][signed=false]" => IntegralType.Create(8, false, canonical, "u8"),
-            "INT[bits=16][signed=true]" => IntegralType.Create(16, true, canonical, "i16"),
-            "INT[bits=16][signed=false]" => IntegralType.Create(16, false, canonical, "u16"),
-            "INT" => IntegralType.Create(32, true, canonical, "i32"),
-            "UINT" => IntegralType.Create(32, false, canonical, "u32"),
-            "LONG" => IntegralType.Create(64, true, canonical, "i64"),
-            "ULONG" => IntegralType.Create(64, false, canonical, "u64"),
+            "INT[bits=8][signed=true]" => IntegralType.Create(8, true, canonical, "sbyte"),
+            "INT[bits=8][signed=false]" => IntegralType.Create(8, false, canonical, "byte"),
+            "INT[bits=16][signed=true]" => IntegralType.Create(16, true, canonical, "short"),
+            "INT[bits=16][signed=false]" => IntegralType.Create(16, false, canonical, "ushort"),
+            "INT" => IntegralType.Create(32, true, canonical, "int"),
+            "UINT" => IntegralType.Create(32, false, canonical, "uint"),
+            "LONG" => IntegralType.Create(64, true, canonical, "long"),
+            "ULONG" => IntegralType.Create(64, false, canonical, "ulong"),
             _ => default,
         };
         return type.Bits != 0;
@@ -2852,7 +2517,7 @@ internal sealed class TypedBugPatternAnalysis
 
     private static IntegralType PromoteNarrowIntegral(IntegralType type) =>
         type.Bits < 32
-            ? IntegralType.Create(32, true, "INT", "i32")
+            ? IntegralType.Create(32, true, "INT", "int")
             : type;
 
     private static string GetUintArithmeticType(
@@ -3087,29 +2752,12 @@ internal sealed class TypedBugPatternAnalysis
         IReadOnlyList<BoundExpression> Indices,
         TextSpan Span);
 
-    private enum OptionKind
-    {
-        None,
-        Option,
-        Result,
-    }
-
     private enum Presence
     {
         Unknown,
         Absent,
         Present,
         Maybe,
-    }
-
-    private enum VariantState
-    {
-        Unknown,
-        Maybe,
-        OptionNone,
-        OptionSome,
-        ResultErr,
-        ResultOk,
     }
 
     private enum SequenceKind
@@ -3426,26 +3074,20 @@ internal sealed class TypedBugPatternAnalysis
         public NumericDomain? Numeric { get; }
         public DecimalDomain? Decimal { get; }
         public Presence Presence { get; }
-        public VariantState Variant { get; }
         public SequenceShape? Sequence { get; }
-        public string? ValueIdentity { get; }
 
         private AbstractValue(
             string typeName,
             NumericDomain? numeric,
             DecimalDomain? decimalValue,
             Presence presence,
-            VariantState variant,
-            SequenceShape? sequence,
-            string? valueIdentity)
+            SequenceShape? sequence)
         {
             TypeName = typeName;
             Numeric = numeric;
             Decimal = decimalValue;
             Presence = presence;
-            Variant = variant;
             Sequence = sequence;
-            ValueIdentity = valueIdentity;
         }
 
         public static AbstractValue Unknown(string typeName) =>
@@ -3454,8 +3096,6 @@ internal sealed class TypedBugPatternAnalysis
                 null,
                 null,
                 Presence.Unknown,
-                VariantState.Unknown,
-                null,
                 null);
 
         public static AbstractValue NumericValue(
@@ -3466,22 +3106,7 @@ internal sealed class TypedBugPatternAnalysis
                 numeric,
                 null,
                 Presence.Unknown,
-                VariantState.Unknown,
-                null,
                 null);
-
-        public static AbstractValue VariantValue(
-            string typeName,
-            VariantState variant,
-            string? identity) =>
-            new(
-                typeName,
-                null,
-                null,
-                Presence.Unknown,
-                variant,
-                null,
-                identity);
 
         public static AbstractValue SequenceValue(
             string typeName,
@@ -3492,9 +3117,7 @@ internal sealed class TypedBugPatternAnalysis
                 null,
                 null,
                 presence,
-                VariantState.Unknown,
-                sequence,
-                sequence.ReferenceId);
+                sequence);
 
         public static AbstractValue DecimalValue(
             string typeName,
@@ -3504,8 +3127,6 @@ internal sealed class TypedBugPatternAnalysis
                 null,
                 value,
                 Presence.Unknown,
-                VariantState.Unknown,
-                null,
                 null);
 
         public AbstractValue WithNumeric(NumericDomain numeric) =>
@@ -3514,9 +3135,7 @@ internal sealed class TypedBugPatternAnalysis
                 numeric,
                 Decimal,
                 Presence,
-                Variant,
-                Sequence,
-                ValueIdentity);
+                Sequence);
 
         public AbstractValue WithDecimal(DecimalDomain value) =>
             new(
@@ -3524,9 +3143,7 @@ internal sealed class TypedBugPatternAnalysis
                 Numeric,
                 value,
                 Presence,
-                Variant,
-                Sequence,
-                ValueIdentity);
+                Sequence);
 
         public AbstractValue WithPresence(Presence presence) =>
             new(
@@ -3534,19 +3151,7 @@ internal sealed class TypedBugPatternAnalysis
                 Numeric,
                 Decimal,
                 presence,
-                Variant,
-                Sequence,
-                ValueIdentity);
-
-        public AbstractValue WithVariant(VariantState variant) =>
-            new(
-                TypeName,
-                Numeric,
-                Decimal,
-                Presence,
-                variant,
-                Sequence,
-                ValueIdentity);
+                Sequence);
 
         public AbstractValue Retype(VariableSymbol variable) =>
             Retype(variable.TypeName).WithPresence(
@@ -3560,27 +3165,7 @@ internal sealed class TypedBugPatternAnalysis
                 Numeric,
                 Decimal,
                 Presence,
-                Variant,
-                Sequence,
-                ValueIdentity);
-
-        public AbstractValue WithFreshIdentityWhenNeeded(
-            VariableSymbol variable,
-            TextSpan span)
-        {
-            if (ValueIdentity != null)
-                return this;
-            if (GetOptionKind(variable.TypeName) == OptionKind.None)
-                return this;
-            return new AbstractValue(
-                TypeName,
-                Numeric,
-                Decimal,
-                Presence,
-                Variant,
-                Sequence,
-                $"value:{variable.Id.Value}:{span.Start}");
-        }
+                Sequence);
 
         public bool Equals(AbstractValue? other) =>
             other != null
@@ -3588,9 +3173,7 @@ internal sealed class TypedBugPatternAnalysis
             && Numeric == other.Numeric
             && Decimal == other.Decimal
             && Presence == other.Presence
-            && Variant == other.Variant
-            && Equals(Sequence, other.Sequence)
-            && ValueIdentity == other.ValueIdentity;
+            && Equals(Sequence, other.Sequence);
 
         public override bool Equals(object? obj) =>
             obj is AbstractValue other && Equals(other);
@@ -3601,9 +3184,7 @@ internal sealed class TypedBugPatternAnalysis
                 Numeric,
                 Decimal,
                 Presence,
-                Variant,
-                Sequence,
-                ValueIdentity);
+                Sequence);
 
         public static AbstractValue Join(
             AbstractValue left,
@@ -3618,19 +3199,12 @@ internal sealed class TypedBugPatternAnalysis
             var presence = left.Presence == right.Presence
                 ? left.Presence
                 : Presence.Maybe;
-            var variant = left.Variant == right.Variant
-                ? left.Variant
-                : VariantState.Maybe;
             return new AbstractValue(
                 left.TypeName == right.TypeName ? left.TypeName : "OBJECT",
                 numeric,
                 decimalValue,
                 presence,
-                variant,
-                SequenceShape.Join(left.Sequence, right.Sequence),
-                left.ValueIdentity == right.ValueIdentity
-                    ? left.ValueIdentity
-                    : null);
+                SequenceShape.Join(left.Sequence, right.Sequence));
         }
     }
 

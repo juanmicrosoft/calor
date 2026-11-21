@@ -1,0 +1,140 @@
+module FolderSync FolderSync block
+  module FolderSyncModule partial
+    func EntryName private (string:line) → string
+      let int:sep = (line).IndexOf("|", StringComparison.Ordinal)
+      if (sep < 0)
+        return line
+      return (line).Substring(0, sep)
+
+    func EntryStamp private (string:line) → int
+      let int:sep = (line).IndexOf("|", StringComparison.Ordinal)
+      if (sep < 0)
+        return -1
+      let string:digits = (line).Substring((sep + 1), (line.Length - (sep + 1)))
+      return Int32.Parse(digits)
+
+    func FormatEntry private (string:name, int:stamp) → string
+      return (name + ("|" + stamp.ToString()))
+
+    func IndexHas (string:path, string:name) → bool
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return false
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if matches
+          return true
+      return false
+
+    func IndexStamp (string:path, string:name) → int
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return -1
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if matches
+          return EntryStamp(line)
+      return -1
+
+    func WriteIndexEntry (string:path, string:name, int:stamp) → void
+      ! fs:rw
+      let string:entry = FormatEntry(name, stamp)
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        File.AppendAllText(path, (entry + "\n"))
+        return
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      var string:content = ""
+      var bool:found = false
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if ((!found) && matches)
+          set content (content + (entry + "\n"))
+          set found true
+        else
+          set content (content + (line + "\n"))
+      if (!found)
+        set content (content + (entry + "\n"))
+      File.WriteAllText(path, content)
+
+    func RemoveIndexEntry (string:path, string:name) → void
+      ! fs:rw
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return
+      let string:prefix = (name + "|")
+      let string[]:lines = File.ReadAllLines(path)
+      var string:content = ""
+      each line in lines
+        let bool:matches = (line).StartsWith(prefix, StringComparison.Ordinal)
+        if (!matches)
+          set content (content + (line + "\n"))
+      File.WriteAllText(path, content)
+
+    func CopyNewer (string:sourcePath, string:targetPath) → int
+      ! fs:rw
+      let bool:exists = File.Exists(sourcePath)
+      if (!exists)
+        return 0
+      let string[]:lines = File.ReadAllLines(sourcePath)
+      var int:count = 0
+      each line in lines
+        let string:name = EntryName(line)
+        let int:s = EntryStamp(line)
+        let int:t = IndexStamp(targetPath, name)
+        if (s > t)
+          WriteIndexEntry(targetPath, name, s)
+          set count (count + 1)
+      return count
+
+    func PruneOrphans (string:sourcePath, string:targetPath) → int
+      ! fs:rw
+      let bool:exists = File.Exists(targetPath)
+      if (!exists)
+        return 0
+      let string[]:lines = File.ReadAllLines(targetPath)
+      var int:count = 0
+      each line in lines
+        let string:name = EntryName(line)
+        let bool:present = IndexHas(sourcePath, name)
+        if (!present)
+          RemoveIndexEntry(targetPath, name)
+          set count (count + 1)
+      return count
+
+    func DryRunReport (string:sourcePath, string:targetPath) → string
+      ! fs:r
+      var string:report = ""
+      let bool:srcExists = File.Exists(sourcePath)
+      if srcExists
+        let string[]:srcLines = File.ReadAllLines(sourcePath)
+        each line in srcLines
+          let string:name = EntryName(line)
+          let int:s = EntryStamp(line)
+          let int:t = IndexStamp(targetPath, name)
+          if (s > t)
+            set report (report + ("copy " + (name + "\n")))
+      let bool:tgtExists = File.Exists(targetPath)
+      if tgtExists
+        let string[]:tgtLines = File.ReadAllLines(targetPath)
+        each line2 in tgtLines
+          let string:name2 = EntryName(line2)
+          let bool:present = IndexHas(sourcePath, name2)
+          if (!present)
+            set report (report + ("prune " + (name2 + "\n")))
+      return report
+
+    func Sync (string:sourcePath, string:targetPath) → int
+      ! fs:rw
+      let int:copied = CopyNewer(sourcePath, targetPath)
+      let int:pruned = PruneOrphans(sourcePath, targetPath)
+      return (copied + pruned)
+
+

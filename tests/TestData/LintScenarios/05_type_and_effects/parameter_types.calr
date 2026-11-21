@@ -1,7 +1,8 @@
-§M{m1:Params}
-  §F{f1:Process:pub} (i32:count, str:name, bool:active, f32:value) -> str
-    §R name
+module Params Params block
+  func Process (int:count, string:name, bool:active, float:value) → string
+    !
+    return name
 
-  §F{f2:Math:pub} (i32:a, i32:b, i32:c) -> i32
-    §R (+ (+ a b) c)
-
+  func Math (int:a, int:b, int:c) → int
+    !
+    return ((a + b) + c)

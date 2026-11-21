@@ -1,0 +1,28 @@
+module MapAfter MapAfter block
+  module MapAfterModule partial
+    func Map (int[]:xs, Func<int, int>:f ! unknown) → int[]
+      ! alloc, mut
+      let int:n = xs.Length
+      var int[]:@out = new int[n]
+      for i from 0 to n step 1
+        set @out[i] f(xs[i])
+      return @out
+
+    func Double (int:x) → int
+      !
+      return (x * 2)
+
+    func Announce (int:x) → int
+      ! cw
+      System.Console.WriteLine(x)
+      return x
+
+    func UsePure (int[]:xs) → int[]
+      ! alloc, mut
+      return Map(xs, Double)
+
+    func UseImpure (int[]:xs) → int[]
+      ! alloc, mut, cw
+      return Map(xs, Announce)
+
+

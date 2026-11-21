@@ -1,0 +1,48 @@
+module PatternMatchingDemo PatternMatchingDemo
+  func Main public () → void
+    ! cw
+    let score = 85
+    let grade = match score
+      case >= 90 → "A"
+      case >= 80 → "B"
+      case >= 70 → "C"
+      case >= 60 → "D"
+      case _ → "F"
+    Console.WriteLine("Grade: " + grade)
+    let statusCode = 404
+    let status = match statusCode
+      case 200 → "OK"
+      case 201 → "Created"
+      case 400 → "Bad Request"
+      case 404 → "Not Found"
+      case 500 → "Server Error"
+      case _ → "Unknown Status"
+    Console.WriteLine("HTTP Status: " + status)
+    let value = -5
+    let desc = match value
+      case var n when n > 100 → "large positive"
+      case var n when n > 0 → "small positive"
+      case 0 → "zero"
+      case var n when n > -100 → "small negative"
+      case _ → "large negative"
+    Console.WriteLine("Description: " + desc)
+    let dayNum = 3
+    let day = match dayNum
+      case 0 → "Sunday"
+      case 1 → "Monday"
+      case 2 → "Tuesday"
+      case 3 → "Wednesday"
+      case 4 → "Thursday"
+      case 5 → "Friday"
+      case 6 → "Saturday"
+      case _ → "Invalid day"
+    Console.WriteLine("Day: " + day)
+    let temp = 25
+    let tempDesc = match temp
+      case < 0 → "freezing"
+      case < 10 → "cold"
+      case < 20 → "cool"
+      case < 30 → "warm"
+      case < 40 → "hot"
+      case _ → "extreme"
+    Console.WriteLine("Temperature: " + tempDesc)

@@ -21,7 +21,7 @@ public class NullabilityCheckerTests
     private static readonly TextSpan S = new(0, 0, 0, 0);
 
     private static BoundExpression SourceWith(NullableAnnotation annotation) =>
-        // BoundNoneLiteral is the simplest expression with a mutable-annotation
+        // BoundNullLiteral is the simplest expression with a mutable-annotation
         // shape — construct by wrapping a nominal type in a fake bound
         // expression harness via BoundStringLiteral for NotAnnotated and a
         // custom fixture for others.

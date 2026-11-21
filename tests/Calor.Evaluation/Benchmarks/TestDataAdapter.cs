@@ -1,20 +1,30 @@
 using System.Text.RegularExpressions;
 using Calor.Evaluation.Core;
+using Calor.Evaluation.Metrics;
+using Calor.Compiler.Tests;
 
 namespace Calor.Evaluation.Benchmarks;
 
 /// <summary>
-/// Adapts existing test data from the CSharpImport test suite for use in benchmarks.
+/// Loads current-compiler inputs, resolving explicitly registered active Calor copies.
+/// This is not a replay of a historical producer or its original measured input bytes.
 /// </summary>
 public class TestDataAdapter
 {
     private readonly string _testDataPath;
     private readonly string _benchmarkPath;
+    private readonly string _repositoryRoot;
 
     public TestDataAdapter(string testDataPath, string benchmarkPath)
+        : this(testDataPath, benchmarkPath, ActiveSyntaxInputs.RepositoryRoot)
+    {
+    }
+
+    internal TestDataAdapter(string testDataPath, string benchmarkPath, string repositoryRoot)
     {
         _testDataPath = testDataPath;
         _benchmarkPath = benchmarkPath;
+        _repositoryRoot = repositoryRoot;
     }
 
     /// <summary>
@@ -23,10 +33,14 @@ public class TestDataAdapter
     public string BenchmarkPath => _benchmarkPath;
 
     /// <summary>
-    /// Gets the path to the TestData directory, searching relative to the assembly location.
+    /// Gets canonical repository inputs first, so registered mirrors are not bypassed by output copies.
     /// </summary>
     public static string GetTestDataPath()
     {
+        var currentInputs = Path.Combine(ActiveSyntaxInputs.RepositoryRoot, "tests", "TestData");
+        if (Directory.Exists(currentInputs))
+            return currentInputs;
+
         // Try relative to assembly location first
         var assemblyLocation = Path.GetDirectoryName(typeof(TestDataAdapter).Assembly.Location);
         if (assemblyLocation != null)
@@ -63,21 +77,28 @@ public class TestDataAdapter
     }
 
     /// <summary>
-    /// Creates an EvaluationContext from a benchmark entry.
+    /// Creates a current-compiler context without changing the manifest's logical entry.
+    /// Metadata retains the original and resolved Calor paths and the unchanged paired C# path.
+    /// Both source files are required; missing inputs fail the load instead of becoming empty code.
     /// </summary>
     public async Task<EvaluationContext> CreateContextAsync(BenchmarkEntry entry)
     {
         var calorPath = Path.Combine(_benchmarkPath, entry.CalorFile);
         var csharpPath = Path.Combine(_benchmarkPath, entry.CSharpFile);
+        var resolvedCalorPath = ResolveCurrentCalorPath(_repositoryRoot, calorPath);
 
         // Try benchmark path first, then fall back to test data path
-        if (!File.Exists(calorPath))
+        if (!File.Exists(resolvedCalorPath))
+        {
             calorPath = Path.Combine(_testDataPath, entry.CalorFile);
+            resolvedCalorPath = ResolveCurrentCalorPath(_repositoryRoot, calorPath);
+        }
         if (!File.Exists(csharpPath))
             csharpPath = Path.Combine(_testDataPath, entry.CSharpFile);
 
-        var calorSource = File.Exists(calorPath) ? await File.ReadAllTextAsync(calorPath) : "";
-        var csharpSource = File.Exists(csharpPath) ? await File.ReadAllTextAsync(csharpPath) : "";
+        var calorSource = await File.ReadAllTextAsync(resolvedCalorPath);
+        var csharpSource = await File.ReadAllTextAsync(csharpPath);
+        var sidecar = RegisteredSidecar(resolvedCalorPath);
 
         return new EvaluationContext
         {
@@ -85,12 +106,16 @@ public class TestDataAdapter
             CSharpSource = csharpSource,
             FileName = entry.Id,
             Level = entry.Level,
-            Features = entry.Features
+            Features = entry.Features,
+            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath),
+            CalorIdentitySidecar = sidecar.Text,
+            CalorIdentityFile = sidecar.File
         };
     }
 
     /// <summary>
-    /// Creates an EvaluationContext from paired file paths.
+    /// Creates a current-compiler context from paired file paths. Registered repository
+    /// Calor inputs use required active copies; external inputs remain literal.
     /// </summary>
     public static async Task<EvaluationContext> CreateContextFromFilesAsync(
         string calorPath,
@@ -98,8 +123,10 @@ public class TestDataAdapter
         int level = 1,
         List<string>? features = null)
     {
-        var calorSource = await File.ReadAllTextAsync(calorPath);
+        var resolvedCalorPath = ResolveCurrentCalorPath(ActiveSyntaxInputs.RepositoryRoot, calorPath);
+        var calorSource = await File.ReadAllTextAsync(resolvedCalorPath);
         var csharpSource = await File.ReadAllTextAsync(csharpPath);
+        var sidecar = RegisteredSidecar(resolvedCalorPath);
 
         return new EvaluationContext
         {
@@ -107,9 +134,54 @@ public class TestDataAdapter
             CSharpSource = csharpSource,
             FileName = Path.GetFileNameWithoutExtension(calorPath),
             Level = level,
-            Features = features ?? new List<string>()
+            Features = features ?? new List<string>(),
+            Metadata = InputMetadata(calorPath, resolvedCalorPath, csharpPath),
+            CalorIdentitySidecar = sidecar.Text,
+            CalorIdentityFile = sidecar.File
         };
     }
+
+    /// <summary>
+    /// The identity sidecar (<c>.calor/ids.json</c>) that registers <paramref name="calorPath"/>, read
+    /// without locking or changing the project, or nulls when no sidecar registers the file.
+    /// </summary>
+    internal static (string? Text, string? File) RegisteredSidecar(string calorPath)
+    {
+        var store = Calor.Compiler.Ids.DeclarationIdentityStore.Find(calorPath);
+        if (store == null || !File.Exists(store.SidecarPath)) return (null, null);
+        var relative = Path.GetRelativePath(store.Root, Path.GetFullPath(calorPath)).Replace('\\', '/');
+        var text = File.ReadAllText(store.SidecarPath);
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(text);
+            var registered = document.RootElement.TryGetProperty("Files", out var files)
+                && files.EnumerateArray().Any(f => f.GetString() == relative);
+            return registered ? (text, relative) : (null, null);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return (null, null);
+        }
+    }
+
+    private static string ResolveCurrentCalorPath(string root, string path)
+    {
+        var original = Path.GetFullPath(path);
+        var relative = Path.GetRelativePath(root, original).Replace('\\', '/');
+        return Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith("../", StringComparison.Ordinal)
+            ? original
+            : ActiveSyntaxInputs.ForCurrentCompiler(root, original);
+    }
+
+    private static Dictionary<string, object> InputMetadata(string original, string resolved, string csharp)
+        => new()
+        {
+            ["inputContract"] = "current-compiler-active-syntax",
+            ["originalCalorPath"] = Path.GetFullPath(original),
+            ["resolvedCalorPath"] = Path.GetFullPath(resolved),
+            ["csharpPath"] = Path.GetFullPath(csharp),
+            ["usesActiveSyntax"] = !string.Equals(Path.GetFullPath(original), Path.GetFullPath(resolved), StringComparison.Ordinal)
+        };
 
     /// <summary>
     /// Loads all benchmark entries from a manifest and creates contexts.
@@ -121,15 +193,8 @@ public class TestDataAdapter
 
         foreach (var entry in manifest.Benchmarks)
         {
-            try
-            {
-                var context = await CreateContextAsync(entry);
-                results.Add((entry, context));
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Warning: Failed to load benchmark {entry.Id}: {ex.Message}");
-            }
+            var context = await CreateContextAsync(entry);
+            results.Add((entry, context));
         }
 
         return results;
@@ -215,19 +280,19 @@ public class TestDataAdapter
         var features = new List<string>();
         var content = await File.ReadAllTextAsync(calorPath);
 
-        if (content.Contains("§M{")) features.Add("module");
-        if (content.Contains("§F{")) features.Add("function");
-        if (content.Contains("§V{")) features.Add("variable");
-        if (content.Contains("§I{")) features.Add("parameters");
-        if (content.Contains("§O{")) features.Add("return_type");
-        if (content.Contains("§Q")) features.Add("requires");
-        if (Regex.IsMatch(content, @"§S[\s(]")) features.Add("ensures");
-        if (content.Contains("§INV")) features.Add("invariant");
-        if (content.Contains("§E{")) features.Add("effects");
-        if (content.Contains("§IF")) features.Add("conditional");
-        if (content.Contains("§LOOP")) features.Add("loop");
-        if (content.Contains("§MATCH")) features.Add("pattern_matching");
-        if (content.Contains("§C{")) features.Add("call");
+        if (CalorSyntax.Module.IsMatch(content)) features.Add("module");
+        if (CalorSyntax.Function.IsMatch(content)) features.Add("function");
+        if (CalorSyntax.Binding.IsMatch(content)) features.Add("variable");
+        if (CalorSyntax.HasTypedParameters(content)) features.Add("parameters");
+        if (CalorSyntax.TypedOutput.IsMatch(content)) features.Add("return_type");
+        if (CalorSyntax.Requires.IsMatch(content)) features.Add("requires");
+        if (CalorSyntax.Ensures.IsMatch(content)) features.Add("ensures");
+        if (CalorSyntax.Invariant.IsMatch(content)) features.Add("invariant");
+        if (CalorSyntax.EffectRow.IsMatch(content)) features.Add("effects");
+        if (CalorSyntax.If.IsMatch(content)) features.Add("conditional");
+        if (CalorSyntax.Loop.IsMatch(content)) features.Add("loop");
+        if (CalorSyntax.Match.IsMatch(content)) features.Add("pattern_matching");
+        if (CalorSyntax.Call.IsMatch(content)) features.Add("call");
 
         return features;
     }

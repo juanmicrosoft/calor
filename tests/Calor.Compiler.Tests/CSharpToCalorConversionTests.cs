@@ -204,8 +204,9 @@ public class CSharpToCalorConversionTests
         Assert.Single(result.Ast.Functions);
 
         var mainFunc = result.Ast.Functions[0];
-        // 3 statements: numbers bind, lambda temp bind, doubled bind
-        Assert.Equal(3, mainFunc.Body.Count);
+        // 2 statements: numbers bind, doubled bind. The expression lambda stays in place as the
+        // call argument (`numbers.Select((int:x) => …)`); an untyped temp would be CS8917 in C#.
+        Assert.Equal(2, mainFunc.Body.Count);
     }
 
     [Fact]
@@ -349,7 +350,7 @@ public class CSharpToCalorConversionTests
         Assert.NotNull(result.CalorSource);
 
         // Should contain the main function marker
-        Assert.Contains("main", result.CalorSource);
+        Assert.Contains("func Main ()", result.CalorSource);
         Assert.Contains("Main", result.CalorSource);
 
         // Should contain variable binding
@@ -459,7 +460,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§NEW{Person}", result.CalorSource);
+        Assert.Contains("new Person(", result.CalorSource);
         Assert.Contains("Name =", result.CalorSource);
         Assert.Contains("Age =", result.CalorSource);
         Assert.Contains("City =", result.CalorSource);
@@ -477,7 +478,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§NEW{Settings}", result.CalorSource);
+        Assert.Contains("new Settings(", result.CalorSource);
         Assert.Contains("Timeout =", result.CalorSource);
         Assert.Contains("Enabled =", result.CalorSource);
     }
@@ -562,81 +563,12 @@ public class CSharpToCalorConversionTests
         var cls = result.Ast.Classes[0];
         Assert.True(cls.IsPartial);
         Assert.True(cls.IsStatic);
+        Assert.True(cls.IsModule);
         Assert.Contains("partial", result.CalorSource);
-        Assert.Contains("stat", result.CalorSource);
+        Assert.DoesNotContain("§CL{", result.CalorSource);
     }
-
     #endregion
-
     #region Event Subscription Tests
-
-    [Fact]
-    public void Convert_EventSubscription_CreatesSubscribeNode()
-    {
-        var csharpSource = """
-            public class Handler
-            {
-                public void Setup(Button button)
-                {
-                    button.Click += OnClick;
-                }
-
-                private void OnClick(object sender, EventArgs e) { }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.CalorSource);
-        Assert.Contains("§SUB", result.CalorSource);
-        Assert.DoesNotContain("+=", result.CalorSource);
-        Assert.Contains("event-subscribe", result.Context.UsedFeatures);
-    }
-
-    [Fact]
-    public void Convert_EventUnsubscription_CreatesUnsubscribeNode()
-    {
-        var csharpSource = """
-            public class Handler
-            {
-                public void Cleanup(Button button)
-                {
-                    button.Click -= OnClick;
-                }
-
-                private void OnClick(object sender, EventArgs e) { }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.CalorSource);
-        Assert.Contains("§UNSUB", result.CalorSource);
-        Assert.DoesNotContain("-=", result.CalorSource);
-        Assert.Contains("event-unsubscribe", result.Context.UsedFeatures);
-    }
-
-    [Fact]
-    public void Convert_EventSubscriptionWithLambda_Handled()
-    {
-        var csharpSource = """
-            public class Handler
-            {
-                public void Setup(Button button)
-                {
-                    button.Click += (s, e) => Console.WriteLine("Clicked");
-                }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.CalorSource);
-        Assert.Contains("§SUB", result.CalorSource);
-    }
 
     #endregion
 
@@ -659,7 +591,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CN", result.CalorSource);
+        Assert.Contains("continue", result.CalorSource);
         Assert.Contains("continue", result.Context.UsedFeatures);
     }
 
@@ -679,7 +611,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CN", result.CalorSource);
+        Assert.Contains("continue", result.CalorSource);
     }
 
     [Fact]
@@ -700,7 +632,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CN", result.CalorSource);
+        Assert.Contains("continue", result.CalorSource);
     }
 
     [Fact]
@@ -719,7 +651,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§BK", result.CalorSource);
+        Assert.Contains("break", result.CalorSource);
         Assert.Contains("break", result.Context.UsedFeatures);
     }
 
@@ -773,7 +705,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§PROP", result.CalorSource);
+        Assert.Contains("property string:Name", result.CalorSource);
         Assert.Contains("= \"Unknown\"", result.CalorSource);
     }
 
@@ -838,7 +770,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Events are now emitted as proper §EVT tags with accessor support
-        Assert.Contains("§EVT", result.CalorSource);
+        Assert.Contains("event EventHandler<string>?:SpeakRequest", result.CalorSource);
         Assert.Contains("SpeakRequest", result.CalorSource);
     }
 
@@ -866,9 +798,9 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("compound-assignment", result.Context.UsedFeatures);
-        // Should emit as §ASSIGN _count (+ _count value)
-        Assert.Contains("§ASSIGN", result.CalorSource);
-        Assert.Contains("(+", result.CalorSource);
+        // Should emit as set _count (_count + value)
+        Assert.Contains("set _count", result.CalorSource);
+        Assert.Contains("(_count +", result.CalorSource);
     }
 
     [Fact]
@@ -891,7 +823,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("compound-assignment", result.Context.UsedFeatures);
-        Assert.Contains("(-", result.CalorSource);
+        Assert.Contains("(_count -", result.CalorSource);
     }
 
     [Fact]
@@ -914,7 +846,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("compound-assignment", result.Context.UsedFeatures);
-        Assert.Contains("(*", result.CalorSource);
+        Assert.Contains("(_value *", result.CalorSource);
     }
 
     [Fact]
@@ -937,7 +869,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.Contains("compound-assignment", result.Context.UsedFeatures);
-        Assert.Contains("(/", result.CalorSource);
+        Assert.Contains("(_value /", result.CalorSource);
     }
 
     #endregion
@@ -965,7 +897,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Using statements are now converted to §USE blocks
-        Assert.Contains("§USE{", result.CalorSource);
+        Assert.Contains("using reader = new StreamReader(path)", result.CalorSource);
         Assert.DoesNotContain("§/USE{", result.CalorSource);
         Assert.Contains("reader", result.CalorSource);
         Assert.Contains("using-statement", result.Context.UsedFeatures);
@@ -992,7 +924,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Using statements are now converted to §USE blocks with type
-        Assert.Contains("§USE{", result.CalorSource);
+        Assert.Contains("using StreamWriter:writer = ", result.CalorSource);
         Assert.Contains("writer", result.CalorSource);
         Assert.Contains("StreamWriter", result.CalorSource);
     }
@@ -1020,8 +952,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should have two §USE blocks (one per using)
-        var useCount = result.CalorSource.Split("§USE{").Length - 1;
+        // Should have two using blocks (one per using)
+        var useCount = result.CalorSource.Split("using ").Length - 1;
         Assert.Equal(2, useCount);
     }
 
@@ -1069,8 +1001,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("(?.", result.CalorSource);
-        Assert.Contains("\"Length\"", result.CalorSource);
+        Assert.Contains("?.", result.CalorSource);
+        Assert.Contains("text?.Length", result.CalorSource);
     }
 
     #endregion
@@ -1134,8 +1066,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§DO", result.CalorSource);
-        Assert.Contains("§/DO", result.CalorSource);
+        Assert.Contains("    do", result.CalorSource);
+        Assert.Contains("while (i < 10)", result.CalorSource);
     }
 
     #endregion
@@ -1186,8 +1118,11 @@ public class CSharpToCalorConversionTests
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = false });
         var result = converter.Convert(csharpSource);
 
-        // __makeref is now supported, so conversion should succeed
-        Assert.True(result.Success, GetErrorMessage(result));
+        // 0.30: __makeref has no native form (typed-reference); with the fallback disabled the
+        // unsupported construct is an error and the conversion fails.
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue =>
+            issue.Severity == ConversionIssueSeverity.Error && issue.Feature == "typed-reference");
     }
 
     [Fact]
@@ -1289,9 +1224,11 @@ public class CSharpToCalorConversionTests
         });
         var result = converter.Convert(csharpSource);
 
-        Assert.False(result.Success);
+        // 0.30: a type pattern combined with a property pattern converts to a native `and` pattern.
+        Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
+        Assert.Contains("case (and string s { Length: > 5 }) → \"long\"", result.CalorSource);
+        Assert.DoesNotContain(result.Issues, issue => issue.Feature == "generated-calor-validation");
     }
 
     [Fact]
@@ -1348,8 +1285,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Constructor arg version should use §NEW, not §LIST
-        Assert.Contains("§NEW", result.CalorSource);
+        // Constructor arg version should use a constructor call with the argument
+        Assert.Contains("new List<int>(existing)", result.CalorSource);
     }
 
     [Fact]
@@ -1369,7 +1306,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§NEW", result.CalorSource);
+        Assert.Contains("new List<int>(100)", result.CalorSource);
     }
 
     [Fact]
@@ -1390,8 +1327,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // The copy with ctor arg should use §NEW
-        Assert.Contains("§NEW", result.CalorSource);
+        // The copy with ctor arg should pass the argument to the constructor
+        Assert.Contains("new Dictionary<string, int>(old)", result.CalorSource);
     }
 
     [Fact]
@@ -1411,8 +1348,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // No-arg initializer should still use §LIST (regression check)
-        Assert.Contains("§LIST{", result.CalorSource);
+        // No-arg initializer should still use a collection initializer (regression check)
+        Assert.Contains("List<int>() { 1, 2, 3 }", result.CalorSource);
     }
 
     [Fact]
@@ -1433,7 +1370,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§NEW", result.CalorSource);
+        Assert.Contains("new HashSet<int>(existing)", result.CalorSource);
     }
 
     #endregion
@@ -1460,7 +1397,7 @@ public class CSharpToCalorConversionTests
         var conversionResult = _converter.Convert(csharpSource);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
         Assert.NotNull(conversionResult.CalorSource);
-        Assert.Contains("§USE{", conversionResult.CalorSource);
+        Assert.Contains("using reader = ", conversionResult.CalorSource);
         Assert.DoesNotContain("§/USE{", conversionResult.CalorSource);
 
         // Step 2: Calor -> C#
@@ -1575,8 +1512,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
 
-        // Should emit §B{name} without :const suffix
-        Assert.Contains("§B{count}", result.CalorSource);
+        // Should emit let name without :const suffix
+        Assert.Contains("let count = 42", result.CalorSource);
         Assert.DoesNotContain(":const", result.CalorSource);
     }
 
@@ -1593,8 +1530,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
 
-        // Mutable should use ~ prefix
-        Assert.Contains("§B{~counter", result.CalorSource);
+        // Mutable should use var
+        Assert.Contains("var int:counter", result.CalorSource);
         Assert.DoesNotContain(":const", result.CalorSource);
     }
 
@@ -1610,8 +1547,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
 
-        // Explicit type declaration: type-first format {type:name}
-        Assert.Contains("§B{i32:count}", result.CalorSource);
+        // Explicit type declaration: type-first format type:name
+        Assert.Contains("let int:count", result.CalorSource);
         Assert.DoesNotContain(":const", result.CalorSource);
     }
 
@@ -1628,8 +1565,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
 
-        // Explicit typed mutable: {~name:type} format
-        Assert.Contains("§B{~total:i32}", result.CalorSource);
+        // Explicit typed mutable: var type:name format
+        Assert.Contains("var int:total", result.CalorSource);
         Assert.DoesNotContain(":const", result.CalorSource);
     }
 
@@ -1687,7 +1624,7 @@ public class CSharpToCalorConversionTests
         Assert.NotNull(result.CalorSource);
         // Should NOT contain §ERR (fallback)
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§ARR", result.CalorSource);
+        Assert.Contains("new int[] { 1, 2, 3 }", result.CalorSource);
     }
 
     [Fact]
@@ -1734,7 +1671,7 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.Contains("new double[] {", result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
@@ -1778,59 +1715,17 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should NOT contain raw C# embedded in Calor (the old buggy behavior)
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
-        // Should contain the chain feature usage
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+        // 0.30: native lambdas are inline expressions, so a chain stays one native call
+        // chain; the retired `_chain` temps (and the "linq-method-chain" feature) are gone.
+        Assert.Contains("let int:result = (numbers.Where((int:n) => (n > 2))).First()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
-    [Fact]
-    public void Convert_LinqChainedCall_ProducesMultipleBindStatements()
+    private static void AssertNativeChain(ConversionResult result)
     {
-        var csharpSource = """
-            using System.Linq;
-
-            var numbers = new[] { 1, 2, 3, 4, 5 };
-            var result = numbers.Where(n => n > 2).First();
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var mainFunc = result.Ast.Functions[0];
-        // Should have more than 2 statements: numbers decl + chain intermediate + result
-        Assert.True(mainFunc.Body.Count >= 3,
-            $"Expected at least 3 statements (decomposed chain), got {mainFunc.Body.Count}");
-    }
-
-    [Fact]
-    public void Convert_LinqChainedCall_IntermediateBindsHaveNoType()
-    {
-        var csharpSource = """
-            using System.Linq;
-
-            var numbers = new[] { 1, 2, 3 };
-            var result = numbers.Where(n => n > 1).Select(n => n * 2).ToList();
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var mainFunc = result.Ast.Functions[0];
-        // Find intermediate chain binds (they have generated names like _chain001)
-        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-
-        Assert.True(chainBinds.Count >= 2, $"Expected at least 2 intermediate chain binds, got {chainBinds.Count}");
-        foreach (var bind in chainBinds)
-        {
-            Assert.Null(bind.TypeName); // Intermediate binds should have no explicit type
-        }
+        Assert.DoesNotContain("_chain", result.CalorSource);
+        Assert.DoesNotContain("raw ", result.CalorSource);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
@@ -1944,40 +1839,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // Should contain decomposed chain, not embedded C#
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
-    }
-
-    [Fact]
-    public void Convert_LinqChainInMethodBody_IntermediateBindsHaveNoType()
-    {
-        var csharpSource = """
-            public class Service
-            {
-                public void Process(int[] numbers)
-                {
-                    var result = numbers.Where(n => n > 0).Select(n => n * 2).ToList();
-                }
-            }
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var cls = result.Ast.Classes[0];
-        var method = cls.Methods[0];
-        var chainBinds = method.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-
-        Assert.True(chainBinds.Count >= 2, $"Expected at least 2 intermediate chain binds, got {chainBinds.Count}");
-        foreach (var bind in chainBinds)
-        {
-            Assert.Null(bind.TypeName); // Intermediate binds should have no explicit type
-        }
+        Assert.Contains("let result = (numbers.Where((n) => (n > 0))).First()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
@@ -1998,22 +1861,12 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+        Assert.Contains("return (numbers.Where((n) => (n > 0))).First()", result.CalorSource);
+        AssertNativeChain(result);
 
-        // Should have intermediate bind + return in the method body
-        var cls = result.Ast!.Classes[0];
-        var method = cls.Methods[0];
-        Assert.True(method.Body.Count >= 2,
-            $"Expected at least 2 statements (intermediate bind + return), got {method.Body.Count}");
-
-        // Last statement should be a return
-        Assert.IsType<ReturnStatementNode>(method.Body[^1]);
-        // Previous statements should be intermediate chain binds
-        var chainBinds = method.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-        Assert.NotEmpty(chainBinds);
+        // The chain is the return statement's own expression: nothing is hoisted ahead of it.
+        var method = result.Ast!.Classes[0].Methods[0];
+        Assert.IsType<ReturnStatementNode>(Assert.Single(method.Body));
     }
 
     [Fact]
@@ -2057,50 +1910,18 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.Ast);
+        AssertNativeChain(result);
 
         var mainFunc = result.Ast.Functions[0];
-        // Intermediate chain binds should have null type
-        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-        Assert.NotEmpty(chainBinds);
-        foreach (var bind in chainBinds)
-        {
-            Assert.Null(bind.TypeName);
-        }
+        // The chain stays inline; only the declared binding carries a type.
+        Assert.Contains("let IEnumerable<int>:result = (numbers.Where((n) => (n > 0))).Select((n) => (n * 2))",
+            result.CalorSource);
 
         // Final bind ("result") should have the declared type
         var resultBind = mainFunc.Body.OfType<BindStatementNode>()
             .FirstOrDefault(b => b.Name == "result");
         Assert.NotNull(resultBind);
         Assert.NotNull(resultBind.TypeName);
-    }
-
-    [Fact]
-    public void Convert_ThreeStepChain_ProducesCorrectIntermediates()
-    {
-        // Three-step chain: numbers.Where(...).OrderBy(...).ToList()
-        var csharpSource = """
-            using System.Linq;
-
-            var numbers = new[] { 3, 1, 2 };
-            var sorted = numbers.Where(n => n > 0).OrderBy(n => n).ToList();
-            """;
-
-        var result = _converter.Convert(csharpSource);
-
-        Assert.True(result.Success, GetErrorMessage(result));
-        Assert.NotNull(result.Ast);
-
-        var mainFunc = result.Ast.Functions[0];
-        // Should have: numbers decl + 2 intermediate binds + final bind = 4 statements
-        Assert.True(mainFunc.Body.Count >= 4,
-            $"Expected at least 4 statements for 3-step chain, got {mainFunc.Body.Count}");
-
-        var chainBinds = mainFunc.Body.OfType<BindStatementNode>()
-            .Where(b => b.Name.StartsWith("_chain"))
-            .ToList();
-        Assert.Equal(2, chainBinds.Count);
     }
 
     [Fact]
@@ -2124,8 +1945,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Should use native StringBuilder operations (not chain decomposition)
-        Assert.Contains("sb-append", result.CalorSource);
-        Assert.Contains("sb-tostring", result.CalorSource);
+        Assert.Contains(".Append(\"a\")", result.CalorSource);
+        Assert.Contains(".ToString()", result.CalorSource);
         // Should NOT have chain intermediates
         Assert.DoesNotContain("_chain", result.CalorSource);
     }
@@ -2154,7 +1975,7 @@ public class CSharpToCalorConversionTests
     #region Expression-Level Chain Hoisting Tests
 
     [Fact]
-    public void Convert_LinqChainInIfCondition_HoistsToTempBind()
+    public void Convert_LinqChainInIfCondition_StaysInline()
     {
         var csharpSource = """
             if (numbers.Where(n => n > 0).Any())
@@ -2167,14 +1988,13 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // The chain should be hoisted: a temp _chain bind before the if
-        Assert.Contains("_chain", result.CalorSource);
-        // Should NOT contain the broken CalorEmitter serialization pattern
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        // 0.30: the chain is the condition itself; no temp is hoisted before the if.
+        Assert.Contains("if (numbers.Where((n) => (n > 0))).Any()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
-    public void Convert_LinqChainAsMethodArgument_HoistsToTempBind()
+    public void Convert_LinqChainAsMethodArgument_StaysInline()
     {
         var csharpSource = """
             Console.WriteLine(numbers.Where(n => n > 0).Count());
@@ -2184,13 +2004,12 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // The chain should be hoisted: a temp _chain bind before the call
-        Assert.Contains("_chain", result.CalorSource);
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        Assert.Contains("System.Console.WriteLine((numbers.Where((n) => (n > 0))).Count())", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
-    public void Convert_LinqChainInWhileCondition_HoistsToTempBind()
+    public void Convert_LinqChainInWhileCondition_StaysInline()
     {
         var csharpSource = """
             while (items.Where(x => x.Active).Any())
@@ -2203,8 +2022,9 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("_chain", result.CalorSource);
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        // A while condition runs on every iteration, so it must not be hoisted ahead of the loop.
+        Assert.Contains("while (items.Where((x) => x.Active)).Any()", result.CalorSource);
+        AssertNativeChain(result);
     }
 
     [Fact]
@@ -2224,7 +2044,7 @@ public class CSharpToCalorConversionTests
     }
 
     [Fact]
-    public void Convert_ThreeDeepChainInArgument_HoistsAllLevels()
+    public void Convert_ThreeDeepChainInArgument_StaysInline()
     {
         var csharpSource = """
             Console.WriteLine(numbers.Where(n => n > 0).OrderBy(n => n).First());
@@ -2234,10 +2054,9 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        // A 3-deep chain should produce at least 2 temp binds (_chain for Where, _chain for OrderBy)
-        var chainCount = System.Text.RegularExpressions.Regex.Matches(result.CalorSource!, "_chain").Count;
-        Assert.True(chainCount >= 2, $"Expected at least 2 _chain temp binds, got {chainCount}. Calor:\n{result.CalorSource}");
-        Assert.DoesNotContain("§C{(§C{", result.CalorSource);
+        Assert.Contains("System.Console.WriteLine((numbers.Where((n) => (n > 0))).OrderBy((n) => n).First())",
+            result.CalorSource);
+        AssertNativeChain(result);
     }
 
     #endregion
@@ -2256,8 +2075,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("(x) =>", result.CalorSource);
+        Assert.Contains("(x) => (x * 2)", result.CalorSource);
         // Should NOT contain arrow notation
         Assert.DoesNotContain("→", result.CalorSource);
     }
@@ -2280,8 +2099,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("(a, b) =>", result.CalorSource);
+        Assert.Contains("(a, b) => (a - b)", result.CalorSource);
         Assert.DoesNotContain("→", result.CalorSource);
     }
 
@@ -2296,7 +2115,7 @@ public class CSharpToCalorConversionTests
         var conversionResult = _converter.Convert(csharpSource);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
         Assert.NotNull(conversionResult.CalorSource);
-        Assert.Contains("§LAM{", conversionResult.CalorSource);
+        Assert.Contains("(n) =>", conversionResult.CalorSource);
 
         // Verify the emitted Calor re-parses
         var diagnostics = new DiagnosticBag();
@@ -2312,7 +2131,11 @@ public class CSharpToCalorConversionTests
     [Fact]
     public void Convert_StatementBodyLambda_EmitsLamBlock()
     {
+        // The usings let the semantic model type `x`: a block lambda bound to a temp needs a
+        // natural delegate type, and an untyped `x` would preserve the member instead.
         var csharpSource = """
+            using System;
+            using System.Collections.Generic;
             public class Test
             {
                 public void Run()
@@ -2331,8 +2154,8 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("(int:x) =>", result.CalorSource);
+        Assert.Contains("let doubled = (x * 2)", result.CalorSource);
         Assert.DoesNotContain("→", result.CalorSource);
     }
 
@@ -2357,8 +2180,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Lambda parameter should be inferred as i32, not object
-        Assert.Contains(":i32}", result.CalorSource);
-        Assert.DoesNotContain(":object}", result.CalorSource);
+        Assert.Contains("(int:n) =>", result.CalorSource);
+        Assert.DoesNotContain("object:n", result.CalorSource);
     }
 
     [Fact]
@@ -2382,9 +2205,9 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         // Both n and index should be inferred as i32
-        Assert.Contains("n:i32", result.CalorSource);
-        Assert.Contains("index:i32", result.CalorSource);
-        Assert.DoesNotContain(":object", result.CalorSource);
+        Assert.Contains("int:n", result.CalorSource);
+        Assert.Contains("int:index", result.CalorSource);
+        Assert.DoesNotContain("object:", result.CalorSource);
     }
 
     [Fact]
@@ -2407,7 +2230,7 @@ public class CSharpToCalorConversionTests
         var conversionResult = _converter.Convert(csharpSource);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
         Assert.NotNull(conversionResult.CalorSource);
-        Assert.Contains("§LAM{", conversionResult.CalorSource);
+        Assert.Contains("(n) =>", conversionResult.CalorSource);
         Assert.DoesNotContain("§ERR", conversionResult.CalorSource);
         Assert.DoesNotContain("→", conversionResult.CalorSource);
         // #1097: without `using System.Linq` the lambda parameters cannot be
@@ -2486,12 +2309,13 @@ public class CSharpToCalorConversionTests
             compilationResult.Diagnostics,
             d => d.Code == DiagnosticCode.UnknownExternalCall);
 
-        // Calor0419 REMAINS, and should: the manifest says the LINQ operators are
-        // pure but cannot verify what the lambdas handed to them do, so the row is
-        // an assumption rather than a proof. That is the designed outcome, not the
-        // defect #1128 reported, and asserting it keeps a future "fix" from
-        // silencing an honest warning.
-        Assert.Contains(
+        // The manifest says the LINQ operators are pure but cannot verify what the
+        // lambdas handed to them do. 0.30: the converter writes that honestly as the
+        // sound `! unknown` row instead of a narrower row accepted as an assumption,
+        // and a declared `! unknown` assumes nothing, so Calor0419 no longer fires.
+        // Pin the row so a future "fix" cannot narrow it to an unverified claim.
+        Assert.Contains("    func Run ()\n      ! unknown\n", conversionResult.CalorSource!.Replace("\r\n", "\n"));
+        Assert.DoesNotContain(
             compilationResult.Diagnostics,
             d => d.Code == DiagnosticCode.AssumedEffects);
     }
@@ -2518,14 +2342,14 @@ public class CSharpToCalorConversionTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§LAM{", result.CalorSource);
-        Assert.Contains("§/LAM{", result.CalorSource);
+        Assert.Contains("async (int:x) =>", result.CalorSource);
+        Assert.Contains("return (x * 2)", result.CalorSource);
         Assert.Contains("async", result.CalorSource);
         Assert.DoesNotContain("→", result.CalorSource);
     }
 
     [Fact]
-    public void Convert_StaticMethod_RoundtripsWithStModifier()
+    public void Convert_StaticMethod_RoundtripsAsModuleFunction()
     {
         var csharpSource = """
             public static class MathHelper
@@ -2539,9 +2363,10 @@ public class CSharpToCalorConversionTests
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
         Assert.NotNull(conversionResult.CalorSource);
 
-        // Verify :stat appears for both class and methods
-        var statCount = conversionResult.CalorSource!.Split(":stat").Length - 1;
-        Assert.True(statCount >= 3, $"Expected at least 3 :stat occurrences (1 class + 2 methods), got {statCount}");
+        Assert.True(Assert.Single(conversionResult.Ast!.Classes).IsModule);
+        Assert.DoesNotContain("class MathHelper", conversionResult.CalorSource);
+        Assert.DoesNotContain("§MT{", conversionResult.CalorSource);
+        Assert.Equal(2, conversionResult.CalorSource!.Split("func ").Length - 1);
 
         // Full roundtrip
         var compilationResult = Program.Compile(conversionResult.CalorSource!);
@@ -2559,11 +2384,11 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithVrAbbreviation_SetsVirtual()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c001:Base:pub}
-                    §MT{m001:GetName:pub:vr}
-                        §O{str}
-                        §R "base"
+            module TestModule TestModule block
+              class Base
+                func GetName virtual () → string
+                  !
+                  return "base"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2582,12 +2407,13 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithOvAbbreviation_SetsOverride()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c001:Derived:pub}
-                    §EXT{Base}
-                    §MT{m001:GetName:pub:ov}
-                        §O{str}
-                        §R "derived"
+            module TestModule TestModule block
+              class Derived
+                extends Base
+
+                func GetName override () → string
+                  !
+                  return "derived"
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2606,13 +2432,11 @@ public class CSharpToCalorConversionTests
     public void Parse_MethodWithStAbbreviation_SetsStatic()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §CL{c001:Utils:pub:st}
-                    §MT{m001:Add:pub:st}
-                        §I{i32:a}
-                        §I{i32:b}
-                        §O{i32}
-                        §R (+ a b)
+            module TestModule TestModule block
+              module Utils
+                func Add (int:a, int:b) → int
+                  !
+                  return (a + b)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2640,8 +2464,8 @@ public class CSharpToCalorConversionTests
         var conversionResult = _converter.Convert(csharpSource);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
         Assert.NotNull(conversionResult.CalorSource);
-        // Emitter uses "virt" abbreviation for virtual
-        Assert.Contains(":virt", conversionResult.CalorSource);
+        // Emitter uses the virtual modifier for virtual
+        Assert.Contains("func Speak virtual", conversionResult.CalorSource);
 
         var compilationResult = Program.Compile(conversionResult.CalorSource!);
         Assert.False(compilationResult.HasErrors,
@@ -2657,10 +2481,12 @@ public class CSharpToCalorConversionTests
     public void Parse_ClassWithStAbbreviation_SetsIsStaticTrue()
     {
         var calorSource = """
-            §M{m1:TestModule}
-                §F{main:Main:pub}
-                    §O{void}
-                §CL{c001:Foo:pub:st}
+            module TestModule TestModule block
+              func Main () → void
+                !
+                return
+
+              module Foo
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -2698,7 +2524,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§RANGE", result.CalorSource);
+        Assert.Contains("(1..3)", result.CalorSource);
     }
 
     [Fact]
@@ -2720,7 +2546,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§RANGE", result.CalorSource);
+        Assert.Contains("(..3)", result.CalorSource);
     }
 
     [Fact]
@@ -2742,7 +2568,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§RANGE", result.CalorSource);
+        Assert.Contains("(2..)", result.CalorSource);
     }
 
     [Fact]
@@ -2764,7 +2590,7 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§^ 1", result.CalorSource);
+        Assert.Contains("(^1)", result.CalorSource);
     }
 
     [Fact]
@@ -2786,8 +2612,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§RANGE", result.CalorSource);
-        Assert.Contains("§^ 1", result.CalorSource);
+        Assert.Contains("(1..(^1))", result.CalorSource);
+        Assert.Contains("(^1)", result.CalorSource);
     }
 
     [Fact]
@@ -2810,8 +2636,8 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§WITH", result.CalorSource);
-        Assert.Contains("§SET{Name}", result.CalorSource);
+        Assert.Contains("p with {", result.CalorSource);
+        Assert.Contains("Name = \"Bob\"", result.CalorSource);
     }
 
     [Fact]
@@ -2834,9 +2660,9 @@ public class CSharpToCalorConversionTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§WITH", result.CalorSource);
-        Assert.Contains("§SET{Name}", result.CalorSource);
-        Assert.Contains("§SET{Age}", result.CalorSource);
+        Assert.Contains("p with {", result.CalorSource);
+        Assert.Contains("Name = \"Bob\"", result.CalorSource);
+        Assert.Contains("Age = 25", result.CalorSource);
     }
 
     [Fact]
@@ -3092,7 +2918,7 @@ public class CSharpToCalorConversionTests
 
         // Verify emitter output contains property declarations
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§PROP", result.CalorSource);
+        Assert.Contains("property int:X", result.CalorSource);
     }
 
     [Fact]
@@ -3123,9 +2949,9 @@ public class CSharpToCalorConversionTests
 
         // Verify emitter output contains both classes as §CL blocks
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CL{", result.CalorSource);
-        Assert.Contains(":Outer", result.CalorSource);
-        Assert.Contains(":Inner", result.CalorSource);
+        Assert.Contains("class ", result.CalorSource);
+        Assert.Contains("class Outer", result.CalorSource);
+        Assert.Contains("class Inner", result.CalorSource);
     }
 
     [Fact]
@@ -3155,8 +2981,8 @@ public class CSharpToCalorConversionTests
 
         // Verify CalorEmitter uses "stat" modifier
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CTOR{", result.CalorSource);
-        Assert.Contains(":stat}", result.CalorSource);
+        Assert.Contains("ctor ", result.CalorSource);
+        Assert.Contains("ctor stat", result.CalorSource);
 
         // Verify CSharpEmitter outputs "static Foo()"
         var csharpOutput = new CSharpEmitter().Emit(result.Ast);
@@ -3525,7 +3351,7 @@ public class CSharpToCalorConversionTests
 
         var result = _converter.Convert(csharpSource);
         Assert.True(result.Success, GetErrorMessage(result));
-        Assert.Contains("§CSHARP", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource);
         Assert.Contains("event System.EventHandler Changed;", result.CalorSource);
         Assert.DoesNotContain("§IFACE{", result.CalorSource);
         Assert.Contains(result.Losses, loss =>
@@ -3786,7 +3612,7 @@ public class CSharpToCalorConversionTests
     {
         // Directly test the lexer with a large hex value
         var diagnostics = new DiagnosticBag();
-        var source = "§EN{e1:Test}\nVal = 0xFFFFFFFF\n§/EN{e1}";
+        var source = "enum Test\n  Val = 0xFFFFFFFF";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -4048,11 +3874,15 @@ public class CSharpToCalorConversionTests
     [Fact]
     public void PartialClassMerger_PreservesBaseClass()
     {
+        // The base type is declared so it resolves: an unresolved base could be a class or an
+        // interface, and the converter keeps such a class as C# (class-unresolved-base-kind).
         var csharp1 = """
             public partial class Bar : BaseType
             {
                 public void MethodA() { }
             }
+
+            public class BaseType { }
             """;
 
         var csharp2 = """
@@ -4088,6 +3918,8 @@ public class CSharpToCalorConversionTests
     public void PartialClassMerger_MergesInterfaces()
     {
         var csharp1 = """
+            using System;
+
             public partial class Baz : IDisposable
             {
                 public void Dispose() { }
@@ -4095,6 +3927,8 @@ public class CSharpToCalorConversionTests
             """;
 
         var csharp2 = """
+            using System;
+
             public partial class Baz : ICloneable
             {
                 public object Clone() { return this; }
@@ -4180,7 +4014,11 @@ public class CSharpToCalorConversionTests
     [Fact]
     public void PartialClassMerger_DifferentNamespaces_DoesNotMerge()
     {
+        // 0.30: ModuleName is only a file label and no longer changes a global type's CLR
+        // namespace, so the two partials must live in different C# namespaces to stay apart.
         var csharp1 = """
+            namespace App.Models;
+
             public partial class Widget
             {
                 public int X { get; set; }
@@ -4188,13 +4026,15 @@ public class CSharpToCalorConversionTests
             """;
 
         var csharp2 = """
+            namespace App.Views;
+
             public partial class Widget
             {
                 public int Y { get; set; }
             }
             """;
 
-        // Different module names = different namespaces — should NOT merge
+        // Different namespaces — should NOT merge
         var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Models" }).Convert(csharp1);
         var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Views" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));

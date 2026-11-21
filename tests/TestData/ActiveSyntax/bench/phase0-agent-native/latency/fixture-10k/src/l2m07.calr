@@ -1,0 +1,92 @@
+module L2M07 L2M07 block
+  module L2M07Module public
+
+    func l2m07_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M34.L3M34Module.l3m34_fn03(x, 76)
+      let int:v2 = L3M16.L3M16Module.l3m16_fn11(x, 29)
+      return ((v1 + v2) + y)
+
+    func l2m07_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 2) + y)
+      if (acc > 22163)
+        return (acc + 22163)
+      else
+        return ((acc * 2) + 22163)
+
+    func l2m07_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M28.L3M28Module.l3m28_fn02(x, 57)
+      return (v1 + y)
+
+    func l2m07_fn04 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M23.L3M23Module.l3m23_fn03(x, 58)
+      return (v1 + y)
+
+    func l2m07_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M14.L3M14Module.l3m14_fn09(x, 37)
+      let int:v2 = L3M12.L3M12Module.l3m12_fn02(x, 86)
+      return ((v1 + v2) + y)
+
+    func l2m07_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M14.L3M14Module.l3m14_fn09(x, 63)
+      let int:v2 = L3M28.L3M28Module.l3m28_fn11(x, 80)
+      return ((v1 + v2) + y)
+
+    func l2m07_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M31.L3M31Module.l3m31_fn05(x, 70)
+      let int:v2 = L3M33.L3M33Module.l3m33_fn01(x, 62)
+      return ((v1 + v2) + y)
+
+    func l2m07_fn08 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22170)
+      if (x >= 22170)
+        return x
+      else
+        return 22170
+
+    func l2m07_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22177)
+      if (x >= 22177)
+        return x
+      else
+        return 22177
+
+    func l2m07_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22184)
+      if (x >= 22184)
+        return x
+      else
+        return 22184
+
+    func l2m07_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M24.L3M24Module.l3m24_fn09(x, 4)
+      return (v1 + y)
+
+    func l2m07_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M04.L3M04Module.l3m04_fn11(x, 63)
+      return (v1 + y)
+
+    func l2m07_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M01.L3M01Module.l3m01_fn02(x, 11)
+      let int:v2 = L3M30.L3M30Module.l3m30_fn07(x, 21)
+      return ((v1 + v2) + y)

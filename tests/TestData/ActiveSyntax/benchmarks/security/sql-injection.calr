@@ -1,0 +1,78 @@
+// Security Benchmark: SQL Injection Detection
+// Tests taint analysis for SQL injection vulnerabilities
+
+module SqlInjectionBenchmark SqlInjectionBenchmark
+  // Inject a provider using standard SQL literals (no backslash escapes).
+  // execute_param binds value separately; it must not interpolate it into query.
+  interface db
+    func execute (string:query) → void
+      ! db:w
+    func execute_param (string:query, string:value) → void
+      ! db:w
+    func query (string:query) → void
+      ! db:w
+
+  class SqlEscaping public
+    // Double SQL literal delimiters; the regression harness models this exact symbol.
+    func Escape public static (string:value) → string
+      !
+      return value.Replace("'", "''")
+
+  func VulnerableQuery public (string:user_input, db:connection) → string
+    // BUG: Direct SQL concatenation with user input
+    // EXPECTED: Calor0981 SQL Injection
+    ! db:w
+    var string:query = "SELECT * FROM users WHERE name = '" + user_input
+    set query query + "'"
+    connection.execute(query)
+    return query
+
+  func SafeParameterizedQuery public (string:user_input, db:connection) → string
+    // SAFE: Parameterized query with placeholders
+    // EXPECTED: No warnings
+    ! db:w
+    let string:query = "SELECT * FROM users WHERE name = ?"
+    connection.execute_param(query, user_input)
+    return query
+
+  func VulnerableMultipleConcatenation public (string:user_input, string:user_data, db:connection) → string
+    // BUG: Multiple concatenations with user input
+    // EXPECTED: Calor0981 SQL Injection
+    ! db:w
+    var string:query = "INSERT INTO users (name, email) VALUES ('"
+    set query query + user_input
+    set query query + "', '"
+    set query query + user_data
+    set query query + "')"
+    connection.execute(query)
+    return query
+
+  func SafeEscapedInput public (string:user_input, db:connection) → string
+    // SAFE: Input properly escaped before concatenation
+    // EXPECTED: No warnings
+    ! db:w
+    let string:escaped = SqlEscaping.Escape(user_input)
+    var string:query = "SELECT * FROM users WHERE name = '" + escaped
+    set query query + "'"
+    connection.execute(query)
+    return query
+
+  func VulnerableIndirectTaint public (string:user_input, db:connection) → string
+    // BUG: Taint propagates through intermediate variable
+    // EXPECTED: Calor0981 SQL Injection
+    ! db:w
+    let string:name = user_input
+    let string:search = name
+    var string:query = "SELECT * FROM users WHERE name LIKE '%" + search
+    set query query + "%'"
+    connection.query(query)
+    return query
+
+  func SafeConstantQuery public (db:connection) → string
+    // SAFE: Query uses only constants
+    // EXPECTED: No warnings
+    ! db:w
+    let string:tableName = "users"
+    let string:query = "SELECT COUNT(*) FROM " + tableName
+    connection.execute(query)
+    return query

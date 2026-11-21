@@ -1,0 +1,13 @@
+module OptionalIds OptionalIds
+  module OptionalIdsModule
+    func Add public (int:a, int:b) → int
+      !
+      return a + b
+
+    func Sub public (int:a, int:b) → int
+      !
+      return a - b
+
+    func Mul public (int:a, int:b) → int
+      !
+      return a * b

@@ -57,11 +57,10 @@ public class BugPatternTests
     public void DivisionByZero_LiteralZeroDivisor_ReportsError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:0)";
+module Test Test block
+  func Divide (int:x) → int
+    !
+    return (x / 0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -78,11 +77,10 @@ public class BugPatternTests
     public void DivisionByZero_NonZeroLiteralDivisor_NoError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:2)";
+module Test Test block
+  func Divide (int:x) → int
+    !
+    return (x / 2)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -98,12 +96,10 @@ public class BugPatternTests
     public void DivisionByZero_VariableDivisor_NoGuard_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x y)";
+module Test Test block
+  func Divide (int:x, int:y) → int
+    !
+    return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -120,14 +116,12 @@ public class BugPatternTests
     public void DivisionByZero_VariableDivisor_WithGuard_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivide:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF{if1} (!= y INT:0)
-          §R (/ x y)
-      §R INT:0";
+module Test Test block
+  func SafeDivide (int:x, int:y) → int
+    !
+    if (y != 0)
+      return (x / y)
+    return 0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -153,13 +147,11 @@ public class BugPatternTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDivide:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §Q (!= y INT:0)
-      §R (/ x y)";
+module Test Test block
+  func SafeDivide (int:x, int:y) → int
+    !
+    requires (y != 0)
+    return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -180,12 +172,10 @@ public class BugPatternTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-      §I{u32:x}
-      §I{u32:y}
-      §O{u32}
-      §R (/ x y)";
+module Test Test block
+  func Divide (uint:x, uint:y) → uint
+    !
+    return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -205,12 +195,10 @@ public class BugPatternTests
         // The signed path is untouched by the unsigned refusal: an unguarded
         // signed variable divisor still warns under the Z3 path.
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x y)";
+module Test Test block
+  func Divide (int:x, int:y) → int
+    !
+    return (x / y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -228,11 +216,10 @@ public class BugPatternTests
         // The literal-zero path is pre-solver and type-agnostic: refusal of
         // unsigned VARIABLES must not lose the hard error on a literal 0.
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-      §I{u32:x}
-      §O{u32}
-      §R (/ x INT:0)";
+module Test Test block
+  func Divide (uint:x) → uint
+    !
+    return (x / 0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -249,12 +236,10 @@ public class BugPatternTests
     public void DivisionByZero_InNestedExpression_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Nested:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ INT:1 (/ x y))";
+module Test Test block
+  func Nested (int:x, int:y) → int
+    !
+    return (1 + (x / y))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -270,12 +255,10 @@ public class BugPatternTests
     public void DivisionByZero_Modulo_AlsoChecked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Modulo:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (% x y)";
+module Test Test block
+  func Modulo (int:x, int:y) → int
+    !
+    return (x % y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -296,12 +279,10 @@ public class BugPatternTests
     public void Overflow_Addition_WithPotentialOverflow_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)";
+module Test Test block
+  func Add (int:x, int:y) → int
+    !
+    return (x + y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -318,12 +299,10 @@ public class BugPatternTests
     public void Overflow_Multiplication_HighRisk_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multiply:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (* x y)";
+module Test Test block
+  func Multiply (int:x, int:y) → int
+    !
+    return (x * y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -342,14 +321,12 @@ public class BugPatternTests
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeAdd:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §Q (AND (>= x INT:0) (<= x INT:100))
-      §Q (AND (>= y INT:0) (<= y INT:100))
-      §R (+ x y)";
+module Test Test block
+  func SafeAdd (int:x, int:y) → int
+    !
+    requires ((x >= 0) && (x <= 100))
+    requires ((y >= 0) && (y <= 100))
+    return (x + y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -367,14 +344,14 @@ public class BugPatternTests
     #region Null Dereference Tests
 
     [Fact]
-    public void NullDeref_UnwrapWithoutCheck_ReportsWarning()
+    public void NullDeref_ArrayLengthWithoutCheck_ReportsWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Unwrap:pub}
-      §I{Option<i32>:opt}
-      §O{i32}
-      §R (CALL opt.unwrap)";
+module Test Test block
+  func Unwrap () → int
+    !
+    let int[]:items = null
+    return items.Length";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -383,21 +360,18 @@ public class BugPatternTests
         var checker = new NullDereferenceChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // Should warn about unwrap without is_some check
-        Assert.Contains(diagnostics.Warnings, d =>
-            d.Code == DiagnosticCode.UnsafeUnwrap ||
+        Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullDereference);
     }
 
     [Fact]
-    public void NullDeref_UnwrapOr_Safe()
+    public void NullDeref_Coalesce_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
-      §I{Option<i32>:opt}
-      §O{i32}
-      §R (CALL opt.unwrap_or INT:0)";
+module Test Test block
+  func Safe (int?:value) → int
+    !
+    return (value ?? 0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -406,9 +380,8 @@ public class BugPatternTests
         var checker = new NullDereferenceChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
-        // unwrap_or is safe - no warning
         Assert.DoesNotContain(diagnostics.Warnings, d =>
-            d.Code == DiagnosticCode.UnsafeUnwrap);
+            d.Code == DiagnosticCode.NullDereference);
     }
 
     #endregion
@@ -423,12 +396,10 @@ public class BugPatternTests
     public void BugPatternRunner_RunsAllCheckers()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Risky:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ (/ x y) (* x y))";
+module Test Test block
+  func Risky (int:x, int:y) → int
+    !
+    return ((x / y) + (x * y))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -445,11 +416,10 @@ public class BugPatternTests
     public void BugPatternRunner_SafeCode_NoWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x INT:1)";
+module Test Test block
+  func Safe (int:x) → int
+    !
+    return (x + 1)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -471,13 +441,10 @@ public class BugPatternTests
     public void DivisionByZero_NestedDivision_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NestedDiv:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §I{i32:c}
-      §O{i32}
-      §R (/ a (/ b c))";
+module Test Test block
+  func NestedDiv (int:a, int:b, int:c) → int
+    !
+    return (a / (b / c))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -497,12 +464,10 @@ public class BugPatternTests
     public void DivisionByZero_DivisionInExpression_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ExprDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ INT:10 (/ x y))";
+module Test Test block
+  func ExprDiv (int:x, int:y) → int
+    !
+    return (10 + (x / y))";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -519,11 +484,10 @@ public class BugPatternTests
     public void DivisionByZero_ConstantNonZeroDivisor_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDiv:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:5)";
+module Test Test block
+  func SafeDiv (int:x) → int
+    !
+    return (x / 5)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -543,11 +507,10 @@ public class BugPatternTests
     public void DivisionByZero_NegativeConstantDivisor_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:NegDiv:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:-3)";
+module Test Test block
+  func NegDiv (int:x) → int
+    !
+    return (x / -3)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -567,15 +530,12 @@ public class BugPatternTests
     public void DivisionByZero_MultipleOperations_AllChecked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiOp:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §I{i32:c}
-      §O{i32}
-      §B{x:i32} (/ a b)
-      §B{y:i32} (/ x c)
-      §R y";
+module Test Test block
+  func MultiOp (int:a, int:b, int:c) → int
+    !
+    let int:x = (a / b)
+    let int:y = (x / c)
+    return y";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -599,11 +559,10 @@ public class BugPatternTests
     public void Overflow_LargeConstantAddition_Detected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:LargeAdd:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x INT:2147483647)";
+module Test Test block
+  func LargeAdd (int:x) → int
+    !
+    return (x + 2147483647)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -620,11 +579,10 @@ public class BugPatternTests
     public void Overflow_SmallConstantAddition_Safe()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SmallAdd:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x INT:1)";
+module Test Test block
+  func SmallAdd (int:x) → int
+    !
+    return (x + 1)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -641,12 +599,10 @@ public class BugPatternTests
     public void Overflow_Subtraction_Checked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Sub:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (- x y)";
+module Test Test block
+  func Sub (int:x, int:y) → int
+    !
+    return (x - y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -667,12 +623,10 @@ public class BugPatternTests
     public void SafeCode_OnlyAddition_NoDivisionWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:OnlyAdd:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (+ x y)";
+module Test Test block
+  func OnlyAdd (int:x, int:y) → int
+    !
+    return (x + y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -692,10 +646,10 @@ public class BugPatternTests
     public void SafeCode_ReturnConstant_NoWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Const:pub}
-      §O{i32}
-      §R INT:42";
+module Test Test block
+  func Const () → int
+    !
+    return 42";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -715,14 +669,12 @@ public class BugPatternTests
     public void SafeCode_SimpleArithmetic_MinimalWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Arith:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §B{sum:i32} (+ a b)
-      §B{diff:i32} (- a b)
-      §R (+ sum diff)";
+module Test Test block
+  func Arith (int:a, int:b) → int
+    !
+    let int:sum = (a + b)
+    let int:diff = (a - b)
+    return (sum + diff)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -743,14 +695,12 @@ public class BugPatternTests
     public void GuardDetection_GreaterThanZero_ProtectsDivision()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GuardGT:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF{if1} (> y INT:0)
-          §R (/ x y)
-      §R INT:0";
+module Test Test block
+  func GuardGT (int:x, int:y) → int
+    !
+    if (y > 0)
+      return (x / y)
+    return 0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -770,14 +720,12 @@ public class BugPatternTests
     public void GuardDetection_LessThanZero_ProtectsDivision()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:GuardLT:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF{if1} (< y INT:0)
-          §R (/ x y)
-      §R INT:0";
+module Test Test block
+  func GuardLT (int:x, int:y) → int
+    !
+    if (y < 0)
+      return (x / y)
+    return 0";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -798,11 +746,10 @@ public class BugPatternTests
     public void EdgeCase_DivisionByParameter_Warns()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:DivByParam:pub}
-      §I{i32:divisor}
-      §O{i32}
-      §R (/ INT:100 divisor)";
+module Test Test block
+  func DivByParam (int:divisor) → int
+    !
+    return (100 / divisor)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -819,17 +766,13 @@ public class BugPatternTests
     public void EdgeCase_DivisionInBothBranches_BothChecked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:BothBranches:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §I{i32:z}
-      §I{bool:cond}
-      §O{i32}
-      §IF{if1} cond
-          §R (/ x y)
-      §EL
-          §R (/ x z)";
+module Test Test block
+  func BothBranches (int:x, int:y, int:z, bool:cond) → int
+    !
+    if cond
+      return (x / y)
+    else
+      return (x / z)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -849,10 +792,10 @@ public class BugPatternTests
     public void EdgeCase_ModuloByZero_AlsoDetected()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ModZero:pub}
-      §O{i32}
-      §R (% INT:10 INT:0)";
+module Test Test block
+  func ModZero () → int
+    !
+    return (10 % 0)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -869,9 +812,10 @@ public class BugPatternTests
     public void DivisionByZero_LiteralCastThatTruncatesToZero_ReportsError()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub} () -> i32
-    §R (/ INT:100 (cast i32 FLOAT:0.5))";
+module Test Test block
+  func Divide () → int
+    !
+    return (100 / ((int)0.5))";
 
         var func = GetFunction(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors);

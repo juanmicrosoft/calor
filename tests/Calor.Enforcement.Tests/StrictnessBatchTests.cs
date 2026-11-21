@@ -29,14 +29,17 @@ public class StrictnessBatchTests
     public void DelegateInvocation_FunctionTypedParameter_WithoutRow_IsUnknown()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Apply:pub}
-      §I{Func<i32,i32>:transform}
-      §I{i32:value}
-      §O{i32}
-      §R §C{transform} §A value §/C
+module Test Test block
+  func Apply (Func<int, int>:transform, int:value) → int
+    !
+    return transform(value)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func Apply (Func<int,int>:transform ! unknown, int:value) → int
+                !
+                return transform(value)
+            """));
         // v0.15 E4 (§13.1): row-less ⇒ Unknown ⇒ Calor0425 at the invocation, and the
         // Unknown charge fails closed as Calor0410 'unknown' on the pure declaration.
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
@@ -48,13 +51,19 @@ public class StrictnessBatchTests
     public void DelegateInvocation_LambdaBoundLocal_ChargesInferredRow()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UseLambda:pub}
-      §O{i32}
-      §B{f} §LAM{lam1:x:i32} (+ x 1) §/LAM{lam1}
-      §R §C{f} §A INT:1 §/C
+module Test Test block
+  func UseLambda () → int
+    !
+    let f = (int:x) => (x + 1)
+    return f(1)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func UseLambda () → int
+                !
+                let f = (int:x) => x + 1
+                return f(1)
+            """));
         // v0.15 E4, baseline Y9a: a row-less §B takes its initializer's row (§3.5); ρ_body is pure, so {} is charged and it compiles.
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation || d.Code == DiagnosticCode.EffectRowUnknown);
@@ -64,14 +73,17 @@ public class StrictnessBatchTests
     public void DelegateInvocation_UnderPermissiveEffects_Calor0425IsSuppressed()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Apply:pub}
-      §I{Func<i32,i32>:transform}
-      §I{i32:value}
-      §O{i32}
-      §R §C{transform} §A value §/C
+module Test Test block
+  func Apply (Func<int, int>:transform, int:value) → int
+    !
+    return transform(value)
 ";
-        var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
+        var result = TestHarness.CompileWithEffects(NativeSource(source, """
+            module Test Test
+              func Apply (Func<int,int>:transform ! unknown, int:value) → int
+                !
+                return transform(value)
+            """), enforceEffects: true,
             policy: UnknownCallPolicy.Permissive);
         // v0.15 E4 (§4.5): the flag's one job is to waive "cannot tell" — the Calor0425 is
         // suppressed, nothing is charged, and the file compiles. Its sibling for "does not
@@ -85,16 +97,22 @@ public class StrictnessBatchTests
     {
         // The delegate error must NOT hit same-module bare-name calls.
         var source = @"
-§M{m001:Test}
-  §F{f001:Helper:pri}
-      §I{i32:x}
-      §O{i32}
-      §R (+ x 1)
-  §F{f002:Main:pub}
-      §O{i32}
-      §R §C{Helper} §A INT:1 §/C
+module Test Test block
+  func Helper private (int:x) → int
+    return (x + 1)
+
+  func Main () → int
+    !
+    return Helper(1)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func Helper private (int:x) → int
+                return x + 1
+              func Main () → int
+                !
+                return Helper(1)
+            """));
 
         Assert.False(result.HasErrors,
             $"Bare-name internal call must still resolve. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -109,14 +127,19 @@ public class StrictnessBatchTests
         // Now it routes through the unknown-call chain (Calor0411 + worst-case
         // effects → Calor0410) under the default strict policy.
         var source = @"
-§M{m001:Test}
-  §CL{c001:Mapper:pub}
-      §MT{mt001:Apply:pub}
-          §I{i32:value}
-          §O{i32}
-          §R §C{transform} §A value §/C
+module Test Test block
+  class Mapper
+    func Apply (int:value) → int
+      !
+      return transform(value)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Mapper
+                func Apply (int:value) → int
+                  !
+                  return transform(value)
+            """));
 
         Assert.True(result.HasErrors, "A free bare-name invocation must fail closed");
         Assert.Contains(result.Diagnostics,
@@ -133,19 +156,30 @@ public class StrictnessBatchTests
     public void OverrideWithBroaderEffects_IsError()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Base:pub}
-      §MT{mt001:Render:pub:virt}
-          §O{void}
-          §E{}
-  §CL{c002:Derived:pub}
-      §EXT{Base}
-      §MT{mt002:Render:pub:over}
-          §O{void}
-          §E{cw}
-          §P ""laundered""
+module Test Test block
+  class Base
+    func Render virtual () → void
+      !
+      return
+
+  class Derived
+    extends Base
+
+    func Render override () → void
+      ! cw
+      Console.WriteLine(""laundered"")
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Base
+                func Render virtual () → void
+                  !
+              class Derived
+                extends Base
+                func Render override () → void
+                  ! cw
+                  System.Console.WriteLine("laundered")
+            """));
 
         Assert.True(result.HasErrors, "Override broadening the base effect set must fail");
         Assert.Contains(result.Diagnostics.Errors,
@@ -156,17 +190,31 @@ public class StrictnessBatchTests
     public void GenericOverrideWithAlphaEquivalentTypeParameters_IsMatchedForVariance()
     {
         var source = """
-            §M{m001:Test}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render<T>:pub:virt} (T:value) -> void
-                  §E{}
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render<U>:pub:over} (U:value) -> void
-                  §E{cw}
-                  §P "laundered"
+            module Test Test block
+              class Base
+                func Render<T> virtual (T:value) → void
+                  !
+                  return
+
+              class Derived internal
+                extends Base
+
+                func Render<U> override (U:value) → void
+                  ! cw
+                  Console.WriteLine("laundered")
             """;
 
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Base
+                func Render<T> virtual (T:value) → void
+                  !
+              class Derived internal
+                extends Base
+                func Render<U> override (U:value) → void
+                  ! cw
+                  System.Console.WriteLine("laundered")
+            """));
 
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
             diagnostic.Code == DiagnosticCode.OverrideEffectVariance
@@ -177,20 +225,31 @@ public class StrictnessBatchTests
     public void OverrideWithSubsetEffects_Compiles()
     {
         var source = @"
-§M{m001:Test}
-  §CL{c001:Base:pub}
-      §MT{mt001:Render:pub:virt}
-          §O{void}
-          §E{cw,fs:w}
-          §P ""base""
-  §CL{c002:Derived:pub}
-      §EXT{Base}
-      §MT{mt002:Render:pub:over}
-          §O{void}
-          §E{cw}
-          §P ""derived""
+module Test Test block
+  class Base
+    func Render virtual () → void
+      ! cw, fs:w
+      Console.WriteLine(""base"")
+
+  class Derived
+    extends Base
+
+    func Render override () → void
+      ! cw
+      Console.WriteLine(""derived"")
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class Base
+                func Render virtual () → void
+                  ! cw,fs:w
+                  System.Console.WriteLine("base")
+              class Derived
+                extends Base
+                func Render override () → void
+                  ! cw
+                  System.Console.WriteLine("derived")
+            """));
 
         Assert.False(result.HasErrors,
             $"Override with a subset of base effects must compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -200,19 +259,29 @@ public class StrictnessBatchTests
     public void InterfaceImplementationWithBroaderEffects_IsError()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRenderer}
-      §MT{m001:Render}
-          §O{void}
-          §E{}
-  §CL{c001:ConsoleRenderer:pub}
-      §IMPL{IRenderer}
-      §MT{mt001:Render:pub}
-          §O{void}
-          §E{cw}
-          §P ""rendering""
+module Test Test block
+  interface IRenderer
+    func Render () → void
+      !
+
+  class ConsoleRenderer
+    implements IRenderer
+
+    func Render () → void
+      ! cw
+      Console.WriteLine(""rendering"")
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              interface IRenderer
+                func Render () → void
+                  !
+              class ConsoleRenderer
+                implements IRenderer
+                func Render () → void
+                  ! cw
+                  System.Console.WriteLine("rendering")
+            """));
 
         Assert.True(result.HasErrors, "Implementation broadening the interface effect set must fail");
         Assert.Contains(result.Diagnostics.Errors,
@@ -223,19 +292,29 @@ public class StrictnessBatchTests
     public void InterfaceImplementationWithinDeclaredEffects_Compiles()
     {
         var source = @"
-§M{m001:Test}
-  §IFACE{i001:IRenderer}
-      §MT{m001:Render}
-          §O{void}
-          §E{cw}
-  §CL{c001:ConsoleRenderer:pub}
-      §IMPL{IRenderer}
-      §MT{mt001:Render:pub}
-          §O{void}
-          §E{cw}
-          §P ""rendering""
+module Test Test block
+  interface IRenderer
+    func Render () → void
+      ! cw
+
+  class ConsoleRenderer
+    implements IRenderer
+
+    func Render () → void
+      ! cw
+      Console.WriteLine(""rendering"")
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              interface IRenderer
+                func Render () → void
+                  ! cw
+              class ConsoleRenderer
+                implements IRenderer
+                func Render () → void
+                  ! cw
+                  System.Console.WriteLine("rendering")
+            """));
 
         Assert.False(result.HasErrors,
             $"Implementation within the interface's declared effects must compile. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -247,14 +326,21 @@ public class StrictnessBatchTests
         // Base class is external C# (not in this module): variance cannot be
         // checked, so the assumed channel is Calor0425 (§13.1's `:260` rewrite).
         var source = @"
-§M{m001:Test}
-  §CL{c001:MyController:pub}
-      §EXT{SomeExternalBase}
-      §MT{mt001:Handle:pub:over}
-          §O{void}
-          §E{}
+module Test Test block
+  class MyController
+    extends SomeExternalBase
+
+    func Handle override () → void
+      !
+      return
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              class MyController
+                extends SomeExternalBase
+                func Handle override () → void
+                  !
+            """));
 
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown && d.Message.Contains("external base"));
@@ -267,18 +353,26 @@ public class StrictnessBatchTests
         // charges the interface's declared §E{cw} — no unknown-call diagnostic,
         // and the caller must declare cw.
         var missingDeclaration = @"
-§M{m001:Test}
-  §IFACE{i001:IShape}
-      §MT{m001:Describe}
+§M{Test}
+  §IFACE{IShape}
+      §MT{Describe}
           §O{void}
           §E{cw}
-  §F{f001:Draw:pub}
+  §F{Draw:pub}
       §I{IShape:shape}
       §O{void}
       §C{shape.Describe}
       §/C
 ";
-        var failing = TestHarness.Compile(missingDeclaration);
+        var failing = TestHarness.Compile(NativeSource(missingDeclaration, """
+            module Test Test
+              interface IShape
+                func Describe () → void
+                  ! cw
+              func Draw (IShape:shape) → void
+                !
+                shape.Describe()
+            """));
         Assert.True(failing.HasErrors, "Caller must declare the interface's declared effect");
         Assert.Contains(failing.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("Draw"));
@@ -287,82 +381,17 @@ public class StrictnessBatchTests
 
         var declared = missingDeclaration.Replace("      §O{void}\n      §C{shape.Describe}",
             "      §O{void}\n      §E{cw}\n      §C{shape.Describe}");
-        var passing = TestHarness.Compile(declared);
+        var passing = TestHarness.Compile(NativeSource(declared, """
+            module Test Test
+              interface IShape
+                func Describe () → void
+                  ! cw
+              func Draw (IShape:shape) → void
+                ! cw
+                shape.Describe()
+            """));
         Assert.False(passing.HasErrors,
             $"Caller declaring the interface effect must compile. Errors: {string.Join("; ", passing.Diagnostics.Errors.Select(e => e.Message))}");
-    }
-
-    // ========================================================================
-    // D-W2.3 — Interop is effect-unknown, propagating as an assumption
-    // ========================================================================
-
-    [Fact]
-    public void InteropContent_SurfacesAssumption()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:UsesInterop:pub}
-      §O{void}
-      §RAW
-var x = System.Environment.TickCount;
-§/RAW
-";
-        var result = TestHarness.Compile(source);
-
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects
-                && d.Message.Contains("UsesInterop")
-                && d.Message.Contains("interop"));
-    }
-
-    [Fact]
-    public void InteropAssumption_PropagatesToCaller()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:UsesInterop:pub}
-      §O{void}
-      §RAW
-var x = 1;
-§/RAW
-  §F{f002:Caller:pub}
-      §O{void}
-      §C{UsesInterop}
-      §/C
-  §F{f003:Transitive:pub}
-      §O{void}
-      §C{Caller}
-      §/C
-";
-        var result = TestHarness.Compile(source);
-
-        // The direct caller AND the transitive caller inherit the assumption.
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("'Caller'"));
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("'Transitive'"));
-    }
-
-    [Fact]
-    public void InteropAssumption_UnderStrictEffects_IsError()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:UsesInterop:pub}
-      §O{void}
-      §RAW
-var x = 1;
-§/RAW
-";
-        var options = new CompilationOptions
-        {
-            EnforceEffects = true,
-            StrictEffects = true
-        };
-        var result = TestHarness.Compile(source, options);
-
-        Assert.Contains(result.Diagnostics.Errors,
-            d => d.Code == DiagnosticCode.AssumedEffects && d.Message.Contains("UsesInterop"));
     }
 
     // ========================================================================
@@ -376,14 +405,17 @@ var x = 1;
         // pass strict enforcement. With no type information the call routes
         // through the unknown-call chain (fail loud), not the purged name list.
         var source = @"
-§M{m001:Test}
-  §F{f001:AddItem:pub}
-      §O{void}
-      §C{items.Add}
-        §A INT:1
-      §/C
+module Test Test block
+  func AddItem () → void
+    !
+    items.Add(1)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func AddItem () → void
+                !
+                items.Add(1)
+            """));
 
         Assert.True(result.HasErrors, "items.Add in a pure function must fail enforcement");
         Assert.Contains(result.Diagnostics,
@@ -396,15 +428,19 @@ var x = 1;
         // With a typed receiver the manifest resolves List`1.Add = mut: the
         // caller must declare mut (and gets Calor0410, not Calor0411, without it).
         var missing = @"
-§M{m001:Test}
-  §F{f001:AddItem:pub}
-      §O{void}
-      §B{List<i32>:items} §NEW{List<i32>} §/NEW
-      §C{items.Add}
-        §A INT:1
-      §/C
+module Test Test block
+  func AddItem () → void
+    !
+    let List<int>:items = new List<int>()
+    items.Add(1)
 ";
-        var failing = TestHarness.Compile(missing);
+        var failing = TestHarness.Compile(NativeSource(missing, """
+            module Test Test
+              func AddItem () → void
+                !
+                let List<int>:items = new List<int>()
+                items.Add(1)
+            """));
         Assert.True(failing.HasErrors, "Typed list Add without §E{mut} must fail");
         Assert.Contains(failing.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("mut"));
@@ -416,14 +452,19 @@ var x = 1;
     public void UntypedReceiver_PureLookingMethodName_FailsClosed()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Query:pub}
+§M{Test}
+  §F{Query:pub}
       §O{void}
       §E{}
       §C{items.Where}
       §/C
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Test Test
+              func Query () → void
+                !
+                items.Where()
+            """));
 
         Assert.Contains(result.Diagnostics,
             diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall
@@ -431,37 +472,6 @@ var x = 1;
         Assert.Contains(result.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.ForbiddenEffect
                 && diagnostic.Message.Contains("unknown"));
-    }
-
-    [Fact]
-    public void ResolvedImmutableApis_LinqAndStringOps_StillPure()
-    {
-        // Pure calls remain pure only through resolved receiver identities and
-        // authoritative manifest entries — never through a global name list.
-        var source = @"
-§M{m001:Test}
-  §F{f001:Query:pub}
-      §I{List<i32>:items}
-      §I{str:name}
-      §O{void}
-      §C{items.Where}
-      §/C
-      §C{items.Select}
-      §/C
-      §C{items.ToList}
-      §/C
-      §C{name.Trim}
-      §/C
-      §C{name.PadLeft}
-        §A INT:10
-      §/C
-      §C{items.ConvertAll}
-      §/C
-";
-        var result = TestHarness.Compile(source);
-
-        Assert.False(result.HasErrors,
-            $"Audited-pure names must remain pure. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
 
     // ========================================================================
@@ -475,27 +485,40 @@ var x = 1;
         // function is resolved as the VALUE, so the DECOY'S row governs — row-less
         // ⇒ Calor0425 + Calor0410 'unknown' — never the shadowed pure function's.
         var source = @"
-§M{m001:Shadow}
-  §F{f001:Helper:pub}
-      §O{i32}
-      §E{}
-      §R INT:1
-  §F{f002:Loud:pub}
-      §O{i32}
-      §E{cw}
-      §P ""laundered""
-      §R INT:2
-  §F{f003:Go:pub}
-      §I{Func<i32>:Helper}
-      §O{i32}
-      §E{}
-      §R §C{Helper} §/C
-  §F{f004:Main:pub}
-      §O{void}
-      §E{}
-      §B{r:i32} §C{Go} §A Loud §/C
+module Shadow Shadow block
+  func Helper () → int
+    !
+    return 1
+
+  func Loud () → int
+    ! cw
+    Console.WriteLine(""laundered"")
+    return 2
+
+  func Go (Func<int>:Helper) → int
+    !
+    return Helper()
+
+  func Main () → void
+    !
+    let int:r = Go(Loud)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Shadow Shadow
+              func Helper () → int
+                !
+                return 1
+              func Loud () → int
+                ! cw
+                System.Console.WriteLine("laundered")
+                return 2
+              func Go (Func<int>:Helper ! unknown) → int
+                !
+                return Helper()
+              func Main () → void
+                !
+                let int:r = Go(Loud)
+            """));
 
         Assert.True(result.HasErrors, "Decoy-named delegate invocation must fail closed");
         Assert.Contains(result.Diagnostics.Warnings,
@@ -512,15 +535,19 @@ var x = 1;
         // Review C1 (statement leg): effects inside a §PP conditional block are
         // charged (union of branches) — a §PP body is never silently pure.
         var source = @"
-§M{m001:PpHole}
-  §F{f001:Sneaky:pub}
-      §O{void}
-      §E{}
-      §PP{DEBUG}
-      §C{Console.WriteLine} ""hidden effect""
-      §/PP{DEBUG}
+module PpHole PpHole block
+  func Sneaky () → void
+    !
+    pp DEBUG
+      Console.WriteLine(""hidden effect"")
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module PpHole PpHole
+              func Sneaky public () → void
+                !
+                pp DEBUG
+                  Console.WriteLine("hidden effect")
+            """));
 
         Assert.True(result.HasErrors, "§PP-wrapped effects must be charged");
         Assert.Contains(result.Diagnostics.Errors,
@@ -534,16 +561,21 @@ var x = 1;
         // Review C1 (member leg): a class method wrapped in a class-level §PP
         // block must not escape enforcement.
         var source = @"
-§M{m001:PPM}
-  §CL{c001:Logger:pub}
-      §PP{DEBUG}
-      §MT{mt001:Sneak:pub}
-          §O{void}
-          §E{}
-          §C{Console.WriteLine} §A ""pp-wrapped method effect"" §/C
-      §/PP{DEBUG}
+module PPM PPM block
+  class Logger
+    pp DEBUG
+      func Sneak () → void
+        !
+        Console.WriteLine(""pp-wrapped method effect"")
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module PPM PPM
+              class Logger
+                pp DEBUG
+                  func Sneak () → void
+                    !
+                    Console.WriteLine("pp-wrapped method effect")
+            """));
 
         Assert.True(result.HasErrors, "§PP-wrapped methods must be enforced");
         Assert.Contains(result.Diagnostics.Errors,
@@ -558,24 +590,39 @@ var x = 1;
         // in-module method is variance-checked (Calor0421) — inheritance must
         // not launder through interface dispatch.
         var source = @"
-§M{m001:InheritLaunder}
-  §IFACE{i001:IQuiet}
-      §MT{m001:Run}
-          §O{void}
-          §E{}
-  §CL{c001:Loud:pub}
-      §MT{mt001:Run:pub}
-          §O{void}
-          §E{cw}
-          §P ""runs loud""
-  §CL{c002:Sneaky:pub}
-      §EXT{Loud}
-      §IMPL{IQuiet}
-      §MT{mt002:Noop:pub}
-          §O{void}
-          §E{}
+module InheritLaunder InheritLaunder block
+  interface IQuiet
+    func Run () → void
+      !
+
+  class Loud
+    func Run () → void
+      ! cw
+      Console.WriteLine(""runs loud"")
+
+  class Sneaky
+    extends Loud
+    implements IQuiet
+
+    func Noop () → void
+      !
+      return
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module InheritLaunder InheritLaunder
+              interface IQuiet
+                func Run () → void
+                  !
+              class Loud
+                func Run () → void
+                  ! cw
+                  System.Console.WriteLine("runs loud")
+              class Sneaky
+                extends Loud
+                implements IQuiet
+                func Noop () → void
+                  !
+            """));
 
         Assert.True(result.HasErrors, "Inherited implementation broadening interface effects must fail");
         Assert.Contains(result.Diagnostics.Errors,
@@ -589,19 +636,30 @@ var x = 1;
         // Review C3 (external arm): §IMPL satisfied only by a member inherited
         // from an external base is surfaced as Calor0425 (§13.1's `:607`).
         var source = @"
-§M{m001:ExtImpl}
-  §IFACE{i001:IQuiet}
-      §MT{m001:Run}
-          §O{void}
-          §E{}
-  §CL{c001:Bridge:pub}
-      §EXT{SomeExternalBase}
-      §IMPL{IQuiet}
-      §MT{mt001:Other:pub}
-          §O{void}
-          §E{}
+module ExtImpl ExtImpl block
+  interface IQuiet
+    func Run () → void
+      !
+
+  class Bridge
+    extends SomeExternalBase
+    implements IQuiet
+
+    func Other () → void
+      !
+      return
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module ExtImpl ExtImpl
+              interface IQuiet
+                func Run () → void
+                  !
+              class Bridge
+                extends SomeExternalBase
+                implements IQuiet
+                func Other () → void
+                  !
+            """));
 
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown
@@ -615,20 +673,26 @@ var x = 1;
         // function) charges that function's declared effects at the passing
         // site — ConvertAll and friends can no longer launder it.
         var source = @"
-§M{m001:HigherOrder}
-  §F{f001:LoudMap:pub}
-      §I{i32:x}
-      §O{i32}
-      §E{cw}
-      §P ""mapping""
-      §R x
-  §F{f002:Go:pub}
-      §I{List<i32>:items}
-      §O{void}
-      §E{}
-      §B{r} §C{items.ConvertAll} §A LoudMap §/C
+module HigherOrder HigherOrder block
+  func LoudMap (int:x) → int
+    ! cw
+    Console.WriteLine(""mapping"")
+    return x
+
+  func Go (List<int>:items) → void
+    !
+    let r = items.ConvertAll(LoudMap)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """));
 
         Assert.True(result.HasErrors, "Method-group argument effects must be charged");
         Assert.Contains(result.Diagnostics.Errors,
@@ -637,25 +701,171 @@ var x = 1;
     }
 
     [Fact]
-    public void C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption()
+    public void NativeMethodGroupArgument_SelectedClrCallRejectsUndeclaredAndAcceptsDeclaredCw()
     {
-        // Review C4 (value arm): a function-typed VALUE passed to a
-        // manifest-resolved higher-order call (Select) is surfaced as a
-        // Calor0419 assumption — the BCL callee may invoke it invisibly.
-        var source = @"
-§M{m001:HofVal}
-  §F{f001:Go:pub}
-      §I{Func<i32,i32>:f}
-      §I{List<i32>:items}
-      §O{void}
-      §E{}
-      §B{r} §C{items.Select} §A f §/C
-";
-        var result = TestHarness.Compile(source);
+        const string undeclared = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string declared = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string pureDecoy = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                !
+                return x
+              func LoudMap (string:x) → string
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string impureDecoy = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func LoudMap (string:x) → string
+                !
+                return x
+              func Go (List<int>:items) → void
+                !
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string incompatibleCallback = """
+            module HigherOrder HigherOrder
+              func LoudMap (string:x) → string
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string unknownReceiver = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (SomeExternal:items) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        const string shadowedCallback = """
+            module HigherOrder HigherOrder
+              func LoudMap (int:x) → int
+                ! cw
+                System.Console.WriteLine("mapping")
+                return x
+              func Go (List<int>:items, Func<int,int>:LoudMap !) → void
+                ! cw
+                let r = items.ConvertAll(LoudMap)
+            """;
+        var rejected = CompileNative(undeclared);
+        AssertCwRejected(rejected);
+        var accepted = CompileNative(declared);
+        Assert.False(accepted.HasErrors, string.Join("; ", accepted.Diagnostics));
+        Assert.Equal(SelectedClrCall(rejected), SelectedClrCall(accepted));
 
-        Assert.Contains(result.Diagnostics.Warnings,
-            d => d.Code == DiagnosticCode.AssumedEffects
-                && d.Message.Contains("'f'") && d.Message.Contains("items.Select"));
+        var pure = CompileNative(pureDecoy);
+        Assert.False(pure.HasErrors, string.Join("; ", pure.Diagnostics));
+        Assert.Equal(SelectedClrCall(accepted), SelectedClrCall(pure));
+        var impure = CompileNative(impureDecoy);
+        AssertCwRejected(impure);
+        Assert.Equal(SelectedClrCall(rejected), SelectedClrCall(impure));
+
+        foreach (var source in new[] { incompatibleCallback, unknownReceiver, shadowedCallback })
+        {
+            var unknown = CompileNative(source);
+            Assert.True(unknown.HasErrors);
+            var unresolved = Assert.Single(unknown.Diagnostics,
+                diagnostic => diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+            Assert.Contains(".ConvertAll", unresolved.Message);
+            var forbidden = Assert.Single(unknown.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.ForbiddenEffect, forbidden.Code);
+            Assert.Contains("Function 'Go' uses effect 'unknown' but does not declare it", forbidden.Message);
+            var (model, invocation) = ClrCall(unknown, valid: false);
+            Assert.Null(Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model, invocation).Symbol);
+            if (source == shadowedCallback)
+            {
+                var parameter = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IParameterSymbol>(
+                    Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model,
+                        invocation.ArgumentList.Arguments.Single().Expression).Symbol);
+                Assert.Equal("LoudMap", parameter.Name);
+                Assert.Equal("System.Func<int, int>", parameter.Type.ToDisplayString());
+            }
+        }
+
+        static CompilationResult CompileNative(string source) =>
+            Calor.Compiler.Program.Compile(NativeSource(source, source));
+
+        static void AssertCwRejected(CompilationResult result)
+        {
+            Assert.True(result.HasErrors);
+            var error = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.ForbiddenEffect, error.Code);
+            Assert.Equal("Function 'Go' uses effect 'cw' but does not declare it", error.Message);
+        }
+
+        static (Microsoft.CodeAnalysis.SemanticModel Model,
+            Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax Invocation) ClrCall(
+                CompilationResult result, bool valid)
+        {
+            var generated = new Calor.Compiler.CodeGen.CSharpEmitter().Emit(result.Ast!);
+            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                "using System;\nusing System.Collections.Generic;\n" + generated);
+            var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                "StrictnessMethodGroup", [tree], TestHarness.CompilationReferences,
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                   Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+            Assert.Equal(valid, !compilation.GetDiagnostics().Any(
+                diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error));
+            var invocation = Assert.Single(tree.GetRoot().DescendantNodes()
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>(),
+                syntax => syntax.Expression is Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax
+                   { Name.Identifier.ValueText: "ConvertAll" });
+            var model = compilation.GetSemanticModel(tree);
+            return (model, invocation);
+        }
+
+        static (string Call, string Callback) SelectedClrCall(CompilationResult result)
+        {
+            var (model, invocation) = ClrCall(result, valid: true);
+            var call = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(
+                Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model, invocation).Symbol);
+            Assert.Equal(
+                "System.Collections.Generic.List<int>.ConvertAll<int>(System.Converter<int, int>)",
+                call.ToDisplayString());
+            Assert.False(call.IsStatic);
+            var callback = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IMethodSymbol>(
+                Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSymbolInfo(model,
+                   invocation.ArgumentList.Arguments.Single().Expression).Symbol);
+            Assert.Equal("HigherOrder.HigherOrderModule.LoudMap(int)", callback.ToDisplayString());
+            Assert.True(callback.IsStatic);
+            Assert.False(callback.ReturnsByRef);
+            Assert.False(callback.ReturnsByRefReadonly);
+            Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_Int32, callback.ReturnType.SpecialType);
+            Assert.Equal(Microsoft.CodeAnalysis.RefKind.None, callback.Parameters.Single().RefKind);
+            return (call.ToDisplayString(), callback.ToDisplayString());
+        }
     }
 
     [Fact]
@@ -665,32 +875,33 @@ var x = 1;
         // be captured by an in-module method-name collision — it goes to the
         // unknown chain (fail loud), for both single and chained receivers.
         var source = @"
-§M{m001:RC}
-  §CL{c001:Helper:pub}
-      §MT{mt001:Refresh:pub}
-          §O{i32}
-          §E{}
-          §R INT:1
-  §F{f001:GoSingle:pub}
-      §I{SomeExternal:svc}
-      §O{void}
-      §E{}
-      §C{svc.Refresh}
-      §/C
-  §F{f002:GoChained:pub}
-      §I{SomeExternal:svc}
-      §O{void}
-      §E{}
-      §C{svc.conn.Refresh}
-      §/C
+module RC RC block
+  class Helper
+    func Refresh () → int
+      !
+      return 1
+
+  func GoSingle (SomeExternal:svc) → void
+    !
+    svc.Refresh()
+
+  func GoChained (SomeExternal:svc) → void
+    !
+    svc.conn.Refresh()
 ";
         var result = TestHarness.Compile(source);
 
         Assert.True(result.HasErrors, "External-typed receiver collisions must fail loud");
+        // The unknown-call message names the receiver's type, not its path:
+        // 'SomeExternal.Refresh' for the single receiver; for the chain, the
+        // external getter 'SomeExternal.get_conn' and the untyped Refresh after it.
         Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("svc.Refresh"));
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("'SomeExternal.Refresh'"));
         Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("svc.conn.Refresh"));
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("'SomeExternal.get_conn'"));
+        Assert.Equal(2, result.Diagnostics.Count(
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains(".Refresh'")));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("Helper.Refresh"));
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("GoSingle"));
         Assert.Contains(result.Diagnostics.Errors,
@@ -703,20 +914,28 @@ var x = 1;
         // Companion: a receiver statically typed as the in-module declaring
         // class still resolves (declared-§E charge) — no unknown-call noise.
         var source = @"
-§M{m001:RC2}
-  §CL{c001:Helper:pub}
-      §MT{mt001:Refresh:pub}
-          §O{i32}
-          §E{}
-          §R INT:1
-  §F{f001:Go:pub}
-      §O{void}
-      §E{alloc}
-      §B{h:Helper} §NEW{Helper} §/NEW
-      §C{h.Refresh}
-      §/C
+module RC2 RC2 block
+  class Helper
+    func Refresh () → int
+      !
+      return 1
+
+  func Go () → void
+    ! alloc
+    let Helper:h = new Helper()
+    h.Refresh()
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module RC2 RC2
+              class Helper
+                func Refresh () → int
+                  !
+                  return 1
+              func Go () → void
+                ! alloc
+                let Helper:h = new Helper()
+                h.Refresh()
+            """));
 
         Assert.False(result.HasErrors,
             $"In-module typed receiver must still resolve. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
@@ -730,15 +949,17 @@ var x = 1;
         // Review M1 / v0.15 E4 (§13.1): `§C f §A x §/C` is the same invocation as
         // `§C{f}` — the row of `f` is charged; row-less ⇒ Calor0425 + 0410 'unknown'.
         var source = @"
-§M{m001:Wrap}
-  §F{f001:Apply:pub}
-      §I{Func<i32,i32>:f}
-      §I{i32:x}
-      §O{i32}
-      §E{}
-      §R §C f §A x §/C
+module Wrap Wrap block
+  func Apply (Func<int, int>:f, int:x) → int
+    !
+    return f(x)
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module Wrap Wrap
+              func Apply (Func<int,int>:f ! unknown, int:x) → int
+                !
+                return f(x)
+            """));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
         Assert.True(result.HasErrors, "Expression-call invocation of an Unknown row must fail closed");
         Assert.Contains(result.Diagnostics.Warnings,
@@ -751,17 +972,26 @@ var x = 1;
         // Review M1 / v0.15 E4 (§13.1): invoking the RESULT of a call (`GetF()()`)
         // charges the callee's declared RETURN row; `§O` with no row ⇒ Calor0425.
         var source = @"
-§M{m001:E}
-  §F{f001:GetF:pub}
-      §O{Func<i32>}
-      §E{}
-      §R §LAM{l1} §R INT:1 §/LAM{l1}
-  §F{f002:Go:pub}
-      §O{i32}
-      §E{}
-      §R §C §C{GetF} §/C §/C
+module E E block
+  func GetF () → Func<int>
+    !
+    return () =>
+      return 1
+
+  func Go () → int
+    !
+    return (GetF())()
 ";
-        var result = TestHarness.Compile(source);
+        var result = TestHarness.Compile(NativeSource(source, """
+            module E E
+              func GetF () → Func<int> ! unknown
+                !
+                return () =>
+                  return 1
+              func Go () → int
+                !
+                return GetF()()
+            """));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
         Assert.True(result.HasErrors, "Invoking a returned value whose return row is Unknown must fail closed");
         Assert.Contains(result.Diagnostics.Warnings,
@@ -853,13 +1083,19 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtAssignment_IsError()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
+            """, """
+            module M M
+              func Main (Func<int,int>:src ! cw) → int
+                ! cw
+                let Func<int,int>:f ! = src
+                return 1
+            """));
 
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -869,13 +1105,19 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtAssignment_Compiles()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{cw} src
-                §R INT:1
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                let Func<int, int>:f ! cw = src
+                return 1
+            """, """
+            module M M
+              func Main (Func<int,int>:src ! cw) → int
+                ! cw
+                let Func<int,int>:f ! cw = src
+                return 1
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -887,13 +1129,19 @@ var x = 1;
     {
         // The source carries no row, so nothing is known about it. Not a
         // mismatch — an undecidable hop.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Main (Func<int, int>:src) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
+            """, """
+            module M M
+              func Main (Func<int,int>:src ! unknown) → int
+                ! cw
+                let Func<int,int>:f ! = src
+                return 1
+            """));
 
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown
@@ -912,14 +1160,21 @@ var x = 1;
         //
         // Two Calor0424s here, and both are wanted: one for the initializer
         // (site 1's first half) and one for the re-assignment.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{~f:Func<i32,i32>} §E{} src
-                §ASSIGN f src
-                §R INT:1
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                var Func<int, int>:f ! = src
+                set f src
+                return 1
+            """, """
+            module M M
+              func Main (Func<int,int>:src ! cw) → int
+                ! cw
+                var Func<int,int>:f ! = src
+                set f src
+                return 1
+            """));
 
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -929,14 +1184,21 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtReassignment_Compiles()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{~f:Func<i32,i32>} §E{cw} src
-                §ASSIGN f src
-                §R INT:1
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                var Func<int, int>:f ! cw = src
+                set f src
+                return 1
+            """, """
+            module M M
+              func Main (Func<int,int>:src ! cw) → int
+                ! cw
+                var Func<int,int>:f ! cw = src
+                set f src
+                return 1
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -951,14 +1213,21 @@ var x = 1;
         // RECEIVER typed (`this.cb`, `xs[i]`); RowSiteChecker declines those,
         // and that limit is recorded in the method's doc comment rather than
         // silently relied on.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §CL{c001:Holder:pub}
-                §FLD{Func<i32,i32>:cb:pri} §E{}
-                §MT{mt001:Set:pub} (Func<i32,i32>:src §E{cw}) -> void
-                  §E{}
-                  §ASSIGN cb src
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              class Holder
+                field Func<int, int>:cb private !
+                func Set (Func<int, int>:src ! cw) → void
+                  !
+                  set cb src
+            """, """
+            module M M
+              class Holder
+                field Func<int,int>:cb private !
+                func Set (Func<int,int>:src ! cw) → void
+                  !
+                  set cb src
+            """));
 
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -970,7 +1239,19 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtArgument_IsError()
     {
-        var result = TestHarness.Compile(ArgumentSite("§E{}"));
+        var result = TestHarness.Compile(NativeSource(ArgumentSite("§E{}"), """
+            module M M
+              func Shout (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Apply (Func<int,int>:transform !, int:value) → int
+                !
+                return value
+              func Main () → int
+                ! cw
+                return Apply(Shout, 1)
+            """));
 
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -980,7 +1261,19 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtArgument_Compiles()
     {
-        var result = TestHarness.Compile(ArgumentSite("§E{cw}"));
+        var result = TestHarness.Compile(NativeSource(ArgumentSite("§E{cw}"), """
+            module M M
+              func Shout (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Apply (Func<int,int>:transform ! cw, int:value) → int
+                !
+                return value
+              func Main () → int
+                ! cw
+                return Apply(Shout, 1)
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -991,7 +1284,19 @@ var x = 1;
     public void RowMismatch_AtArgument_CannotTell()
     {
         // No row on the parameter at all — §6.4's second message sample.
-        var result = TestHarness.Compile(ArgumentSite(""));
+        var result = TestHarness.Compile(NativeSource(ArgumentSite(""), """
+            module M M
+              func Shout (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Apply (Func<int,int>:transform ! unknown, int:value) → int
+                !
+                return value
+              func Main () → int
+                ! cw
+                return Apply(Shout, 1)
+            """));
 
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown
@@ -1002,15 +1307,15 @@ var x = 1;
 
     /// <summary>§6.4's own example, parameterised on the destination row.</summary>
     private static string ArgumentSite(string parameterRow) => $$"""
-        §M{m001:M}
-          §F{f001:Shout:pub} (i32:x) -> i32
+        §M{M}
+          §F{Shout:pub} (i32:x) -> i32
             §E{cw}
             §P x
             §R x
-          §F{f002:Apply:pub} (Func<i32,i32>:transform {{parameterRow}}, i32:value) -> i32
+          §F{Apply:pub} (Func<i32,i32>:transform {{parameterRow}}, i32:value) -> i32
             §E{}
             §R value
-          §F{f003:Main:pub} () -> i32
+          §F{Main:pub} () -> i32
             §E{cw}
             §R §C{Apply} §A Shout §A INT:1 §/C
         """;
@@ -1020,12 +1325,17 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtReturn_IsError()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
-                §E{}
-                §R src
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Pick (Func<int, int>:src ! cw) → Func<int, int> !
+                !
+                return src
+            """, """
+            module M M
+              func Pick (Func<int,int>:src ! cw) → Func<int,int> !
+                !
+                return src
+            """));
 
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -1035,12 +1345,17 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtReturn_Compiles()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{cw}
-                §E{}
-                §R src
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Pick (Func<int, int>:src ! cw) → Func<int, int> ! cw
+                !
+                return src
+            """, """
+            module M M
+              func Pick (Func<int,int>:src ! cw) → Func<int,int> ! cw
+                !
+                return src
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowMismatch
@@ -1050,12 +1365,17 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtReturn_CannotTell()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src) -> Func<i32,i32> §E{cw}
-                §E{}
-                §R src
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Pick (Func<int, int>:src) → Func<int, int> ! cw
+                !
+                return src
+            """, """
+            module M M
+              func Pick (Func<int,int>:src ! unknown) → Func<int,int> ! cw
+                !
+                return src
+            """));
 
         Assert.Contains(result.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown
@@ -1073,16 +1393,30 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtOverride_IsError()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render:pub:virt} () -> void
-                  §E{}
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render:pub:over} () -> void
-                  §E{cw}
-                  §P "laundered"
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              class Base
+                func Render virtual () → void
+                  !
+                  return
+
+              class Derived internal
+                extends Base
+
+                func Render override () → void
+                  ! cw
+                  Console.WriteLine("laundered")
+            """, """
+            module M M
+              class Base
+                func Render virtual () → void
+                  !
+              class Derived internal
+                extends Base
+                func Render override () → void
+                  ! cw
+                  System.Console.WriteLine("laundered")
+            """));
 
         var error = Assert.Single(result.Diagnostics.Errors
             .Where(d => d.Code == DiagnosticCode.OverrideEffectVariance));
@@ -1093,17 +1427,31 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtOverride_Compiles()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render:pub:virt} () -> void
-                  §E{cw,fs:w}
-                  §P "base"
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render:pub:over} () -> void
-                  §E{cw}
-                  §P "derived"
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              class Base
+                func Render virtual () → void
+                  ! cw, fs:w
+                  Console.WriteLine("base")
+
+              class Derived internal
+                extends Base
+
+                func Render override () → void
+                  ! cw
+                  Console.WriteLine("derived")
+            """, """
+            module M M
+              class Base
+                func Render virtual () → void
+                  ! cw,fs:w
+                  System.Console.WriteLine("base")
+              class Derived internal
+                extends Base
+                func Render override () → void
+                  ! cw
+                  System.Console.WriteLine("derived")
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.OverrideEffectVariance
@@ -1115,17 +1463,29 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtInterfaceImpl_IsError()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §IFACE{i001:IRenderer}
-                §MT{m002:Render} () -> void
-                  §E{}
-              §CL{c001:ConsoleRenderer:pub}
-                §IMPL{IRenderer}
-                §MT{mt001:Render:pub} () -> void
-                  §E{cw}
-                  §P "rendering"
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              interface IRenderer
+                func Render () → void
+                  !
+
+              class ConsoleRenderer
+                implements IRenderer
+
+                func Render () → void
+                  ! cw
+                  Console.WriteLine("rendering")
+            """, """
+            module M M
+              interface IRenderer
+                func Render () → void
+                  !
+              class ConsoleRenderer
+                implements IRenderer
+                func Render () → void
+                  ! cw
+                  System.Console.WriteLine("rendering")
+            """));
 
         var error = Assert.Single(result.Diagnostics.Errors
             .Where(d => d.Code == DiagnosticCode.InterfaceEffectVariance));
@@ -1136,17 +1496,29 @@ var x = 1;
     [Fact]
     public void RowMismatch_AtInterfaceImpl_Compiles()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §IFACE{i001:IRenderer}
-                §MT{m002:Render} () -> void
-                  §E{cw}
-              §CL{c001:ConsoleRenderer:pub}
-                §IMPL{IRenderer}
-                §MT{mt001:Render:pub} () -> void
-                  §E{cw}
-                  §P "rendering"
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              interface IRenderer
+                func Render () → void
+                  ! cw
+
+              class ConsoleRenderer
+                implements IRenderer
+
+                func Render () → void
+                  ! cw
+                  Console.WriteLine("rendering")
+            """, """
+            module M M
+              interface IRenderer
+                func Render () → void
+                  ! cw
+              class ConsoleRenderer
+                implements IRenderer
+                func Render () → void
+                  ! cw
+                  System.Console.WriteLine("rendering")
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.InterfaceEffectVariance
@@ -1175,19 +1547,33 @@ var x = 1;
         //
         // Discriminating revert: delete the InstantiateAndCharge call in
         // CheckArgumentSite and `UsePure` is silently charged nothing.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
-                §E{e}
-                §R x
-              §F{f002:Announce:pub} (i32:x) -> i32
-                §E{cw}
-                §P x
-                §R x
-              §F{f003:UsePure:pub} () -> i32
-                §E{}
-                §R §C{Map} §A INT:1 §A Announce §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Map <! e> (int:x, Func<int, int>:f ! e) → int
+                ! e
+                return x
+
+              func Announce (int:x) → int
+                ! cw
+                Console.WriteLine(x)
+                return x
+
+              func UsePure () → int
+                !
+                return Map(1, Announce)
+            """, """
+            module M M
+              func Map <! e> (int:x, Func<int,int>:f ! e) → int
+                ! e
+                return x
+              func Announce (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func UsePure () → int
+                !
+                return Map(1, Announce)
+            """));
 
         var reported = Assert.Single(result.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -1203,18 +1589,31 @@ var x = 1;
     {
         // The `_Compiles` half the gap pin promised: `Double` in place of
         // `Announce`, so `e := Concrete(∅)` and `Map`'s instantiated row is pure.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
-                §E{e}
-                §R x
-              §F{f002:Double:pub} (i32:x) -> i32
-                §E{}
-                §R (* x INT:2)
-              §F{f003:UsePure:pub} () -> i32
-                §E{}
-                §R §C{Map} §A INT:1 §A Double §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Map <! e> (int:x, Func<int, int>:f ! e) → int
+                ! e
+                return x
+
+              func Double (int:x) → int
+                !
+                return (x * 2)
+
+              func UsePure () → int
+                !
+                return Map(1, Double)
+            """, """
+            module M M
+              func Map <! e> (int:x, Func<int,int>:f ! e) → int
+                ! e
+                return x
+              func Double (int:x) → int
+                !
+                return x * 2
+              func UsePure () → int
+                !
+                return Map(1, Double)
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect
@@ -1229,15 +1628,24 @@ var x = 1;
         // §7.4 — "Any Unknown contributor makes e := Unknown and the site reports
         // Calor0425." Here `cb` is a function-typed parameter with NO row, so its
         // row is Unknown (§3.5) and the variable cannot be solved.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Map:pub}<eff e> (i32:x, Func<i32,i32>:f §E{e}) -> i32
-                §E{e}
-                §R x
-              §F{f003:Use:pub} (Func<i32,i32>:cb) -> i32
-                §E{}
-                §R §C{Map} §A INT:1 §A cb §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Map <! e> (int:x, Func<int, int>:f ! e) → int
+                ! e
+                return x
+
+              func Use (Func<int, int>:cb) → int
+                !
+                return Map(1, cb)
+            """, """
+            module M M
+              func Map <! e> (int:x, Func<int,int>:f ! e) → int
+                ! e
+                return x
+              func Use (Func<int,int>:cb ! unknown) → int
+                !
+                return Map(1, cb)
+            """));
 
         // P22 — §10.3's SECOND string. v0.15 SHIPPED A DIVERGENCE from the design
         // here: the doc's sample ends "'UseImpure' is charged Unknown effects",
@@ -1286,15 +1694,24 @@ var x = 1;
         //
         // Discriminating revert: compare binders by NAME and this reports that
         // 'Outer' uses effect variable 'b'.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
-                §E{b}
-                §R INT:0
-              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
-                §E{a}
-                §R §C{Inner} §A h §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Inner <! b> (Func<int>:g ! b) → int
+                ! b
+                return 0
+
+              func Outer <! a> (Func<int>:h ! a) → int
+                ! a
+                return Inner(h)
+            """, """
+            module M M
+              func Inner <! b> (Func<int>:g ! b) → int
+                ! b
+                return 0
+              func Outer <! a> (Func<int>:h ! a) → int
+                ! a
+                return Inner(h)
+            """));
 
         Assert.DoesNotContain(result.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect
@@ -1310,15 +1727,24 @@ var x = 1;
         // variable in its row, so the instantiated row mentions a variable the
         // caller has not promised. That is an undeclared effect, spelled in
         // today's Calor0410 shape.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Inner:pub}<eff b> (Func<i32>:g §E{b}) -> i32
-                §E{b}
-                §R INT:0
-              §F{f002:Outer:pub}<eff a> (Func<i32>:h §E{a}) -> i32
-                §E{}
-                §R §C{Inner} §A h §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Inner <! b> (Func<int>:g ! b) → int
+                ! b
+                return 0
+
+              func Outer <! a> (Func<int>:h ! a) → int
+                !
+                return Inner(h)
+            """, """
+            module M M
+              func Inner <! b> (Func<int>:g ! b) → int
+                ! b
+                return 0
+              func Outer <! a> (Func<int>:h ! a) → int
+                !
+                return Inner(h)
+            """));
 
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect
@@ -1341,32 +1767,48 @@ var x = 1;
         //
         // Discriminating revert: restore either AddAssumption/Report and the
         // matching DoesNotContain fails.
-        var overrideArm = TestHarness.Compile(@"
-§M{m001:Test}
-  §CL{c001:MyController:pub}
+        var overrideArm = TestHarness.Compile(NativeSource(@"
+§M{Test}
+  §CL{MyController:pub}
       §EXT{SomeExternalBase}
-      §MT{mt001:Handle:pub:over}
+      §MT{Handle:pub:over}
           §O{void}
           §E{}
-");
+", """
+            module Test Test
+              class MyController
+                extends SomeExternalBase
+                func Handle override () → void
+                  !
+            """));
         Assert.DoesNotContain(overrideArm.Diagnostics,
             d => d.Code == DiagnosticCode.AssumedEffects);
         Assert.Contains(overrideArm.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowUnknown);
 
-        var interfaceArm = TestHarness.Compile(@"
-§M{m001:ExtImpl}
-  §IFACE{i001:IQuiet}
-      §MT{m001:Run}
+        var interfaceArm = TestHarness.Compile(NativeSource(@"
+§M{ExtImpl}
+  §IFACE{IQuiet}
+      §MT{Run}
           §O{void}
           §E{}
-  §CL{c001:Bridge:pub}
+  §CL{Bridge:pub}
       §EXT{SomeExternalBase}
       §IMPL{IQuiet}
-      §MT{mt001:Other:pub}
+      §MT{Other:pub}
           §O{void}
           §E{}
-");
+", """
+            module ExtImpl ExtImpl
+              interface IQuiet
+                func Run () → void
+                  !
+              class Bridge
+                extends SomeExternalBase
+                implements IQuiet
+                func Other () → void
+                  !
+            """));
         Assert.DoesNotContain(interfaceArm.Diagnostics,
             d => d.Code == DiagnosticCode.AssumedEffects);
 
@@ -1403,19 +1845,32 @@ var x = 1;
         // Discriminating revert: delete the PropagateInstantiatedCharges call and
         // `Top` goes silent.
         const string source = """
-            §M{m001:M}
-              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §R §C{g}
-              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
-                §E{cw}
-                §R §C{Run} §A h §/C
-              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
-                §E{}
-                §R §C{Outer} §A q §/C
+            module M M block
+              func Run <! e> (Func<int>:g ! e) → int
+                ! e
+                return g()
+
+              func Outer (Func<int>:h ! cw) → int
+                ! cw
+                return Run(h)
+
+              func Top (Func<int>:q ! cw) → int
+                !
+                return Outer(q)
             """;
 
-        var strict = TestHarness.Compile(source);
+        var strict = TestHarness.Compile(NativeSource(source, """
+            module M M
+              func Run <! e> (Func<int>:g ! e) → int
+                ! e
+                return g()
+              func Outer (Func<int>:h ! cw) → int
+                ! cw
+                return Run(h)
+              func Top (Func<int>:q ! cw) → int
+                !
+                return Outer(q)
+            """));
         Assert.Contains(strict.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect
               && d.Message.Contains("Function 'Top' uses effect 'cw' but does not declare it"));
@@ -1425,7 +1880,18 @@ var x = 1;
         // policy), but the diagnostic must still FIRE. Before the fix this
         // compiled clean.
         var permissive = TestHarness.CompileWithEffects(
-            source, policy: Calor.Compiler.Effects.UnknownCallPolicy.Permissive);
+            NativeSource(source, """
+            module M M
+              func Run <! e> (Func<int>:g ! e) → int
+                ! e
+                return g()
+              func Outer (Func<int>:h ! cw) → int
+                ! cw
+                return Run(h)
+              func Top (Func<int>:q ! cw) → int
+                !
+                return Outer(q)
+            """), policy: Calor.Compiler.Effects.UnknownCallPolicy.Permissive);
         Assert.Contains(permissive.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect
               && d.Message.Contains("Function 'Top' uses effect 'cw' but does not declare it"));
@@ -1441,57 +1907,42 @@ var x = 1;
         // Discriminating revert: replace the worklist in
         // PropagateInstantiatedCharges with one sweep over the seed set and this
         // fails while the two-hop pin above still passes.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §R §C{g}
-              §F{f002:Outer:pub} (Func<i32>:h §E{cw}) -> i32
-                §E{cw}
-                §R §C{Run} §A h §/C
-              §F{f003:Top:pub} (Func<i32>:q §E{cw}) -> i32
-                §E{cw}
-                §R §C{Outer} §A q §/C
-              §F{f004:Top2:pub} (Func<i32>:r §E{cw}) -> i32
-                §E{}
-                §R §C{Top} §A r §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Run <! e> (Func<int>:g ! e) → int
+                ! e
+                return g()
+
+              func Outer (Func<int>:h ! cw) → int
+                ! cw
+                return Run(h)
+
+              func Top (Func<int>:q ! cw) → int
+                ! cw
+                return Outer(q)
+
+              func Top2 (Func<int>:r ! cw) → int
+                !
+                return Top(r)
+            """, """
+            module M M
+              func Run <! e> (Func<int>:g ! e) → int
+                ! e
+                return g()
+              func Outer (Func<int>:h ! cw) → int
+                ! cw
+                return Run(h)
+              func Top (Func<int>:q ! cw) → int
+                ! cw
+                return Outer(q)
+              func Top2 (Func<int>:r ! cw) → int
+                !
+                return Top(r)
+            """));
 
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect
               && d.Message.Contains("Function 'Top2' uses effect 'cw' but does not declare it"));
-    }
-
-    [Fact]
-    public void GenericInstantiation_AssumedRow_ReportsOnceAtTheHop()
-    {
-        // Review round 1, finding 2. §4.4: an Assumed source produces an Assumed
-        // destination and every hop that carries an assumption reports it ONCE.
-        // Site 6 was silent — a callee whose own effects could only be ASSUMED
-        // (§CS interop) flowed through the solve and the reasons were charged but
-        // never surfaced, so the caller inherited an assumption with no Calor0425
-        // naming it. The Calor0419 on `Wrapped` is a different statement: it says
-        // *that function* is assumed, not that this HOP carries the assumption.
-        //
-        // Discriminating revert: drop the IsAssumed arm in InstantiateAndCharge
-        // and only the Calor0419 remains.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Run:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §R INT:0
-              §F{f002:Wrapped:pub} () -> i32
-                §E{}
-                §R §CS{ 1 + 1 }
-              §F{f003:Caller:pub} () -> i32
-                §E{}
-                §R §C{Run} §A Wrapped §/C
-            """);
-
-        Assert.Contains(result.Diagnostics,
-            d => d.Code == DiagnosticCode.EffectRowUnknown
-              && d.Message.Contains("instantiated effect row of 'Run' at this call site rests on an assumption")
-              && d.Message.Contains("raw C# interop expression"));
     }
 
     [Fact]
@@ -1505,15 +1956,24 @@ var x = 1;
         //
         // Discriminating revert: move `if (arguments.Count == 0) return;` back
         // above the binder-count check and this goes silent.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:NoBinder:pub}<eff e> () -> i32
-                §E{e}
-                §R INT:0
-              §F{f002:Use:pub} () -> i32
-                §E{}
-                §R §C{NoBinder} §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func NoBinder <! e> () → int
+                ! e
+                return 0
+
+              func Use () → int
+                !
+                return NoBinder()
+            """, """
+            module M M
+              func NoBinder <! e> () → int
+                ! e
+                return 0
+              func Use () → int
+                !
+                return NoBinder()
+            """));
 
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowUnknown
@@ -1533,18 +1993,29 @@ var x = 1;
         //
         // Discriminating revert: compute the extras from the names again and both
         // assertions below fail.
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §IFACE{i001:IThing}
-                §MT{mt001:Handle}<eff e, eff f> (Func<i32>:next §E{f}) -> i32
-                  §E{f}
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              interface IThing
+                func Handle <! e,! f> (Func<int>:next ! f) → int
+                  ! f
 
-              §CL{c001:Impl:pub}
-                §IMPL{IThing}
-                §MT{mt002:Handle:pub}<eff f, eff e> (Func<i32>:next §E{f}) -> i32
-                  §E{f}
-                  §R INT:0
-            """);
+              class Impl
+                implements IThing
+
+                func Handle <! f,! e> (Func<int>:next ! f) → int
+                  ! f
+                  return 0
+            """, """
+            module M M
+              interface IThing
+                func Handle <! e, ! f> (Func<int>:next ! f) → int
+                  ! f
+              class Impl
+                implements IThing
+                func Handle <! f, ! e> (Func<int>:next ! f) → int
+                  ! f
+                  return 0
+            """));
 
         var reported = Assert.Single(result.Diagnostics,
             d => d.Code == DiagnosticCode.InterfaceEffectVariance);
@@ -1565,26 +2036,49 @@ var x = 1;
         // still an ERROR under --permissive-effects. Discriminating revert:
         // route Calor0424 through the policy check, or restore the
         // varianceSeverity demotion at EffectEnforcementPass.cs:517-519.
-        var assignment = Permissive("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src §E{cw}) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
-            """);
+        var assignment = Permissive(NativeSource("""
+            module M M block
+              func Main (Func<int, int>:src ! cw) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
+            """, """
+            module M M
+              func Main (Func<int,int>:src ! cw) → int
+                ! cw
+                let Func<int,int>:f ! = src
+                return 1
+            """));
         Assert.Contains(assignment.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch);
 
-        var argument = Permissive(ArgumentSite("§E{}"));
+        var argument = Permissive(NativeSource(ArgumentSite("§E{}"), """
+            module M M
+              func Shout (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Apply (Func<int,int>:transform !, int:value) → int
+                !
+                return value
+              func Main () → int
+                ! cw
+                return Apply(Shout, 1)
+            """));
         Assert.Contains(argument.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch);
 
-        var @return = Permissive("""
-            §M{m001:M}
-              §F{f001:Pick:pub} (Func<i32,i32>:src §E{cw}) -> Func<i32,i32> §E{}
-                §E{}
-                §R src
-            """);
+        var @return = Permissive(NativeSource("""
+            module M M block
+              func Pick (Func<int, int>:src ! cw) → Func<int, int> !
+                !
+                return src
+            """, """
+            module M M
+              func Pick (Func<int,int>:src ! cw) → Func<int,int> !
+                !
+                return src
+            """));
         Assert.Contains(@return.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowMismatch);
 
@@ -1592,32 +2086,58 @@ var x = 1;
         // makes --permissive-effects strictly less powerful and it is now an
         // error. No test asserted the demotion, and no committed .calr depends
         // on it.
-        var @override = Permissive("""
-            §M{m001:M}
-              §CL{c001:Base:pub}
-                §MT{mt001:Render:pub:virt} () -> void
-                  §E{}
-              §CL{c002:Derived:Base:pub}
-                §MT{mt002:Render:pub:over} () -> void
-                  §E{cw}
-                  §P "laundered"
-            """);
+        var @override = Permissive(NativeSource("""
+            module M M block
+              class Base
+                func Render virtual () → void
+                  !
+                  return
+
+              class Derived internal
+                extends Base
+
+                func Render override () → void
+                  ! cw
+                  Console.WriteLine("laundered")
+            """, """
+            module M M
+              class Base
+                func Render virtual () → void
+                  !
+              class Derived internal
+                extends Base
+                func Render override () → void
+                  ! cw
+                  System.Console.WriteLine("laundered")
+            """));
         Assert.Contains(@override.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.OverrideEffectVariance);
         Assert.DoesNotContain(@override.Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.OverrideEffectVariance);
 
-        var impl = Permissive("""
-            §M{m001:M}
-              §IFACE{i001:IRenderer}
-                §MT{m002:Render} () -> void
-                  §E{}
-              §CL{c001:ConsoleRenderer:pub}
-                §IMPL{IRenderer}
-                §MT{mt001:Render:pub} () -> void
-                  §E{cw}
-                  §P "rendering"
-            """);
+        var impl = Permissive(NativeSource("""
+            module M M block
+              interface IRenderer
+                func Render () → void
+                  !
+
+              class ConsoleRenderer
+                implements IRenderer
+
+                func Render () → void
+                  ! cw
+                  Console.WriteLine("rendering")
+            """, """
+            module M M
+              interface IRenderer
+                func Render () → void
+                  !
+              class ConsoleRenderer
+                implements IRenderer
+                func Render () → void
+                  ! cw
+                  System.Console.WriteLine("rendering")
+            """));
         Assert.Contains(impl.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.InterfaceEffectVariance);
         Assert.DoesNotContain(impl.Diagnostics.Warnings,
@@ -1632,16 +2152,28 @@ var x = 1;
         // waiver for "we do not know" is honest; a waiver for "we know it is
         // wrong" is not, and the test above is that half.
         const string source = """
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
+            module M M block
+              func Main (Func<int, int>:src) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
             """;
 
-        Assert.Contains(TestHarness.Compile(source).Diagnostics.Warnings,
+        Assert.Contains(TestHarness.Compile(NativeSource(source, """
+            module M M
+              func Main (Func<int,int>:src ! unknown) → int
+                ! cw
+                let Func<int,int>:f ! = src
+                return 1
+            """)).Diagnostics.Warnings,
             d => d.Code == DiagnosticCode.EffectRowUnknown);
-        Assert.DoesNotContain(Permissive(source).Diagnostics,
+        Assert.DoesNotContain(Permissive(NativeSource(source, """
+            module M M
+              func Main (Func<int,int>:src ! unknown) → int
+                ! cw
+                let Func<int,int>:f ! = src
+                return 1
+            """)).Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowUnknown);
     }
 
@@ -1655,13 +2187,19 @@ var x = 1;
             StrictEffects = true,
             UnsafeTranspileOnly = true,
         };
-        var result = TestHarness.Compile("""
-            §M{m001:M}
-              §F{f001:Main:pub} (Func<i32,i32>:src) -> i32
-                §E{cw}
-                §B{f:Func<i32,i32>} §E{} src
-                §R INT:1
-            """, options);
+        var result = TestHarness.Compile(NativeSource("""
+            module M M block
+              func Main (Func<int, int>:src) → int
+                ! cw
+                let Func<int, int>:f ! = src
+                return 1
+            """, """
+            module M M
+              func Main (Func<int,int>:src ! unknown) → int
+                ! cw
+                let Func<int,int>:f ! = src
+                return 1
+            """), options);
 
         Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.EffectRowUnknown);
@@ -1674,34 +2212,27 @@ var x = 1;
     {
         // §6.4's first sample, asserted as the FULL clause rather than a
         // Contains("transform"). Discriminating revert: reword any part of it.
-        var result = TestHarness.Compile(ArgumentSite("§E{}"));
+        var result = TestHarness.Compile(NativeSource(ArgumentSite("§E{}"), """
+            module M M
+              func Shout (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Apply (Func<int,int>:transform !, int:value) → int
+                !
+                return value
+              func Main () → int
+                ! cw
+                return Apply(Shout, 1)
+            """));
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors
             .Where(d => d.Code == DiagnosticCode.EffectRowMismatch));
 
         Assert.Equal(
             "Argument 'Shout' has effect row cw, which does not fit parameter 'transform' of "
-            + "'Apply' (declared row: [pure]). Extra effect(s): cw. Widen 'transform' to §E{cw}, "
+            + "'Apply' (declared row: [pure]). Extra effect(s): cw. Widen 'transform' to '! cw', "
             + "or pass a function whose row fits. An effect row that does not fit is never waived.",
-            diagnostic.Message);
-    }
-
-    [Fact]
-    public void MessageTexts_Calor0425_NamesTheRowlessPositionAndTheWaiver()
-    {
-        // §6.4's second sample. The design doc's wording says "Add §E{…} on the
-        // same line as the type … or compile with --permissive-effects", and
-        // names what an Unknown row costs the enclosing declaration.
-        var result = TestHarness.Compile(ArgumentSite(""));
-
-        var diagnostic = Assert.Single(result.Diagnostics.Warnings
-            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
-
-        Assert.Equal(
-            "Parameter 'transform' of 'Apply' is function-typed with no effect row, so its effects "
-            + "are Unknown. Add §E{…} on the same line as the type to state what callers may pass, "
-            + "or compile with --permissive-effects. Invoking a value whose row is Unknown charges "
-            + "Unknown to 'Apply'.",
             diagnostic.Message);
     }
 
@@ -1718,10 +2249,10 @@ var x = 1;
     /// <summary>The A3-callback shape (§10.1's worked example, X13) with the
     /// invoking method's own row as <paramref name="bumpRow"/>.</summary>
     private static string CallbackField(string bumpRow) => $$"""
-        §M{m001:CallbackAfter}
-          §CL{c001:Counter:pub}
-            §FLD{Action<i32>:onChange:pri} §E{cw}
-            §MT{mt001:Bump:pub} (i32:n) -> void
+        §M{CallbackAfter}
+          §CL{Counter:pub}
+            §FLD{Action<i32>:onChange:priv} §E{cw}
+            §MT{Bump:pub} (i32:n) -> void
               {{bumpRow}}
               §C{onChange} §A n §/C
         """;
@@ -1733,7 +2264,14 @@ var x = 1;
         // function-typed value WITH a row, invoked by a function that declares
         // that row, compiles with zero effect-family diagnostics. Pre-E4 this was
         // Calor0418 (A-1.11.1's A3-callback baseline: 1x at (6,7)).
-        var result = TestHarness.Compile(CallbackField("§E{cw}"));
+        var result = TestHarness.Compile(NativeSource(CallbackField("§E{cw}"), """
+            module CallbackAfter CallbackAfter
+              class Counter
+                field Action<int>:onChange private ! cw
+                func Bump (int:n) → void
+                  ! cw
+                  onChange(n)
+            """));
 
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
         Assert.DoesNotContain(result.Diagnostics, d =>
@@ -1741,6 +2279,51 @@ var x = 1;
             || d.Code == DiagnosticCode.EffectRowUnknown
             || d.Code == DiagnosticCode.EffectRowMismatch
             || d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    /// <summary>
+    /// A3-middleware's native shape: a class method passes its rowed callback to a
+    /// row-polymorphic function of a sibling module, which C# requires to be
+    /// qualified (<c>Lib.RunTwice(next)</c>). The qualified call resolves to Calor
+    /// source, so the callback is charged through RunTwice's parameter row — the
+    /// same as the bare-name call — and is verified, not assumed (no Calor0419).
+    /// The negative half pins that this is not a waiver: a caller narrower than
+    /// the instantiated row is still Calor0410.
+    /// </summary>
+    [Fact]
+    public void Invocation_QualifiedSourceCallee_ChargesTheCallbackRow_NotAnAssumption()
+    {
+        static string Source(string handleRow) => $$"""
+            module Mid Mid block
+              class Retry
+                func Handle <! e> (int:request, Func<int>:next ! e) → int
+                  {{handleRow}}
+                  return Lib.RunTwice(next)
+
+              module Lib partial
+                func RunTwice <! e> (Func<int>:g ! e) → int
+                  ! e
+                  return (g() + g())
+            """;
+
+        var verified = TestHarness.Compile(Source("! e"));
+        Assert.False(verified.HasErrors, string.Join("; ", verified.Diagnostics.Errors.Select(e => e.Message)));
+        Assert.DoesNotContain(verified.Diagnostics, d => d.Code == DiagnosticCode.AssumedEffects);
+
+        var narrowed = TestHarness.Compile(Source("!"));
+        Assert.Contains(narrowed.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+            && d.Message.Contains("RunTwice's row instantiates to e", StringComparison.Ordinal));
+
+        // A metadata receiver may still invoke the value invisibly: assumed.
+        var metadata = TestHarness.Compile("""
+            module Ext Ext block
+              module M partial
+                func Keep (Action:g ! cw, System.Collections.Generic.List<Action>:sink) → void
+                  ! cw, mut
+                  sink.Add(g)
+            """);
+        Assert.Contains(metadata.Diagnostics, d => d.Code == DiagnosticCode.AssumedEffects
+            && d.Message.Contains("passes function-typed value 'g'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1751,7 +2334,14 @@ var x = 1;
         // correction), and the doc was corrected to the emitter, not the reverse.
         // The row IS charged and the caller's under-declaration is Calor0410 —
         // never Calor0424, which has no invocation cell in §6.2.
-        var result = TestHarness.Compile(CallbackField("§E{}"));
+        var result = TestHarness.Compile(NativeSource(CallbackField("§E{}"), """
+            module CallbackAfter CallbackAfter
+              class Counter
+                field Action<int>:onChange private ! cw
+                func Bump (int:n) → void
+                  !
+                  onChange(n)
+            """));
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors
             .Where(d => d.Code == DiagnosticCode.ForbiddenEffect));
@@ -1768,22 +2358,33 @@ var x = 1;
     [Fact]
     public void MessageTexts_Calor0425_AtInvocation_NamesTheValueTheCauseAndTheWaiver()
     {
-        // E4's new string (recorded in design-doc §10.1 alongside the provenance
+        // E4's string (recorded in design-doc §10.1 alongside the provenance
         // clause), by FULL equality. X9c's shape with the row deleted — PP-E1's
-        // L7 class.
+        // L7 class. Under the 0.30 callback-row policy (D2) an OMITTED callback
+        // row is a hard Calor0407 at the declaration, so the Unknown row that
+        // reaches the invocation is the explicit `! unknown` one.
+        var omitted = TestHarness.Compile("""
+            module X9 X9 block
+              func Apply (Func<int, int>:transform, int:value) → int
+                ! cw
+                return transform(value)
+            """);
+        Assert.Contains(omitted.Diagnostics.Errors, d => d.Code == DiagnosticCode.MissingCallableEffectRow);
+        Assert.DoesNotContain(omitted.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+
         var result = TestHarness.Compile("""
-            §M{m001:X9}
-              §F{f001:Apply:pub} (Func<i32,i32>:transform, i32:value) -> i32
-                §E{cw}
-                §R §C{transform} §A value §/C
+            module X9 X9 block
+              func Apply (Func<int, int>:transform ! unknown, int:value) → int
+                ! cw
+                return transform(value)
             """);
 
         var diagnostic = Assert.Single(result.Diagnostics.Warnings
             .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
         Assert.Equal(
             "Invocation of 'transform' in 'Apply' cannot be charged: its effect row is Unknown "
-            + "(parameter 'transform' of 'Apply' (type 'Func<i32,i32>') carries no effect row). "
-            + "Add §E{…} on the same line as the type to state what 'transform' may do, or "
+            + "(parameter 'transform' of 'Apply' (type 'Func<int,int>') explicitly declares Unknown effects). "
+            + "Add ! on the same line as the type to state what 'transform' may do, or "
             + "compile with --permissive-effects. 'Apply' is charged Unknown.",
             diagnostic.Message);
         // Fail-closed: the Unknown charge is the same one an unknown external
@@ -1798,13 +2399,21 @@ var x = 1;
         // §13.1's second half of the Y9a rewrite: the inferred row of a
         // lambda-bound local is CHARGED, so a declaration narrower than it is
         // Calor0410 — with §10.1's provenance naming the local.
-        var result = TestHarness.Compile("""
-            §M{m001:Y9}
-              §F{f001:Narrow:pub} () -> void
-                §E{}
-                §B{g} §LAM{lam2} §P "hi" §/LAM{lam2}
-                §C{g} §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module Y9 Y9 block
+              func Narrow () → void
+                !
+                let g = () =>
+                  Console.WriteLine("hi")
+                g()
+            """, """
+            module Y9 Y9
+              func Narrow () → void
+                !
+                let g = () =>
+                  System.Console.WriteLine("hi")
+                g()
+            """));
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors
             .Where(d => d.Code == DiagnosticCode.ForbiddenEffect));
@@ -1814,43 +2423,27 @@ var x = 1;
     }
 
     [Fact]
-    public void Invocation_AssumedRow_ChargesTheSetAndReportsTheAssumptionOnce()
-    {
-        // §4.3's Assumed cell read at an invocation: ρ_body of the lambda is
-        // Assumed (its body is raw interop), so the invocation charges the set
-        // and reports ONE Calor0425 carrying the reason.
-        var result = TestHarness.Compile("""
-            §M{m001:Asm}
-              §F{f001:Go:pub} () -> i32
-                §E{}
-                §B{h} §LAM{l1} §R §CS{Foo.Bar()} §/LAM{l1}
-                §R §C{h} §/C
-            """);
-
-        var reported = Assert.Single(result.Diagnostics
-            .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
-        Assert.Equal(
-            "Invocation of 'h' in 'Go' is charged [assumed: pure] under an assumption: contains a "
-            + "raw C# interop expression (§CS). The row is charged as an assumption, not a proof.",
-            reported.Message);
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
-    }
-
-    [Fact]
     public void Invocation_PolymorphicRow_ChargesTheVariable_WhichTheDeclarationBinds()
     {
         // A3-middleware's `RunTwice`: `g §E{e}` invoked inside a declaration that
         // binds `e`. The row's variable part is the caller's own binder, its
         // concrete part is empty, and nothing is reported — this is what makes
         // the four A3 fixtures exit 0 with zero diagnostics (A-1.11).
-        var result = TestHarness.Compile("""
-            §M{m001:MiddlewareAfter}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:g §E{e}) -> i32
-                §E{e}
-                §B{first:i32} §C{g}
-                §B{second:i32} §C{g}
-                §R (+ first second)
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module MiddlewareAfter MiddlewareAfter block
+              func RunTwice <! e> (Func<int>:g ! e) → int
+                ! e
+                let int:first = g()
+                let int:second = g()
+                return (first + second)
+            """, """
+            module MiddlewareAfter MiddlewareAfter
+              func RunTwice <! e> (Func<int>:g ! e) → int
+                ! e
+                let int:first = g()
+                let int:second = g()
+                return first + second
+            """));
 
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message)));
         Assert.DoesNotContain(result.Diagnostics, d =>
@@ -1862,16 +2455,17 @@ var x = 1;
     [Fact]
     public void Invocation_ProvablyNonFunctionValue_IsTheResidualCalor0418_NeverWaived()
     {
+        // The message quotes the source spelling of the type ('int' in native syntax).
         // The ONE shape Calor0418 is kept for: the invoked value's type is
         // provably not a function type, so there is no row to read. An error
         // under the default policy AND under --permissive-effects — this is "we
         // know it is wrong", not "we cannot tell" (§4.5), and the binder does
-        // not catch it (measured: `§C{x}` on an i32 parameter binds clean).
+        // not catch it (measured: `x()` on an int parameter binds clean).
         const string source = """
-            §M{m001:P1}
-              §F{f001:Go:pub} (i32:x) -> i32
-                §E{}
-                §R §C{x} §/C
+            module P1 P1 block
+              func Go (int:x) → int
+                !
+                return x()
             """;
 
         foreach (var result in new[] { TestHarness.Compile(source), Permissive(source) })
@@ -1879,7 +2473,7 @@ var x = 1;
             var diagnostic = Assert.Single(result.Diagnostics.Errors
                 .Where(d => d.Code == DiagnosticCode.DelegateInvocation));
             Assert.Equal(
-                "'x' has type 'i32', which is not a function type, so invoking it cannot be "
+                "'x' has type 'int', which is not a function type, so invoking it cannot be "
                 + "charged to any effect row. Calor0418 is reported only for a value that is "
                 + "provably not a function; a function-typed value is charged through its "
                 + "effect row.",
@@ -1895,12 +2489,17 @@ var x = 1;
         // the binder does not know is not provably EITHER way, so the value is
         // Unknown (Calor0425, fails closed) rather than Calor0418. Pre-E4 this
         // drew Calor0418 "value 'cb' (declared type 'MyExternalDelegate')".
-        var result = TestHarness.Compile("""
-            §M{m001:P2}
-              §F{f001:Go:pub} (MyExternalDelegate:cb) -> void
-                §E{}
-                §C{cb} §/C
-            """);
+        var result = TestHarness.Compile(NativeSource("""
+            module P2 P2 block
+              func Go (MyExternalDelegate:cb) → void
+                !
+                cb()
+            """, """
+            module P2 P2
+              func Go (MyExternalDelegate:cb) → void
+                !
+                cb()
+            """));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
         Assert.Contains(result.Diagnostics.Warnings,
@@ -1916,14 +2515,20 @@ var x = 1;
         // DECLARED row is the value's row (§4.4), and invoking it charges that
         // row, with provenance, and reports nothing further.
         const string source = """
-            §M{m001:F15}
-              §F{f001:Main:pub} (Func<i32,i32>:opaque) -> i32
-                §E{}
-                §B{g:Func<i32,i32>} §E{cw} opaque
-                §R §C{g} §A INT:1 §/C
+            module F15 F15 block
+              func Main (Func<int, int>:opaque) → int
+                !
+                let Func<int, int>:g ! cw = opaque
+                return g(1)
             """;
 
-        var strict = TestHarness.Compile(source);
+        var strict = TestHarness.Compile(NativeSource(source, """
+            module F15 F15
+              func Main (Func<int,int>:opaque ! unknown) → int
+                !
+                let Func<int,int>:g ! cw = opaque
+                return g(1)
+            """));
         var hop = Assert.Single(strict.Diagnostics
             .Where(d => d.Code == DiagnosticCode.EffectRowUnknown));
         Assert.StartsWith("Initializer of binding 'g' has effect row [unknown]", hop.Message);
@@ -1938,7 +2543,13 @@ var x = 1;
         // 2, accepted with the answer — but the CHARGE is not a "cannot tell"
         // and survives: Calor0410 still fires (demoted, as every 0410 is under
         // the flag). The assertion is waivable; the row asserted is not.
-        var permissive = Permissive(source);
+        var permissive = Permissive(NativeSource(source, """
+            module F15 F15
+              func Main (Func<int,int>:opaque ! unknown) → int
+                !
+                let Func<int,int>:g ! cw = opaque
+                return g(1)
+            """));
         Assert.DoesNotContain(permissive.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
         Assert.Contains(permissive.Diagnostics,
             d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("charged by invoking 'g'"));
@@ -1957,18 +2568,18 @@ var x = 1;
     [InlineData(":Func<i32,i32>")]
     public void Invocation_MutableReboundToImpure_IsCaughtAtSite1_TypedAndUntyped(string declaredType)
     {
-        var result = TestHarness.Compile($$"""
-            §M{m001:F1}
-              §F{f001:Impure:pub} (i32:x) -> i32
+        var result = TestHarness.Compile(NativeMutableRebinding($$"""
+            §M{F1}
+              §F{Impure:pub} (i32:x) -> i32
                 §E{cw}
                 §P x
                 §R x
-              §F{f002:Go:pub} () -> i32
+              §F{Go:pub} () -> i32
                 §E{}
-                §B{~f{{declaredType}}} §LAM{l1:x:i32} (+ x 1) §/LAM{l1}
+                §B{~f{{declaredType}}} §LAM{x:i32} (+ x 1) §/LAM
                 §ASSIGN f Impure
                 §R §C{f} §A INT:1 §/C
-            """);
+            """, declaredType));
 
         Assert.True(result.HasErrors, "re-binding a function-valued mutable to an impure value under §E{} must fail");
         var mismatch = Assert.Single(result.Diagnostics.Errors
@@ -1976,6 +2587,35 @@ var x = 1;
         Assert.Contains("Value assigned to 'f' has effect row cw", mismatch.Message);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.DelegateInvocation);
     }
+
+    private static string NativeMutableRebinding(string original, string declaredType) => declaredType switch
+    {
+        "" => NativeSource(original, """
+            module F1 F1
+              func Impure (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Go () → int
+                !
+                var f = (int:x) => x + 1
+                set f Impure
+                return f(1)
+            """),
+        ":Func\u003Ci32,i32\u003E" => NativeSource(original, """
+            module F1 F1
+              func Impure (int:x) → int
+                ! cw
+                System.Console.WriteLine(x)
+                return x
+              func Go () → int
+                !
+                var Func<int,int>:f = (int:x) => x + 1
+                set f Impure
+                return f(1)
+            """),
+        _ => throw new ArgumentOutOfRangeException(nameof(declaredType))
+    };
 
     /// <summary>F2: two sibling branches each bind <c>f</c>; the invocation must
     /// charge the row of the <c>§B</c> the binder resolved it to, not the first
@@ -1990,17 +2630,17 @@ var x = 1;
     public void Invocation_SiblingBranchSameName_ChargesTheBoundDeclaration(
         string firstBinding, string secondBinding, bool expectCalor0410)
     {
-        var result = TestHarness.Compile($$"""
-            §M{m001:F2}
-              §F{f003:Go:pub} (bool:b, Func<i32,i32>:pure §E{}, Func<i32,i32>:impure §E{cw}) -> i32
+        var result = TestHarness.Compile(NativeSiblingBranch($$"""
+            §M{F2}
+              §F{Go:pub} (bool:b, Func<i32,i32>:pure §E{}, Func<i32,i32>:impure §E{cw}) -> i32
                 §E{}
-                §IF{if1} b
+                §IF b
                   §B{f:Func<i32,i32>} {{firstBinding}}
                   §R INT:0
                 §EL
                   §B{f:Func<i32,i32>} {{secondBinding}}
                   §R §C{f} §A INT:1 §/C
-            """);
+            """, firstBinding, secondBinding, expectCalor0410));
 
         Assert.DoesNotContain(result.Diagnostics, d =>
             d.Code == DiagnosticCode.DelegateInvocation
@@ -2018,23 +2658,54 @@ var x = 1;
         }
     }
 
-    [Fact]
-    public void Invocation_ShadowingInANestedScope_IsRejectedByTheBinder()
+    private static string NativeSiblingBranch(
+        string original, string firstBinding, string secondBinding, bool expectCalor0410) =>
+        (firstBinding, secondBinding, expectCalor0410) switch
+    {
+        ("\u00A7E{} pure", "\u00A7E{cw} impure", true) => NativeSource(original, """
+            module F2 F2
+              func Go (bool:b, Func<int,int>:pure !, Func<int,int>:impure ! cw) → int
+                !
+                if b
+                  let Func<int,int>:f ! = pure
+                  return 0
+                else
+                  let Func<int,int>:f ! cw = impure
+                  return f(1)
+            """),
+        ("\u00A7E{cw} impure", "\u00A7E{} pure", false) => NativeSource(original, """
+            module F2 F2
+              func Go (bool:b, Func<int,int>:pure !, Func<int,int>:impure ! cw) → int
+                !
+                if b
+                  let Func<int,int>:f ! cw = impure
+                  return 0
+                else
+                  let Func<int,int>:f ! = pure
+                  return f(1)
+            """),
+        _ => throw new ArgumentOutOfRangeException(nameof(firstBinding))
+    };
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Invocation_ShadowingInANestedScope_IsRejectedByTheBinder(bool initialized)
     {
         // F2's third shape. A `§B{f}` shadowing a parameter `f` in a nested
         // scope never reaches the effect pass: the binder rejects it (Calor0255)
         // and Program.Compile stops on binder errors, which is fail-closed by
         // construction. Pinned so the day the binder admits shadowing, this
         // test says the invocation charge must be re-checked for it.
-        var result = TestHarness.Compile("""
-            §M{m001:F2c}
-              §F{f003:Go:pub} (Func<i32,i32>:f §E{}) -> i32
+        var result = TestHarness.Compile(NativeShadowing($$"""
+            §M{F2c}
+              §F{Go:pub} (Func<i32,i32>:f §E{}) -> i32
                 §E{}
-                §IF{if1} true
-                  §B{f:Func<i32,i32>} §E{cw} §LAM{l2:x:i32} §P x §R x §/LAM{l2}
+                §IF true
+                  §B{f:Func<i32,i32>} §E{cw} {{(initialized ? "§LAM{x:i32} §P x §R x §/LAM" : "")}}
                   §R §C{f} §A INT:1 §/C
                 §R §C{f} §A INT:2 §/C
-            """);
+            """, initialized));
 
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.BindShadowsEnclosingScope);
         Assert.DoesNotContain(result.Diagnostics, d =>
@@ -2043,28 +2714,410 @@ var x = 1;
             || d.Code == DiagnosticCode.DelegateInvocation);
     }
 
+    private static string NativeShadowing(string original, bool initialized) => initialized switch
+    {
+        true => NativeSource(original, """
+            module F2c F2c
+              func Go (Func<int,int>:f !) → int
+                !
+                if true
+                  let Func<int,int>:f ! cw = (int:x) =>
+                    System.Console.WriteLine(x)
+                    return x
+                  return f(1)
+                return f(2)
+            """),
+        false => NativeSource(original, """
+            module F2c F2c
+              func Go (Func<int,int>:f !) → int
+                !
+                if true
+                  let Func<int,int>:f ! cw
+                  return f(1)
+                return f(2)
+            """),
+    };
+
+    [Theory]
+    [InlineData("", false, false)]
+    [InlineData("", true, false)]
+    [InlineData("", false, true)]
+    [InlineData("", true, true)]
+    [InlineData("cw", false, false)]
+    [InlineData("cw", true, false)]
+    [InlineData("cw", false, true)]
+    [InlineData("cw", true, true)]
+    public void Invocation_ExplicitBindingRow_UsesIdentifierIdentity(
+        string row, bool initialized, bool captured)
+    {
+        var source = NativeExplicitBinding($$"""
+            §M{BindingIdentity}
+              §F{Go:pub} (Func<i32,i32>:source §E{ {{row}}}) -> i32
+                §E{}
+                §B{~f:Func<i32,i32>} §E{ {{row}}} {{(initialized ? "source" : "")}}
+                {{(initialized ? "" : "§ASSIGN f source")}}
+                {{(captured ? "§B{g:Func<i32,i32>} §LAM{x:i32} §C{f} §A x §/C §/LAM" : "")}}
+                §R §C{ {{(captured ? "g" : "f")}}} §A 1 §/C
+            """, row, initialized, captured);
+        var result = TestHarness.Compile(source);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code is
+            DiagnosticCode.EffectRowUnknown or DiagnosticCode.EffectRowMismatch or DiagnosticCode.DelegateInvocation);
+        var binding = Assert.Single(Assert.Single(result.Ast!.Functions).Body.OfType<BindStatementNode>(),
+            bind => bind.Name == "f");
+        // The binding's identity is its identifier, not the statement: the native
+        // statement span also covers the type, the row and any initializer.
+        Assert.Equal("f", source.Substring(binding.IdentifierSpan.Start, binding.IdentifierSpan.Length));
+        Assert.NotEqual(binding.Span, binding.IdentifierSpan);
+        if (row.Length == 0)
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        else
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("charged by invoking 'f' (row: cw)"));
+    }
+
+    private static string NativeExplicitBinding(
+        string original, string row, bool initialized, bool captured) => (row, initialized, captured) switch
+    {
+        ("", false, false) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f !
+                set f source
+                return f(1)
+            """),
+        ("", true, false) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f ! = source
+                return f(1)
+            """),
+        ("", false, true) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f !
+                set f source
+                let Func<int,int>:g = (int:x) => f(x)
+                return g(1)
+            """),
+        ("", true, true) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f ! = source
+                let Func<int,int>:g = (int:x) => f(x)
+                return g(1)
+            """),
+        ("cw", false, false) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source ! cw) → int
+                !
+                var Func<int,int>:f ! cw
+                set f source
+                return f(1)
+            """),
+        ("cw", true, false) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source ! cw) → int
+                !
+                var Func<int,int>:f ! cw = source
+                return f(1)
+            """),
+        ("cw", false, true) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source ! cw) → int
+                !
+                var Func<int,int>:f ! cw
+                set f source
+                let Func<int,int>:g = (int:x) => f(x)
+                return g(1)
+            """),
+        ("cw", true, true) => NativeSource(original, """
+            module BindingIdentity BindingIdentity
+              func Go (Func<int,int>:source ! cw) → int
+                !
+                var Func<int,int>:f ! cw = source
+                let Func<int,int>:g = (int:x) => f(x)
+                return g(1)
+            """),
+        _ => throw new ArgumentOutOfRangeException(nameof(row))
+    };
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Invocation_RowlessBinding_OnlyAnInitializerProvidesEvidence(bool initialized)
+    {
+        var result = TestHarness.Compile(NativeRowlessBinding($$"""
+            §M{BindingUnknown}
+              §F{Go:pub} (Func<i32,i32>:source §E{}) -> i32
+                §E{}
+                §B{~f:Func<i32,i32>} {{(initialized ? "source" : "")}}
+                {{(initialized ? "" : "§ASSIGN f source")}}
+                §R §C{f} §A 1 §/C
+            """, initialized));
+
+        if (initialized)
+        {
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+            Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+        }
+        else
+        {
+            Assert.Contains(result.Diagnostics.Warnings, d => d.Code == DiagnosticCode.EffectRowUnknown
+                && d.Message.StartsWith("Invocation of 'f'", StringComparison.Ordinal));
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("'unknown'"));
+        }
+    }
+
+    private static string NativeRowlessBinding(string original, bool initialized) => initialized switch
+    {
+        false => NativeSource(original, """
+            module BindingUnknown BindingUnknown
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f
+                set f source
+                return f(1)
+            """),
+        true => NativeSource(original, """
+            module BindingUnknown BindingUnknown
+              func Go (Func<int,int>:source !) → int
+                !
+                var Func<int,int>:f = source
+                return f(1)
+            """),
+    };
+
+    [Theory]
+    [InlineData("", "cw", false)]
+    [InlineData("cw", "", false)]
+    [InlineData("", "cw", true)]
+    [InlineData("cw", "", true)]
+    public void Invocation_BareSiblingBindingsAndCapturedScopes_UseOnlyTheirOwnRow(
+        string firstRow, string secondRow, bool captured)
+    {
+        var result = TestHarness.Compile(NativeSiblingBinding($$"""
+            §M{SiblingIdentity}
+              §F{Go:pub} (bool:b, Func<i32,i32>:first §E{ {{firstRow}}}, Func<i32,i32>:second §E{ {{secondRow}}}) -> i32
+                §E{}
+                §IF b
+                  §B{~f:Func<i32,i32>} §E{ {{firstRow}}}
+                  §ASSIGN f first
+                  §R 0
+                §EL
+                  §B{~f:Func<i32,i32>} §E{ {{secondRow}}}
+                  §ASSIGN f second
+                  {{(captured ? "§B{g:Func<i32,i32>} §LAM{x:i32} §C{f} §A x §/C §/LAM" : "")}}
+                  §R §C{ {{(captured ? "g" : "f")}}} §A 1 §/C
+            """, firstRow, secondRow, captured));
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code is
+            DiagnosticCode.EffectRowUnknown or DiagnosticCode.EffectRowMismatch or DiagnosticCode.DelegateInvocation);
+        if (secondRow.Length == 0)
+            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
+        else
+            Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("charged by invoking 'f' (row: cw)"));
+    }
+
+    private static string NativeSiblingBinding(
+        string original, string firstRow, string secondRow, bool captured) => (firstRow, secondRow, captured) switch
+    {
+        ("", "cw", false) => NativeSource(original, """
+            module SiblingIdentity SiblingIdentity
+              func Go (bool:b, Func<int,int>:first !, Func<int,int>:second ! cw) → int
+                !
+                if b
+                  var Func<int,int>:f !
+                  set f first
+                  return 0
+                else
+                  var Func<int,int>:f ! cw
+                  set f second
+                  return f(1)
+            """),
+        ("cw", "", false) => NativeSource(original, """
+            module SiblingIdentity SiblingIdentity
+              func Go (bool:b, Func<int,int>:first ! cw, Func<int,int>:second !) → int
+                !
+                if b
+                  var Func<int,int>:f ! cw
+                  set f first
+                  return 0
+                else
+                  var Func<int,int>:f !
+                  set f second
+                  return f(1)
+            """),
+        ("", "cw", true) => NativeSource(original, """
+            module SiblingIdentity SiblingIdentity
+              func Go (bool:b, Func<int,int>:first !, Func<int,int>:second ! cw) → int
+                !
+                if b
+                  var Func<int,int>:f !
+                  set f first
+                  return 0
+                else
+                  var Func<int,int>:f ! cw
+                  set f second
+                  let Func<int,int>:g = (int:x) => f(x)
+                  return g(1)
+            """),
+        ("cw", "", true) => NativeSource(original, """
+            module SiblingIdentity SiblingIdentity
+              func Go (bool:b, Func<int,int>:first ! cw, Func<int,int>:second !) → int
+                !
+                if b
+                  var Func<int,int>:f ! cw
+                  set f first
+                  return 0
+                else
+                  var Func<int,int>:f !
+                  set f second
+                  let Func<int,int>:g = (int:x) => f(x)
+                  return g(1)
+            """),
+        _ => throw new ArgumentOutOfRangeException(nameof(firstRow))
+    };
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Invocation_SyntheticBindingIdentity_IsPreservedButAmbiguityIsNotEvidence(
+        bool ambiguous, bool impure)
+    {
+        var row = impure ? "cw" : "";
+        var parsed = TestHarness.Compile(NativeSyntheticBinding($$"""
+            §M{SyntheticIdentity}
+              §F{Go:pub} (bool:b, Func<i32,i32>:source §E{ {{row}}}) -> i32
+                §E{}
+                §IF b
+                  §B{~f:Func<i32,i32>} §E{}
+                  §R 0
+                §EL
+                  §B{~f:Func<i32,i32>} §E{ {{row}}}
+                  §ASSIGN f source
+                  §R §C{f} §A 1 §/C
+            """, ambiguous, impure));
+        var module = parsed.Ast!;
+        var branch = Assert.IsType<IfStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+        foreach (var statements in new[] { branch.ThenBody, branch.ElseBody! })
+        {
+            var body = Assert.IsAssignableFrom<IList<StatementNode>>(statements);
+            var bind = Assert.IsType<BindStatementNode>(body[0]);
+            body[0] = new BindStatementNode(ambiguous ? TextSpan.Empty : bind.IdentifierSpan,
+                bind.Name, bind.TypeName, bind.IsMutable, bind.Initializer, bind.Attributes, row: bind.Row);
+        }
+        var diagnostics = new DiagnosticBag();
+        new EffectEnforcementPass(diagnostics).Enforce(module);
+
+        if (ambiguous)
+        {
+            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown
+                && d.Message.Contains("more than one declaration named 'f'"));
+            Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("'unknown'"));
+        }
+        else
+        {
+            Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.EffectRowUnknown);
+            Assert.Equal(impure, diagnostics.HasErrors);
+            if (impure)
+                Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect
+                    && d.Message.Contains("charged by invoking 'f' (row: cw)"));
+        }
+    }
+
+    private static string NativeSyntheticBinding(
+        string original, bool ambiguous, bool impure) => (ambiguous, impure) switch
+    {
+        (false, false) => NativeSource(original, """
+            module SyntheticIdentity SyntheticIdentity
+              func Go (bool:b, Func<int,int>:source !) → int
+                !
+                if b
+                  var Func<int,int>:f !
+                  return 0
+                else
+                  var Func<int,int>:f !
+                  set f source
+                  return f(1)
+            """),
+        (false, true) => NativeSource(original, """
+            module SyntheticIdentity SyntheticIdentity
+              func Go (bool:b, Func<int,int>:source ! cw) → int
+                !
+                if b
+                  var Func<int,int>:f !
+                  return 0
+                else
+                  var Func<int,int>:f ! cw
+                  set f source
+                  return f(1)
+            """),
+        (true, false) => NativeSource(original, """
+            module SyntheticIdentity SyntheticIdentity
+              func Go (bool:b, Func<int,int>:source !) → int
+                !
+                if b
+                  var Func<int,int>:f !
+                  return 0
+                else
+                  var Func<int,int>:f !
+                  set f source
+                  return f(1)
+            """),
+        (true, true) => NativeSource(original, """
+            module SyntheticIdentity SyntheticIdentity
+              func Go (bool:b, Func<int,int>:source ! cw) → int
+                !
+                if b
+                  var Func<int,int>:f !
+                  return 0
+                else
+                  var Func<int,int>:f ! cw
+                  set f source
+                  return f(1)
+            """),
+    };
+
     [Fact]
     public void PolymorphicSource_IntoRowlessDestination_IsCannotTell_NotDoesNotFit()
     {
         // F6 (pre-existing since E3b, made visible by PP-E1's L7-MID mutant):
-        // `next §E{e}` passed to a parameter with NO row. §4.3 says Unknown never
-        // yields DoesNotFit on either side, so this is Calor0425 (the row-less
-        // destination message) and never a Calor0424 reading "declared row:
-        // [unknown]" with a leaked "(binder #0)".
-        var result = TestHarness.Compile("""
-            §M{m001:F6}
-              §F{f001:RunTwice:pub} (Func<i32>:g) -> i32
-                §E{}
-                §R INT:0
-              §F{f002:Handle:pub}<eff e> (Func<i32>:next §E{e}) -> i32
-                §E{e}
-                §R §C{RunTwice} §A next §/C
-            """);
+        // The historical rowless destination is explicit Unknown in current
+        // syntax. Unknown never yields DoesNotFit on either side: this is
+        // Calor0425, not Calor0424 with a leaked "(binder #0)".
+        var result = TestHarness.Compile(NativeSource("""
+            module F6 F6 block
+              func RunTwice (Func<int>:g) → int
+                !
+                return 0
+
+              func Handle <! e> (Func<int>:next ! e) → int
+                ! e
+                return RunTwice(next)
+            """, """
+            module F6 F6
+              func RunTwice (Func<int>:g ! unknown) → int
+                !
+                return 0
+              func Handle <! e> (Func<int>:next ! e) → int
+                ! e
+                return RunTwice(next)
+            """));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.EffectRowMismatch);
         Assert.Contains(result.Diagnostics.Warnings, d =>
             d.Code == DiagnosticCode.EffectRowUnknown
-            && d.Message.StartsWith("Parameter 'g' of 'RunTwice' is function-typed with no effect row", StringComparison.Ordinal));
+            && d.Message.StartsWith("Parameter 'g' of 'RunTwice' explicitly declares Unknown effects", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -2079,18 +3132,30 @@ var x = 1;
     [Fact]
     public void PropertyRow_IsParsedAndHonoured()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:PropRow}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+        var result = TestHarness.Compile(NativeSource("""
+            §M{PropRow}
+              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
                 §E{e}
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
-              §CL{c001:Holder:pub}
-                §PROP{p001:Stage:Func<i32>:pub:get,set} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
+              §CL{Holder:pub}
+                §PROP{Stage:Func<i32>:pub:get,set} §E{cw}
+                §MT{Twice:pub} () -> i32
                   §E{cw}
                   §R §C{RunTwice} §A Stage §/C
-            """);
+            """, """
+            module PropRow PropRow
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return stage() + stage()
+              class Holder
+                property Func<int>:Stage ! cw
+                  get
+                  set
+                func Twice () → int
+                  ! cw
+                  return RunTwice(Stage)
+            """));
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnexpectedToken);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -2107,18 +3172,30 @@ var x = 1;
     [Fact]
     public void PropertyRow_IsResolved_NotMerelyParsed()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:PropRow}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
+        var result = TestHarness.Compile(NativeSource("""
+            §M{PropRow}
+              §F{RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
                 §E{e}
                 §R (+ §C{stage} §/C §C{stage} §/C)
 
-              §CL{c001:Holder:pub}
-                §PROP{p001:Stage:Func<i32>:pub:get,set} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
+              §CL{Holder:pub}
+                §PROP{Stage:Func<i32>:pub:get,set} §E{cw}
+                §MT{Twice:pub} () -> i32
                   §E{}
                   §R §C{RunTwice} §A Stage §/C
-            """);
+            """, """
+            module PropRow PropRow
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return stage() + stage()
+              class Holder
+                property Func<int>:Stage ! cw
+                  get
+                  set
+                func Twice () → int
+                  !
+                  return RunTwice(Stage)
+            """));
 
         var forbidden = Assert.Single(
             result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -2135,23 +3212,42 @@ var x = 1;
     [Fact]
     public void UnnameableArgument_IsChargedUnknown_NotSilentlyDropped()
     {
-        var result = TestHarness.Compile("""
-            §M{m001:FailClosed}
-              §F{f001:RunTwice:pub}<eff e> (Func<i32>:stage §E{e}) -> i32
-                §E{e}
-                §R (+ §C{stage} §/C §C{stage} §/C)
+        var result = TestHarness.Compile(NativeSource("""
+            module FailClosed FailClosed block
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return (stage() + stage())
 
-              §CL{c001:Holder:pub}
-                §FLD{Func<i32>:stage:pri} §E{cw}
-                §MT{mt001:Twice:pub} () -> i32
-                  §E{}
-                  §R §C{RunTwice} §A this.stage §/C
-            """);
+              class Holder
+                field Func<int>:stage private ! cw
+                func Twice () → int
+                  !
+                  return RunTwice(this.stage)
+            """, """
+            module FailClosed FailClosed
+              func RunTwice <! e> (Func<int>:stage ! e) → int
+                ! e
+                return stage() + stage()
+              class Holder
+                field Func<int>:stage private ! cw
+                func Twice () → int
+                  !
+                  return RunTwice(this.stage)
+            """));
 
         Assert.Contains(
             result.Diagnostics,
             d => d.Code == DiagnosticCode.EffectRowUnknown
               && d.Message.Contains("is charged Unknown for it", StringComparison.Ordinal));
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    // Frozen inputs remain beside explicit native mirrors; negatives must reach semantics.
+    private static string NativeSource(string original, string native)
+    {
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(native, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("; ", diagnostics));
+        return native;
     }
 }

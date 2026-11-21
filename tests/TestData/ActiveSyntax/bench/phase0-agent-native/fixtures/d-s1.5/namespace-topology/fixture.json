@@ -1,0 +1,35 @@
+{
+  "featureKey": "namespace-topology",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "supportLevel": "Partial",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Get",
+  "runtimeExpectedInt": 42,
+  "currentObservation": {
+    "inputContract": "current-compiler-active-syntax",
+    "conversionMode": "lossless-project",
+    "reason": "Explicit lossless project conversion emits two native namespace files. It retains both original CLR owners without granting single-result native conversion.",
+    "fullyNative": true,
+    "nativeConversionCount": 3,
+    "requiredIssueMessage": "Feature 'namespace-topology' is partially supported. Review the recorded namespace-topology interop loss or explicitly choose lossy namespace-topology conversion",
+    "outputs": [
+      {
+        "fileName": "namespace-topology.namespace1.calr",
+        "namespace": "Alpha",
+        "clrType": "Alpha.Marker",
+        "nativeConversionCount": 1,
+        "expectedPath": "bench/phase0-agent-native/fixtures/d-s1.5/namespace-topology/expected.calr",
+        "testPath": "bench/phase0-agent-native/fixtures/d-s1.5/namespace-topology/test.calr"
+      },
+      {
+        "fileName": "namespace-topology.namespace2.calr",
+        "namespace": "Beta",
+        "clrType": "Beta.Value",
+        "nativeConversionCount": 2,
+        "expectedPath": "tests/TestData/Records/namespace-topology-expected-beta.calr.txt",
+        "testPath": "tests/TestData/Records/namespace-topology-test-beta.calr.txt"
+      }
+    ]
+  }
+}

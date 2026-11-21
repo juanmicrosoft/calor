@@ -208,7 +208,7 @@ public sealed class PartialClassMerger
 
         var merged = primary.CopyMetadataTo(new ClassDefinitionNode(
             primary.Span,
-            primary.Id,
+            primary.LocalId,
             primary.Name,
             isAbstract,
             isSealed,
@@ -236,7 +236,12 @@ public sealed class PartialClassMerger
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
             identifierSpan: primary.IdentifierSpan,
-            items: items.Count > 0 ? items : null));
+            items: items.Count > 0 ? items : null,
+            isModule: partials.Any(part => part.IsModule))
+        {
+            // One type has one implicit static initialization; its parts' rows combine.
+            StaticInitializerEffects = MergeRows(partials.Select(part => part.StaticInitializerEffects))
+        });
 
         // Tag with source files
         if (sourceFiles.Count > 0)
@@ -244,6 +249,22 @@ public sealed class PartialClassMerger
             merged.SourceFile = string.Join(", ", sourceFiles);
         }
         return merged;
+    }
+
+    private static EffectsNode? MergeRows(IEnumerable<EffectsNode?> rows)
+    {
+        var declared = rows.OfType<EffectsNode>().ToList();
+        if (declared.Count <= 1)
+            return declared.FirstOrDefault();
+        if (declared.FirstOrDefault(row => row.IsUnknown) is { } unknown)
+            return unknown;
+        var codes = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (category, values) in declared.SelectMany(row => row.Effects))
+            codes[category] = string.Join(",", (codes.TryGetValue(category, out var existing)
+                    ? existing.Split(',') : Array.Empty<string>())
+                .Concat(values.Split(',')).Select(value => value.Trim()).Where(value => value.Length > 0)
+                .Distinct(StringComparer.Ordinal));
+        return new EffectsNode(declared[0].Span, codes);
     }
 
     private static int VisibilityRank(Visibility v) => v switch
@@ -280,6 +301,11 @@ public sealed class PartialClassMerger
         var targetApplicable = GetApplicableUsings(targetModule, targetClass)
             .Select(GetUsingKey)
             .ToHashSet();
+        // A class in the module's global (namespace-less) scope takes its usings at module
+        // level, where the parser puts them (scope null). Tagging them with the global scope id
+        // duplicated the target's own usings and failed native module emission.
+        var targetScopeIsGlobal = targetModule.NamespaceScopes.Any(scope =>
+            scope.IsGlobal && scope.Id == targetClass.NamespaceScopeId);
         foreach (var usingDirective in applicable.Where(item => !item.IsGlobal))
         {
             var clone = new UsingDirectiveNode(
@@ -289,7 +315,7 @@ public sealed class PartialClassMerger
                 usingDirective.IsStatic,
                 isGlobal: false,
                 namespaceIdentity: targetClass.NamespaceIdentity,
-                namespaceScopeId: string.IsNullOrEmpty(targetClass.NamespaceScopeId)
+                namespaceScopeId: string.IsNullOrEmpty(targetClass.NamespaceScopeId) || targetScopeIsGlobal
                     ? null
                     : targetClass.NamespaceScopeId);
             if (targetApplicable.Add(GetUsingKey(clone)))

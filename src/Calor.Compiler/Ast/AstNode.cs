@@ -7,7 +7,17 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public abstract class AstNode
 {
-    public TextSpan Span { get; }
+    private TextSpan _span;
+    public TextSpan Span => _span;
+
+    internal void IncludeSpan(TextSpan span) => _span = _span.Union(span);
+
+    /// <summary>
+    /// Tooling-owned identity projected from the registered project sidecar.
+    /// Declaration LocalId values are ephemeral parser/converter handles, never source fields or durable identities.
+    /// </summary>
+    public string? ToolingId { get; internal set; }
+    internal Ids.IdKind? ToolingIdAllocationKind { get; set; }
 
     /// <summary>
     /// Fully-qualified C# namespace associated with this declaration.
@@ -37,12 +47,14 @@ public abstract class AstNode
 
     protected AstNode(TextSpan span)
     {
-        Span = span;
+        _span = span;
     }
 
     internal T CopyMetadataTo<T>(T target) where T : AstNode
     {
         ArgumentNullException.ThrowIfNull(target);
+        target.ToolingId = ToolingId;
+        target.ToolingIdAllocationKind = ToolingIdAllocationKind;
         target.NamespaceIdentity = NamespaceIdentity;
         target.NamespaceScopeId = NamespaceScopeId;
         target.FullyQualifiedSymbolIdentity = FullyQualifiedSymbolIdentity;
@@ -51,7 +63,16 @@ public abstract class AstNode
     }
 
     public virtual void Accept(IAstVisitor visitor) => AstVisitorDispatch.Visit(visitor, this);
-    public virtual T Accept<T>(IAstVisitor<T> visitor) => AstVisitorDispatch.Visit(visitor, this);
+    public virtual T Accept<T>(IAstVisitor<T> visitor)
+    {
+        var result = AstVisitorDispatch.Visit(visitor, this);
+        return visitor is IAstResultObserver<T> observer ? observer.Observe(this, result) : result;
+    }
+}
+
+internal interface IAstResultObserver<T>
+{
+    T Observe(AstNode node, T result);
 }
 
 // <generated-ast-infrastructure>
@@ -96,20 +117,12 @@ public interface IAstVisitor
     void Visit(RecordCreationNode node);
     void Visit(FieldAssignmentNode node);
     void Visit(FieldAccessNode node);
-    void Visit(SomeExpressionNode node);
-    void Visit(NoneExpressionNode node);
-    void Visit(OkExpressionNode node);
-    void Visit(ErrExpressionNode node);
     void Visit(MatchExpressionNode node);
     void Visit(MatchStatementNode node);
     void Visit(MatchCaseNode node);
     void Visit(WildcardPatternNode node);
     void Visit(VariablePatternNode node);
     void Visit(LiteralPatternNode node);
-    void Visit(SomePatternNode node);
-    void Visit(NonePatternNode node);
-    void Visit(OkPatternNode node);
-    void Visit(ErrPatternNode node);
     void Visit(RequiresNode node);
     void Visit(EnsuresNode node);
     void Visit(InvariantNode node);
@@ -218,6 +231,7 @@ public interface IAstVisitor
     void Visit(FallbackExpressionNode node);
     void Visit(FallbackCommentNode node);
     void Visit(TypeOfExpressionNode node);
+    void Visit(OverflowContextExpressionNode node);
     void Visit(NameOfExpressionNode node);
     void Visit(ExpressionCallNode node);
     void Visit(YieldReturnStatementNode node);
@@ -285,20 +299,12 @@ public interface IAstVisitor<T>
     T Visit(RecordCreationNode node);
     T Visit(FieldAssignmentNode node);
     T Visit(FieldAccessNode node);
-    T Visit(SomeExpressionNode node);
-    T Visit(NoneExpressionNode node);
-    T Visit(OkExpressionNode node);
-    T Visit(ErrExpressionNode node);
     T Visit(MatchExpressionNode node);
     T Visit(MatchStatementNode node);
     T Visit(MatchCaseNode node);
     T Visit(WildcardPatternNode node);
     T Visit(VariablePatternNode node);
     T Visit(LiteralPatternNode node);
-    T Visit(SomePatternNode node);
-    T Visit(NonePatternNode node);
-    T Visit(OkPatternNode node);
-    T Visit(ErrPatternNode node);
     T Visit(RequiresNode node);
     T Visit(EnsuresNode node);
     T Visit(InvariantNode node);
@@ -407,6 +413,7 @@ public interface IAstVisitor<T>
     T Visit(FallbackExpressionNode node);
     T Visit(FallbackCommentNode node);
     T Visit(TypeOfExpressionNode node);
+    T Visit(OverflowContextExpressionNode node);
     T Visit(NameOfExpressionNode node);
     T Visit(ExpressionCallNode node);
     T Visit(YieldReturnStatementNode node);
@@ -481,20 +488,12 @@ public static class AstSchemaMetadata
         Create<RecordCreationNode>("TypeNodes.cs"),
         Create<FieldAssignmentNode>("TypeNodes.cs"),
         Create<FieldAccessNode>("TypeNodes.cs"),
-        Create<SomeExpressionNode>("TypeNodes.cs"),
-        Create<NoneExpressionNode>("TypeNodes.cs"),
-        Create<OkExpressionNode>("TypeNodes.cs"),
-        Create<ErrExpressionNode>("TypeNodes.cs"),
         Create<MatchExpressionNode>("PatternNodes.cs"),
         Create<MatchStatementNode>("PatternNodes.cs"),
         Create<MatchCaseNode>("PatternNodes.cs"),
         Create<WildcardPatternNode>("PatternNodes.cs"),
         Create<VariablePatternNode>("PatternNodes.cs"),
         Create<LiteralPatternNode>("PatternNodes.cs"),
-        Create<SomePatternNode>("PatternNodes.cs"),
-        Create<NonePatternNode>("PatternNodes.cs"),
-        Create<OkPatternNode>("PatternNodes.cs"),
-        Create<ErrPatternNode>("PatternNodes.cs"),
         Create<RequiresNode>("ContractNodes.cs"),
         Create<EnsuresNode>("ContractNodes.cs"),
         Create<InvariantNode>("ContractNodes.cs"),
@@ -603,6 +602,7 @@ public static class AstSchemaMetadata
         Create<FallbackExpressionNode>("ExpressionNodes.cs"),
         Create<FallbackCommentNode>("StatementNodes.cs"),
         Create<TypeOfExpressionNode>("ModernOperatorNodes.cs"),
+        Create<OverflowContextExpressionNode>("ModernOperatorNodes.cs"),
         Create<NameOfExpressionNode>("ModernOperatorNodes.cs"),
         Create<ExpressionCallNode>("ModernOperatorNodes.cs"),
         Create<YieldReturnStatementNode>("ControlFlowNodes.cs"),
@@ -711,20 +711,12 @@ internal static class AstVisitorDispatch
             case RecordCreationNode typed: visitor.Visit(typed); return;
             case FieldAssignmentNode typed: visitor.Visit(typed); return;
             case FieldAccessNode typed: visitor.Visit(typed); return;
-            case SomeExpressionNode typed: visitor.Visit(typed); return;
-            case NoneExpressionNode typed: visitor.Visit(typed); return;
-            case OkExpressionNode typed: visitor.Visit(typed); return;
-            case ErrExpressionNode typed: visitor.Visit(typed); return;
             case MatchExpressionNode typed: visitor.Visit(typed); return;
             case MatchStatementNode typed: visitor.Visit(typed); return;
             case MatchCaseNode typed: visitor.Visit(typed); return;
             case WildcardPatternNode typed: visitor.Visit(typed); return;
             case VariablePatternNode typed: visitor.Visit(typed); return;
             case LiteralPatternNode typed: visitor.Visit(typed); return;
-            case SomePatternNode typed: visitor.Visit(typed); return;
-            case NonePatternNode typed: visitor.Visit(typed); return;
-            case OkPatternNode typed: visitor.Visit(typed); return;
-            case ErrPatternNode typed: visitor.Visit(typed); return;
             case RequiresNode typed: visitor.Visit(typed); return;
             case EnsuresNode typed: visitor.Visit(typed); return;
             case InvariantNode typed: visitor.Visit(typed); return;
@@ -833,6 +825,7 @@ internal static class AstVisitorDispatch
             case FallbackExpressionNode typed: visitor.Visit(typed); return;
             case FallbackCommentNode typed: visitor.Visit(typed); return;
             case TypeOfExpressionNode typed: visitor.Visit(typed); return;
+            case OverflowContextExpressionNode typed: visitor.Visit(typed); return;
             case NameOfExpressionNode typed: visitor.Visit(typed); return;
             case ExpressionCallNode typed: visitor.Visit(typed); return;
             case YieldReturnStatementNode typed: visitor.Visit(typed); return;
@@ -908,20 +901,12 @@ internal static class AstVisitorDispatch
             RecordCreationNode typed => visitor.Visit(typed),
             FieldAssignmentNode typed => visitor.Visit(typed),
             FieldAccessNode typed => visitor.Visit(typed),
-            SomeExpressionNode typed => visitor.Visit(typed),
-            NoneExpressionNode typed => visitor.Visit(typed),
-            OkExpressionNode typed => visitor.Visit(typed),
-            ErrExpressionNode typed => visitor.Visit(typed),
             MatchExpressionNode typed => visitor.Visit(typed),
             MatchStatementNode typed => visitor.Visit(typed),
             MatchCaseNode typed => visitor.Visit(typed),
             WildcardPatternNode typed => visitor.Visit(typed),
             VariablePatternNode typed => visitor.Visit(typed),
             LiteralPatternNode typed => visitor.Visit(typed),
-            SomePatternNode typed => visitor.Visit(typed),
-            NonePatternNode typed => visitor.Visit(typed),
-            OkPatternNode typed => visitor.Visit(typed),
-            ErrPatternNode typed => visitor.Visit(typed),
             RequiresNode typed => visitor.Visit(typed),
             EnsuresNode typed => visitor.Visit(typed),
             InvariantNode typed => visitor.Visit(typed),
@@ -1030,6 +1015,7 @@ internal static class AstVisitorDispatch
             FallbackExpressionNode typed => visitor.Visit(typed),
             FallbackCommentNode typed => visitor.Visit(typed),
             TypeOfExpressionNode typed => visitor.Visit(typed),
+            OverflowContextExpressionNode typed => visitor.Visit(typed),
             NameOfExpressionNode typed => visitor.Visit(typed),
             ExpressionCallNode typed => visitor.Visit(typed),
             YieldReturnStatementNode typed => visitor.Visit(typed),

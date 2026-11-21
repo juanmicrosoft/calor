@@ -276,6 +276,7 @@ public sealed class ManifestLoader
             ValidateMethodEffects(mapping.Methods, $"{source.FilePath}: {mapping.Type}", errors);
             ValidateMethodEffects(mapping.Getters, $"{source.FilePath}: {mapping.Type} getters", errors);
             ValidateMethodEffects(mapping.Setters, $"{source.FilePath}: {mapping.Type} setters", errors);
+            ValidateMethodEffects(mapping.Fields, $"{source.FilePath}: {mapping.Type} fields", errors);
             ValidateMethodEffects(mapping.Constructors, $"{source.FilePath}: {mapping.Type} constructors", errors);
         }
 
@@ -310,7 +311,8 @@ public sealed class ManifestLoader
     }
 
     private static bool IsValidEffectCode(string code)
-        => EffectCodes.IsKnownCompactCode(code);
+        => EffectCodes.IsKnownCompactCode(code)
+            || string.Equals(code, EffectResolver.UnknownManifestCode, StringComparison.Ordinal);
 
     /// <summary>The variable that relocates Calor's user-level directory (normally <c>~/.calor</c>).</summary>
     internal const string CalorHomeVariable = "CALOR_HOME";

@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 using Microsoft.CodeAnalysis;
@@ -234,13 +235,13 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     {
         var (calor, _) = await Convert(Source("F2-INTERP-02"), surface);
         output.WriteLine(calor);
-        Assert.Contains("§B{FormattableString:f} (cast global::System.FormattableString \"x=${x}\")", calor);
-        Assert.Contains("§B{IFormattable:g} (cast global::System.IFormattable \"y=${x:D3}\")", calor);
-        Assert.Contains("§C{FormattableString.Invariant} (cast global::System.FormattableString \"${1.5}\")", calor);
-        Assert.Contains("(cast global::System.FormattableString \"k=${x}\")", calor);
+        Assert.Contains("let FormattableString:f = ((global::System.FormattableString)\"x=${x}\")", calor);
+        Assert.Contains("let IFormattable:g = ((global::System.IFormattable)\"y=${x:D3}\")", calor);
+        Assert.Contains("FormattableString.Invariant(((global::System.FormattableString)\"${1.5}\"))", calor);
+        Assert.Contains("((global::System.FormattableString)\"k=${x}\")", calor);
 
         (calor, _) = await Convert(Source("F2-INTERP-01"), surface);
-        Assert.DoesNotContain("(cast", calor);
+        Assert.DoesNotContain("(global::System.FormattableString)", calor);
     }
 
     [Theory]
@@ -366,28 +367,93 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
         Assert.Equal(expected, Execute(compilation.GeneratedCode));
     }
 
-    [Fact]
-    public void NativeHole_StringArgumentWithACSharpOnlyEscape_StaysRaw()
+    [Theory]
+    [InlineData("null", false)]
+    [InlineData("null", true)]
+    [InlineData("default(bool)", false)]
+    [InlineData("default(bool)", true)]
+    public void StandaloneScalarHole_ConvertsNativelyAndPassesStrictEffects(string expression, bool initializer)
     {
-        // Review round 2: Calor keeps "\x41" as four characters; C# reads "A". Not lifted.
-        const string calor = """
-            §M{m001:InterpEscape}
-              §F{f001:Show:pub} () -> str
-                §R "${String.Concat("\x41")}"
+        var interpolation = "$\"value={" + expression + "}\"";
+        var member = initializer ? "private static string Text = " + interpolation + ";" : "";
+        var returned = initializer ? "Text" : interpolation;
+        var source = $$"""
+            #nullable enable
+            public class ScalarHole
+            {
+                {{member}}
+                public static string Render() { return {{returned}}; }
+            }
             """;
-        var result = Program.Compile(calor, "f2-escape-arg.calr",
-            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
-        Assert.Contains("String.Concat(\"\\x41\")", result.GeneratedCode);
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        Assert.Equal(0, conversion.InteropPreservationCount);
+        Assert.Empty(conversion.Losses);
+
+        foreach (var typing in new[] { false, true })
+        {
+            var result = Program.Compile(conversion.CalorSource!, "standalone-scalar-hole.calr",
+                new CompilationOptions
+                {
+                    EnableTypeChecking = typing,
+                    EnforceEffects = true,
+                    StrictEffects = true,
+                    UnknownCallPolicy = UnknownCallPolicy.Strict,
+                    UnsafeTranspileOnly = false,
+                    VerifyContracts = false,
+                    StatusWriter = TextWriter.Null
+                });
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert.Empty(result.Diagnostics);
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("null /* scalar-marker */")]
+    [InlineData("default(/* scalar-marker */bool)")]
+    public void StandaloneScalarHole_CommentsRetainThePreservationBoundary(string expression)
+    {
+        var source = $$"""
+            #nullable enable
+            public class ScalarHole
+            {
+                public static string Render() { return $"value={{{expression}}}"; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        Assert.NotEqual(0, conversion.InteropPreservationCount);
+        Assert.Contains("/* scalar-marker */", conversion.CalorSource);
+    }
+
+    [Theory]
+    [InlineData("default(/** scalar-marker */bool)")]
+    [InlineData("default(\n/** scalar-marker */\nbool)")]
+    [InlineData("\n/** scalar-marker */\nnull")]
+    public void StandaloneScalarHole_DocumentationCommentsRetainThePreservationBoundary(string expression)
+    {
+        var source = $$"""
+            #nullable enable
+            public class ScalarHole
+            {
+                public static string Render() { return $"value={{{expression}}}"; }
+            }
+            """;
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Issues));
+        Assert.NotEqual(0, conversion.InteropPreservationCount);
+        Assert.Contains(expression, conversion.CalorSource);
     }
 
     [Fact]
     public void NativeHole_StringArgumentWithDollarBrace_StaysLiteral()
     {
         const string calor = """
-            §M{m001:InterpLiteralArg}
-              §F{f001:Show:pub} (i32:x) -> str
-                §R "${String.Concat("${x}")}"
+            module InterpLiteralArg InterpLiteralArg block
+              func Show (int:x) → string
+                !
+                return "${String.Concat("\${x}")}"
             """;
         var result = Program.Compile(calor, "f2-literal-arg.calr",
             new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
@@ -419,27 +485,29 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void UndefinedHoleName_IsReportedAtTheHole()
     {
         const string calor = """
-            §M{m001:InterpBinding}
-              §F{f001:Show:pub} (i32:n) -> str
-                §R "value=${nope}"
+            module InterpBinding InterpBinding block
+              func Show (int:n) → string
+                !
+                return "value=${nope}"
             """;
         var result = Program.Compile(calor, "f2-interp-05.calr");
         var error = Assert.Single(result.Diagnostics.Errors, d => d.Code == "Calor0200");
-        Assert.Equal((3, 17), (error.Span.Line, error.Span.Column));
+        Assert.Equal((4, 21), (error.Span.Line, error.Span.Column));
     }
 
     [Fact]
     public void HoleDiagnostic_OnALaterLine_KeepsItsLineAndColumn()
     {
         const string calor = """
-            §M{m001:InterpBinding}
-              §F{f001:Show:pub} (i32:n) -> str
-                §B{str:a} "first ${n}"
-                §R "x=${n} y=${(+ n missing)}"
+            module InterpBinding InterpBinding block
+              func Show (int:n) → string
+                !
+                let string:a = "first ${n}"
+                return "x=${n} y=${(n + missing)}"
             """;
         var result = Program.Compile(calor, "f2-interp-05b.calr");
         var error = Assert.Single(result.Diagnostics.Errors, d => d.Code == "Calor0200");
-        Assert.Equal((4, 25), (error.Span.Line, error.Span.Column));
+        Assert.Equal((5, 29), (error.Span.Line, error.Span.Column));
     }
 
     // F2-INTERP-06: a call hole is analyzed as a call. A pure function that reads the console
@@ -448,10 +516,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void CallHole_InAPureFunction_IsAnUndeclaredEffect()
     {
         const string calor = """
-            §M{m001:InterpEffects}
-              §F{f001:Greet:pub} () -> str
-                §E{}
-                §R "hello ${Console.ReadLine()}"
+            module InterpEffects InterpEffects block
+              func Greet () → string
+                !
+                return "hello ${Console.ReadLine()}"
             """;
         var result = Program.Compile(calor, "f2-interp-06.calr");
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == "Calor0410" && d.Message.Contains("'cr'"));
@@ -462,10 +530,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     public void CallHole_WithTheDeclaredEffect_Compiles()
     {
         const string calor = """
-            §M{m001:InterpEffects}
-              §F{f001:Greet:pub} () -> str
-                §E{cr}
-                §R "hello ${Console.ReadLine()} ${Math.Max(1, 2)}"
+            module InterpEffects InterpEffects block
+              func Greet () → string
+                ! cr
+                return "hello ${Console.ReadLine()} ${Math.Max(1, 2)}"
             """;
         var result = Program.Compile(calor, "f2-interp-06b.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
@@ -474,26 +542,31 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void CallHole_ThatCannotBeLifted_StillReportsAssumedEffects()
+    public void NamedCallHole_IsAnalyzedNativelyAndExecutes()
     {
-        // Negative control: a named argument keeps the hole raw C#; it must not become pure.
         const string calor = """
-            §M{m001:InterpEffects}
-              §F{f001:Show:pub} (i32:n) -> str
-                §E{}
-                §R "v=${Math.Max(val1: n, val2: 3)}"
+            module InterpEffects InterpEffects block
+              class Probe
+                func Run static () → string
+                  !
+                  let int:n = 1
+                  let int:higher = 5
+                  return "v=${Math.Max(val1: n, val2: 3)}|v=${Math.Max(val1: higher, val2: 3)}"
             """;
-        var result = Program.Compile(calor, "f2-interp-06c.calr");
-        Assert.Contains(result.Diagnostics, d => d.Code == "Calor0419");
+        var result = Program.Compile(calor, "f2-interp-named.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "Calor0419");
+        Assert.Equal("v=3|v=5", Execute(result.GeneratedCode));
     }
 
     [Fact]
     public void NameofHole_IsNotTreatedAsACall()
     {
         const string calor = """
-            §M{m001:InterpNameof}
-              §F{f001:Show:pub} (i32:n) -> str
-                §R "${nameof(n)}=${n}"
+            module InterpNameof InterpNameof block
+              func Show (int:n) → string
+                !
+                return "${nameof(n)}=${n}"
             """;
         var result = Program.Compile(calor, "f2-interp-nameof.calr");
         Assert.DoesNotContain(result.Diagnostics, d => d.Code is "Calor0411" or "Calor0410");
@@ -505,9 +578,10 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
     {
         // F2-INTERP-04 negative control at the compiler: an escaped \${x} is text, not a hole.
         const string calor = """
-            §M{m001:Literal}
-              §F{f001:Show:pub} (i32:x) -> str
-                §R "\${x}|{x}"
+            module Literal Literal block
+              func Show (int:x) → string
+                !
+                return "\${x}|{x}"
             """;
         var result = Program.Compile(calor, "f2-interp-04.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
@@ -520,7 +594,7 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
         {
             var options = ConvertCommand.BuildCSharpToCalorOptions(
                 benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: false, explicitCallClosers: false);
+                passthrough: false);
             var result = new CSharpToCalorConverter(options).Convert(source);
             Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
             return (result.CalorSource!, result.Losses.Any(loss => loss.Kind == ConversionLossKind.InteropPreserved));

@@ -65,7 +65,7 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         // Mutable binding should use ~ prefix
-        Assert.Contains("~name", calor);
+        Assert.Contains("var name", calor);
         // Should not contain :const
         Assert.DoesNotContain(":const", calor);
     }
@@ -87,7 +87,7 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         // Should have tilde prefix for mutable, with type
-        Assert.Contains("~name", calor);
+        Assert.Contains("var string:name", calor);
         Assert.DoesNotContain(":const", calor);
     }
 
@@ -96,7 +96,7 @@ public class Test
     #region Bug 2: Chained call with built-in hoists to temp bind
 
     [Fact]
-    public void Converter_ChainedCallWithBuiltin_HoistsToTempBind()
+    public void Converter_ChainedCallWithBuiltin_UsesComputedTarget()
     {
         var csharp = @"
 public class Test
@@ -108,18 +108,16 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        // The built-in ToLower() is hoisted to a temp bind, GetHashCode called on temp
-        Assert.Contains("_chain", calor);
+        Assert.DoesNotContain("_chain", calor);
+        Assert.Contains("(obj).ToLower()", calor);
         Assert.Contains("GetHashCode", calor);
         // Should NOT contain the broken CalorEmitter serialization pattern
         Assert.DoesNotContain("§C{(§C{", calor);
     }
 
     [Fact]
-    public void Converter_DeeperChainWithMultipleBuiltins_HoistsToTempBinds()
+    public void Converter_DeeperChainWithMultipleBuiltins_UsesComputedTarget()
     {
-        // When multiple built-in operations are chained (e.g., ToLower().Trim()),
-        // each built-in is hoisted to a temp bind
         var csharp = @"
 public class Test
 {
@@ -130,8 +128,7 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        // Chain is decomposed via temp binds
-        Assert.Contains("_chain", calor);
+        Assert.DoesNotContain("_chain", calor);
         Assert.Contains("GetHashCode", calor);
         // Should NOT contain the broken CalorEmitter serialization pattern
         Assert.DoesNotContain("§C{(§C{", calor);
@@ -260,8 +257,8 @@ public class Test
     public void Parser_StModifier_OnClass_SetsIsStatic()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:st}";
+module Test Test block
+  module Helper internal";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.True(cls.IsStatic);
@@ -271,9 +268,11 @@ public class Test
     public void Parser_StModifier_OnMethod_SetsIsStatic()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper}
-    §MT{m1:Greet:pub:st}";
+module Test Test block
+  class Helper internal
+    func Greet static ()
+      !
+      return";
         var module = ParseModule(source);
         var method = module.Classes[0].Methods[0];
         Assert.True(method.Modifiers.HasFlag(Calor.Compiler.Ast.MethodModifiers.Static));
@@ -283,8 +282,8 @@ public class Test
     public void Parser_StModifier_OnClass_EmitsStaticInCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Helper:st}";
+module Test Test block
+  module Helper internal";
         var csharp = ParseAndEmit(source);
         Assert.Contains("static class Helper", csharp);
     }
@@ -406,11 +405,11 @@ public class Test
     public void TypeMapper_DecRoundtripsToDecimal()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Calc}
-    §MT{m1:GetPrice:pub}
-        §O{dec}
-        §R 0";
+module Test Test block
+  class Calc internal
+    func GetPrice () → decimal
+      !
+      return 0";
         var csharp = ParseAndEmit(source);
         Assert.Contains("decimal", csharp);
     }
@@ -423,10 +422,11 @@ public class Test
     public void Parser_NewExpression_EmptyParens_ParsesWithoutError()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:Create:pub}
-        §R §NEW{MyClass}()§/NEW";
+module Test Test block
+  class MyClass internal
+    func Create ()
+      !
+      return new MyClass()";
         var module = ParseModule(source);
         Assert.NotNull(module);
     }
@@ -435,15 +435,17 @@ public class Test
     public void Parser_NewExpression_EmptyParens_EquivalentToWithout()
     {
         var sourceWithParens = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:Create:pub}
-        §R §NEW{MyClass}()§/NEW";
+module Test Test block
+  class MyClass internal
+    func Create ()
+      !
+      return new MyClass()";
         var sourceWithout = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:Create:pub}
-        §R §NEW{MyClass}§/NEW";
+module Test Test block
+  class MyClass internal
+    func Create ()
+      !
+      return new MyClass()";
         var csharp1 = ParseAndEmit(sourceWithParens);
         var csharp2 = ParseAndEmit(sourceWithout);
 
@@ -455,24 +457,23 @@ public class Test
     #region Edge cases: st + struct interaction
 
     [Fact]
-    public void Parser_StStruct_DoesNotProduceStaticStruct()
+    public void Parser_StaticStructDeclaration_IsRejected()
     {
-        // "st struct" should parse as static struct, not double-stat
         var source = @"
-§M{m1:Test}
-  §CL{c1:Point:st struct}";
-        var module = ParseModule(source);
-        var cls = Assert.Single(module.Classes);
-        Assert.True(cls.IsStatic, "Should be static");
-        Assert.True(cls.IsStruct, "Should be struct");
+module Test Test block
+  class Point internal static struct";
+        var result = Program.Compile(source, "static-struct.calr");
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.InvalidModifier
+            && diagnostic.Message.Contains("Static class declarations are removed", StringComparison.Ordinal));
     }
 
     [Fact]
     public void Parser_StructAlone_IsNotStatic()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:Point:struct}";
+module Test Test block
+  class Point internal struct";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         Assert.False(cls.IsStatic, "struct alone should not be static");
@@ -487,10 +488,11 @@ public class Test
     public void Parser_NewExpression_EmptyParens_WithTrailingMemberAccess()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyClass}
-    §MT{m1:GetName:pub}
-        §R §NEW{MyClass}()§/NEW.ToString";
+module Test Test block
+  class MyClass internal
+    func GetName ()
+      !
+      return new MyClass() . ToString";
         var csharp = ParseAndEmit(source);
         // Should produce new MyClass().ToString() in the output
         Assert.Contains("new MyClass()", csharp);
@@ -632,9 +634,9 @@ public class Test
         var calor = emitter.Emit(result.Ast!);
 
         // Must NOT fall back to interop
-        Assert.DoesNotContain("§CSHARP", calor);
+        RawFrameAssertions.AssertFramed(calor, present: false);
         // Must contain native Calor base call with interpolation
-        Assert.Contains("§BASE", calor);
+        Assert.Contains("base(", calor);
         Assert.Contains("${kind}", calor);
         Assert.Contains("${functionId}", calor);
     }
@@ -847,14 +849,13 @@ public class Test
     {
         // §K Status.OK in Calor source should parse correctly and emit Status.OK in C#
         var source = @"
-§M{m1:Test}
-  §F{f001:Describe:pub}
-      §I{i32:status}
-      §O{str}
-      §R §W{m1} status
-          §K Status.OK → ""ok""
-          §K Status.Error → ""error""
-          §K _ → ""unknown""
+module Test Test block
+  func Describe (int:status) → string
+    !
+    return match status
+      case Status.OK → ""ok""
+      case Status.Error → ""error""
+      case _ → ""unknown""
 ";
         var result = ParseAndEmit(source);
 
@@ -897,10 +898,10 @@ public class Test
     public void IDX_SimpleRef_ParsesAndEmitsValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~result:str} §IDX{words} 0
+module Test Test block
+  func Main () → void
+    !
+    var string:result = words[0]
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("words[0]", result);
@@ -918,7 +919,7 @@ public class Test
         var calorEmitter = new CalorEmitter();
         var calorOutput = arrayAccess.Accept(calorEmitter);
 
-        Assert.Equal("§IDX{words} 0", calorOutput);
+        Assert.Equal("words[0]", calorOutput);
     }
 
     [Fact]
@@ -955,8 +956,9 @@ public class Test
         var calor = ConvertToCalor(csharp);
         Assert.NotNull(calor);
 
-        // Lambda should be hoisted to a temp binding
-        Assert.Contains("_lam", calor);
+        // 0.30: a native lambda is an inline expression, so it stays in the call argument.
+        Assert.Contains("return (numbers.Select((int:x) => (x * 2))).ToArray()", calor);
+        Assert.DoesNotContain("_lam", calor);
     }
 
     [Fact]
@@ -974,8 +976,9 @@ public class Test
         var calor = ConvertToCalor(csharp);
         Assert.NotNull(calor);
 
-        // Both lambdas should be hoisted
-        Assert.Contains("_lam", calor);
+        // 0.30: both lambdas stay inline in the chain.
+        Assert.Contains("(numbers.Where((int:x) => (x > 0))).Select((int:x) => (x * 2)).ToArray()", calor);
+        Assert.DoesNotContain("_lam", calor);
     }
 
     [Fact]
@@ -1051,15 +1054,18 @@ public class Test
             }
             """;
 
-        // Depth > 2 ternary chains are decomposed into if/else with a result variable
+        // 0.30: native conditionals nest inline, so a deep ternary chain is no longer
+        // decomposed into if/else with a `_ternResult` variable.
         var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
         var emitter = new CalorEmitter();
         var calor = emitter.Emit(result.Ast!);
-        Assert.Contains(">= score 90", calor);
-        Assert.Contains("§IF", calor);
-        Assert.Contains("_ternResult", calor);
+        Assert.Contains("return ((score >= 90) ? 4 : ((score >= 80) ? 3 : ((score >= 70) ? 2 : 1)))", calor);
+        Assert.DoesNotContain("_ternResult", calor);
+        var compiled = Program.Compile(calor, "ternary.calr",
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
     }
 
     [Fact]
@@ -1118,13 +1124,11 @@ public class Test
     public void CalorParser_TernaryLispSyntax_ParsesCorrectly()
     {
         var calor = """
-            §M{m001:TestModule}
-                §CL{c001:Test}
-                    §MT{m001:Max:pub}
-                        §I{i32:a}
-                        §I{i32:b}
-                        §O{i32}
-                        §R (? (> a b) a b)
+            module TestModule TestModule block
+              class Test internal
+                func Max (int:a, int:b) → int
+                  !
+                  return ((a > b) ? a : b)
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1162,8 +1166,8 @@ public class Test
         var calor = ConvertToCalor(csharp);
 
         // Lock is now converted to §SYNC block with body inside
-        var syncIdx = calor.IndexOf("§SYNC{");
-        var bindIdx = calor.IndexOf("§B{", syncIdx > 0 ? syncIdx : 0);
+        var syncIdx = calor.IndexOf("lock ");
+        var bindIdx = calor.IndexOf("let ", syncIdx > 0 ? syncIdx : 0);
         Assert.True(syncIdx >= 0, "§SYNC block not found");
         Assert.True(bindIdx > syncIdx, "Body statement should appear inside §SYNC block");
         Assert.DoesNotContain("§/SYNC{", calor);
@@ -1188,7 +1192,7 @@ public class Test
 
         // The checked comment should appear before the body
         var commentIdx = calor.IndexOf("checked");
-        var bindIdx = calor.IndexOf("§B{", commentIdx > 0 ? commentIdx : 0);
+        var bindIdx = calor.IndexOf("let ", commentIdx > 0 ? commentIdx : 0);
         Assert.True(commentIdx >= 0, "Checked comment not found");
         Assert.True(bindIdx > commentIdx, "Checked comment should appear before body statements");
     }
@@ -1210,9 +1214,9 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.True(calor.IndexOf("§B{", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
-        Assert.Contains("§WH{", calor);
-        Assert.DoesNotContain("§RAW", calor);
+        Assert.True(calor.IndexOf("var int:i = 0", StringComparison.Ordinal) < calor.IndexOf("while ", StringComparison.Ordinal));
+        Assert.Contains("while ", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
     }
 
     [Fact]
@@ -1233,9 +1237,9 @@ public class Test
 }";
         var calor = ConvertToCalor(csharp);
 
-        Assert.True(calor.IndexOf("§ASSIGN", StringComparison.Ordinal) < calor.IndexOf("§WH{", StringComparison.Ordinal));
-        Assert.Contains("§WH{", calor);
-        Assert.DoesNotContain("§RAW", calor);
+        Assert.True(calor.IndexOf("set x 0", StringComparison.Ordinal) < calor.IndexOf("while ", StringComparison.Ordinal));
+        Assert.Contains("while ", calor);
+        RawFrameAssertions.AssertFramed(calor, Calor.Compiler.Parsing.TokenKind.RawCSharp, present: false);
     }
 
     #endregion

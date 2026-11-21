@@ -159,7 +159,7 @@ public sealed class StructureTool : McpToolBase
             var classSymbol = new OutlineSymbol
             {
                 Name = cls.Name,
-                Kind = "class",
+                Kind = cls.IsRecord ? "record" : cls.IsModule ? "module" : "class",
                 Line = cls.Span.Line,
                 Detail = includeDetails ? BuildClassDetail(cls) : null,
                 Children = BuildClassChildren(cls, includeDetails)
@@ -300,6 +300,8 @@ public sealed class StructureTool : McpToolBase
         // Constructors
         foreach (var ctor in cls.Constructors)
         {
+            if (ReferenceEquals(ctor, cls.RecordCopyConstructor))
+                continue;
             children.Add(new OutlineSymbol
             {
                 Name = cls.Name,

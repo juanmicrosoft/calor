@@ -23,8 +23,8 @@ public sealed class FixResult
 }
 
 /// <summary>
-/// Auto-fixes known invalid patterns in converter output.
-/// Applies ordered regex-based rules and re-parses after each pass.
+/// Preserves converter output for native parser validation.
+/// Retired prefix syntax is not repaired into a native-positive candidate.
 /// </summary>
 public sealed class PostConversionFixer
 {
@@ -32,23 +32,6 @@ public sealed class PostConversionFixer
 
     private static readonly List<(string Name, string Description, Func<string, (string Result, bool Changed)> Apply)> Rules = new()
     {
-        ("OrphanedClosingTag", "Remove unmatched §/NEW or §/C closing tags at statement level",
-            FixOrphanedClosingTags),
-
-        ("UnmatchedParentheses", "Remove extra closing parentheses or add missing opening parentheses",
-            FixUnmatchedParentheses),
-
-        ("CommaLeaks", "Strip raw commas from Lisp expression positions",
-            FixCommaLeaks),
-
-        ("GenericInLisp", "Extract generic type arguments from Lisp call position to binding",
-            FixGenericInLisp),
-
-        ("InlineErrLam", "Extract §ERR/§LAM from inside Lisp call arguments to preceding binding",
-            FixInlineErrLam),
-
-        ("IfExpressionArrow", "Insert missing → after IF condition in expression context",
-            FixIfExpressionArrow),
     };
 
     /// <summary>
@@ -66,7 +49,9 @@ public sealed class PostConversionFixer
 
             foreach (var (name, description, apply) in Rules)
             {
-                var (result, changed) = apply(current);
+                var result = Parsing.RawCSharpFrame.RewriteOutsideFrames(
+                    current, text => apply(text).Result);
+                var changed = !string.Equals(result, current, StringComparison.Ordinal);
                 if (changed)
                 {
                     current = result;
@@ -180,7 +165,7 @@ public sealed class PostConversionFixer
     private static (string Result, bool Changed) FixGenericInLisp(string source)
     {
         // Match cases where a generic type <T> appears directly inside a Lisp expression
-        // e.g., (§C{Method} §A §C{Option<int>.Some} ... )
+        // e.g., (§C{Method} §A §C{Factory<int>.Create} ... )
         // Replace <...> with {of:...} comment notation to avoid parser confusion
         var pattern = @"(?<=§C\{[^}]*)<([^>]+)>(?=[^}]*\})";
         var result = Regex.Replace(source, pattern, "{of:$1}");
@@ -196,8 +181,8 @@ public sealed class PostConversionFixer
     }
 
     /// <summary>
-    /// Rule E: Extract §ERR or §LAM tags from inside Lisp call arguments to preceding bindings.
-    /// When §ERR{...} or §LAM{...} appears as a Lisp call argument, it causes parse errors.
+    /// Rule E: Extract §LAM tags from inside Lisp call arguments to preceding bindings.
+    /// When §LAM{...} appears as a Lisp call argument, it causes parse errors.
     /// This rule extracts them into §B{autoN} bindings on the line before.
     /// </summary>
     private static (string Result, bool Changed) FixInlineErrLam(string source)
@@ -207,35 +192,12 @@ public sealed class PostConversionFixer
         var autoCounter = 0;
         var outputLines = new List<string>(lines.Length + 10);
 
-        // Pattern: §A followed by §ERR{...} content, inside a call line
-        var errInCallPattern = new Regex(@"(§A\s+)§ERR\{([^}]*)\}\s+([^\n§]*)");
         // Pattern: §A followed by §LAM{...}...§/LAM{...}, inside a call line
         var lamInCallPattern = new Regex(@"(§A\s+)(§LAM\{[^}]*\}[^\n]*§/LAM\{[^}]*\})");
 
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
-
-            // Check for inline §ERR inside a call argument
-            var errMatch = errInCallPattern.Match(line);
-            if (errMatch.Success && line.Contains("§C{"))
-            {
-                autoCounter++;
-                var bindingName = $"__autoErr{autoCounter}";
-                var indent = GetIndent(line);
-                var errTag = errMatch.Groups[2].Value;
-                var errArg = errMatch.Groups[3].Value.Trim();
-
-                // Emit binding before this line
-                var bindingLine = string.IsNullOrEmpty(errArg)
-                    ? $"{indent}§B{{{bindingName}}} §ERR{{{errTag}}}"
-                    : $"{indent}§B{{{bindingName}}} §ERR{{{errTag}}} {errArg}";
-                outputLines.Add(bindingLine);
-
-                // Replace inline §ERR with binding reference
-                line = errInCallPattern.Replace(line, $"$1{bindingName}", 1);
-                changed = true;
-            }
 
             // Check for inline §LAM inside a call argument
             var lamMatch = lamInCallPattern.Match(line);
@@ -268,17 +230,4 @@ public sealed class PostConversionFixer
         return line[..i];
     }
 
-    /// <summary>
-    /// Rule F: Insert missing → after IF condition when used in expression context.
-    /// Targets: §IF{id} (condition) expression → should be §IF{id} (condition) → expression
-    /// </summary>
-    private static (string Result, bool Changed) FixIfExpressionArrow(string source)
-    {
-        // Match §IF or §EI followed by a parenthesized condition, then NOT followed by →
-        // but followed by §R (return), which indicates expression context
-        var pattern = @"(§(?:IF|EI)\{[^}]*\}\s*\([^)]*\))\s+(?!→)(§R\s)";
-        var result = Regex.Replace(source, pattern, "$1 → $2");
-
-        return (result, result != source);
-    }
 }

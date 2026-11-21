@@ -28,6 +28,7 @@ public static class DiagnosticCode
     public const string UnsignedNegativeLiteral = "Calor0010";
     public const string InterpolatedUtf8Literal = "Calor0011";
     public const string SignedIntegerLiteralOverflow = "Calor0012";
+    public const string InvalidRawFrame = "Calor0013";
 
     /// <summary>
     /// Warning: leading whitespace uses tab characters. Calor indentation is
@@ -52,7 +53,6 @@ public static class DiagnosticCode
 
     // Parser errors (Calor0100-0199)
     public const string UnexpectedToken = "Calor0100";
-    public const string MismatchedId = "Calor0101";
     public const string MissingRequiredAttribute = "Calor0102";
     public const string ExpectedKeyword = "Calor0103";
     public const string ExpectedExpression = "Calor0104";
@@ -120,6 +120,9 @@ public static class DiagnosticCode
     /// Write the name first (<c>§B{t:W}</c>).
     /// </summary>
     public const string TypeFirstBindingHeader = "Calor0123";
+
+    public const string MissingBoundaryEffectRow = "Calor0124";
+    public const string NonPublicEffectRow = "Calor0125";
 
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 
@@ -469,6 +472,8 @@ public static class DiagnosticCode
     /// </summary>
     public const string EffectRowMisplaced = "Calor0405";
 
+    public const string MissingCallableEffectRow = "Calor0407";
+
     /// <summary>
     /// Error: effect inference stopped at an iteration cap before the computed
     /// effect sets had stopped changing, so the effects it reports for the named
@@ -548,8 +553,10 @@ public static class DiagnosticCode
     public const string InterfaceEffectVariance = "Calor0421";
 
     /// <summary>
-    /// Error: a constructor body has effects other than intrinsic initialization
-    /// mutation, but constructor declarations have no §E surface.
+    /// Error: a constructor body, or a type's implicit static initialization, has effects
+    /// beyond intrinsic initialization (mut, alloc) and declares no row for them. Since
+    /// 0.30 a constructor may declare an own row, and a type its static-initialization row
+    /// as a header clause.
     /// </summary>
     public const string ConstructorEffectContractUnavailable = "Calor0422";
 
@@ -584,8 +591,9 @@ public static class DiagnosticCode
     public const string EffectRowUnknown = "Calor0425";
 
     /// <summary>
-    /// Error: a custom property or event accessor body has effects other than
-    /// intrinsic accessor mutation, but the accessor has no §E surface.
+    /// Error: a custom property, indexer or event accessor body has effects beyond
+    /// intrinsic accessor mutation/allocation and declares no row for them. Since 0.30 a
+    /// property or indexer accessor may declare an own row; event accessors still cannot.
     /// </summary>
     public const string AccessorEffectContractUnavailable = "Calor0423";
 
@@ -755,6 +763,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string Calor0805 = "Calor0805";
 
+    /// <summary>
+    /// Error: Declaration sidecar identity is unavailable or ambiguous.
+    /// </summary>
+    public const string DeclarationIdentityUnavailable = "Calor0806";
+
     // Contract inheritance (Calor0810-0814)
 
     /// <summary>
@@ -810,27 +823,6 @@ public static class DiagnosticCode
     /// cannot represent — so it is Assumed, not proven, and nothing is claimed.
     /// </summary>
     public const string ImplicationAssumed = "Calor0819";
-
-    // Legacy structural-ID lint (Calor0820-0822) — Phase 1/2 v6 plan
-    // (drop structural IDs, then introduce compact 12-char IDs).
-
-    /// <summary>
-    /// Info (opt-in lint): a structural opener still carries a legacy
-    /// <c>{id:…}</c> block that the Phase 1 migrator (<c>calor fix
-    /// --drop-structural-ids</c>) can safely remove.
-    ///
-    /// Per RFC §5.7 the diagnostic is informational and must include a
-    /// machine-applicable suggested fix (the byte range to delete).
-    /// </summary>
-    public const string LegacyStructuralId = "Calor0820";
-
-    /// <summary>
-    /// Info (opt-in lint, Phase 2): a Calor declaration uses a 26-char
-    /// ULID payload that the compact migrator (<c>calor fix
-    /// --compact-ids</c>) can rewrite to a 12-char Crockford-lowercase
-    /// compact ID.
-    /// </summary>
-    public const string LegacyUlidPayload = "Calor0821";
 
     /// <summary>
     /// Warning (Phase 2): two declarations in the compile unit produced
@@ -1107,6 +1099,12 @@ public static class DiagnosticCode
     /// </summary>
     public const string CSharpInteropBlockPreserved = "Calor1011";
 
+    /// <summary>
+    /// Error: Ordinary raw C# passthrough is missing nonempty feature/reason metadata.
+    /// Reason applicability and staleness require separate validation.
+    /// </summary>
+    public const string InvalidCSharpInteropReason = "Calor1012";
+
     // Refinement type diagnostics (Calor1100-1109)
 
     /// <summary>
@@ -1134,6 +1132,11 @@ public static class DiagnosticCode
     /// The callee writes it through an alias that no refinement guard can check (#1529 review).
     /// </summary>
     public const string RefinedVariableByReference = "Calor1104";
+
+    /// <summary>
+    /// Error: a named refinement captures a free value or uses an unmodeled predicate form.
+    /// </summary>
+    public const string NamedRefinementNotClosed = "Calor1105";
 
     // Obligation verification diagnostics (Calor1120-1141)
 
@@ -1218,6 +1221,11 @@ public static class DiagnosticCode
     /// Error (lint): an unexpected exception occurred while linting a file.
     /// </summary>
     public const string LintProcessingError = "Calor1304";
+
+    /// <summary>
+    /// Warning (lint): a two-branch literal return has a shorter conditional form.
+    /// </summary>
+    public const string LintConditionalReturn = "Calor1305";
 
     // Root compile command (Calor1310-1319)
 
@@ -1536,19 +1544,8 @@ public sealed class Diagnostic
 
     public override string ToString()
     {
-        var location = FilePath != null
-            ? $"{FilePath}({Span.Line},{Span.Column})"
-            : $"({Span.Line},{Span.Column})";
-
-        var severityText = Severity switch
-        {
-            DiagnosticSeverity.Error => "error",
-            DiagnosticSeverity.Warning => "warning",
-            DiagnosticSeverity.Info => "info",
-            _ => "unknown"
-        };
-
-        return $"{location}: {severityText} {Code}: {Message}";
+        var severity = Severity == DiagnosticSeverity.Error ? "" : $"{Severity.ToString().ToLowerInvariant()}: ";
+        return $"{DiagnosticText.OneLine(FilePath ?? "<input>")}:{Span.Line}:{Span.Column} {Code} {severity}{DiagnosticText.ShortMessage(this)}";
     }
 }
 
@@ -1590,6 +1587,9 @@ public sealed class DiagnosticWithFix
 /// </summary>
 public sealed class SuggestedFix
 {
+    /// <summary>False for heuristic suggestions or changes requiring a policy decision.</summary>
+    public bool IsSafeToApply { get; }
+
     /// <summary>
     /// Description of what the fix does.
     /// </summary>
@@ -1600,15 +1600,134 @@ public sealed class SuggestedFix
     /// </summary>
     public IReadOnlyList<TextEdit> Edits { get; }
 
-    public SuggestedFix(string description, IReadOnlyList<TextEdit> edits)
+    public SuggestedFix(string description, IReadOnlyList<TextEdit> edits, bool isSafeToApply = false)
     {
         Description = description ?? throw new ArgumentNullException(nameof(description));
         Edits = edits ?? throw new ArgumentNullException(nameof(edits));
+        IsSafeToApply = isSafeToApply;
     }
 
-    public SuggestedFix(string description, TextEdit edit)
-        : this(description, new[] { edit })
+    public SuggestedFix(string description, TextEdit edit, bool isSafeToApply = false)
+        : this(description, new[] { edit }, isSafeToApply)
     {
+    }
+}
+
+/// <summary>Validates an entire patch against its compilation snapshot before applying any edit.</summary>
+internal static class DiagnosticFixes
+{
+    internal static string Apply(
+        string source, string expectedSource, string filePath,
+        IReadOnlyList<DiagnosticWithFix> diagnostics, out int fixesApplied)
+    {
+        if (!string.Equals(source, expectedSource, StringComparison.Ordinal))
+            throw new InvalidDataException("Source changed since diagnosis; refusing stale fixes.");
+
+        var fixes = diagnostics.Where(d => d.Fix.IsSafeToApply && d.Fix.Edits.Count > 0).ToList();
+        var lineStarts = new List<int> { 0 };
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (source[i] == '\r')
+            {
+                if (i + 1 < source.Length && source[i + 1] == '\n')
+                    i++;
+                lineStarts.Add(i + 1);
+            }
+            else if (source[i] == '\n')
+                lineStarts.Add(i + 1);
+        }
+
+        int Offset(int line, int column)
+        {
+            if (line < 1 || line > lineStarts.Count || column < 1)
+                throw new InvalidDataException("Fix span is outside the source.");
+            var start = lineStarts[line - 1];
+            var end = line < lineStarts.Count ? lineStarts[line] - 1 : source.Length;
+            if (end > start && source[end - 1] == '\r')
+                end--;
+            if (column - 1 > end - start)
+                throw new InvalidDataException("Fix column is outside the source line.");
+            var offset = start + column - 1;
+            if (offset > 0 && offset < source.Length
+                && char.IsHighSurrogate(source[offset - 1]) && char.IsLowSurrogate(source[offset]))
+                throw new InvalidDataException("Fix span splits a UTF-16 surrogate pair.");
+            return offset;
+        }
+
+        var edits = new List<(int Start, int End, string Text)>();
+        foreach (var edit in fixes.SelectMany(d => d.Fix.Edits))
+        {
+            if (edit.FilePath.Length > 0
+                && !Incremental.BuildStateCache.GetPathComparer().Equals(
+                    Path.GetFullPath(edit.FilePath), Path.GetFullPath(filePath)))
+                throw new InvalidDataException($"Fix targets another file: {edit.FilePath}");
+            var start = Offset(edit.StartLine, edit.StartColumn);
+            var end = Offset(edit.EndLine, edit.EndColumn);
+            if (end < start)
+                throw new InvalidDataException("Fix span ends before it starts.");
+            // Producers use LF in insertions. Preserve the document's line ending.
+            var newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n"
+                : source.Contains('\r') && !source.Contains('\n') ? "\r" : "\n";
+            var text = newline != "\n"
+                ? edit.NewText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", newline, StringComparison.Ordinal)
+                : edit.NewText;
+            if (!string.Equals(source[start..end], text, StringComparison.Ordinal))
+                edits.Add((start, end, text));
+        }
+
+        var sorted = edits.Distinct().OrderBy(e => e.Start).ThenBy(e => e.End).ToList();
+        for (var i = 1; i < sorted.Count; i++)
+        {
+            var previous = sorted[i - 1];
+            var current = sorted[i];
+            if (current.Start < previous.End || current.Start == previous.Start)
+                throw new InvalidDataException("Fix edits overlap; apply them separately after a fresh diagnosis.");
+        }
+
+        var result = source;
+        foreach (var edit in sorted.AsEnumerable().Reverse())
+            result = result[..edit.Start] + edit.Text + result[edit.End..];
+        fixesApplied = sorted.Count;
+        return result;
+    }
+
+    internal static string Repair(
+        string source, string filePath, CompilationOptions options,
+        out CompilationResult result, out int editsApplied, List<string>? descriptions = null,
+        CompilationResult? initialResult = null)
+    {
+        result = initialResult ?? Program.Compile(source, filePath, options);
+        editsApplied = 0;
+        // Re-diagnose after each patch: later phases may expose another safe fix.
+        for (var pass = 0; pass < 3; pass++)
+        {
+            options.CancellationToken.ThrowIfCancellationRequested();
+            var fixes = result.Diagnostics.DiagnosticsWithFixes.ToList();
+            if (!result.HasErrors)
+            {
+                var whitespace = Formatting.LosslessSourceDocument.DiagnoseTrailingWhitespace(source, filePath);
+                fixes.AddRange(whitespace.DiagnosticsWithFixes);
+                // Structural edits may cover whitespace edits; apply them on the
+                // next freshly diagnosed snapshot instead of overlapping patches.
+                if (whitespace.Count == 0 && result.Ast is { } ast)
+                    fixes.AddRange(Formatting.LosslessSourceDocument
+                        .DiagnoseCanonicalUsage(source, filePath, ast).DiagnosticsWithFixes);
+            }
+            var next = Apply(source, source, filePath, fixes, out var applied);
+            if (next == source)
+                break;
+            descriptions?.AddRange(fixes
+                .Where(d => d.Fix.IsSafeToApply)
+                .Select(d => $"{d.Code}: {d.Fix.Description}"));
+            editsApplied += applied;
+            var recheck = Program.Compile(next, filePath, options);
+            if (!result.HasErrors && (recheck.HasErrors
+                || !string.Equals(result.GeneratedCode, recheck.GeneratedCode, StringComparison.Ordinal)))
+                throw new InvalidDataException("A safe fix changed compilation semantics; refusing the patch.");
+            source = next;
+            result = recheck;
+        }
+        return source;
     }
 }
 

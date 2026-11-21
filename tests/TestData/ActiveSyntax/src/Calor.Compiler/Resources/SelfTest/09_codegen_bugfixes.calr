@@ -1,0 +1,34 @@
+module Transliterator Transliterator block
+  using System
+  using System.Collections.Generic
+  using System.Text
+
+  class TransliteratorBase abstract
+    property string:Name abstract
+      get
+
+  class CyrillicToLatin
+    extends TransliteratorBase
+
+    field string:_mappings private
+
+    property string:Name override
+      get
+
+    ctor (string:name)
+      set this._mappings name
+
+    func Transliterate (string:input) → string
+      ! cw, cr, mut, alloc
+      var dict = new Dictionary<char,string>()
+      let char[]:buf = new char[256]
+      var sb = new StringBuilder()
+      let ConsoleKeyInfo:keyPressed = Console.ReadKey()
+      for i from 0 to input.Length step 1
+        let char:ch = input[i]
+        if ch == 'Y'
+          sb.Append("Y")
+        else
+          sb.Append(ch)
+      Console.WriteLine("{0} {1}", new StringBuilder(), new StringBuilder())
+      return sb.ToString()

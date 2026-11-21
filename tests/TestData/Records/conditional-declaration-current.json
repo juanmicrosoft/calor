@@ -1,0 +1,21 @@
+{
+  "featureKey": "conditional-declaration",
+  "supportLevel": "Partial",
+  "lossKindCertifiedAbsent": "Dropped",
+  "expectedLossKinds": [],
+  "allowedLossKinds": [],
+  "runtimeEntryPoint": "Get",
+  "runtimeExpectedInt": 127,
+  "convertedRuntimeEntryPoint": "Get",
+  "convertedExpectedUndefinedInt": 130,
+  "convertedExpectedDefinedInt": 119,
+  "definedSymbols": ["FEATURE"],
+  "currentObservation": {
+    "inputContract": "current-compiler-active-syntax",
+    "reason": "The FEATURE branch now contains a native record class instead of preserved C#. Both original and converted branches independently execute to the unchanged recorded results.",
+    "nativeConversionCount": 21,
+    "fullyNative": true,
+    "interopFeatureCounts": {},
+    "requiredIssueFeatures": ["preprocessor-directive"]
+  }
+}

@@ -222,8 +222,7 @@ public static partial class IdValidator
     /// <summary>
     /// Checks if an ID is a legacy ULID-bearing ID: kind prefix +
     /// 26-char Crockford-uppercase payload. The compiler still accepts
-    /// these, but they should be migrated via
-    /// <c>calor fix --compact-ids</c>.
+    /// these; formatting preserves their identity.
     /// </summary>
     public static bool IsLegacyUlidId(string? id)
     {

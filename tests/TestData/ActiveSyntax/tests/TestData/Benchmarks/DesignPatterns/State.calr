@@ -1,0 +1,22 @@
+module StateMachine StateMachine
+  module StateMachineModule
+    func NextState public (int:current) → int
+      !
+      if current == 0
+        return 1
+      else if current == 1
+        return 2
+      else
+        return 0
+
+    func IsGreen public (int:state) → bool
+      !
+      return state == 0
+
+    func IsYellow public (int:state) → bool
+      !
+      return state == 1
+
+    func IsRed public (int:state) → bool
+      !
+      return state == 2

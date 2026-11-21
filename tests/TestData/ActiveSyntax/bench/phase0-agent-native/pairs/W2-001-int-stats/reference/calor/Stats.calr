@@ -1,0 +1,55 @@
+module Stats Stats block
+  module StatsModule partial
+    func Min (int[]:values) → int
+      !
+      requires (values.Length > 0)
+      var int:smallest = values[0]
+      var int:i = 1
+      while (i < values.Length)
+        let int:v = values[i]
+        if (v < smallest)
+          set smallest v
+        set i (i + 1)
+      return smallest
+
+    func Max (int[]:values) → int
+      !
+      requires (values.Length > 0)
+      var int:largest = values[0]
+      var int:i = 1
+      while (i < values.Length)
+        let int:v = values[i]
+        if (v > largest)
+          set largest v
+        set i (i + 1)
+      return largest
+
+    func Sum (int[]:values) → int
+      !
+      var int:total = 0
+      var int:i = 0
+      while (i < values.Length)
+        let int:v = values[i]
+        set total (total + v)
+        set i (i + 1)
+      return total
+
+    func Mean (int[]:values) → int
+      !
+      requires (values.Length > 0)
+      let int:total = Sum(values)
+      let int:n = values.Length
+      return (total / n)
+
+    func Clamp (int:value, int:lo, int:hi) → int
+      !
+      requires (lo <= hi)
+      => (result >= lo)
+      => (result <= hi)
+      if (value < lo)
+        return lo
+      if (value > hi)
+        return hi
+      return value
+
+

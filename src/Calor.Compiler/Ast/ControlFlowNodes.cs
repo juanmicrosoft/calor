@@ -14,6 +14,10 @@ public sealed class ForStatementNode : StatementNode
     public ExpressionNode From { get; }
     public ExpressionNode To { get; }
     public ExpressionNode? Step { get; }
+    public ExpressionNode? Condition { get; }
+    public StatementNode? Update { get; }
+    public string VariableType { get; }
+    public bool ReevaluatesCondition => Condition != null;
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }
 
@@ -26,7 +30,10 @@ public sealed class ForStatementNode : StatementNode
         ExpressionNode? step,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
-        TextSpan? variableSpan = null)
+        TextSpan? variableSpan = null,
+        ExpressionNode? condition = null,
+        StatementNode? update = null,
+        string variableType = "int")
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -35,6 +42,11 @@ public sealed class ForStatementNode : StatementNode
         From = from ?? throw new ArgumentNullException(nameof(from));
         To = to ?? throw new ArgumentNullException(nameof(to));
         Step = step;
+        if ((condition == null) != (update == null))
+            throw new ArgumentException("A re-evaluated for loop requires both condition and update.");
+        Condition = condition;
+        Update = update;
+        VariableType = variableType;
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
@@ -127,6 +139,69 @@ public sealed class IfStatementNode : StatementNode
         ElseIfClauses = elseIfClauses ?? throw new ArgumentNullException(nameof(elseIfClauses));
         ElseBody = elseBody;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
+    }
+
+    internal ReturnStatementNode? GetCanonicalLiteralReturn(string? returnType)
+    {
+        if (ElseIfClauses.Count != 0
+            || ThenBody is not [ReturnStatementNode { Expression: { } whenTrue }]
+            || ElseBody is not [ReturnStatementNode { Expression: { } whenFalse }])
+            return null;
+
+        // Matching literal types avoid conditional common-type inference changing
+        // a branch's conversion, boxing, overload selection or evaluation.
+        var sameType = (whenTrue, whenFalse) switch
+        {
+            (IntLiteralNode left, IntLiteralNode right) =>
+                left.Width == right.Width && left.Signedness == right.Signedness,
+            (FloatLiteralNode left, FloatLiteralNode right) =>
+                left.IsSingle == right.IsSingle && left.IsDecimal == right.IsDecimal,
+            (DecimalLiteralNode, DecimalLiteralNode) => true,
+            (StringLiteralNode { IsUtf8: false, IsMultiline: false },
+                StringLiteralNode { IsUtf8: false, IsMultiline: false }) => true,
+            (BoolLiteralNode, BoolLiteralNode) => true,
+            _ => false
+        };
+        var literalType = whenTrue switch
+        {
+            IntLiteralNode literal => literal.IsUnsigned
+                ? literal.IsLong ? "ulong" : "uint"
+                : literal.IsLong ? "long" : "int",
+            FloatLiteralNode literal => literal.IsDecimal ? "decimal" : literal.IsSingle ? "float" : "double",
+            DecimalLiteralNode => "decimal",
+            BoolLiteralNode => "bool",
+            StringLiteralNode => "string",
+            _ => null
+        };
+        var target = returnType == null ? null : Migration.TypeMapper.ToSurfaceType(returnType);
+        return sameType && target != null && (target == literalType || target == "object")
+            ? new ReturnStatementNode(Span,
+                new ConditionalExpressionNode(Span, Condition, whenTrue, whenFalse))
+            : null;
+    }
+
+    internal static IReadOnlyDictionary<IfStatementNode, ReturnStatementNode> GetCanonicalLiteralReturns(ModuleNode module)
+    {
+        var result = new Dictionary<IfStatementNode, ReturnStatementNode>();
+        var pending = new Stack<(AstNode Node, string? ReturnType)>();
+        pending.Push((module, null));
+        while (pending.TryPop(out var frame))
+        {
+            var returnType = frame.Node switch
+            {
+                FunctionNode function => function.Output?.TypeName,
+                MethodNode method => method.Output?.TypeName,
+                OperatorOverloadNode op => op.Output?.TypeName,
+                ExpressionNode => null,
+                _ => frame.ReturnType
+            };
+            if (frame.Node is IfStatementNode branch
+                && branch.GetCanonicalLiteralReturn(returnType) is { } canonical)
+                result.Add(branch, canonical);
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(frame.Node))
+                pending.Push((child, returnType));
+        }
+        return result;
     }
 
 
@@ -351,27 +426,27 @@ public static class BinaryOperatorExtensions
 {
     public static BinaryOperator? FromString(string? value)
     {
-        return value?.ToUpperInvariant() switch
+        return value switch
         {
-            "ADD" or "+" => BinaryOperator.Add,
-            "SUB" or "SUBTRACT" or "-" => BinaryOperator.Subtract,
-            "MUL" or "MULTIPLY" or "*" => BinaryOperator.Multiply,
-            "DIV" or "DIVIDE" or "/" => BinaryOperator.Divide,
-            "MOD" or "MODULO" or "%" => BinaryOperator.Modulo,
-            "POW" or "POWER" or "**" => BinaryOperator.Power,
-            "EQ" or "EQUAL" or "==" => BinaryOperator.Equal,
-            "NEQ" or "NOTEQUAL" or "NE" or "!=" => BinaryOperator.NotEqual,
-            "LT" or "LESSTHAN" or "<" => BinaryOperator.LessThan,
-            "LTE" or "LE" or "LESSOREQUAL" or "<=" => BinaryOperator.LessOrEqual,
-            "GT" or "GREATERTHAN" or ">" => BinaryOperator.GreaterThan,
-            "GTE" or "GE" or "GREATEROREQUAL" or ">=" => BinaryOperator.GreaterOrEqual,
-            "AND" or "&&" => BinaryOperator.And,
-            "OR" or "||" => BinaryOperator.Or,
-            "BAND" or "BITWISEAND" or "&" => BinaryOperator.BitwiseAnd,
-            "BOR" or "BITWISEOR" or "|" => BinaryOperator.BitwiseOr,
-            "BXOR" or "BITWISEXOR" or "^" => BinaryOperator.BitwiseXor,
-            "SHL" or "LEFTSHIFT" or "<<" => BinaryOperator.LeftShift,
-            "SHR" or "RIGHTSHIFT" or ">>" => BinaryOperator.RightShift,
+            "+" => BinaryOperator.Add,
+            "-" => BinaryOperator.Subtract,
+            "*" => BinaryOperator.Multiply,
+            "/" => BinaryOperator.Divide,
+            "%" => BinaryOperator.Modulo,
+            "**" => BinaryOperator.Power,
+            "==" => BinaryOperator.Equal,
+            "!=" => BinaryOperator.NotEqual,
+            "<" => BinaryOperator.LessThan,
+            "<=" => BinaryOperator.LessOrEqual,
+            ">" => BinaryOperator.GreaterThan,
+            ">=" => BinaryOperator.GreaterOrEqual,
+            "&&" => BinaryOperator.And,
+            "||" => BinaryOperator.Or,
+            "&" => BinaryOperator.BitwiseAnd,
+            "|" => BinaryOperator.BitwiseOr,
+            "^" => BinaryOperator.BitwiseXor,
+            "<<" => BinaryOperator.LeftShift,
+            ">>" => BinaryOperator.RightShift,
             _ => null
         };
     }

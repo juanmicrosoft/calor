@@ -1,0 +1,41 @@
+module TempConvert TempConvert block
+  module TempConvertModule partial
+    func ClampToCeiling private (int:value, int:ceiling) → int
+      => (result <= ceiling)
+      if (value > ceiling)
+        return ceiling
+      return value
+
+    func CelsiusToFahrenheit (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= -459)
+      => (result <= 9032)
+      let int:c = ClampToCeiling(celsius, 5000)
+      return (((c * 9) / 5) + 32)
+
+    func CelsiusToKelvin (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= 0)
+      => (result <= 5273)
+      let int:c = ClampToCeiling(celsius, 5000)
+      return (c + 273)
+
+    func FahrenheitToCelsius (int:fahrenheit) → int
+      !
+      requires (fahrenheit >= -459)
+      => (result >= -273)
+      => (result <= 5000)
+      let int:f = ClampToCeiling(fahrenheit, 9032)
+      return (((f - 32) * 5) / 9)
+
+    func KelvinToCelsius (int:kelvin) → int
+      !
+      requires (kelvin >= 0)
+      => (result >= -273)
+      => (result <= 5000)
+      let int:k = ClampToCeiling(kelvin, 5273)
+      return (k - 273)
+
+

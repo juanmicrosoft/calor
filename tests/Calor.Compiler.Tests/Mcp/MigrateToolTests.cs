@@ -34,6 +34,8 @@ public class MigrateToolTests
         Assert.True(props.TryGetProperty("phase", out _));
         Assert.True(props.TryGetProperty("maxFiles", out _));
         Assert.True(props.TryGetProperty("autoFix", out _));
+        Assert.Equal(new[] { "lossless" }, props.GetProperty("fidelity").GetProperty("enum")
+            .EnumerateArray().Select(value => value.GetString()).ToArray());
 
         // projectPath is required
         Assert.True(schema.TryGetProperty("required", out var required));
@@ -73,6 +75,15 @@ public class MigrateToolTests
 
         Assert.True(result.IsError);
         Assert.Contains("not found", result.Content[0].Text!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DestructiveFidelity_IsRejected()
+    {
+        var result = await _tool.ExecuteAsync(JsonDocument.Parse(
+            """{"projectPath":".","fidelity":"lossy"}""").RootElement);
+        Assert.True(result.IsError);
+        Assert.Contains("Only lossless", result.Content[0].Text);
     }
 
     [Fact]
@@ -178,12 +189,49 @@ public class MigrateToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FixPhase_PreservesNamesAndRepeatedCallTargets()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-native-names-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var path = Path.Combine(tempDir, "Names.calr");
+        const string source = """
+            module Echo
+              func Echo public () → int
+                !
+                return 1
+              func Use public () → int
+                !
+                let int:first = Echo()
+                return Echo()
+            """;
+        await File.WriteAllTextAsync(path, source);
+        try
+        {
+            var compiled = Program.Compile(source, path);
+            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Errors));
+            var result = await _tool.ExecuteAsync(JsonSerializer.SerializeToElement(
+                new { projectPath = tempDir, phase = "fix" }));
+
+            Assert.False(result.IsError);
+            var output = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = Assert.Single(output.GetProperty("perFile").EnumerateArray());
+            Assert.Equal("clean", file.GetProperty("status").GetString());
+            Assert.False(file.TryGetProperty("fixesApplied", out _));
+            Assert.Equal(source, await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_FixPhase_InvalidFixLeavesExistingFileUnchanged()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-invalid-fix-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         var path = Path.Combine(tempDir, "Invalid.calr");
-        const string source = "§M{m1:Test}\n§B{b1:value:StringBuilder} §NEW{object}§/NEW";
+        const string source = "§M{Test}\n§B{b1:value:StringBuilder} §NEW{object}§/NEW";
         await File.WriteAllTextAsync(path, source);
 
         try
@@ -196,7 +244,7 @@ public class MigrateToolTests
             var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
             var file = Assert.Single(json.GetProperty("perFile").EnumerateArray());
             Assert.Equal("fix_incomplete", file.GetProperty("status").GetString());
-            Assert.True(file.GetProperty("fixesApplied").GetInt32() > 0);
+            Assert.Equal(0, file.GetProperty("fixesApplied").GetInt32());
             Assert.Equal(source, await File.ReadAllTextAsync(path));
         }
         finally
@@ -256,6 +304,41 @@ public class MigrateToolTests
             var loss = Assert.Single(file.GetProperty("losses").EnumerateArray());
             Assert.Equal((int)ConversionLossKind.InteropPreserved, loss.GetProperty("kind").GetInt32());
             Assert.True(loss.GetProperty("line").GetInt32() > 0);
+            Assert.True(file.GetProperty("outputWritten").GetBoolean());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("convert")]
+    [InlineData("full")]
+    public async Task ExecuteAsync_ReceiptFailureRetainsWrittenOutputAndLossDisposition(string phase)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-receipt-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var output = Path.Combine(tempDir, "Interop.calr");
+        const string original = "public class Interop { ~Interop() { } }";
+        File.WriteAllText(Path.Combine(tempDir, "Interop.cs"), original);
+        Directory.CreateDirectory(output + ".conversion.json");
+        try
+        {
+            var args = JsonSerializer.SerializeToElement(new { projectPath = tempDir, phase });
+            var result = await _tool.ExecuteAsync(args);
+            using var json = JsonDocument.Parse(result.Content[0].Text!);
+            var file = Assert.Single(json.RootElement.GetProperty("perFile").EnumerateArray());
+            Assert.Contains(file.GetProperty("status").GetString(), new[] { "failed", "convert_failed" });
+            Assert.True(file.GetProperty("outputWritten").GetBoolean());
+            Assert.Equal("preserved", file.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+            Assert.NotEmpty(file.GetProperty("losses").EnumerateArray());
+            Assert.Contains(file.GetProperty("errors").EnumerateArray(),
+                error => error.GetProperty("message").GetString()!.Contains("Output was written", StringComparison.Ordinal));
+            Assert.Contains("raw member:destructor:", File.ReadAllText(output));
+            Assert.Contains("~Interop() { }", File.ReadAllText(output));
+            Assert.Equal(original, File.ReadAllText(Path.Combine(tempDir, "Interop.cs")));
+            Assert.False(File.Exists(output + ".conversion.json"));
         }
         finally
         {
@@ -353,7 +436,7 @@ public class MigrateToolTests
         {
             // Structural closer tags are a hard parser error (Calor0830)
             File.WriteAllText(Path.Combine(tempDir, "Bad.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n  §/F{f001}\n");
+                "§M{Test}\n  §F{Foo:pub} () -> void\n    §P \"hi\"\n  §/F\n");
 
             var args = JsonDocument.Parse($$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "compile"}""").RootElement;
             var result = await _tool.ExecuteAsync(args);
@@ -415,9 +498,9 @@ public class MigrateToolTests
         File.WriteAllText(
             Path.Combine(tempDir, "Test.calr"),
             """
-            §M{m1:TestModule}
+            §M{TestModule}
               §C{c1:Foo:public}
-                §F{f1:Bar:public} §O{Int32}
+                §F{Bar:pub} §O{Int32}
                     → §R 42
               §/C{c1}
             """);
@@ -428,15 +511,15 @@ public class MigrateToolTests
     public async Task ExecuteAsync_CompilePhase_BindError_CarriesDeclarationId()
     {
         // review of #757 item 2: pin the declarationId capability on the
-        // migrate compile phase — Calor0250 parses to a full AST, so the
-        // entry must resolve to its enclosing function ID.
+        // migrate compile phase. A duplicate native binding reaches a full AST;
+        // an untyped binding without an initializer now fails in the parser.
         var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-declid-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
 
         try
         {
             File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
-                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §B{x}\n");
+                "module Test\n  func Foo public () → void\n    !\n    let int:x = 1\n    let int:x = 2\n");
 
             var args = JsonDocument.Parse($$"""{"projectPath": {{JsonSerializer.Serialize(tempDir)}}, "phase": "compile"}""").RootElement;
             var result = await _tool.ExecuteAsync(args);
@@ -445,9 +528,11 @@ public class MigrateToolTests
             var file = root.GetProperty("perFile").EnumerateArray()
                 .Single(f => f.GetProperty("path").GetString()!.EndsWith("BindError.calr"));
             var entry = file.GetProperty("errors").EnumerateArray()
-                .Single(e => e.GetProperty("code").GetString() == "Calor0250");
+                .Single(e => e.GetProperty("code").GetString() == "Calor0258");
 
-            Assert.Equal("f001", entry.GetProperty("declarationId").GetString());
+            var identities = new Calor.Compiler.Ids.DeclarationIdentityStore(tempDir).Sync();
+            Assert.Equal(identities.Declarations.Single(d => d.Name == "Foo").Id,
+                entry.GetProperty("declarationId").GetString());
         }
         finally
         {

@@ -47,9 +47,10 @@ public class LinqSupportTests
     public void DecimalLiteral_TypedSyntax_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{~price:decimal} DECIMAL:18.0000
+module TestMod TestMod block
+  func Test ()
+    !
+    var decimal:price = 18.0000m
 ";
 
         var result = ParseAndEmit(source);
@@ -61,9 +62,10 @@ public class LinqSupportTests
     public void DecimalLiteral_InlineSuffix_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{~amount:decimal} 99.95M
+module TestMod TestMod block
+  func Test ()
+    !
+    var decimal:amount = 99.95m
 ";
 
         var result = ParseAndEmit(source);
@@ -75,9 +77,10 @@ public class LinqSupportTests
     public void DecimalLiteral_IntegerWithSuffix_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{~count:decimal} 42m
+module TestMod TestMod block
+  func Test ()
+    !
+    var decimal:count = 42m
 ";
 
         var result = ParseAndEmit(source);
@@ -109,9 +112,10 @@ public class LinqSupportTests
     public void ArrayInitializer_WithArgElements_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{[i32]:nums} §ARR{a1:i32} §A 1 §A 2 §A 3 §/ARR{a1}
+module TestMod TestMod block
+  func Test ()
+    !
+    let int[]:nums = new int[] { 1, 2, 3 }
 ";
 
         var result = ParseAndEmit(source);
@@ -123,11 +127,12 @@ public class LinqSupportTests
     [Fact]
     public void ArrayInitializer_TypeFirst_EmitsCorrectly()
     {
-        // Type-first format: §ARR{type:id:size}
+        // The binding carries the name; the value header carries only type and size.
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{[i32]:nums} §ARR{i32:nums:3}
+module TestMod TestMod block
+  func Test ()
+    !
+    let int[]:nums = new int[3]
 ";
 
         var result = ParseAndEmit(source);
@@ -159,7 +164,7 @@ public class LinqSupportTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ARR{", result.CalorSource);
+        Assert.Contains("new double[] {", result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
     }
 
@@ -204,7 +209,7 @@ public class LinqSupportTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        Assert.Contains("§ARR{arr:f64}", result.CalorSource);
+        Assert.Contains("let double[]:arr = new double[]", result.CalorSource);
     }
 
     [Fact]
@@ -221,7 +226,7 @@ public class LinqSupportTests
         Assert.DoesNotContain("§ERR", result.CalorSource);
         // #1132: an empty initializer is a fresh zero-length array, not the shared
         // Array.Empty<T>() (`new int[0] == new int[0]` is false in C#).
-        Assert.Contains("§ARR{i32:arr:0}", result.CalorSource);
+        Assert.Contains("new int[0]", result.CalorSource);
         Assert.DoesNotContain("Array.Empty", result.CalorSource);
     }
 
@@ -238,9 +243,9 @@ public class LinqSupportTests
         Assert.NotNull(result.CalorSource);
         // Element type should be inferred from the int[,] declaration. #1132: a bare
         // initializer of a declared int[,] is a rectangular §ARR2D, not a 1-D §ARR of rows.
-        Assert.Matches(@"§ARR2D\{\w+:matrix:i32\}", result.CalorSource);
-        Assert.Contains("§ROW 1 2", result.CalorSource);
-        Assert.DoesNotContain("§ARR{matrix", result.CalorSource);
+        Assert.Contains("new int[,]", result.CalorSource);
+        Assert.Contains("{ 1, 2 }", result.CalorSource);
+        Assert.DoesNotContain("new int[] {", result.CalorSource);
     }
 
     #endregion
@@ -251,12 +256,10 @@ public class LinqSupportTests
     public void ObjectInitializer_BasicProperties_EmitsCorrectly()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{~p:Person} §NEW{Person}
-        Name = ""John""
-        Age = 30
-      §/NEW
+module TestMod TestMod block
+  func Test ()
+    !
+    var Person:p = new Person() { Name = ""John"", Age = 30 }
 ";
 
         var result = ParseAndEmit(source);
@@ -270,12 +273,10 @@ public class LinqSupportTests
     public void ObjectInitializer_EmitsInitializerBlock()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{~cfg:Config} §NEW{Config}
-        Timeout = 30
-        Enabled = true
-      §/NEW
+module TestMod TestMod block
+  func Test ()
+    !
+    var Config:cfg = new Config() { Timeout = 30, Enabled = true }
 ";
 
         var result = ParseAndEmit(source);
@@ -296,7 +297,7 @@ public class LinqSupportTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§NEW{Person}", result.CalorSource);
+        Assert.Contains("new Person(", result.CalorSource);
         Assert.Contains("Name =", result.CalorSource);
         Assert.Contains("Age =", result.CalorSource);
     }
@@ -309,12 +310,10 @@ public class LinqSupportTests
     public void AnonymousType_BasicSyntax_EmitsNewAnonymous()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f1:Test:pub}
-      §B{~obj:var} §ANON
-        Name = ""test""
-        Value = 42
-      §/ANON
+module TestMod TestMod block
+  func Test ()
+    ! alloc
+    var obj = new { Name = ""test"", Value = 42 }
 ";
 
         var result = ParseAndEmit(source);
@@ -335,7 +334,7 @@ public class LinqSupportTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§ANON", result.CalorSource);
+        Assert.Contains("new { Name = \"test\", Value = 42 }", result.CalorSource);
         Assert.Contains("Name =", result.CalorSource);
         Assert.Contains("Value =", result.CalorSource);
         Assert.Contains("anonymous-type", result.Context.UsedFeatures);
@@ -370,10 +369,11 @@ public class LinqSupportTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("Where", result.CalorSource);
-        Assert.Contains("Select", result.CalorSource);
-        // Chained calls are now decomposed, recording "linq-method-chain" instead of "linq-method"
-        Assert.Contains("linq-method-chain", result.Context.UsedFeatures);
+        // 0.30: native lambdas are inline expressions, so a chain stays one native call
+        // chain (the retired `_chain` temp decomposition and its "linq-method-chain" feature).
+        Assert.Contains("(numbers.Where((n) => (n > 0))).Select((n) => (n * 2))", result.CalorSource);
+        Assert.DoesNotContain("_chain", result.CalorSource);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
@@ -398,7 +398,13 @@ public class LinqSupportTests
     [Fact]
     public void LinqQuery_Converter_SimpleWhereSelect()
     {
+        // 0.30: a query converts natively only when its range variable resolves (here through
+        // System.Linq over a declared array) and its selectors are inline native expressions;
+        // otherwise the statement stays C#.
         var csharpSource = """
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
             var evens = from n in numbers
                         where n % 2 == 0
                         select n;
@@ -408,55 +414,65 @@ public class LinqSupportTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("Where", result.CalorSource);
+        Assert.Contains("numbers.Where((int:n) => ((n % 2) == 0))", result.CalorSource);
         Assert.Contains("linq-query", result.Context.UsedFeatures);
+        Assert.DoesNotContain(result.Losses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
     }
 
     [Fact]
     public void LinqQuery_Converter_GroupBy()
     {
         var csharpSource = """
-            var grouped = from p in products
-                          group p by p.Category;
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
+            var grouped = from n in numbers
+                          group n by n % 2;
             """;
 
         var result = _converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("GroupBy", result.CalorSource);
+        Assert.Contains("numbers.GroupBy((int:n) => (n % 2))", result.CalorSource);
     }
 
     [Fact]
     public void LinqQuery_Converter_OrderBy()
     {
         var csharpSource = """
-            var sorted = from p in products
-                         orderby p.Name
-                         select p;
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
+            var sorted = from n in numbers
+                         orderby n
+                         select n;
             """;
 
         var result = _converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("OrderBy", result.CalorSource);
+        Assert.Contains("numbers.OrderBy((int:n) => n)", result.CalorSource);
     }
 
     [Fact]
     public void LinqQuery_Converter_OrderByDescending()
     {
         var csharpSource = """
-            var sorted = from p in products
-                         orderby p.Price descending
-                         select p;
+            using System.Linq;
+
+            var numbers = new[] { 3, 1, 2 };
+            var sorted = from n in numbers
+                         orderby n descending
+                         select n;
             """;
 
         var result = _converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("OrderByDescending", result.CalorSource);
+        Assert.Contains("numbers.OrderByDescending((int:n) => n)", result.CalorSource);
     }
 
     [Fact]

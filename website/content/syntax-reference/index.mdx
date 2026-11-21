@@ -6,156 +6,209 @@ hasChildren: true
 description: "A detailed guide to the symbols and rules used in Calor files. Intended as a reference for developers and coding agents."
 ---
 
-
 This page explains the symbols and rules used in Calor files. It is a detailed
 reference for developers and coding agents, not a required first step for
 someone who is learning what Calor does.
 
-> **Why this syntax?** Calor's notation is optimized for AI agents, not human aesthetics. Reviewers still need to understand the contracts, effects, and verification results they approve. Stable IDs enable precise references, indentation defines structural scope, and Lisp-style expressions avoid operator-precedence ambiguity.
+Calor uses lowercase declaration headers, indentation and ordinary C# expression
+operators. The [generated current-language reference](/docs/syntax-reference/current-language/)
+is the compiler-checked catalog of constructs and complete examples.
 
----
+## Quick reference table
 
-## Quick Reference Table
+The entries below are syntax fragments. An effect or contract line belongs
+inside its function, before the first body statement.
 
-| Element | Syntax | Example |
-|:--------|:-------|:--------|
-| Module | `§M{name}` | `§M{Calculator}` |
-| Function | `§F{name:visibility}` | `§F{Add:pub}` |
-| Async Function | `§AF{name:visibility}` | `§AF{FetchAsync:pub}` |
-| Method | `§MT{name:visibility}` | `§MT{Process:pub}` |
-| Async Method | `§AMT{name:visibility}` | `§AMT{ProcessAsync:pub}` |
-| Await | `§AWAIT expr` | `§AWAIT §C{GetAsync} §/C` |
-| Lambda (inline) | `(params) → expr` | `(x) → (* x 2)` |
-| Lambda (block) | `§LAM{params}` (indented body) | `§LAM{x:i32}` |
-| Delegate | `§DEL{name}` (indented signature) | `§DEL{Handler}` |
-| Event | `§EVT{name:vis:type}` | `§EVT{Click:pub:EventHandler}` |
-| Subscribe | `§SUB event handler` | `§SUB btn.Click OnClick` |
-| Unsubscribe | `§UNSUB event handler` | `§UNSUB btn.Click OnClick` |
-| Input | `§I{type:name}` | `§I{i32:x}` |
-| Output | `§O{type}` | `§O{i32}` |
-| Effects | `§E{codes}` | `§E{cw,fs:r,net:rw}` |
-| Requires | `§Q expr` | `§Q (>= x 0)` |
-| Ensures | `§S expr` | `§S (>= result 0)` |
-| For Loop | `§L{var:from:to:step}` | `§L{i:1:100:1}` |
-| While Loop | `§WH condition` | `§WH (> i 0)` |
-| Do-While Loop | `§DO{id}` (body indented) | `§DO{do1}` then `§/DO{do1} cond` |
-| If/ElseIf/Else | `§IF{id} cond` then `§EI` / `§EL` at same column | `§IF{if1} (> x 0)` |
-| Call | `§C{target}...§/C` | `§C{Math.Max} §A 1 §A 2 §/C` |
-| C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
-| Print | `§P expr` | `§P "Hello"` |
-| Return | `§R expr` | `§R (+ a b)` |
-| Binding | `§B{name} expr` | `§B{x} (+ 1 2)` |
-| Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
-| Block end | _dedent_ (Python-style) | _(no `§/X` needed)_ |
-| List | `§LIST{id:type}` | `§LIST{nums:i32}` |
-| Dictionary | `§DICT{id:kType:vType}` | `§DICT{ages:str:i32}` |
-| HashSet | `§HSET{id:type}` | `§HSET{tags:str}` |
-| Key-Value | `§KV key value` | `§KV "alice" 30` |
-| Push | `§PUSH{coll} value` | `§PUSH{nums} 5` |
-| Put | `§PUT{dict} key value` | `§PUT{ages} "bob" 25` |
-| Set Index | `§SETIDX{list} idx val` | `§SETIDX{nums} 0 10` |
-| Contains | `§HAS{coll} value` | `§HAS{nums} 5` |
-| Count | `§CNT{coll}` | `§CNT{nums}` |
-| Dict Foreach | `§EACHKV{id:k:v} dict` | `§EACHKV{e1:k:v} ages` |
-| Switch | `§W{id} expr` | `§W{sw1} score` |
-| Case | `§K pattern → result` | `§K 200 → "OK"` |
-| Wildcard | `§K _` | `§K _ → "default"` |
-| Relational | `§PREL{op} value` | `§PREL{gte} 90` |
-| Var Pattern | `§VAR{name}` | `§VAR{n}` |
-| Guard | `§WHEN condition` | `§WHEN (> n 0)` |
+| Element | Native syntax |
+|:--------|:--------------|
+| Compilation unit | `module FileLabel Optional.Namespace` |
+| Language semantics version | `semver "2.0.0"` in the module body |
+| Named static container | An indented `module Utilities` |
+| Function or method | `func Add (int:a, int:b) → int` |
+| Parameter | `int:value` in the signature |
+| Return | `return a + b` |
+| Call | `Math.Max(a, b)` |
+| Immutable binding | `let int:count = 3` or `let count = 3` |
+| Mutable binding | `var int:count = 3` or `var count = 3` |
+| Assignment | `set count count + 1` |
+| Effects | `! cw, fs:w`; a bare `!` declares no effects |
+| Precondition | `requires divisor != 0` |
+| Postcondition | `=> result >= 0` |
+| Branch | `if condition`, `else if condition`, `else` |
+| Counted loop, snapshot bounds | `for i from 1 to 10 step 1` |
+| Collection iteration | `each item in items` |
+| While loop | `while condition` |
+| Lambda | `(int:x) ! => x * 2` |
+| Member access and indexing | `value.Name`, `items[index]` |
+| Interpolation | `"hello ${name}"` |
+| Block end | Dedent to the parent column |
 
----
+Use two spaces per indentation level. Expressions use parentheses, commas and
+brackets where C# uses them; there are no call or block closer tags.
+See [calls](/docs/syntax-reference/calls/),
+[bindings](/docs/syntax-reference/binding/) and
+[control flow](/docs/syntax-reference/control-flow/) for complete examples.
+
+## Modules and namespaces
+
+The root module's first name is a compilation-unit label, not a namespace or a
+static class name. The optional second name supplies the C# namespace.
+Omitting it means the global namespace.
+
+An indented named module is different: it is a static container.
+
+```calor
+module LabelExample Demo
+  semver "2.0.0"
+  module Arithmetic
+    func Add (int:a, int:b) → int
+      !
+      return a + b
+
+  func Main () → int
+    !
+    return Arithmetic.Add(20, 22)
+```
+
+`Demo.DemoModule.Main()` returns `42`. `Arithmetic` is the named static
+container; `LabelExample` is neither that container nor the namespace.
+
+The optional `semver` line checks the language-semantics version, not the package
+version. A different major is an error; a newer minor produces a warning.
+
+Native header imports retain compilation-unit scope. C# namespace-local imports
+and more complex namespace topologies can require faithful converter
+preservation; moving an import is not a semantics-preserving shortcut.
 
 ## Types
 
-| Type | Description | C# Equivalent |
-|:-----|:------------|:--------------|
-| `i32` | 32-bit integer | `int` |
-| `i64` | 64-bit integer | `long` |
-| `f32` | 32-bit float | `float` |
-| `f64` | 64-bit float | `double` |
-| `str` | String | `string` |
-| `bool` | Boolean | `bool` |
-| `void` | No return value | `void` |
-| `?T` | Optional T | `T?` (nullable) |
-| `T!E` | Result (T or error E) | `Result\<T, E\>` |
+Use C# type names and type-first bindings and parameters.
 
----
+| Type | Meaning |
+|:-----|:--------|
+| `int`, `long` | Signed 32-bit and 64-bit integers |
+| `float`, `double` | Binary floating-point values |
+| `decimal` | Decimal arithmetic |
+| `string`, `char`, `bool` | Text, UTF-16 code unit, Boolean |
+| `void` | No body result |
+| `T?` | Nullable type |
+| `T[]` | Array |
+| `List<T>`, `Dictionary<TKey,TValue>` | Ordinary .NET generic collections |
+
+See [types](/docs/syntax-reference/types/) for nullability, arrays, exceptions and
+collections, and [inheritance](/docs/syntax-reference/inheritance/) for classes,
+constructors and interface dispatch.
 
 ## Operators
+
+Expressions use infix operators with C# precedence. Parentheses make grouping
+explicit: `a + b * c` and `(a + b) * c` are different expressions.
 
 | Category | Operators |
 |:---------|:----------|
 | Arithmetic | `+`, `-`, `*`, `/`, `%` |
 | Comparison | `==`, `!=`, `<`, `<=`, `>`, `>=` |
 | Logical | `&&`, `\|\|`, `!` |
+| Conditional expression | `condition ? whenTrue : whenFalse` |
 
-All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
-
----
+Integer arithmetic is checked by default. String operations use ordinary members
+such as `text.Length` and `text.Contains(part, System.StringComparison.Ordinal)`;
+see [string operations](/docs/syntax-reference/string-operations/).
 
 ## Effect Codes
 
-| Code | Effect | Description |
-|:-----|:-------|:------------|
-| `cw` | Console write | `Console.WriteLine` |
-| `cr` | Console read | `Console.ReadLine` |
-| `fs:w` | Filesystem write | File system writes |
-| `fs:r` | Filesystem read | File system reads |
-| `fs:rw` | Filesystem read/write | File system read and write |
-| `net:r` | Network read | HTTP GET, etc. |
-| `net:w` | Network write | HTTP POST, etc. |
-| `net:rw` | Network read/write | HTTP, sockets, etc. |
-| `db:r` | Database read | Database queries |
-| `db:w` | Database write | Database mutations |
-| `db:rw` | Database read/write | Database operations |
+| Code | Effect |
+|:-----|:-------|
+| `cw` | Console output |
+| `cr` | Console input |
+| `fs:r` | Filesystem read |
+| `fs:w` | Filesystem write |
+| `net:rw` | Network read/write |
+| `db:rw` | Database read/write |
+| `alloc` | Allocation |
+| `mut` | Heap mutation |
+| `throw` | Explicit exceptions |
 
----
+An effect row bounds the side effects of a function or callback. Common codes
+include `cw` and `cr` for console output and input, `fs:r` and `fs:w` for
+filesystem access, and `alloc`, `mut` and `throw` for allocation, mutation and
+exceptions. A call to an unresolved operation is not silently treated as pure.
 
-## ID Conventions
+Preconditions use `requires`; postconditions use `=>` and can refer to `result`.
+Runtime checks, effect enforcement and verifier proofs are separate mechanisms.
+See [effects](/docs/syntax-reference/effects/) and
+[contracts](/docs/syntax-reference/contracts/) for their exact boundaries.
 
-Stable IDs are **optional** on structural openers and are auto-assigned
-by the parser when omitted. Provide an explicit ID only when you want
-to reference the element from external tooling (e.g. `calor navigate`).
+## ID conventions
 
-| Element | Auto-assigned form | Explicit form |
-|:--------|:-------------------|:--------------|
-| Modules | `§M{Calculator}` | `§M{m001:Calculator}` |
-| Functions | `§F{Add:pub}` | `§F{f001:Add:pub}` |
-| Loops | `§L{i:1:10:1}` | `§L{for1:i:1:10:1}` |
-| Conditionals | none: an `§IF` statement always needs an ID | `§IF{if1} cond` |
+Declaration IDs do not appear in source. Tools maintain persistent identities in
+the project's `.calor/ids.json` sidecar and synchronize active compilation inputs.
+Use supported rename and move tools to carry identity across refactoring.
+Plain-text reconciliation refuses ambiguous matches.
 
----
+Names such as `count` and `items` are ordinary program identifiers, not identity
+fields. See [stable identifiers](/docs/philosophy/stable-identifiers/).
 
-## Complete Example
+## Documentation comments
+
+Put `///` comments immediately before the declaration they document.
+Consecutive lines form one comment; a blank line or ordinary `//` comment
+ends the association. The formatter preserves documentation comments.
+`--require-docs` and `--strict-api` recognize them.
 
 ```calor
-§M{FizzBuzz}
-  §F{Main:pub}
-    §O{void}
-    §E{cw}
-    §L{i:1:100:1}
-      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+/// Arithmetic helpers.
+module DocumentedArithmetic
+  /// Adds two integers.
+  func Add (int:x, int:y) → int
+    !
+    return x + y
 ```
 
-Blocks are delimited by **indentation** (default 2 spaces per nesting level).
-Legacy structural closers raise `Calor0830`; migrate them with
-`calor fix --heal-closers`. See
-[Structure Tags](/docs/syntax-reference/structure-tags/) for details.
+Version annotations also use documentation comments: `/// since 1.0.0`,
+`/// deprecated 2.0.0 Replacement`, and `/// breaking 3.0.0 "Description"`.
+They are not source identity fields. See the
+[generated catalog](/docs/syntax-reference/current-language/#introduction-version-metadata)
+for the supported metadata forms.
 
----
+Frozen benchmark archives preserve the language originally measured.
+They are historical inputs, not current parser-compatibility examples.
+Active-syntax regression copies do not remeasure those experiments or change
+their ledgers and measured commits.
 
-## Detailed Reference
+## Complete example
 
-- [Structure Tags](/docs/syntax-reference/structure-tags/) - Modules, functions, block structure
-- [Types](/docs/syntax-reference/types/) - Type system, Option, Result
-- [Bindings](/docs/syntax-reference/binding/) - `§B` local bindings and inference
-- [Calls](/docs/syntax-reference/calls/) - `§C` calls and implicit close
-- [Expressions](/docs/syntax-reference/expressions/) - Lisp-style operators
-- [Control Flow](/docs/syntax-reference/control-flow/) - Loops, conditionals
-- [Contracts](/docs/syntax-reference/contracts/) - Requires, ensures
-- [Effects](/docs/syntax-reference/effects/) - Effect declarations
-- [String Operations](/docs/syntax-reference/string-operations/) - String, regex, character, and comparison-mode behavior
+```calor
+module FizzBuzz
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i % 15 == 0
+        Console.WriteLine("FizzBuzz")
+      else if i % 3 == 0
+        Console.WriteLine("Fizz")
+      else if i % 5 == 0
+        Console.WriteLine("Buzz")
+      else
+        Console.WriteLine(i)
+```
+
+`Main()` prints the numbers 1 through 100, replacing multiples of three with
+`Fizz`, multiples of five with `Buzz`, and multiples of both with `FizzBuzz`.
+Blocks end by dedenting. The
+[control-flow reference](/docs/syntax-reference/control-flow/) adds loops and
+other branching forms.
+
+## Detailed reference
+
+- [Current language](/docs/syntax-reference/current-language/) — generated construct catalog and executable examples
+- [Declaration structure](/docs/syntax-reference/structure-tags/) — declarations and block organization
+- [Types](/docs/syntax-reference/types/) — primitive types, nullability and collections
+- [Bindings](/docs/syntax-reference/binding/) — immutable and mutable locals
+- [Calls](/docs/syntax-reference/calls/) — arguments, overloads and by-reference calls
+- [Expressions](/docs/syntax-reference/expressions/) — operators and expression forms
+- [Control flow](/docs/syntax-reference/control-flow/) — loops, conditionals and matching
+- [Contracts](/docs/syntax-reference/contracts/) — preconditions, postconditions and runtime guards
+- [Effects](/docs/syntax-reference/effects/) — declarations and callback rows
+- [String operations](/docs/syntax-reference/string-operations/) — strings, regex and formatting
+- [Value constraints](/docs/syntax-reference/refinement-types/) — input contracts and their limits

@@ -1,0 +1,18 @@
+module Iterator Iterator
+  module IteratorModule
+    func HasNext public (int:current, int:end) → bool
+      !
+      return current < end
+
+    func Next public (int:current, int:@step) → int
+      !
+      requires @step > 0
+      return current + @step
+
+    func Current public (int:value) → int
+      !
+      return value
+
+    func Reset public (int:start) → int
+      !
+      return start

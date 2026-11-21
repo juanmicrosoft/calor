@@ -24,7 +24,7 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{m001:PerformanceTestModule}");
+        sb.AppendLine("module PerformanceTestModule PerformanceTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)
@@ -43,42 +43,44 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{m001:TaintTestModule}");
+        sb.AppendLine("module TaintTestModule TaintTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)
         {
-            var funcId = $"f{f:D3}";
-            sb.AppendLine($"  §F{{{funcId}:TaintFunc{f}:pub}}");
-            sb.AppendLine($"    §I{{string:user_input}}");
-            sb.AppendLine($"    §O{{string}}");
+            sb.AppendLine($"  func TaintFunc{f} (string:user_input) → string");
+            // Public boundaries declare their row (Calor0124): database writes for the two
+            // sink shapes, console writes for the print shape.
+            sb.AppendLine(f % 3 == 2 ? "    ! cw" : "    ! db:w");
 
             // Create a chain of data flow
-            sb.AppendLine($"    §B{{var1:string}} user_input");
+            sb.AppendLine($"    let string:var1 = user_input");
             for (var v = 2; v <= dataFlowDepth; v++)
             {
-                sb.AppendLine($"    §B{{var{v}:string}} (+ var{v - 1} STR:\"x\")");
+                sb.AppendLine($"    let string:var{v} = var{v - 1} + \"x\"");
             }
 
             // Add a sink at the end (some functions are vulnerable, some are not)
             if (f % 3 == 0)
             {
-                // Vulnerable: direct use of tainted data
-                sb.AppendLine($"    §C{{db.execute}} §A var{dataFlowDepth} §/C");
+                // Vulnerable: direct use of tainted data. ExecuteSql is the built-in bare-name
+                // SQL sink: native source cannot call through the undeclared `db` receiver the
+                // legacy `db.execute` target named, and the sink category is the same.
+                sb.AppendLine($"    ExecuteSql(var{dataFlowDepth})");
             }
             else if (f % 3 == 1)
             {
                 // Safe: sanitized
-                sb.AppendLine($"    §B{{safe:string}} §C{{sanitize}} §A var{dataFlowDepth} §/C");
-                sb.AppendLine($"    §C{{db.execute}} §A safe §/C");
+                sb.AppendLine($"    let string:safe = sanitize(var{dataFlowDepth})");
+                sb.AppendLine($"    ExecuteSql(safe)");
             }
             else
             {
                 // Safe: no sink
-                sb.AppendLine($"    §C{{print}} §A var{dataFlowDepth} §/C");
+                sb.AppendLine($"    print(var{dataFlowDepth})");
             }
 
-            sb.AppendLine($"    §R var{dataFlowDepth}");
+            sb.AppendLine($"    return var{dataFlowDepth}");
             sb.AppendLine();
         }
 
@@ -92,23 +94,21 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{m001:LoopTestModule}");
+        sb.AppendLine("module LoopTestModule LoopTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)
         {
-            var funcId = $"f{f:D3}";
-            sb.AppendLine($"  §F{{{funcId}:LoopFunc{f}:pub}}");
-            sb.AppendLine($"    §I{{i32:n}}");
-            sb.AppendLine($"    §O{{i32}}");
-            sb.AppendLine($"    §B{{result:i32}} INT:0");
+            sb.AppendLine($"  func LoopFunc{f} (int:n) → int");
+            sb.AppendLine("    !");
+            sb.AppendLine($"    let int:result = 0");
 
             for (var l = 1; l <= loopsPerFunction; l++)
             {
-                GenerateNestedLoop(sb, l, nestingDepth, 2);
+                GenerateNestedLoop(sb, nestingDepth, 2);
             }
 
-            sb.AppendLine($"    §R result");
+            sb.AppendLine($"    return result");
             sb.AppendLine();
         }
 
@@ -122,21 +122,18 @@ public static class SyntheticCodeGenerator
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("§M{m001:ControlFlowTestModule}");
+        sb.AppendLine("module ControlFlowTestModule ControlFlowTestModule block");
         sb.AppendLine();
 
         for (var f = 1; f <= functions; f++)
         {
-            var funcId = $"f{f:D3}";
-            sb.AppendLine($"  §F{{{funcId}:ControlFlow{f}:pub}}");
-            sb.AppendLine($"    §I{{i32:x}}");
-            sb.AppendLine($"    §I{{i32:y}}");
-            sb.AppendLine($"    §O{{i32}}");
-            sb.AppendLine($"    §B{{result:i32}} INT:0");
+            sb.AppendLine($"  func ControlFlow{f} (int:x, int:y) → int");
+            sb.AppendLine("    !");
+            sb.AppendLine($"    let int:result = 0");
 
             GenerateNestedConditionals(sb, branchDepth, 2);
 
-            sb.AppendLine($"    §R result");
+            sb.AppendLine($"    return result");
             sb.AppendLine();
         }
 
@@ -150,11 +147,8 @@ public static class SyntheticCodeGenerator
         bool includeLoops,
         bool includeConditionals)
     {
-        var funcId = $"f{functionNumber:D3}";
-        sb.AppendLine($"  §F{{{funcId}:TestFunc{functionNumber}:pub}}");
-        sb.AppendLine($"    §I{{i32:x}}");
-        sb.AppendLine($"    §I{{i32:y}}");
-        sb.AppendLine($"    §O{{i32}}");
+        sb.AppendLine($"  func TestFunc{functionNumber} (int:x, int:y) → int");
+        sb.AppendLine("    !");
 
         var varCounter = 0;
         var remainingStatements = statements;
@@ -168,48 +162,49 @@ public static class SyntheticCodeGenerator
                 case 0:
                     // Simple binding
                     varCounter++;
-                    sb.AppendLine($"    §B{{v{varCounter}:i32}} (+ x INT:{varCounter})");
+                    sb.AppendLine($"    let int:v{varCounter} = x + {varCounter}");
                     remainingStatements--;
                     break;
 
                 case 1:
                     // Binary operation
                     varCounter++;
-                    sb.AppendLine($"    §B{{v{varCounter}:i32}} (* y INT:{varCounter})");
+                    sb.AppendLine($"    let int:v{varCounter} = y * {varCounter}");
                     remainingStatements--;
                     break;
 
                 case 2 when includeConditionals && remainingStatements >= 3:
                     // Conditional
                     varCounter++;
-                    sb.AppendLine($"    §IF{{if{functionNumber}_{varCounter}}} (> x INT:0)");
-                    sb.AppendLine($"      §B{{v{varCounter}:i32}} (+ x y)");
-                    sb.AppendLine($"    §EL");
+                    sb.AppendLine($"    if x > 0");
+                    sb.AppendLine($"      let int:v{varCounter} = x + y");
+                    sb.AppendLine($"    else");
                     varCounter++;
-                    sb.AppendLine($"      §B{{v{varCounter}:i32}} (- x y)");
+                    sb.AppendLine($"      let int:v{varCounter} = x - y");
                     remainingStatements -= 3;
                     break;
 
                 case 3 when includeLoops && remainingStatements >= 4:
-                    // For loop
-                    var loopId = $"l{varCounter}";
-                    sb.AppendLine($"    §B{{sum{varCounter}:i32}} INT:0");
-                    sb.AppendLine($"    §L{{{loopId}:i:1:10:1}}");
-                    sb.AppendLine($"      §B{{sum{varCounter}:i32}} (+ sum{varCounter} i)");
+                    // For loop. The body re-binds sum as the legacy workload did, so the bound
+                    // tree (and the registered pipeline counters) stay those of the legacy shape.
+                    sb.AppendLine($"    let int:sum{varCounter} = 0");
+                    sb.AppendLine($"    for i from 1 to 10 step 1");
+                    sb.AppendLine($"      let int:sum{varCounter} = sum{varCounter} + i");
                     remainingStatements -= 4;
                     break;
 
                 case 4:
-                    // Function call
+                    // Function call: an unresolved external call, as the legacy `math.abs`
+                    // target was (a resolved System.Math.Abs would add metadata binding work).
                     varCounter++;
-                    sb.AppendLine($"    §B{{v{varCounter}:i32}} §C{{math.abs}} §A x §/C");
+                    sb.AppendLine($"    let int:v{varCounter} = abs(x)");
                     remainingStatements--;
                     break;
 
                 default:
                     // Default: simple binding
                     varCounter++;
-                    sb.AppendLine($"    §B{{v{varCounter}:i32}} INT:{remainingStatements}");
+                    sb.AppendLine($"    let int:v{varCounter} = {remainingStatements}");
                     remainingStatements--;
                     break;
             }
@@ -218,28 +213,26 @@ public static class SyntheticCodeGenerator
         // Final result
         if (varCounter > 0)
         {
-            sb.AppendLine($"    §R v{varCounter}");
+            sb.AppendLine($"    return v{varCounter}");
         }
         else
         {
-            sb.AppendLine($"    §R (+ x y)");
+            sb.AppendLine($"    return x + y");
         }
     }
 
-    private static void GenerateNestedLoop(StringBuilder sb, int loopNum, int depth, int indent)
+    private static void GenerateNestedLoop(StringBuilder sb, int depth, int indent)
     {
         var indentStr = new string(' ', indent * 2);
-        var loopId = $"l{loopNum}d{depth}";
-
-        sb.AppendLine($"{indentStr}§L{{{loopId}:i{depth}:0:n:1}}");
+        sb.AppendLine($"{indentStr}for i{depth} from 0 to n step 1");
 
         if (depth > 1)
         {
-            GenerateNestedLoop(sb, loopNum, depth - 1, indent + 1);
+            GenerateNestedLoop(sb, depth - 1, indent + 1);
         }
         else
         {
-            sb.AppendLine($"{indentStr}  §B{{result:i32}} (+ result i{depth})");
+            sb.AppendLine($"{indentStr}  let int:result = result + i{depth}");
         }
     }
 
@@ -249,15 +242,15 @@ public static class SyntheticCodeGenerator
 
         if (depth <= 0)
         {
-            sb.AppendLine($"{indentStr}§B{{result:i32}} (+ x y)");
+            sb.AppendLine($"{indentStr}let int:result = x + y");
             return;
         }
 
-        sb.AppendLine($"{indentStr}§IF{{if{depth}}} (> x INT:{depth})");
+        sb.AppendLine($"{indentStr}if x > {depth}");
         GenerateNestedConditionals(sb, depth - 1, indent + 1);
-        sb.AppendLine($"{indentStr}§EI (< x INT:-{depth})");
-        sb.AppendLine($"{indentStr}  §B{{result:i32}} (- x y)");
-        sb.AppendLine($"{indentStr}§EL");
-        sb.AppendLine($"{indentStr}  §B{{result:i32}} (* x y)");
+        sb.AppendLine($"{indentStr}else if x < -{depth}");
+        sb.AppendLine($"{indentStr}  let int:result = x - y");
+        sb.AppendLine($"{indentStr}else");
+        sb.AppendLine($"{indentStr}  let int:result = x * y");
     }
 }

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "description": "Effect declarations for common .NET framework interfaces (Tier B). These interfaces cannot be resolved by compile-time IL analysis due to architectural limits (delegate dispatch, BCL intrinsics, DI resolution). Annotations are curated design decisions based on the intended semantics of each interface.",
+  "description": "Effect declarations for common .NET framework interfaces (Tier B). They apply only when a call binds to the named metadata member, which needs the assembly as an explicit reference. Conventions: a member whose job is to run user-supplied code (service construction, hosted services, options configuration, registered callbacks) is 'unknown'; a provider or interceptor behind a member is assumed to stay within the member's own effect (logging providers write output, cw; EF Core interceptors do database work). No namespace-wide defaults: an unlisted member is unknown.",
   "library": "Microsoft.Extensions.*",
   "confidence": "reviewed",
   "mappings": [
@@ -8,7 +8,7 @@
       "type": "Microsoft.Extensions.Logging.ILogger",
       "methods": {
         "Log": ["cw"],
-        "BeginScope": [],
+        "BeginScope": ["unknown"],
         "IsEnabled": []
       }
     },
@@ -16,16 +16,16 @@
       "type": "Microsoft.Extensions.Logging.ILogger`1",
       "methods": {
         "Log": ["cw"],
-        "BeginScope": [],
+        "BeginScope": ["unknown"],
         "IsEnabled": []
       }
     },
     {
       "type": "Microsoft.Extensions.Logging.ILoggerFactory",
       "methods": {
-        "CreateLogger": [],
-        "AddProvider": ["mut"],
-        "Dispose": []
+        "CreateLogger": ["unknown"],
+        "AddProvider": ["unknown"],
+        "Dispose": ["unknown"]
       }
     },
     {
@@ -55,7 +55,7 @@
       "methods": {
         "GetSection": ["env:r"],
         "GetChildren": ["env:r"],
-        "Reload": ["env:r"]
+        "Reload": ["unknown"]
       }
     },
     {
@@ -74,14 +74,19 @@
       "type": "Microsoft.Extensions.Configuration.ConfigurationExtensions",
       "methods": {
         "GetConnectionString": ["env:r"],
-        "GetValue": ["env:r"],
         "GetRequiredSection": ["env:r"]
       }
     },
     {
-      "type": "Microsoft.Extensions.DependencyInjection.IServiceProvider",
+      "type": "Microsoft.Extensions.Configuration.ConfigurationBinder",
       "methods": {
-        "GetService": []
+        "GetValue": ["env:r"]
+      }
+    },
+    {
+      "type": "System.IServiceProvider",
+      "methods": {
+        "GetService": ["unknown"]
       }
     },
     {
@@ -93,7 +98,7 @@
     {
       "type": "Microsoft.Extensions.DependencyInjection.IServiceScope",
       "methods": {
-        "Dispose": []
+        "Dispose": ["unknown"]
       },
       "getters": {
         "ServiceProvider": []
@@ -108,47 +113,45 @@
     {
       "type": "Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions",
       "methods": {
-        "GetRequiredService": [],
-        "GetService": [],
-        "GetServices": [],
-        "CreateScope": [],
-        "CreateAsyncScope": []
+        "GetRequiredService": ["unknown"],
+        "GetService": ["unknown"],
+        "GetServices": ["unknown"],
+        "CreateScope": ["unknown"],
+        "CreateAsyncScope": ["unknown"]
       }
     },
     {
       "type": "Microsoft.Extensions.Options.IOptions`1",
-      "defaultEffects": [],
       "getters": {
-        "Value": []
+        "Value": ["unknown"]
       }
     },
     {
       "type": "Microsoft.Extensions.Options.IOptionsSnapshot`1",
-      "defaultEffects": [],
       "getters": {
-        "Value": []
+        "Value": ["unknown"]
       },
       "methods": {
-        "Get": []
+        "Get": ["unknown"]
       }
     },
     {
       "type": "Microsoft.Extensions.Options.IOptionsMonitor`1",
       "getters": {
-        "CurrentValue": []
+        "CurrentValue": ["unknown"]
       },
       "methods": {
-        "Get": [],
-        "OnChange": []
+        "Get": ["unknown"],
+        "OnChange": ["unknown"]
       }
     },
     {
       "type": "Microsoft.Extensions.Hosting.IHost",
       "methods": {
-        "StartAsync": ["net:rw"],
-        "StopAsync": ["net:rw"],
-        "RunAsync": ["net:rw"],
-        "Dispose": []
+        "StartAsync": ["unknown"],
+        "StopAsync": ["unknown"],
+        "RunAsync": ["unknown"],
+        "Dispose": ["unknown"]
       },
       "getters": {
         "Services": []
@@ -157,11 +160,11 @@
     {
       "type": "Microsoft.Extensions.Hosting.IHostBuilder",
       "methods": {
-        "Build": [],
-        "ConfigureAppConfiguration": [],
-        "ConfigureHostConfiguration": [],
-        "ConfigureServices": [],
-        "UseServiceProviderFactory": []
+        "Build": ["unknown"],
+        "ConfigureAppConfiguration": ["mut"],
+        "ConfigureHostConfiguration": ["mut"],
+        "ConfigureServices": ["mut"],
+        "UseServiceProviderFactory": ["mut"]
       },
       "getters": {
         "Properties": []
@@ -170,14 +173,14 @@
     {
       "type": "Microsoft.Extensions.Hosting.IHostedService",
       "methods": {
-        "StartAsync": ["net:rw"],
-        "StopAsync": ["net:rw"]
+        "StartAsync": ["unknown"],
+        "StopAsync": ["unknown"]
       }
     },
     {
       "type": "Microsoft.Extensions.Hosting.IHostApplicationLifetime",
       "methods": {
-        "StopApplication": ["proc"]
+        "StopApplication": ["unknown"]
       },
       "getters": {
         "ApplicationStarted": [],
@@ -188,12 +191,12 @@
     {
       "type": "Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions",
       "methods": {
-        "Run": ["net:rw"],
-        "RunAsync": ["net:rw"],
-        "Start": ["net:rw"],
-        "StopAsync": ["net:rw"],
-        "WaitForShutdown": ["net:rw"],
-        "WaitForShutdownAsync": ["net:rw"]
+        "Run": ["unknown"],
+        "RunAsync": ["unknown"],
+        "Start": ["unknown"],
+        "StopAsync": ["unknown"],
+        "WaitForShutdown": ["unknown"],
+        "WaitForShutdownAsync": ["unknown"]
       }
     },
     {
@@ -203,17 +206,17 @@
         "SaveChangesAsync": ["db:w"],
         "Find": ["db:r"],
         "FindAsync": ["db:r"],
-        "Add": ["mut"],
-        "AddAsync": ["mut"],
-        "AddRange": ["mut"],
-        "AddRangeAsync": ["mut"],
-        "Update": ["mut"],
-        "UpdateRange": ["mut"],
+        "Add": ["mut", "db:rw"],
+        "AddAsync": ["mut", "db:rw"],
+        "AddRange": ["mut", "db:rw"],
+        "AddRangeAsync": ["mut", "db:rw"],
+        "Update": ["mut", "db:rw"],
+        "UpdateRange": ["mut", "db:rw"],
         "Remove": ["mut"],
         "RemoveRange": ["mut"],
-        "Attach": ["mut"],
-        "AttachRange": ["mut"],
-        "Entry": [],
+        "Attach": ["mut", "db:rw"],
+        "AttachRange": ["mut", "db:rw"],
+        "Entry": ["mut"],
         "Set": [],
         "Dispose": [],
         "DisposeAsync": []
@@ -222,19 +225,19 @@
     {
       "type": "Microsoft.EntityFrameworkCore.DbSet`1",
       "methods": {
-        "Add": ["mut"],
-        "AddAsync": ["mut"],
-        "AddRange": ["mut"],
-        "AddRangeAsync": ["mut"],
-        "Update": ["mut"],
-        "UpdateRange": ["mut"],
+        "Add": ["mut", "db:rw"],
+        "AddAsync": ["mut", "db:rw"],
+        "AddRange": ["mut", "db:rw"],
+        "AddRangeAsync": ["mut", "db:rw"],
+        "Update": ["mut", "db:rw"],
+        "UpdateRange": ["mut", "db:rw"],
         "Remove": ["mut"],
         "RemoveRange": ["mut"],
-        "Attach": ["mut"],
-        "AttachRange": ["mut"],
+        "Attach": ["mut", "db:rw"],
+        "AttachRange": ["mut", "db:rw"],
         "Find": ["db:r"],
         "FindAsync": ["db:r"],
-        "Entry": [],
+        "Entry": ["mut"],
         "AsNoTracking": [],
         "AsTracking": [],
         "Include": [],
@@ -304,7 +307,6 @@
     },
     {
       "type": "Microsoft.AspNetCore.Http.HttpContext",
-      "defaultEffects": [],
       "getters": {
         "Request": [],
         "Response": [],
@@ -318,7 +320,6 @@
     },
     {
       "type": "Microsoft.AspNetCore.Http.HttpRequest",
-      "defaultEffects": [],
       "getters": {
         "Path": [],
         "Method": [],
@@ -376,7 +377,6 @@
     },
     {
       "type": "Microsoft.AspNetCore.Mvc.ControllerBase",
-      "defaultEffects": [],
       "methods": {
         "Ok": [],
         "NotFound": [],
@@ -431,12 +431,5 @@
         "RemoveAsync": ["db:w"]
       }
     }
-  ],
-  "namespaceDefaults": {
-    "Microsoft.Extensions.Logging": ["cw"],
-    "Microsoft.Extensions.Configuration": ["env:r"],
-    "Microsoft.Extensions.Options": [],
-    "Microsoft.Extensions.DependencyInjection": [],
-    "Microsoft.Extensions.Caching.Memory": []
-  }
+  ]
 }

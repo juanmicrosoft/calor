@@ -29,6 +29,23 @@ public class ClaudeInitializerMcpTests : IDisposable
     }
 
     [Fact]
+    public async Task Initialize_CreatesDocumentedArtifactsWithoutInstallingSlashSkills()
+    {
+        var result = await CreateInitializer().InitializeAsync(_testDir, force: false);
+        Assert.True(result.Success);
+        var expected = new[]
+        {
+            Path.Combine(_testDir, "CLAUDE.md"),
+            Path.Combine(_testDir, ".claude", "settings.json"),
+            _claudeJsonPath
+        };
+        Assert.Equal(expected.Order(StringComparer.Ordinal),
+            result.CreatedFiles.Concat(result.UpdatedFiles).Order(StringComparer.Ordinal));
+        Assert.All(expected, path => Assert.True(File.Exists(path), path));
+        Assert.False(Directory.Exists(Path.Combine(_testDir, ".claude", "skills")));
+    }
+
+    [Fact]
     public async Task Initialize_ConfiguresMcpServer_InClaudeJson()
     {
         var initializer = CreateInitializer();

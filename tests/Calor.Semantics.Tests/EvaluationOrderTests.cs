@@ -20,19 +20,16 @@ public class EvaluationOrderTests
         // We verify this by checking the CNF lowering produces temporaries in order.
 
         var source = @"
-§M{m001:Test}
-  §F{f001:target:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §I{i32:c}
-      §O{i32}
-      §R (+ (+ a b) c)
-  §F{f002:test:pub}
-      §O{i32}
-      §B{i32:x} INT:1
-      §B{i32:y} INT:2
-      §B{i32:z} INT:3
-      §R (+ (+ x y) z)
+module Test Test
+  func target (int:a, int:b, int:c) → int
+    !
+    return (a + b) + c
+  func test () → int
+    !
+    let int:x = 1
+    let int:y = 2
+    let int:z = 3
+    return (x + y) + z
 ";
 
         var cnf = SemanticsTestHarness.CompileToCnf(source);
@@ -59,13 +56,10 @@ public class EvaluationOrderTests
         // For a + b + c, evaluate a, then b, compute a+b, then c, compute (a+b)+c
 
         var source = @"
-§M{m001:Test}
-  §F{f001:compute:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §I{i32:c}
-      §O{i32}
-      §R (+ (+ a b) c)
+module Test Test
+  func compute (int:a, int:b, int:c) → int
+    !
+    return (a + b) + c
 ";
 
         var cnf = SemanticsTestHarness.CompileToCnf(source);
@@ -87,12 +81,10 @@ public class EvaluationOrderTests
         // When A is false in A && B, B should not be evaluated
 
         var source = @"
-§M{m001:Test}
-  §F{f001:testAnd:pub}
-      §I{bool:a}
-      §I{bool:b}
-      §O{bool}
-      §R (&& a b)
+module Test Test
+  func testAnd (bool:a, bool:b) → bool
+    !
+    return a && b
 ";
 
         var cnf = SemanticsTestHarness.CompileToCnf(source);
@@ -116,12 +108,10 @@ public class EvaluationOrderTests
         // When A is true in A || B, B should not be evaluated
 
         var source = @"
-§M{m001:Test}
-  §F{f001:testOr:pub}
-      §I{bool:a}
-      §I{bool:b}
-      §O{bool}
-      §R (|| a b)
+module Test Test
+  func testOr (bool:a, bool:b) → bool
+    !
+    return a || b
 ";
 
         var cnf = SemanticsTestHarness.CompileToCnf(source);
@@ -143,11 +133,10 @@ public class EvaluationOrderTests
     public void CNF_Validation_ProducesValidIR()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:simple:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (* x INT:2)
+module Test Test
+  func simple (int:x) → int
+    !
+    return x * 2
 ";
 
         var cnf = SemanticsTestHarness.CompileToCnf(source);

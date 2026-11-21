@@ -7,7 +7,11 @@ using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
+using Diagnostic = Calor.Compiler.Diagnostics.Diagnostic;
 
 namespace Calor.Compiler.Tests.Analysis;
 
@@ -65,16 +69,17 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
-    public void SomeNullCoalesce_DoesNotUnwrapPayload_OrResolvePayloadOverload()
+    public void NullCoalesce_UsesFallbackTypeToResolveOverload()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Pick:pri} (i32:value) -> i32
-                §R value
-              §F{f2:Pick:pri} (str:value) -> str
-                §R value
-              §F{f3:Use:pub} () -> i32
-                §R §C{Pick} §A (?? §SM INT:1 INT:0) §/C
+            module Test
+              func Pick private (int:value) → int
+                return value
+              func Pick private (string:value) → string
+                return value
+              func Use public () → int
+                !
+                return Pick(null ?? 0)
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -82,31 +87,36 @@ public sealed class SymbolAndOverloadBindingTests
         var call = Assert.IsType<BoundCallExpression>(
             Assert.IsType<BoundReturnStatement>(Assert.Single(use.Body)).Expression);
 
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
-        Assert.Equal("OBJECT", Assert.Single(call.Arguments).Type.DisplayString);
-        Assert.Null(call.ResolvedSymbol);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.Equal("INT", Assert.Single(call.Arguments).Type.DisplayString);
+        Assert.Same(bound.Functions[0].Symbol, call.ResolvedSymbol);
     }
 
     [Fact]
     public void MemberOverloads_ResolveBareQualifiedAndStatementCalls()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:UseQualified:pub} (Converter:c) -> i32
-                §R §C{c.Convert} §A INT:1 §/C
+            module Test
+              func UseQualified public (Converter:c) → int
+                !
+                return c.Convert(1)
 
-              §CL{c1:Converter:pub}
-                §FLD{i32:_value:priv}
-                §MT{m1:Convert:pub} (i32:x) -> i32
-                  §R x
-                §MT{m2:Convert:pub} (str:x) -> str
-                  §R x
-                §MT{m3:Convert:pub} (i32:x, i32:y) -> bool
-                  §R BOOL:true
-                §MT{m4:Use:pub}
-                  §C{Convert} §A INT:1 §/C
-                  §C{Convert} §A STR:"x" §/C
-                  §C{Convert} §A INT:1 §A INT:2 §/C
+              class Converter
+                field int:_value private
+                func Convert public (int:x) → int
+                  !
+                  return x
+                func Convert public (string:x) → string
+                  !
+                  return x
+                func Convert public (int:x, int:y) → bool
+                  !
+                  return true
+                func Use public () → void
+                  !
+                  Convert(1)
+                  Convert("x")
+                  Convert(1, 2)
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -118,7 +128,8 @@ public sealed class SymbolAndOverloadBindingTests
         var statementCalls = bound.Functions
             .Single(function => function.Symbol.Name == "Converter.Use")
             .Body
-            .OfType<BoundCallStatement>()
+            .Select(statement => Assert.IsType<BoundCallExpression>(
+                Assert.IsType<BoundExpressionStatement>(statement).Expression))
             .ToArray();
 
         Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
@@ -211,11 +222,12 @@ public sealed class SymbolAndOverloadBindingTests
     public void ProgramCompile_KnownInternalNoMatch_FailsBeforeEmission()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Pick:pri} (i32:value) -> i32
-                §R value
-              §F{f2:Use:pub} () -> i32
-                §R §C{Pick} §A STR:"wrong" §/C
+            module Test
+              func Pick private (int:value) → int
+                return value
+              func Use public () → int
+                !
+                return Pick("wrong")
             """;
 
         var result = Calor.Compiler.Program.Compile(source);
@@ -230,13 +242,14 @@ public sealed class SymbolAndOverloadBindingTests
     public void ProgramCompile_KnownInternalAmbiguity_FailsBeforeEmission()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Pick<T>:pri} (T:value, i32:other) -> T
-                §R value
-              §F{f2:Pick<T>:pri} (i32:value, T:other) -> T
-                §R other
-              §F{f3:Use:pub} () -> i32
-                §R §C{Pick} §A INT:1 §A INT:2 §/C
+            module Test
+              func Pick<T> private (T:value, int:other) → T
+                return value
+              func Pick<T> private (int:value, T:other) → T
+                return other
+              func Use public () → int
+                !
+                return Pick(1, 2)
             """;
 
         var result = Calor.Compiler.Program.Compile(source);
@@ -251,9 +264,10 @@ public sealed class SymbolAndOverloadBindingTests
     public void ProgramCompile_ExternalInteropCall_RemainsEmissionEligible()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Use:pub} () -> void
-                §C{Console.WriteLine} §A STR:"ok" §/C
+            module Test
+              func Use public () → void
+                !
+                Console.WriteLine("ok")
             """;
 
         var result = Calor.Compiler.Program.Compile(
@@ -272,13 +286,14 @@ public sealed class SymbolAndOverloadBindingTests
     public void NewExpressionGenericTypeReferences_RetainExactNestedIdentities()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Create:pub} () -> object
-                §R §NEW{Box<List<Widget>>} §/NEW
-              §CL{c1:Widget:pub}
-              §CL{c2:List:pub}<T>
-              §CL{c3:Box:pub}<T>
-                §FLD{i32:_dummy:priv}
+            module Test
+              func Create public () → object
+                !
+                return new Box<List<Widget>>()
+              class Widget
+              class List<T>
+              class Box<T>
+                field int:_dummy private
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -395,15 +410,15 @@ public sealed class SymbolAndOverloadBindingTests
         {
             "?str",
             "string?",
-            "OPTION[inner=STRING]",
+            "NULLABLE[inner=STRING]",
         };
 
         Assert.All(spellings, spelling =>
             Assert.Equal("STRING?", TypeIdentity.Canonicalize(spelling)));
         Assert.Equal(
-            "OPTION<STRING>?",
-            TypeIdentity.Canonicalize("OPTION[inner=Option<str>]"));
-        Assert.Equal("OPTION<STRING?>", TypeIdentity.Canonicalize("Option<?str>"));
+            "Option<STRING>?",
+            TypeIdentity.Canonicalize("NULLABLE[inner=Option<str>]"));
+        Assert.Equal("Option<STRING?>", TypeIdentity.Canonicalize("Option<?str>"));
 
         var scope = new Scope();
         var expected = new FunctionSymbol(
@@ -418,9 +433,9 @@ public sealed class SymbolAndOverloadBindingTests
             Assert.Same(expected, resolution.Function);
         }
 
-        foreach (var spelling in new[] { "Option<str>", "Option[str]", "Calor.Runtime.Option<string>" })
+        foreach (var spelling in new[] { "Option<str>", "Option<string>" })
         {
-            Assert.Equal("OPTION<STRING>", TypeIdentity.Canonicalize(spelling));
+            Assert.Equal("Option<STRING>", TypeIdentity.Canonicalize(spelling));
             Assert.Null(scope.ResolveOverload("Pick", [spelling]).Function);
         }
     }
@@ -429,37 +444,50 @@ public sealed class SymbolAndOverloadBindingTests
     public void StatementGenericCalls_RetainTypeArgumentsAndResolveGenericArity()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Select<T>:pri} (T:value) -> T
-                §R value
-              §F{f2:Select<T,U>:pri} (T:value) -> T
-                §R value
-              §F{f3:Use:pub} () -> void
-                §C{Select<i32>} §A INT:1 §/C
-                §C{Select<i32,str>} §A INT:1 §/C
+            module Test
+              func Select<T> private (T:value) → T
+                return value
+              func Select<T,U> private (T:value) → T
+                return value
+              func Use public () → void
+                !
+                Select<int>(1)
+                Select<int,string>(1)
             """;
 
         var diagnostics = new DiagnosticBag();
         var module = Parse(source, diagnostics);
-        var astCalls = module.Functions[2].Body.OfType<CallStatementNode>().ToArray();
+        var astCalls = module.Functions[2].Body
+            .Select(statement => Assert.IsType<CallExpressionNode>(
+                Assert.IsType<ExpressionStatementNode>(statement).Expression))
+            .ToArray();
         var bound = new Binder(diagnostics).Bind(module);
         var boundCalls = bound.Functions
             .Single(function => function.Symbol.Name == "Use")
             .Body
-            .OfType<BoundCallStatement>()
+            .Select(statement => Assert.IsType<BoundCallExpression>(
+                Assert.IsType<BoundExpressionStatement>(statement).Expression))
             .ToArray();
 
         Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
-        Assert.Equal(["i32"], astCalls[0].TypeArguments);
-        Assert.Equal(["i32", "str"], astCalls[1].TypeArguments);
+        Assert.Equal(["int"], astCalls[0].TypeArguments);
+        Assert.Equal(["int", "string"], astCalls[1].TypeArguments);
         Assert.Equal("Select", astCalls[0].Target);
         Assert.Equal("Select", astCalls[1].Target);
-        Assert.Equal(["i32"], boundCalls[0].TypeArguments);
-        Assert.Equal(["i32", "str"], boundCalls[1].TypeArguments);
+        Assert.Equal(["int"], boundCalls[0].TypeArguments);
+        Assert.Equal(["int", "string"], boundCalls[1].TypeArguments);
         Assert.Equal(1, boundCalls[0].ResolvedSymbol!.GenericArity);
         Assert.Equal(2, boundCalls[1].ResolvedSymbol!.GenericArity);
-        Assert.Equal("Select<int>(1);", new CSharpEmitter().Visit(astCalls[0]));
-        Assert.Contains("§C{Select<i32>}", new CalorEmitter().Emit(module));
+        Assert.Contains("Select<int>(1);", new CSharpEmitter().Emit(module));
+        var emitted = new CalorEmitter().Emit(module);
+        Assert.DoesNotContain('§', emitted);
+        Assert.Contains("Select<int>(1)", emitted);
+        Assert.Contains("Select<int, string>(1)", emitted);
+        var rebound = ParseAndBind(emitted, out var roundTripDiagnostics);
+        Assert.DoesNotContain(roundTripDiagnostics, IsOverloadDiagnostic);
+        Assert.Equal(new[] { 1, 2 }, BoundNodeHelpers.DescendantsAndSelf(
+                rebound.Functions.Single(function => function.Symbol.Name == "Use"))
+            .OfType<BoundCallExpression>().Select(call => call.ResolvedSymbol!.GenericArity));
     }
 
     [Fact]
@@ -525,18 +553,21 @@ public sealed class SymbolAndOverloadBindingTests
     public void DeclarationSymbols_UseIdentifierSpans_AndStableAstIdsIgnoreSiblingInsertion()
     {
         const string original = """
-            §M{m1:Test}
-              §F{stable:Keep:pub} (i32:value) -> i32
-                §B{local:i32} value
-                §R local
+            module Test
+              func Keep public (int:value) → int
+                !
+                let int:local = value
+                return local
             """;
         const string inserted = """
-            §M{m1:Test}
-              §F{before:Before:pub} () -> i32
-                §R 0
-              §F{stable:Keep:pub} (i32:value) -> i32
-                §B{local:i32} value
-                §R local
+            module Test
+              func Before public () → int
+                !
+                return 0
+              func Keep public (int:value) → int
+                !
+                let int:local = value
+                return local
             """;
 
         var first = ParseAndBind(original, out _);
@@ -565,11 +596,12 @@ public sealed class SymbolAndOverloadBindingTests
     public void MutableRebind_BindsAsAssignmentToOriginalSymbol()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Update:pub} () -> i32
-                §B{~value:i32} 1
-                §B{~value} 2
-                §R value
+            module Test
+              func Update public () → int
+                !
+                var int:value = 1
+                var value = 2
+                return value
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -591,13 +623,14 @@ public sealed class SymbolAndOverloadBindingTests
     public void ImmutableAndTypeInvalidRebinds_AreDiagnosed()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Update:pub} () -> i32
-                §B{fixed:i32} 1
-                §B{~fixed} 2
-                §B{~value:i32} 1
-                §B{~value} STR:"wrong"
-                §R value
+            module Test
+              func Update public () → int
+                !
+                let int:@fixed = 1
+                var @fixed = 2
+                var int:value = 1
+                var value = "wrong"
+                return value
             """;
 
         _ = ParseAndBind(source, out var diagnostics);
@@ -606,6 +639,479 @@ public sealed class SymbolAndOverloadBindingTests
             diagnostic.Code == DiagnosticCode.BindReassignsImmutable);
         Assert.Contains(diagnostics, diagnostic =>
             diagnostic.Code == DiagnosticCode.BindRebindTypeMismatch);
+    }
+
+    [Fact]
+    public void NormalParamsArray_BeatsGenericScalar_ToExactSymbolAndArgumentMap()
+    {
+        var array = Function("array", "Pick", "i32",
+            [Parameter("values", "?[?object]", ParameterModifier.Params)], []);
+        var generic = Function("generic", "Pick", "i32",
+            [Parameter("value", "T")], [], ["T"]);
+        var use = Function("use", "Use", "i32", [Parameter("values", "?[?object]")],
+            [new ReturnStatementNode(Span, Call("Pick", [new ReferenceNode(Span, "values")]))]);
+
+        var bound = Bind(Module([array, generic, use]), out var diagnostics);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound.Functions[^1])
+            .OfType<BoundCallExpression>());
+
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        Assert.Same(bound.Functions[0].Symbol, call.ResolvedSymbol);
+        Assert.Equal(bound.Functions[0].SymbolId, call.ResolvedSymbolId);
+        var mapping = Assert.Single(Assert.Single(call.SelectedOverloadMatches).Arguments);
+        Assert.Equal(0, mapping.ArgumentIndex);
+        Assert.Equal(0, mapping.ParameterIndex);
+        Assert.Equal(TypeIdentity.Canonicalize("?[?object]"), TypeIdentity.Canonicalize(mapping.ParameterType));
+        Assert.False(mapping.IsExpandedParams);
+    }
+
+    public static IEnumerable<object[]> NormalParamsCases()
+    {
+        // Retain the original theory labels; active inputs use the equivalent C# type spellings.
+        foreach (var (native, csharp) in new[]
+        {
+            ("[object]", "object[]"),
+            ("[?object]", "object?[]"),
+            ("?[object]", "object[]?"),
+            ("?[?object]", "object?[]?"),
+        })
+        foreach (var reversed in new[] { false, true })
+        foreach (var named in new[] { false, true })
+        foreach (var statement in new[] { false, true })
+            yield return [native, csharp, reversed, named, statement];
+    }
+
+    [Theory]
+    [MemberData(nameof(NormalParamsCases))]
+    public void NormalParamsForwarding_MatchesRoslynSelectionMappingRuntimeAndEffects(
+        string nativeArray, string csharpArray, bool reversed, bool named, bool statement)
+    {
+        var array = $$"""
+              func Pick public (System.Exception?:exception, string:message, params {{csharpArray}}:values) → int
+                !
+                return 1
+            """;
+        const string generic = """
+              func Pick<T> public (System.Exception?:exception, string:message, T:values) → int
+                ! alloc
+                let int[]:allocated = new int[1]
+                return 2
+            """;
+        var nativeArguments = named
+            ? """values: values, message: "x", exception: (System.Exception?)null"""
+            : """(System.Exception?)null, "x", values""";
+        var source = "module ParamsOracle ParamsOracle\n" + (reversed ? generic + "\n" + array : array + "\n" + generic)
+            + $$"""
+
+              func Use public ({{csharpArray}}:values) → int
+                !
+                {{(statement ? "" : "return ")}}Pick({{nativeArguments}})
+                {{(statement ? "return 0" : "")}}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var ast = Parse(source, diagnostics);
+        var bound = new Binder(diagnostics).Bind(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var call = BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>().SingleOrDefault();
+        var callStatement = use.Body.OfType<BoundCallStatement>().SingleOrDefault();
+        var match = Assert.Single(call?.SelectedOverloadMatches ?? callStatement!.SelectedOverloadMatches);
+        var selected = bound.Functions.Single(function =>
+            function.Symbol.Name == "Pick" && function.Symbol.GenericArity == 0);
+        Assert.Same(selected.Symbol, match.Function);
+        Assert.Equal(selected.SymbolId, call?.ResolvedSymbolId ?? callStatement!.ResolvedSymbolId);
+        Assert.Equal(named ? new[] { 2, 1, 0 } : new[] { 0, 1, 2 },
+            match.Arguments.Select(argument => argument.ParameterIndex).ToArray());
+        Assert.Equal(new[] { 0, 1, 2 }, match.Arguments.Select(argument => argument.ArgumentIndex).ToArray());
+        Assert.All(match.Arguments, argument => Assert.False(argument.IsExpandedParams));
+        Assert.Equal(TypeIdentity.Canonicalize(csharpArray),
+            TypeIdentity.Canonicalize(match.Arguments[named ? 0 : 2].ParameterType));
+        var graph = CallGraphAnalysis.BuildResolved(bound);
+        Assert.True(CallGraphAnalysis.Build(ast).IsBoundResolutionComplete);
+        Assert.Equal(selected.SymbolId, Assert.Single(graph.ForwardGraph[use.SymbolId]).Callee);
+        var effects = new EffectEnforcementPass(diagnostics);
+        effects.Enforce(ast);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics));
+        Assert.Equal("[pure]", effects.DeclarationFacts[ast.Functions.Single(function => function.Name == "Use").Id]
+            .InferredRow.ToDisplayString());
+        Assert.Equal("memory:allocation",
+            effects.DeclarationFacts[ast.Functions.Single(function => function.TypeParameters.Count == 1).Id]
+                .InferredRow.ToDisplayString());
+
+        var csharpArguments = named
+            ? """values: values, message: "x", exception: (System.Exception?)null"""
+            : """(System.Exception?)null, "x", values""";
+        var csharpArrayOverload = $"public static int Pick(System.Exception? exception, string message, params {csharpArray} values) => 1;";
+        const string csharpGenericOverload = "public static int Pick<T>(System.Exception? exception, string message, T values) { var allocated = new int[1]; return 2; }";
+        var oracle = $$"""
+            public static class ParamsOracle
+            {
+                {{(reversed ? csharpGenericOverload : csharpArrayOverload)}}
+                {{(reversed ? csharpArrayOverload : csharpGenericOverload)}}
+                public static int Use({{csharpArray}} values)
+                {
+                    {{(statement ? "" : "return ")}}Pick({{csharpArguments}});
+                    {{(statement ? "return 0;" : "")}}
+                }
+            }
+            """;
+        var oracleCompilation = CompileParamsCSharp(oracle);
+        var oracleMethod = SelectedParamsMethod(oracleCompilation);
+        Assert.Equal(0, oracleMethod.Arity);
+        var result = Calor.Compiler.Program.Compile(source);
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        var emittedCompilation = CompileParamsCSharp(GeneratedCSharpCompiler.GlobalUsingsPreamble + result.GeneratedCode);
+        var emittedMethod = SelectedParamsMethod(emittedCompilation);
+        Assert.Equal(0, emittedMethod.Arity);
+        Assert.True(emittedMethod.Parameters[2].IsParams);
+        var oracleArray = Assert.IsAssignableFrom<IArrayTypeSymbol>(oracleMethod.Parameters[2].Type);
+        var emittedArray = Assert.IsAssignableFrom<IArrayTypeSymbol>(emittedMethod.Parameters[2].Type);
+        Assert.Equal(oracleArray.Rank, emittedArray.Rank);
+        Assert.Equal(oracleArray.NullableAnnotation, emittedArray.NullableAnnotation);
+        Assert.Equal(oracleArray.ElementType.SpecialType, emittedArray.ElementType.SpecialType);
+        Assert.Equal(oracleArray.ElementType.NullableAnnotation, emittedArray.ElementType.NullableAnnotation);
+        var expected = statement ? 0 : 1;
+        Assert.Equal(expected, InvokeParamsUse(oracleCompilation, "ParamsOracle", new object?[] { "item" }));
+        Assert.Equal(expected, InvokeParamsUse(emittedCompilation, "ParamsOracle.ParamsOracleModule", new object?[] { "item" }));
+        if (nativeArray.StartsWith('?'))
+        {
+            Assert.Equal(expected, InvokeParamsUse(oracleCompilation, "ParamsOracle", null));
+            Assert.Equal(expected, InvokeParamsUse(emittedCompilation, "ParamsOracle.ParamsOracleModule", null));
+        }
+    }
+
+    private static CSharpCompilation CompileParamsCSharp(string source) =>
+        CSharpCompilation.Create("Params_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(source)],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+
+    private static IMethodSymbol SelectedParamsMethod(CSharpCompilation compilation)
+    {
+        Assert.DoesNotContain(compilation.GetDiagnostics(), diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var tree = compilation.SyntaxTrees.Single();
+        var invocation = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        return Assert.IsAssignableFrom<IMethodSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol);
+    }
+
+    private static object? InvokeParamsUse(CSharpCompilation compilation, string typeName, object? values)
+    {
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        return System.Reflection.Assembly.Load(stream.ToArray()).GetType(typeName, throwOnError: true)!
+            .GetMethod("Use")!.Invoke(null, [values]);
+    }
+
+    [Theory]
+    [InlineData("expanded-scalar")]
+    [InlineData("expanded-many")]
+    [InlineData("expanded-empty")]
+    [InlineData("expanded-nullable-array")]
+    [InlineData("expanded-nullable-elements")]
+    [InlineData("generic-only")]
+    [InlineData("explicit-generic")]
+    [InlineData("named-scalar")]
+    [InlineData("unknown-name")]
+    [InlineData("duplicate-name")]
+    [InlineData("ref")]
+    [InlineData("out")]
+    [InlineData("in")]
+    [InlineData("wrong-modifier")]
+    [InlineData("optional-equivalent")]
+    [InlineData("optional-params-omitted")]
+    [InlineData("better-generic-conversion")]
+    [InlineData("ambiguous-shapes")]
+    [InlineData("ambiguous-generics")]
+    [InlineData("ambiguous-optionals")]
+    public void ParamsBoundaries_MatchRoslynWithoutBlanketNonGenericPreference(string scenario)
+    {
+        var array = Function("array", "Pick", "i32",
+            [Parameter("values", "[i32]", ParameterModifier.Params)], []);
+        var generic = Function("generic", "Pick", "i32",
+            [Parameter("values", "T")], [], ["T"]);
+        FunctionNode[] functions = [array, generic];
+        var declarations = "public static int Pick(params int[] values) => 1; public static int Pick<T>(T values) => 2;";
+        string[] types = ["i32"];
+        string?[]? names = null;
+        string?[]? modifiers = null;
+        string[]? typeArguments = null;
+        var invocation = "Pick(value)";
+        var expectedIndex = 1;
+        var expectedKind = OverloadResolutionKind.Resolved;
+        var expanded = false;
+        switch (scenario)
+        {
+            case "expanded-scalar":
+                functions[0] = Function("array", "Pick", "i32",
+                    [Parameter("values", "[object]", ParameterModifier.Params)], []);
+                declarations = "public static int Pick(params object[] values) => 1; public static int Pick<T>(T values) => 2;";
+                break;
+            case "expanded-many":
+            case "expanded-nullable-array":
+            case "expanded-nullable-elements":
+                types = ["i32", "i32"];
+                invocation = "Pick(value, value)";
+                expectedIndex = 0;
+                expanded = true;
+                if (scenario == "expanded-nullable-array")
+                {
+                    functions[0] = Function("array", "Pick", "i32",
+                        [Parameter("values", "?[i32]", ParameterModifier.Params)], []);
+                    declarations = "public static int Pick(params int[]? values) => 1; public static int Pick<T>(T values) => 2;";
+                }
+                else if (scenario == "expanded-nullable-elements")
+                {
+                    functions[0] = Function("array", "Pick", "i32",
+                        [Parameter("values", "?[?i32]", ParameterModifier.Params)], []);
+                    declarations = "public static int Pick(params int?[]? values) => 1; public static int Pick<T>(T values) => 2;";
+                    types = ["?i32", "?i32"];
+                    invocation = "Pick((int?)value, (int?)value)";
+                }
+                break;
+            case "expanded-empty":
+                types = [];
+                invocation = "Pick()";
+                expectedIndex = 0;
+                expanded = true;
+                break;
+            case "generic-only":
+                functions = [generic];
+                declarations = "public static int Pick<T>(T values) => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                expectedIndex = 0;
+                break;
+            case "explicit-generic":
+                types = ["[i32]"];
+                typeArguments = ["[i32]"];
+                invocation = "Pick<int[]>(values)";
+                break;
+            case "named-scalar":
+                functions[0] = Function("array", "Pick", "i32",
+                    [Parameter("values", "[object]", ParameterModifier.Params)], []);
+                declarations = "public static int Pick(params object[] values) => 1; public static int Pick<T>(T values) => 2;";
+                names = ["values"];
+                invocation = "Pick(values: value)";
+                break;
+            case "unknown-name":
+                names = ["missing"];
+                invocation = "Pick(missing: value)";
+                expectedKind = OverloadResolutionKind.NoMatch;
+                break;
+            case "duplicate-name":
+                types = ["i32", "i32"];
+                names = ["values", "values"];
+                invocation = "Pick(values: value, values: value)";
+                expectedKind = OverloadResolutionKind.NoMatch;
+                break;
+            case "ref":
+            case "out":
+            case "in":
+                var modifier = scenario switch
+                {
+                    "ref" => ParameterModifier.Ref,
+                    "out" => ParameterModifier.Out,
+                    _ => ParameterModifier.In,
+                };
+                functions =
+                [
+                    Function("array", "Pick", "i32", [Parameter("values", "[i32]", modifier)], []),
+                    Function("generic", "Pick", "i32", [Parameter("values", "T", modifier)], [], ["T"]),
+                ];
+                var assignment = scenario == "out" ? "values = default!;" : "";
+                declarations = $"public static int Pick({scenario} int[] values) {{ {assignment} return 1; }} "
+                    + $"public static int Pick<T>({scenario} T values) {{ {assignment} return 2; }}";
+                types = ["[i32]"];
+                modifiers = [scenario];
+                invocation = $"Pick({scenario} values)";
+                expectedIndex = 0;
+                break;
+            case "wrong-modifier":
+                types = ["[i32]"];
+                modifiers = ["ref"];
+                invocation = "Pick(ref values)";
+                expectedKind = OverloadResolutionKind.NoMatch;
+                break;
+            case "optional-equivalent":
+                functions =
+                [
+                    Function("array", "Pick", "i32",
+                        [Parameter("values", "[i32]"), Parameter("count", "i32", defaultValue: new IntLiteralNode(Span, 0))], []),
+                    Function("generic", "Pick", "i32",
+                        [Parameter("values", "T"), Parameter("count", "i32", defaultValue: new IntLiteralNode(Span, 0))], [], ["T"]),
+                ];
+                declarations = "public static int Pick(int[] values, int count = 0) => 1; public static int Pick<T>(T values, int count = 0) => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                expectedIndex = 0;
+                break;
+            case "optional-params-omitted":
+                functions =
+                [
+                    Function("array", "Pick", "i32",
+                        [Parameter("count", "i32", defaultValue: new IntLiteralNode(Span, 0)),
+                            Parameter("values", "[i32]", ParameterModifier.Params)], []),
+                    Function("generic", "Pick", "i32",
+                        [Parameter("count", "i32"), Parameter("values", "T")], [], ["T"]),
+                ];
+                declarations = "public static int Pick(int count = 0, params int[] values) => 1; public static int Pick<T>(int count, T values) => 2;";
+                types = ["[i32]"];
+                names = ["values"];
+                invocation = "Pick(values: values)";
+                expectedIndex = 0;
+                break;
+            case "better-generic-conversion":
+                functions[0] = Function("object", "Pick", "i32", [Parameter("values", "object")], []);
+                declarations = "public static int Pick(object values) => 1; public static int Pick<T>(T values) => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                break;
+            case "ambiguous-shapes":
+                functions =
+                [
+                    Function("concrete", "Pick", "i32", [Parameter("left", "i32"), Parameter("right", "object")], []),
+                    Function("generic", "Pick", "i32", [Parameter("left", "object"), Parameter("right", "T")], [], ["T"]),
+                ];
+                declarations = "public static int Pick(int left, object right) => 1; public static int Pick<T>(object left, T right) => 2;";
+                types = ["i32", "i32"];
+                invocation = "Pick(value, value)";
+                expectedKind = OverloadResolutionKind.Ambiguous;
+                break;
+            case "ambiguous-generics":
+                functions =
+                [
+                    Function("left", "Pick", "i32", [Parameter("left", "T"), Parameter("right", "i32")], [], ["T"]),
+                    Function("right", "Pick", "i32", [Parameter("left", "i32"), Parameter("right", "T")], [], ["T"]),
+                ];
+                declarations = "public static int Pick<T>(T left, int right) => 1; public static int Pick<T>(int left, T right) => 2;";
+                types = ["i32", "i32"];
+                invocation = "Pick(value, value)";
+                expectedKind = OverloadResolutionKind.Ambiguous;
+                break;
+            case "ambiguous-optionals":
+                functions =
+                [
+                    Function("number", "Pick", "i32", [Parameter("values", "[i32]"),
+                        Parameter("other", "i32", defaultValue: new IntLiteralNode(Span, 0))], []),
+                    Function("text", "Pick", "i32", [Parameter("values", "[i32]"),
+                        Parameter("other", "str", defaultValue: new StringLiteralNode(Span, ""))], []),
+                ];
+                declarations = "public static int Pick(int[] values, int other = 0) => 1; public static int Pick(int[] values, string other = \"\") => 2;";
+                types = ["[i32]"];
+                invocation = "Pick(values)";
+                expectedKind = OverloadResolutionKind.Ambiguous;
+                break;
+        }
+
+        var bound = Bind(Module(functions), out var diagnostics);
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        var scope = new Scope();
+        foreach (var function in bound.Functions)
+            Assert.True(scope.DeclareOverload(function.Symbol));
+        var result = scope.ResolveOverload("Pick", types, names, modifiers, typeArguments,
+            (parameter, _) => TypeIdentity.Canonicalize(parameter) == "OBJECT" ? 1 : null);
+        Assert.Equal(expectedKind, result.Kind);
+        var oracle = CompileParamsCSharp($$"""
+            public static class BoundaryOracle
+            {
+                {{declarations}}
+                public static int Use(int[] values, int value) => {{invocation}};
+            }
+            """);
+        var tree = oracle.SyntaxTrees.Single();
+        var call = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        var symbol = oracle.GetSemanticModel(tree).GetSymbolInfo(call);
+        if (expectedKind != OverloadResolutionKind.Resolved)
+        {
+            Assert.Null(result.Function);
+            Assert.Empty(result.Matches);
+            Assert.Null(symbol.Symbol);
+            Assert.Contains(oracle.GetDiagnostics(), diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+            if (expectedKind == OverloadResolutionKind.Ambiguous)
+            {
+                Assert.Equal(2, result.Candidates.Count);
+                Assert.Contains(oracle.GetDiagnostics(), diagnostic => diagnostic.Id == "CS0121");
+            }
+            return;
+        }
+
+        Assert.Same(bound.Functions[expectedIndex].Symbol, result.Function);
+        var match = Assert.Single(result.Matches);
+        Assert.Equal(types.Length, match.Arguments.Count);
+        Assert.All(match.Arguments, argument => Assert.Equal(expanded, argument.IsExpandedParams));
+        Assert.NotNull(result.Function);
+        Assert.Equal(result.Function.GenericArity, SelectedParamsMethod(oracle).Arity);
+        var expectedMarker = scenario == "generic-only" ? 2 : expectedIndex + 1;
+        using var stream = new MemoryStream();
+        var emission = oracle.Emit(stream);
+        Assert.True(emission.Success, string.Join("\n", emission.Diagnostics));
+        Assert.Equal(expectedMarker, System.Reflection.Assembly.Load(stream.ToArray())
+            .GetType("BoundaryOracle", throwOnError: true)!.GetMethod("Use")!.Invoke(null, [new[] { 4 }, 3]));
+    }
+
+    [Fact]
+    public void ApplicableNormalParamsForm_IsNotReplacedByCheaperExpandedMapping()
+    {
+        var scope = new Scope();
+        var function = new FunctionSymbol("Pick", "i32",
+            [new VariableSymbol("values", "object[]", false, modifier: ParameterModifier.Params)]);
+        Assert.True(scope.DeclareOverload(function));
+        var result = scope.ResolveOverload("Pick", ["str[]"], implicitConversionCost: (parameter, _) =>
+            TypeIdentity.Canonicalize(parameter) switch
+            {
+                "OBJECT[]" => 300,
+                "OBJECT" => 0,
+                _ => null,
+            });
+
+        Assert.Same(function, result.Function);
+        Assert.False(Assert.Single(Assert.Single(result.Matches).Arguments).IsExpandedParams);
+        var oracle = CompileParamsCSharp("""
+            public static class NormalOracle
+            {
+                public static int Pick(params object[] values) => values.Length;
+                public static int Use(string[] values) => Pick(values);
+            }
+            """);
+        var tree = oracle.SyntaxTrees.Single();
+        var call = Assert.Single(tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>());
+        var operation = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.Operations.IInvocationOperation>(
+            oracle.GetSemanticModel(tree).GetOperation(call));
+        Assert.Equal(Microsoft.CodeAnalysis.Operations.ArgumentKind.Explicit,
+            Assert.Single(operation.Arguments).ArgumentKind);
+        Assert.Equal(2, InvokeParamsUse(oracle, "NormalOracle", new[] { "first", "second" }));
+    }
+
+    [Fact]
+    public void NormalParamsTie_PreservesConditionalAlternativesAndTheirMappings()
+    {
+        var scope = new Scope();
+        var first = new FunctionSymbol(SymbolId.Create("first"), "Pick", "i32",
+            [new VariableSymbol("values", "[i32]", false, modifier: ParameterModifier.Params)],
+            conditionalAlternative: new ConditionalAlternative("feature", 0));
+        var second = new FunctionSymbol(SymbolId.Create("second"), "Pick", "i32",
+            [new VariableSymbol("values", "[i32]", false, modifier: ParameterModifier.Params)],
+            conditionalAlternative: new ConditionalAlternative("feature", 1));
+        var generic = new FunctionSymbol("Pick", "i32", [new VariableSymbol("values", "T", false)], ["T"]);
+        Assert.True(scope.DeclareOverload(generic));
+        Assert.True(scope.DeclareOverload(first));
+        Assert.True(scope.DeclareOverload(second));
+
+        var result = scope.ResolveOverload("Pick", ["[i32]"]);
+
+        Assert.Equal(OverloadResolutionKind.Resolved, result.Kind);
+        Assert.Equal(new[] { first, second }, result.Functions);
+        Assert.Equal(2, result.Matches.Count);
+        Assert.All(result.Matches, match =>
+        {
+            var mapping = Assert.Single(match.Arguments);
+            Assert.Equal(0, mapping.ParameterIndex);
+            Assert.False(mapping.IsExpandedParams);
+            Assert.Equal(TypeIdentity.Canonicalize("[i32]"), TypeIdentity.Canonicalize(mapping.ParameterType));
+        });
     }
 
     [Fact]
@@ -675,18 +1181,21 @@ public sealed class SymbolAndOverloadBindingTests
     public void BaseMemberAndBaseConstructorCalls_ResolveAgainstTrackedBaseClass()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
-                §FLD{i32:value:prot}
-                §CTOR{ctor1:pub} (i32:x)
-                  §ASSIGN value x
-                §MT{m1:Pick:pub} (i32:x) -> i32
-                  §R x
-              §CL{c2:Derived:Base:pub}
-                §CTOR{ctor2:pub} (i32:x)
-                  §BASE §A x §/BASE
-                §MT{m2:Use:pub} () -> i32
-                  §R §C{base.Pick} §A INT:1 §/C
+            module Test
+              class Base
+                field int:value protected
+                ctor public (int:x)
+                  set value x
+                func Pick public (int:x) → int
+                  !
+                  return x
+              class Derived
+                extends Base
+                ctor public (int:x)
+                  base(x)
+                func Use public () → int
+                  !
+                  return base.Pick(1)
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -711,14 +1220,15 @@ public sealed class SymbolAndOverloadBindingTests
     public void PreprocessorWrappedMethods_AreRegisteredBoundAndResolvedTogether()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Worker:pub}
-                §PP{FEATURE}
-                  §MT{m1:Do:pub} () -> i32
-                    §R 1
-                §/PP{FEATURE}
-                §MT{m2:Run:pub} () -> i32
-                  §R §C{Do} §/C
+            module Test
+              class Worker
+                pp FEATURE
+                  func Do public () → int
+                    !
+                    return 1
+                func Run public () → int
+                  !
+                  return Do()
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -1025,20 +1535,22 @@ public sealed class SymbolAndOverloadBindingTests
     public void InheritedBareAndThisCalls_ResolveExactAccessibleBaseMember()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Base:pub}
-                §MT{pick:Pick:prot} (i32:value) -> i32
-                  §E{cw}
-                  §P STR:"pick"
-                  §R value
-                §MT{hidden:Hidden:pri} () -> i32
-                  §R 0
-              §CL{c2:Derived:Base:pub}
-                §MT{use:Use:pub} () -> i32
-                  §B{first:i32} §C{Pick} §A INT:1 §/C
-                  §B{second:i32} §C{this.Pick} §A INT:2 §/C
-                  §C{Hidden} §/C
-                  §R (+ first second)
+            module Test
+              class Base
+                func Pick protected (int:value) → int
+                  ! cw
+                  Console.WriteLine("pick")
+                  return value
+                func Hidden private () → int
+                  return 0
+              class Derived
+                extends Base
+                func Use public () → int
+                  !
+                  let int:first = Pick(1)
+                  let int:second = this.Pick(2)
+                  Hidden()
+                  return first + second
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -1058,7 +1570,7 @@ public sealed class SymbolAndOverloadBindingTests
             })
             .Where(symbol => symbol?.Name == "Base.Pick")
             .ToArray();
-        var hiddenCall = Assert.Single(calls.OfType<BoundCallStatement>());
+        var hiddenCall = Assert.Single(calls.OfType<BoundCallExpression>(), call => call.Target == "Hidden");
 
         Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
         Assert.Equal(2, resolvedPickCalls.Length);
@@ -1093,17 +1605,14 @@ public sealed class SymbolAndOverloadBindingTests
     public void PreprocessorWrappedConstructorsAndProperties_AreBoundIntoModule()
     {
         const string source = """
-            §M{m1:Test}
-              §CL{c1:Worker:pub}
-                §PP{FEATURE}
-                  §CTOR{ctor1:pub} ()
-                    §P STR:"created"
-                  §PROP{p1:Value:i32:pub}
-                    §GET
-                      §R INT:1
-                    §/GET
-                  §/PROP{p1}
-                §/PP{FEATURE}
+            module Test
+              class Worker
+                pp FEATURE
+                  ctor public ()
+                    Console.WriteLine("created")
+                  property int:Value public
+                    get
+                      return 1
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -1121,12 +1630,13 @@ public sealed class SymbolAndOverloadBindingTests
     public void ForeachElementInference_ResolvesInternalOverloadWithoutNameFallback()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Echo:pri} (str:value) -> str
-                §R value
-              §F{f2:Use:pub} ([str]:values) -> void
-                §EACH{e1:item} values
-                  §B{copy:str} §C{Echo} §A item §/C
+            module Test
+              func Echo private (string:value) → string
+                return value
+              func Use public (string[]:values) → void
+                !
+                each item in values
+                  let string:copy = Echo(item)
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
@@ -1170,38 +1680,47 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Equal("External.Log", unresolved.Target);
     }
 
+    /// <summary>
+    /// 0.30: a computed-receiver call the binder resolves to a non-virtual metadata
+    /// member is attributed to metadata. It is no edge to a project declaration, so
+    /// neither graph lists it as unresolved (it used to stay "explicitly unresolved",
+    /// which made every caller's query answers partial). The constructor of a metadata
+    /// type is untouched by that rule. MetadataCallResidualTests pins the calls that
+    /// stay unresolved.
+    /// </summary>
     [Fact]
-    public void ResolvedCallGraph_BinderExpressionCall_RemainsExplicitlyUnresolved()
+    public void ResolvedCallGraph_BinderMetadataExpressionCall_IsNotUnresolved()
     {
         const string source = """
-            §M{m1:Test}
-              §F{f1:Use:pub} () -> object
-                §R §C §NEW{object} §/NEW.GetType §/C
+            module Test
+              func Use public () → object
+                !
+                return new object().GetType()
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
         var use = Assert.Single(bound.Functions);
         var expressionCall = Assert.Single(
-            BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundExpressionCall>());
+            BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundCallExpression>());
+        Assert.NotNull(expressionCall.EvaluatedReceiver);
+        Assert.Equal("GetType", expressionCall.ResolvedMetadataMethod?.Name);
+        Assert.Equal("<expression-call>", expressionCall.Target);
         var graph = CallGraphAnalysis.BuildResolved(bound);
-        var unresolved = Assert.Single(graph.UnresolvedCalls.Where(call =>
-            call.Target == "<expression-call>"));
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
         Assert.Empty(graph.ForwardGraph[use.SymbolId]);
-        Assert.Equal(use.SymbolId, unresolved.Caller);
-        Assert.Equal("<expression-call>", unresolved.Target);
-        Assert.Equal(expressionCall.Span, unresolved.Span);
+        Assert.DoesNotContain(graph.UnresolvedCalls, call => call.Target == "<expression-call>");
+        Assert.Contains(graph.UnresolvedCalls, call => call.Target == "object..ctor");
 
         var astDiagnostics = new DiagnosticBag();
-        var astGraph = CallGraphAnalysis.Build(Parse(source, astDiagnostics));
+        var ast = Parse(source, astDiagnostics);
+        var astGraph = CallGraphAnalysis.Build(ast);
         Assert.False(
             astDiagnostics.HasErrors,
             string.Join(", ", astDiagnostics.Select(diagnostic => diagnostic.Message)));
-        Assert.Contains(astGraph.UnresolvedCalls, call =>
-            call.CallerId == "f1"
-            && call.Target == "<expression-call>"
-            && call.Span == expressionCall.Span);
+        Assert.DoesNotContain(astGraph.UnresolvedCalls, call =>
+            call.CallerId == Assert.Single(ast.Functions).Id
+            && call.Target == "<expression-call>");
     }
 
     private static bool IsOverloadDiagnostic(Diagnostic diagnostic) =>

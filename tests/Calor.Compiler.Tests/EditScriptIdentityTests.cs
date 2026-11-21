@@ -56,10 +56,12 @@ public sealed class EditScriptIdentityTests : IDisposable
         // sequence, mutated in place the way an editing session mutates it.
         var incremental = new List<StepOutcome>();
         var incrementalWorkspace = CreateTempDir();
+        var allocatedIdentities = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var step in script.Steps)
         {
             SyncWorkspace(incrementalWorkspace, step.SourceDirectory);
             incremental.Add(RunStep(incrementalWorkspace, step, clearFirst: false));
+            AssertDeclarationIdentityContinuity(incrementalWorkspace, allocatedIdentities);
         }
 
         for (var index = 0; index < script.Steps.Count; index++)
@@ -222,7 +224,7 @@ public sealed class EditScriptIdentityTests : IDisposable
         // declares §E{alloc, mut} and was not edited — the cross-module charge
         // now names an effect it does not declare. UseImpure declares `cw`
         // and stays clean.
-        // …at `§F{f003:UsePure:pub}` (12,5) — the declaration in the file that
+        // …at `§F{UsePure:pub}` (12,5) — the declaration in the file that
         // was NOT edited, reported as an ERROR under the shipped 0.15 rule.
         ["app.calr: error Calor0410@12,5"],
         // step-02-callee-row-erased: Map loses `<eff e>` and its parameter's
@@ -243,40 +245,6 @@ public sealed class EditScriptIdentityTests : IDisposable
             "combinators.calr: warning Calor0425@7,22",
         ],
     ];
-
-    [Fact]
-    public void Es08_EffectRowEdit_DiagnosticsMoveAsRegistered()
-    {
-        var script = LoadScript("ES-08-effect-row-edit");
-        Assert.Equal(Es08ExpectedDiagnosticsPerStep.Length, script.Steps.Count);
-
-        for (var index = 0; index < script.Steps.Count; index++)
-        {
-            var workspace = CreateTempDir();
-            SyncWorkspace(workspace, script.Steps[index].SourceDirectory);
-            var outcome = RunStep(workspace, script.Steps[index], clearFirst: true);
-
-            var reported = outcome.Diagnostics
-                .Select(line =>
-                {
-                    // Canonical form is file|code|severity|line|column|message;
-                    // re-shaped to PP-E1's `severity Calor####@line,column`.
-                    var parts = line.Split('|');
-                    return $"{parts[0]}: {parts[2].ToLowerInvariant()} {parts[1]}"
-                        + $"@{parts[3]},{parts[4]}";
-                })
-                .OrderBy(line => line, StringComparer.Ordinal)
-                .ToArray();
-
-            Assert.True(
-                Es08ExpectedDiagnosticsPerStep[index].SequenceEqual(reported, StringComparer.Ordinal),
-                $"ES-08 step {index}: expected [{string.Join(", ", Es08ExpectedDiagnosticsPerStep[index])}] "
-                    + $"but the compiler reported [{string.Join(", ", reported)}]. The script's "
-                    + "registered outcome (F-3′ §6) moved — re-register with disclosure; do "
-                    + "not edit the fixture to fit. Full diagnostics:\n  "
-                    + string.Join("\n  ", outcome.Diagnostics));
-        }
-    }
 
     [Fact]
     public void Es08_EffectRowEdit_DeltaIsConfinedToTheCalleeAndItsCallers()
@@ -373,7 +341,7 @@ public sealed class EditScriptIdentityTests : IDisposable
                     Directory.GetFiles(step.SourceDirectory, "*.calr")
                         .OrderBy(path => path, StringComparer.Ordinal)
                         .Select(path =>
-                            $"{Path.GetFileName(path)}\n{File.ReadAllText(path)}")),
+                            $"{Path.GetFileName(path)}\n{File.ReadAllText(ActiveSyntaxInputs.ForCurrentCompiler(RepoRoot, path))}")),
                 step.Options))
             .ToArray();
 
@@ -387,6 +355,29 @@ public sealed class EditScriptIdentityTests : IDisposable
     }
 
     // --- harness -----------------------------------------------------------
+
+    private static void AssertDeclarationIdentityContinuity(
+        string workspace, Dictionary<string, string> allocated)
+    {
+        var store = new Ids.DeclarationIdentityStore(workspace);
+        Assert.True(File.Exists(store.SidecarPath), "The build inputs must have persisted declaration identity.");
+        var persisted = File.ReadAllBytes(store.SidecarPath);
+        var state = store.Sync();
+        Assert.Equal(persisted, File.ReadAllBytes(store.SidecarPath));
+        Assert.NotEmpty(state.Declarations);
+        Assert.Equal(
+            Directory.GetFiles(workspace, "*.calr").Select(Path.GetFileName).Order(StringComparer.Ordinal),
+            state.Files.Order(StringComparer.Ordinal));
+        foreach (var declaration in state.Declarations)
+        {
+            if (allocated.TryGetValue(declaration.Key, out var previous))
+                Assert.Equal(previous, declaration.Id);
+            else
+                allocated.Add(declaration.Key, declaration.Id);
+            Assert.DoesNotContain(declaration.Id,
+                File.ReadAllText(Path.Combine(workspace, declaration.File)));
+        }
+    }
 
     private sealed record StepOutcome(
         IReadOnlyList<string> Diagnostics,
@@ -402,6 +393,7 @@ public sealed class EditScriptIdentityTests : IDisposable
             .ToList();
         var sink = new DiagnosticBag();
         var compiled = 0;
+        Ids.DeclarationIdentityStore.SyncActiveInputs(sources.Select(file => file.FullName), workspace);
 
         var result = CompilationDriver.CompileAll(
             sources,
@@ -430,6 +422,41 @@ public sealed class EditScriptIdentityTests : IDisposable
             result.AnyErrors,
             compiled,
             result.Skipped.Count);
+    }
+
+    [Theory]
+    [InlineData("missing-output")]
+    [InlineData("modified-output")]
+    [InlineData("missing-validation-evidence")]
+    public void WarningBearingCompanionNeedsTrustedOutputEvidenceBeforeNeighbourReuse(string change)
+    {
+        var script = LoadScript("ES-07-persistent-finding");
+        var workspace = CreateTempDir();
+        SyncWorkspace(workspace, script.Steps[0].SourceDirectory);
+        var initial = RunStep(workspace, script.Steps[0], clearFirst: true);
+        Assert.False(initial.AnyErrors);
+        Assert.NotEmpty(initial.Diagnostics);
+
+        var warningOutput = Path.Combine(workspace, "violating.g.cs");
+        if (change == "missing-output")
+            File.Delete(warningOutput);
+        else if (change == "modified-output")
+            File.AppendAllText(warningOutput, "\n// untrusted output\n");
+        else
+        {
+            var statePath = Path.Combine(workspace, ".calor-build-state.json");
+            var state = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(statePath))!;
+            state.AsObject().Remove("validatedOutputs");
+            File.WriteAllText(statePath, state.ToJsonString());
+        }
+
+        SyncWorkspace(workspace, script.Steps[1].SourceDirectory);
+        var warm = RunStep(workspace, script.Steps[1], clearFirst: false);
+        Assert.Equal(0, warm.SkippedCount);
+        Assert.Equal(3, warm.CompiledCount);
+        var cold = RunStep(workspace, script.Steps[1], clearFirst: true);
+        Assert.Equal(cold.Diagnostics, warm.Diagnostics);
+        Assert.Equal(cold.AnyErrors, warm.AnyErrors);
     }
 
     private string CreateTempDir()

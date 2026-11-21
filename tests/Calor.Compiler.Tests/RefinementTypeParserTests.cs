@@ -42,8 +42,28 @@ public sealed class RefinementTypeParserTests
         Assert.False(diagnostics.HasErrors,
             $"Parse errors:\n{string.Join("\n", diagnostics.Select(d => d.Message))}");
 
+        AttachToolingIdentity(module, calorSource);
         var emitter = new CSharpEmitter();
         return emitter.Emit(module);
+    }
+
+    private static void AttachToolingIdentity(ModuleNode module, string source)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-refinement-identity-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var file = Path.Combine(root, "active.calr");
+            File.WriteAllText(file, source);
+            var store = new Ids.DeclarationIdentityStore(root);
+            store.Sync([file]);
+            store.Attach(file, source, module);
+            Assert.Equal(source, File.ReadAllText(file));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     private static string ParseAndEmitCalor(string calorSource)
@@ -61,156 +81,29 @@ public sealed class RefinementTypeParserTests
         return emitter.Emit(module);
     }
 
-    // ───── Tokenization ─────
-
-    [Fact]
-    public void Tokenize_RefinedType_ReturnsCorrectTokenKind()
-    {
-        var tokens = Tokenize("§RTYPE", out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.RefinedType, tokens[0].Kind);
-    }
-
-    [Fact]
-    public void Tokenize_EndRefinedType_ReturnsCorrectTokenKind()
-    {
-        var tokens = Tokenize("§/RTYPE", out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-        Assert.Equal(TokenKind.EndRefinedType, tokens[0].Kind);
-    }
-
     [Fact]
     public void Tokenize_Proof_ReturnsCorrectTokenKind()
     {
-        var tokens = Tokenize("§PROOF", out var diagnostics);
+        var tokens = Tokenize("proof", out var diagnostics);
         Assert.False(diagnostics.HasErrors);
         Assert.Equal(TokenKind.Proof, tokens[0].Kind);
     }
 
     [Fact]
-    public void Tokenize_RefinedType_IsKeyword()
-    {
-        var tokens = Tokenize("§RTYPE", out _);
-        Assert.True(tokens[0].IsKeyword);
-    }
-
-    [Fact]
     public void Tokenize_Proof_IsKeyword()
     {
-        var tokens = Tokenize("§PROOF", out _);
+        var tokens = Tokenize("proof", out _);
         Assert.True(tokens[0].IsKeyword);
-    }
-
-    // ───── Parsing: Refinement Type Definitions ─────
-
-    [Fact]
-    public void Parse_RefinementTypeDefinition_ParsesCorrectly()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
-                  §O{void}
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        Assert.Single(module.RefinementTypes);
-
-        var rtype = module.RefinementTypes[0];
-        Assert.Equal("r1", rtype.Id);
-        Assert.Equal("NatInt", rtype.Name);
-        Assert.Equal("i32", rtype.BaseTypeName);
-        Assert.NotNull(rtype.Predicate);
-    }
-
-    [Fact]
-    public void Parse_RefinementTypeWithAndPredicate_ParsesCorrectly()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        Assert.Single(module.RefinementTypes);
-
-        var rtype = module.RefinementTypes[0];
-        Assert.Equal("Port", rtype.Name);
-        Assert.Equal("i32", rtype.BaseTypeName);
-        Assert.IsType<BinaryOperationNode>(rtype.Predicate);
-    }
-
-    [Fact]
-    public void Parse_RefinementTypeWithLengthPredicate_ParsesCorrectly()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NonEmpty:str} (> (len #) INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        Assert.Single(module.RefinementTypes);
-
-        var rtype = module.RefinementTypes[0];
-        Assert.Equal("NonEmpty", rtype.Name);
-        Assert.Equal("str", rtype.BaseTypeName);
-    }
-
-    [Fact]
-    public void Parse_MultipleRefinementTypes_ParsesAll()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §RTYPE{r2:Port:i32} (&& (>= # INT:1) (<= # INT:65535))
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors,
-            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        Assert.Equal(2, module.RefinementTypes.Count);
-        Assert.Equal("NatInt", module.RefinementTypes[0].Name);
-        Assert.Equal("Port", module.RefinementTypes[1].Name);
-    }
-
-    // ───── Parsing: SelfRefNode (#) ─────
-
-    [Fact]
-    public void Parse_SelfRefInsidePredicate_CreatesSelfRefNode()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors);
-        var rtype = module.RefinementTypes[0];
-
-        // The predicate is (>= # INT:0), a BinaryOperationNode
-        var binOp = Assert.IsType<BinaryOperationNode>(rtype.Predicate);
-        Assert.IsType<SelfRefNode>(binOp.Left);
     }
 
     [Fact]
     public void Parse_SelfRefOutsidePredicate_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{void}
-                  §R #
+            module Test Test block
+              func Main () → void
+                !
+                return #
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -225,11 +118,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_ProofObligation_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -241,7 +133,8 @@ public sealed class RefinementTypeParserTests
         Assert.Single(func.Body);
 
         var proof = Assert.IsType<ProofObligationNode>(func.Body[0]);
-        Assert.Equal("p1", proof.Id);
+        Assert.Equal(proof.LocalId, proof.Id);
+        Assert.Null(proof.ToolingId);
         Assert.Equal("positive", proof.Description);
         Assert.NotNull(proof.Condition);
     }
@@ -250,11 +143,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_ProofObligationWithoutDescription_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -264,7 +156,8 @@ public sealed class RefinementTypeParserTests
 
         var func = Assert.Single(module.Functions);
         var proof = Assert.IsType<ProofObligationNode>(func.Body[0]);
-        Assert.Equal("p1", proof.Id);
+        Assert.Equal(proof.LocalId, proof.Id);
+        Assert.Null(proof.ToolingId);
         Assert.Null(proof.Description);
     }
 
@@ -274,10 +167,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_InlineRefinementOnParameter_ParsesCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -298,10 +191,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_ParameterWithoutRefinement_HasNullInlineRefinement()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -312,114 +205,51 @@ public sealed class RefinementTypeParserTests
         Assert.Null(param.InlineRefinement);
     }
 
-    // ───── C# Emission: Erasure ─────
-
-    [Fact]
-    public void CSharpEmit_RefinementTypeDefinition_ErasesToNothing()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
-                  §O{void}
-            """;
-
-        var csharp = ParseAndEmitCSharp(source);
-
-        // Refinement type definition should be erased — no "NatInt" in C#
-        Assert.DoesNotContain("RTYPE", csharp);
-        Assert.DoesNotContain("§", csharp);
-        // Function should still be emitted
-        Assert.Contains("Main", csharp);
-    }
-
     [Fact]
     public void CSharpEmit_ProofObligation_EmitsRuntimeGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var csharp = ParseAndEmitCSharp(source);
 
         Assert.Contains("if (!(x >= 0))", csharp);
-        Assert.Contains("Proof obligation [p1: positive] violated", csharp);
+        Assert.Matches(@"Proof obligation \[po_[0-9a-z]{12}: positive\] violated", csharp);
     }
 
     [Fact]
     public void CSharpEmit_ProofObligationWithoutDescription_EmitsRuntimeGuard()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof (x >= 0)
             """;
 
         var csharp = ParseAndEmitCSharp(source);
 
         Assert.Contains("if (!(x >= 0))", csharp);
-        Assert.Contains("Proof obligation [p1] violated", csharp);
-    }
-
-    // ───── CalorEmitter: Round-trip ─────
-
-    [Fact]
-    public void CalorEmit_RefinementType_RoundTrips()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            """;
-
-        var calor = ParseAndEmitCalor(source);
-
-        Assert.Contains("§RTYPE{r1:NatInt:i32}", calor);
-        Assert.Contains("#", calor);
+        Assert.Matches(@"Proof obligation \[po_[0-9a-z]{12}\] violated", csharp);
     }
 
     [Fact]
     public void CalorEmit_ProofObligation_RoundTrips()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:positive} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"positive"} (x >= 0)
             """;
 
         var calor = ParseAndEmitCalor(source);
 
-        Assert.Contains("§PROOF{p1:positive}", calor);
-    }
-
-    // ───── Type System ─────
-
-    [Fact]
-    public void TypeCheck_RefinementType_RegistersInEnvironment()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Main:pub}
-                  §O{void}
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var checker = new TypeChecker(diagnostics);
-        checker.Check(module);
-
-        // No errors from type checking
-        Assert.False(diagnostics.HasErrors,
-            $"TypeCheck errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        Assert.Contains("proof{\"positive\"}", calor);
     }
 
     [Fact]
@@ -483,82 +313,26 @@ public sealed class RefinementTypeParserTests
         Assert.True(FeatureSupport.IsFullySupported("proof-obligation"));
     }
 
-    // ───── IdScanner ─────
-
-    [Fact]
-    public void IdScanner_RefinementType_CollectsId()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var scanner = new Ids.IdScanner();
-        var entries = scanner.Scan(module, "test.calr");
-
-        Assert.Contains(entries, e => e.Id == "r1" && e.Kind == Ids.IdKind.RefinementType);
-    }
-
     [Fact]
     public void IdScanner_ProofObligation_CollectsId()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
-                  §PROOF{p1:test} (>= x INT:0)
+            module Test Test block
+              func Main (int:x) → void
+                !
+                proof{"test"} (x >= 0)
             """;
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
 
+        AttachToolingIdentity(module, source);
         var scanner = new Ids.IdScanner();
         var entries = scanner.Scan(module, "test.calr");
 
-        Assert.Contains(entries, e => e.Id == "p1" && e.Kind == Ids.IdKind.ProofObligation);
-    }
-
-    // ───── Negative Tests: Error Paths ─────
-
-    [Fact]
-    public void TypeCheck_DuplicateRefinementTypeName_ReportsError()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §RTYPE{r2:NatInt:i32} (> # INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var checker = new TypeChecker(diagnostics);
-        checker.Check(module);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.RefinementDuplicateName);
-    }
-
-    [Fact]
-    public void TypeCheck_UndefinedBaseType_ReportsError()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:MyType:nonexistent_type_xyz} (>= # INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors);
-
-        var checker = new TypeChecker(diagnostics);
-        checker.Check(module);
-
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.RefinementUndefinedBaseType);
+        Assert.Contains(entries, e => e.Id == module.Functions.Single().Body.OfType<ProofObligationNode>().Single().Id
+            && e.Kind == Ids.IdKind.ProofObligation);
+        Assert.All(entries, e => Assert.True(Ids.IdValidator.IsCanonicalId(e.Id)));
     }
 
     [Fact]
@@ -568,10 +342,10 @@ public sealed class RefinementTypeParserTests
         // This tests that the error is reported even if it somehow appears
         // in a context where it can be parsed (e.g., inside a function return)
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{i32}
-                  §R #
+            module Test Test block
+              func Main () → int
+                !
+                return #
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -584,12 +358,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_HashInCallArgument_ReportsError()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{void}
-                  §C{Console.WriteLine}
-                    §A #
-                  §/C
+            module Test Test block
+              func Main () → void
+                ! cw
+                Console.WriteLine(#)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -598,32 +370,16 @@ public sealed class RefinementTypeParserTests
         Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.SelfRefOutsidePredicate);
     }
 
-    [Fact]
-    public void Parse_HashInsideRefinementPredicate_NoError()
-    {
-        // Verify that # inside a refinement predicate does NOT report an error
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            """;
-
-        var module = Parse(source, out var diagnostics);
-
-        Assert.False(diagnostics.HasErrors,
-            $"Unexpected errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.SelfRefOutsidePredicate);
-    }
-
     // ───── CalorEmitter: Inline Refinement Round-trip ─────
 
     [Fact]
     public void CalorEmit_InlineRefinement_RoundTrips()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:age} | (>= # INT:0)
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0)) → void
+                !
+                return
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -638,10 +394,10 @@ public sealed class RefinementTypeParserTests
     public void CalorEmit_ParameterWithoutRefinement_NoBar()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §O{void}
+            module Test Test block
+              func Main (int:x) → void
+                !
+                return
             """;
 
         var calor = ParseAndEmitCalor(source);
@@ -656,10 +412,10 @@ public sealed class RefinementTypeParserTests
     public void Parse_InlineRefinementWithDefaultValue_ParsesBothCorrectly()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:age} | (>= # INT:0) = INT:18
-                  §O{void}
+            module Test Test block
+              func Main (int:age | (# >= 0) = 18) → void
+                !
+                return
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -682,12 +438,10 @@ public sealed class RefinementTypeParserTests
     {
         // | inside a Lisp expression should still be bitwise OR, not refinement
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §I{i32:x}
-                  §I{i32:y}
-                  §O{i32}
-                  §R (| x y)
+            module Test Test block
+              func Main (int:x, int:y) → int
+                !
+                return (x | y)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -702,45 +456,14 @@ public sealed class RefinementTypeParserTests
         Assert.IsType<BinaryOperationNode>(ret.Expression);
     }
 
-    // ───── Roslyn Compilation Integration Test ─────
-
-    [Fact]
-    public void RoslynCompile_RefinementTypeErased_CSharpCompiles()
-    {
-        var source = """
-            §M{m001:Test}
-              §RTYPE{r1:NatInt:i32} (>= # INT:0)
-              §F{f001:Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §PROOF{p1:result} (>= (+ a b) INT:0)
-                  §R (+ a b)
-            """;
-
-        var csharp = ParseAndEmitCSharp(source);
-
-        // Should not contain any Calor syntax
-        Assert.DoesNotContain("§", csharp);
-        Assert.DoesNotContain("RTYPE", csharp);
-
-        // Unverified proof obligations remain executable runtime guards.
-        Assert.Contains("Proof obligation [p1: result] violated", csharp);
-
-        // Verify it compiles with Roslyn
-        var errors = RoslynCompile(csharp);
-        Assert.Empty(errors);
-    }
-
     [Fact]
     public void RoslynCompile_InlineRefinementErased_CSharpCompiles()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Clamp:pub}
-                  §I{i32:value} | (>= # INT:0)
-                  §O{i32}
-                  §R value
+            module Test Test block
+              func Clamp (int:value | (# >= 0)) → int
+                !
+                return value
             """;
 
         var csharp = ParseAndEmitCSharp(source);

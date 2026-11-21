@@ -7,7 +7,7 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// Tests for compiler gap fixes discovered during native interop sample conversion.
-/// Covers: struct support, static fields, global namespace, increment/decrement operators.
+/// Covers: struct support, static fields, global namespace, explicit update replacements.
 /// </summary>
 public class CompilerGapFixTests
 {
@@ -52,10 +52,10 @@ public class CompilerGapFixTests
     public void Struct_BasicDeclaration()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyPoint:pub:struct}
-      §FLD{i32:X:pub}
-      §FLD{i32:Y:pub}
+module TestMod TestMod block
+  class MyPoint struct
+    field int:X
+    field int:Y
 ";
 
         var result = ParseAndEmit(source);
@@ -67,11 +67,11 @@ public class CompilerGapFixTests
     [Fact]
     public void Struct_MultiPositionModifiers()
     {
-        // §CL{c1:Name:pub:struct} — modifiers span _pos2 and _pos3
+        // §CL{Name:pub:struct} — modifiers span _pos2 and _pos3
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyPoint:pub:struct}
-      §FLD{i32:X:pub}
+module TestMod TestMod block
+  class MyPoint struct
+    field int:X
 ";
 
         var result = ParseAndEmit(source);
@@ -83,8 +83,8 @@ public class CompilerGapFixTests
     public void Struct_BackwardCompat()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyClass:pub}
+module TestMod TestMod block
+  class MyClass
 ";
 
         var result = ParseAndEmit(source);
@@ -98,8 +98,8 @@ public class CompilerGapFixTests
     {
         // C# structs are implicitly sealed, so "sealed" is correctly omitted from output
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyVal:pub:struct seal}
+module TestMod TestMod block
+  class MyVal sealed struct
 ";
 
         var result = ParseAndEmit(source);
@@ -113,8 +113,8 @@ public class CompilerGapFixTests
     public void Struct_AbstractStruct_ReportsDiagnostic()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:Bad:struct abs}
+module TestMod TestMod block
+  class Bad struct abstract
 ";
 
         var diagnostics = ParseWithDiagnostics(source);
@@ -131,9 +131,9 @@ public class CompilerGapFixTests
     public void StaticField_EmitsStaticKeyword()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:Counter:pub}
-      §FLD{i32:Count:pub:stat}
+module TestMod TestMod block
+  class Counter
+    field int:Count static
 ";
 
         var result = ParseAndEmit(source);
@@ -145,9 +145,9 @@ public class CompilerGapFixTests
     public void StaticField_BackwardCompat()
     {
         var source = @"
-§M{m1:TestMod}
-  §CL{c1:MyClass:pub}
-      §FLD{str:_name:pri}
+module TestMod TestMod block
+  class MyClass
+    field string:_name private
 ";
 
         var result = ParseAndEmit(source);
@@ -164,8 +164,8 @@ public class CompilerGapFixTests
     public void GlobalNamespace_SuppressesWrapper()
     {
         var source = @"
-§M{m1:_global}
-  §CL{c1:MyClass:pub}
+module _global
+  class MyClass
 ";
 
         var result = ParseAndEmit(source);
@@ -178,8 +178,8 @@ public class CompilerGapFixTests
     public void GlobalNamespace_BackwardCompat()
     {
         var source = @"
-§M{m1:MyApp}
-  §CL{c1:MyClass:pub}
+module MyApp MyApp block
+  class MyClass
 ";
 
         var result = ParseAndEmit(source);
@@ -189,70 +189,94 @@ public class CompilerGapFixTests
 
     #endregion
 
-    #region Fix 4: Increment/Decrement
+    #region Fix 4: Increment/Decrement Replacements
 
     [Fact]
-    public void Increment_Prefix()
+    public void Increment_PrefixReplacement_UsesUpdatedValue()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (inc x)
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    set x (x + 1)
+    let int:value = x
+    return value
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(++x);", result);
+        Assert.Contains("x = checked(x + 1);", result);
+        Assert.Contains("int value = x;", result);
+        Assert.True(result.IndexOf("x = checked(x + 1);", StringComparison.Ordinal)
+            < result.IndexOf("int value = x;", StringComparison.Ordinal));
+        Assert.Contains("return value;", result);
     }
 
     [Fact]
-    public void Increment_PostFix()
+    public void Increment_PostfixReplacement_CapturesPreviousValue()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (post-inc x)
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    let int:previous = x
+    set x (x + 1)
+    return previous
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(x++);", result);
+        Assert.Contains("x = checked(x + 1);", result);
+        Assert.Contains("int previous = x;", result);
+        Assert.True(result.IndexOf("int previous = x;", StringComparison.Ordinal)
+            < result.IndexOf("x = checked(x + 1);", StringComparison.Ordinal));
+        Assert.Contains("return previous;", result);
     }
 
     [Fact]
-    public void Decrement_Prefix()
+    public void Decrement_PrefixReplacement_UsesUpdatedValue()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (dec x)
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    set x (x - 1)
+    let int:value = x
+    return value
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(--x);", result);
+        Assert.Contains("x = checked(x - 1);", result);
+        Assert.Contains("int value = x;", result);
+        Assert.True(result.IndexOf("x = checked(x - 1);", StringComparison.Ordinal)
+            < result.IndexOf("int value = x;", StringComparison.Ordinal));
+        Assert.Contains("return value;", result);
     }
 
     [Fact]
-    public void Decrement_PostFix()
+    public void Decrement_PostfixReplacement_CapturesPreviousValue()
     {
         var source = @"
-§M{m1:TestMod}
-  §F{f001:Main:pub}
-      §O{void}
-      §B{~x:i32} 0
-      (post-dec x)
+module TestMod TestMod block
+  func Main () → int
+    !
+    var int:x = 0
+    let int:previous = x
+    set x (x - 1)
+    return previous
 ";
 
         var result = ParseAndEmit(source);
 
-        Assert.Contains("checked(x--);", result);
+        Assert.Contains("x = checked(x - 1);", result);
+        Assert.Contains("int previous = x;", result);
+        Assert.True(result.IndexOf("int previous = x;", StringComparison.Ordinal)
+            < result.IndexOf("x = checked(x - 1);", StringComparison.Ordinal));
+        Assert.Contains("return previous;", result);
     }
 
     #endregion
@@ -263,15 +287,15 @@ public class CompilerGapFixTests
     public void Integration_AllFixes()
     {
         var source = @"
-§M{m1:_global}
-  §CL{c1:Vector2:pub:struct}
-      §FLD{i32:X:pub}
-      §FLD{i32:Y:pub}
-      §FLD{i32:InstanceCount:pub:stat}
-      §MT{m001:Advance:pub}
-          §O{void}
-          (inc X)
-          (post-inc InstanceCount)
+module _global
+  class Vector2 struct
+    field int:X
+    field int:Y
+    field int:InstanceCount static
+    func Advance () → void
+      !
+      set X (X + 1)
+      set InstanceCount (InstanceCount + 1)
 ";
 
         var result = ParseAndEmit(source);
@@ -282,9 +306,8 @@ public class CompilerGapFixTests
         Assert.Contains("public struct Vector2", result);
         // Static field
         Assert.Contains("public static int InstanceCount;", result);
-        // Increment operators as standalone statements
-        Assert.Contains("checked(++X);", result);
-        Assert.Contains("checked(InstanceCount++);", result);
+        Assert.Contains("X = checked(X + 1);", result);
+        Assert.Contains("InstanceCount = checked(InstanceCount + 1);", result);
     }
 
     #endregion

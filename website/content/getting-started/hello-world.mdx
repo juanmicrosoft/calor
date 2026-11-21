@@ -36,14 +36,14 @@ cd HelloCalor
 Save this exact text in a UTF-8 file named `Program.calr` inside `HelloCalor`:
 
 ```calor
-§M{m001:HelloApp}
-  §F{f001:Main:pub} () -> void
-    §E{cw}
-    §P "Hello from Calor!"
+module HelloApp
+  func Main () → void
+    ! cw
+    Console.WriteLine("Hello from Calor!")
 ```
 
-`§M` declares the module, `§F` declares `Main`, and `§E{cw}` declares console
-output. The indented `§P` statement prints the message.
+`module` declares the module, `func` declares `Main`, and `! cw` declares console
+output. The indented `Console.WriteLine` call prints the message.
 
 ## Run without a project
 

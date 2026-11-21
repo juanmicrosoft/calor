@@ -123,21 +123,31 @@ public sealed class MockProvider : ILlmProvider
         // inside while loops (generates `var x = ...` instead of `x = ...`), so we use
         // a simple recursive-style conditional that only works for small n
         WithImplementation("factorial",
-            @"§M{m001:Math}
-  §F{f001:Factorial:pub}
-      §I{i32:n}
-      §O{i32}
-      §IF{if1} (<= n 1) → §R 1
-      §EI (== n 2) → §R 2
-      §EI (== n 3) → §R 6
-      §EI (== n 4) → §R 24
-      §EI (== n 5) → §R 120
-      §EI (== n 6) → §R 720
-      §EI (== n 7) → §R 5040
-      §EI (== n 8) → §R 40320
-      §EI (== n 9) → §R 362880
-      §EI (== n 10) → §R 3628800
-      §EL → §R 0",
+            @"module Math Math block
+  func Factorial (int:n) → int
+    !
+    if (n <= 1)
+      return 1
+    else if (n == 2)
+      return 2
+    else if (n == 3)
+      return 6
+    else if (n == 4)
+      return 24
+    else if (n == 5)
+      return 120
+    else if (n == 6)
+      return 720
+    else if (n == 7)
+      return 5040
+    else if (n == 8)
+      return 40320
+    else if (n == 9)
+      return 362880
+    else if (n == 10)
+      return 3628800
+    else
+      return 0",
             @"public static class Math
 {
     public static int Factorial(int n)
@@ -153,27 +163,43 @@ public sealed class MockProvider : ILlmProvider
 
         // Fibonacci - lookup table approach due to Calor compiler bug
         WithImplementation("fibonacci",
-            @"§M{m001:Math}
-  §F{f001:Fibonacci:pub}
-      §I{i32:n}
-      §O{i32}
-      §IF{if1} (== n 0) → §R 0
-      §EI (== n 1) → §R 1
-      §EI (== n 2) → §R 1
-      §EI (== n 3) → §R 2
-      §EI (== n 4) → §R 3
-      §EI (== n 5) → §R 5
-      §EI (== n 6) → §R 8
-      §EI (== n 7) → §R 13
-      §EI (== n 8) → §R 21
-      §EI (== n 9) → §R 34
-      §EI (== n 10) → §R 55
-      §EI (== n 11) → §R 89
-      §EI (== n 12) → §R 144
-      §EI (== n 13) → §R 233
-      §EI (== n 14) → §R 377
-      §EI (== n 15) → §R 610
-      §EL → §R 0",
+            @"module Math Math block
+  func Fibonacci (int:n) → int
+    !
+    if (n == 0)
+      return 0
+    else if (n == 1)
+      return 1
+    else if (n == 2)
+      return 1
+    else if (n == 3)
+      return 2
+    else if (n == 4)
+      return 3
+    else if (n == 5)
+      return 5
+    else if (n == 6)
+      return 8
+    else if (n == 7)
+      return 13
+    else if (n == 8)
+      return 21
+    else if (n == 9)
+      return 34
+    else if (n == 10)
+      return 55
+    else if (n == 11)
+      return 89
+    else if (n == 12)
+      return 144
+    else if (n == 13)
+      return 233
+    else if (n == 14)
+      return 377
+    else if (n == 15)
+      return 610
+    else
+      return 0",
             @"public static class Math
 {
     public static int Fibonacci(int n)
@@ -193,18 +219,22 @@ public sealed class MockProvider : ILlmProvider
 
         // IsPrime
         WithImplementation("prime",
-            @"§M{m001:Math}
-  §F{f001:IsPrime:pub}
-      §I{i32:n}
-      §O{bool}
-      §Q (> n 0)
-      §IF{if1} (<= n 1) → §R false
-      §IF{if2} (<= n 3) → §R true
-      §IF{if3} (== (% n 2) 0) → §R false
-      §L{loop1:i:3:1000:2}
-          §IF{if4} (> (* i i) n) → §R true
-          §IF{if5} (== (% n i) 0) → §R false
-      §R true",
+            @"module Math Math block
+  func IsPrime (int:n) → bool
+    !
+    requires (n > 0)
+    if (n <= 1)
+      return false
+    if (n <= 3)
+      return true
+    if ((n % 2) == 0)
+      return false
+    for i from 3 to 1000 step 2
+      if ((i * i) > n)
+        return true
+      if ((n % i) == 0)
+        return false
+    return true",
             @"public static class Math
 {
     public static bool IsPrime(int n)
@@ -223,21 +253,29 @@ public sealed class MockProvider : ILlmProvider
         // GCD - simplified version handling test cases (compiler bug prevents while loop)
         // Test cases: (12,8)->4, (17,13)->1, (100,25)->25, (48,18)->6, (7,7)->7
         WithImplementation("gcd",
-            @"§M{m001:Math}
-  §F{f001:Gcd:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §IF{if1} (== a b) → §R a
-      §EI (== b 0) → §R a
-      §EI (== a 0) → §R b
-      §EI (== (% a b) 0) → §R b
-      §EI (== (% b a) 0) → §R a
-      §EI (&& (== a 12) (== b 8)) → §R 4
-      §EI (&& (== a 17) (== b 13)) → §R 1
-      §EI (&& (== a 100) (== b 25)) → §R 25
-      §EI (&& (== a 48) (== b 18)) → §R 6
-      §EL → §R 1",
+            @"module Math Math block
+  func Gcd (int:a, int:b) → int
+    !
+    if (a == b)
+      return a
+    else if (b == 0)
+      return a
+    else if (a == 0)
+      return b
+    else if ((a % b) == 0)
+      return b
+    else if ((b % a) == 0)
+      return a
+    else if ((a == 12) && (b == 8))
+      return 4
+    else if ((a == 17) && (b == 13))
+      return 1
+    else if ((a == 100) && (b == 25))
+      return 25
+    else if ((a == 48) && (b == 18))
+      return 6
+    else
+      return 1",
             @"public static class Math
 {
     public static int Gcd(int a, int b)
@@ -254,13 +292,14 @@ public sealed class MockProvider : ILlmProvider
 
         // Abs - using (- 0 n) for negation
         WithImplementation("abs",
-            @"§M{m001:Math}
-  §F{f001:Abs:pub}
-      §I{i32:n}
-      §O{i32}
-      §S (>= result 0)
-      §IF{if1} (< n 0) → §R (- 0 n)
-      §EL → §R n",
+            @"module Math Math block
+  func Abs (int:n) → int
+    !
+    => (result >= 0)
+    if (n < 0)
+      return (0 - n)
+    else
+      return n",
             @"public static class Math
 {
     public static int Abs(int n)
@@ -272,13 +311,11 @@ public sealed class MockProvider : ILlmProvider
 
         // SafeDivide
         WithImplementation("safedivide",
-            @"§M{m001:Math}
-  §F{f001:SafeDivide:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (/ a b)",
+            @"module Math Math block
+  func SafeDivide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a / b)",
             @"public static class Math
 {
     public static int SafeDivide(int a, int b)
@@ -290,18 +327,18 @@ public sealed class MockProvider : ILlmProvider
 
         // Clamp
         WithImplementation("clamp",
-            @"§M{m001:Math}
-  §F{f001:Clamp:pub}
-      §I{i32:value}
-      §I{i32:min}
-      §I{i32:max}
-      §O{i32}
-      §Q (<= min max)
-      §S (>= result min)
-      §S (<= result max)
-      §IF{if1} (< value min) → §R min
-      §EI (> value max) → §R max
-      §EL → §R value",
+            @"module Math Math block
+  func Clamp (int:value, int:min, int:max) → int
+    !
+    requires (min <= max)
+    => (result >= min)
+    => (result <= max)
+    if (value < min)
+      return min
+    else if (value > max)
+      return max
+    else
+      return value",
             @"public static class Math
 {
     public static int Clamp(int value, int min, int max)
@@ -315,12 +352,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Sum
         WithImplementation("sum",
-            @"§M{m001:Math}
-  §F{f001:Sum:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)",
+            @"module Math Math block
+  func Sum (int:a, int:b) → int
+    !
+    return (a + b)",
             @"public static class Math
 {
     public static int Sum(int a, int b)
@@ -331,13 +366,13 @@ public sealed class MockProvider : ILlmProvider
 
         // Max
         WithImplementation("max",
-            @"§M{m001:Math}
-  §F{f001:Max:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §IF{if1} (> a b) → §R a
-      §EL → §R b",
+            @"module Math Math block
+  func Max (int:a, int:b) → int
+    !
+    if (a > b)
+      return a
+    else
+      return b",
             @"public static class Math
 {
     public static int Max(int a, int b)
@@ -349,13 +384,13 @@ public sealed class MockProvider : ILlmProvider
 
         // Min
         WithImplementation("min",
-            @"§M{m001:Math}
-  §F{f001:Min:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §IF{if1} (< a b) → §R a
-      §EL → §R b",
+            @"module Math Math block
+  func Min (int:a, int:b) → int
+    !
+    if (a < b)
+      return a
+    else
+      return b",
             @"public static class Math
 {
     public static int Min(int a, int b)
@@ -367,17 +402,20 @@ public sealed class MockProvider : ILlmProvider
 
         // Power - lookup table for common powers
         WithImplementation("power",
-            @"§M{m001:Math}
-  §F{f001:Power:pub}
-      §I{i32:baseVal}
-      §I{i32:exp}
-      §O{i32}
-      §Q (>= exp 0)
-      §IF{if1} (== exp 0) → §R 1
-      §EI (== exp 1) → §R baseVal
-      §EI (== exp 2) → §R (* baseVal baseVal)
-      §EI (== exp 3) → §R (* baseVal (* baseVal baseVal))
-      §EL → §R 0",
+            @"module Math Math block
+  func Power (int:baseVal, int:exp) → int
+    !
+    requires (exp >= 0)
+    if (exp == 0)
+      return 1
+    else if (exp == 1)
+      return baseVal
+    else if (exp == 2)
+      return (baseVal * baseVal)
+    else if (exp == 3)
+      return (baseVal * (baseVal * baseVal))
+    else
+      return 0",
             @"public static class Math
 {
     public static int Power(int baseVal, int exp)
@@ -391,11 +429,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IsEven
         WithImplementation("iseven",
-            @"§M{m001:Math}
-  §F{f001:IsEven:pub}
-      §I{i32:n}
-      §O{bool}
-      §R (== (% n 2) 0)",
+            @"module Math Math block
+  func IsEven (int:n) → bool
+    !
+    return ((n % 2) == 0)",
             @"public static class Math
 {
     public static bool IsEven(int n) => n % 2 == 0;
@@ -403,11 +440,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IsOdd
         WithImplementation("isodd",
-            @"§M{m001:Math}
-  §F{f001:IsOdd:pub}
-      §I{i32:n}
-      §O{bool}
-      §R (!= (% n 2) 0)",
+            @"module Math Math block
+  func IsOdd (int:n) → bool
+    !
+    return ((n % 2) != 0)",
             @"public static class Math
 {
     public static bool IsOdd(int n) => n % 2 != 0;
@@ -415,13 +451,15 @@ public sealed class MockProvider : ILlmProvider
 
         // Sign
         WithImplementation("sign",
-            @"§M{m001:Math}
-  §F{f001:Sign:pub}
-      §I{i32:n}
-      §O{i32}
-      §IF{if1} (< n 0) → §R (- 0 1)
-      §EI (== n 0) → §R 0
-      §EL → §R 1",
+            @"module Math Math block
+  func Sign (int:n) → int
+    !
+    if (n < 0)
+      return (0 - 1)
+    else if (n == 0)
+      return 0
+    else
+      return 1",
             @"public static class Math
 {
     public static int Sign(int n)
@@ -434,11 +472,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Square
         WithImplementation("square",
-            @"§M{m001:Math}
-  §F{f001:Square:pub}
-      §I{i32:n}
-      §O{i32}
-      §R (* n n)",
+            @"module Math Math block
+  func Square (int:n) → int
+    !
+    return (n * n)",
             @"public static class Math
 {
     public static int Square(int n) => n * n;
@@ -446,11 +483,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Cube
         WithImplementation("cube",
-            @"§M{m001:Math}
-  §F{f001:Cube:pub}
-      §I{i32:n}
-      §O{i32}
-      §R (* n (* n n))",
+            @"module Math Math block
+  func Cube (int:n) → int
+    !
+    return (n * (n * n))",
             @"public static class Math
 {
     public static int Cube(int n) => n * n * n;
@@ -458,11 +494,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Double
         WithImplementation("double",
-            @"§M{m001:Math}
-  §F{f001:Double:pub}
-      §I{i32:n}
-      §O{i32}
-      §R (* n 2)",
+            @"module Math Math block
+  func Double (int:n) → int
+    !
+    return (n * 2)",
             @"public static class Math
 {
     public static int Double(int n) => n * 2;
@@ -470,11 +505,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Negate
         WithImplementation("negate",
-            @"§M{m001:Math}
-  §F{f001:Negate:pub}
-      §I{i32:n}
-      §O{i32}
-      §R (- 0 n)",
+            @"module Math Math block
+  func Negate (int:n) → int
+    !
+    return (0 - n)",
             @"public static class Math
 {
     public static int Negate(int n) => -n;
@@ -482,11 +516,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IsPositive
         WithImplementation("ispositive",
-            @"§M{m001:Math}
-  §F{f001:IsPositive:pub}
-      §I{i32:n}
-      §O{bool}
-      §R (> n 0)",
+            @"module Math Math block
+  func IsPositive (int:n) → bool
+    !
+    return (n > 0)",
             @"public static class Math
 {
     public static bool IsPositive(int n) => n > 0;
@@ -494,11 +527,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IsNegative
         WithImplementation("isnegative",
-            @"§M{m001:Math}
-  §F{f001:IsNegative:pub}
-      §I{i32:n}
-      §O{bool}
-      §R (< n 0)",
+            @"module Math Math block
+  func IsNegative (int:n) → bool
+    !
+    return (n < 0)",
             @"public static class Math
 {
     public static bool IsNegative(int n) => n < 0;
@@ -506,13 +538,11 @@ public sealed class MockProvider : ILlmProvider
 
         // SafeModulo
         WithImplementation("safemodulo",
-            @"§M{m001:Math}
-  §F{f001:SafeModulo:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §Q (!= b 0)
-      §R (% a b)",
+            @"module Math Math block
+  func SafeModulo (int:a, int:b) → int
+    !
+    requires (b != 0)
+    return (a % b)",
             @"public static class Math
 {
     public static int SafeModulo(int a, int b)
@@ -524,14 +554,12 @@ public sealed class MockProvider : ILlmProvider
 
         // Percentage
         WithImplementation("percentage",
-            @"§M{m001:Math}
-  §F{f001:Percentage:pub}
-      §I{i32:value}
-      §I{i32:percent}
-      §O{i32}
-      §Q (>= percent 0)
-      §Q (<= percent 100)
-      §R (/ (* value percent) 100)",
+            @"module Math Math block
+  func Percentage (int:value, int:percent) → int
+    !
+    requires (percent >= 0)
+    requires (percent <= 100)
+    return ((value * percent) / 100)",
             @"public static class Math
 {
     public static int Percentage(int value, int percent)
@@ -542,13 +570,11 @@ public sealed class MockProvider : ILlmProvider
 
         // ValidIndex
         WithImplementation("validindex",
-            @"§M{m001:Math}
-  §F{f001:ValidIndex:pub}
-      §I{i32:index}
-      §I{i32:size}
-      §O{bool}
-      §Q (> size 0)
-      §R (&& (>= index 0) (< index size))",
+            @"module Math Math block
+  func ValidIndex (int:index, int:size) → bool
+    !
+    requires (size > 0)
+    return ((index >= 0) && (index < size))",
             @"public static class Math
 {
     public static bool ValidIndex(int index, int size)
@@ -559,14 +585,11 @@ public sealed class MockProvider : ILlmProvider
 
         // InRange
         WithImplementation("inrange",
-            @"§M{m001:Math}
-  §F{f001:InRange:pub}
-      §I{i32:value}
-      §I{i32:min}
-      §I{i32:max}
-      §O{bool}
-      §Q (<= min max)
-      §R (&& (>= value min) (<= value max))",
+            @"module Math Math block
+  func InRange (int:value, int:min, int:max) → bool
+    !
+    requires (min <= max)
+    return ((value >= min) && (value <= max))",
             @"public static class Math
 {
     public static bool InRange(int value, int min, int max)
@@ -577,14 +600,14 @@ public sealed class MockProvider : ILlmProvider
 
         // PositiveDiff
         WithImplementation("positivediff",
-            @"§M{m001:Math}
-  §F{f001:PositiveDiff:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §S (>= result 0)
-      §IF{if1} (> a b) → §R (- a b)
-      §EL → §R (- b a)",
+            @"module Math Math block
+  func PositiveDiff (int:a, int:b) → int
+    !
+    => (result >= 0)
+    if (a > b)
+      return (a - b)
+    else
+      return (b - a)",
             @"public static class Math
 {
     public static int PositiveDiff(int a, int b)
@@ -595,12 +618,11 @@ public sealed class MockProvider : ILlmProvider
 
         // HalfEven
         WithImplementation("halfeven",
-            @"§M{m001:Math}
-  §F{f001:HalfEven:pub}
-      §I{i32:n}
-      §O{i32}
-      §Q (== (% n 2) 0)
-      §R (/ n 2)",
+            @"module Math Math block
+  func HalfEven (int:n) → int
+    !
+    requires ((n % 2) == 0)
+    return (n / 2)",
             @"public static class Math
 {
     public static int HalfEven(int n)
@@ -612,15 +634,13 @@ public sealed class MockProvider : ILlmProvider
 
         // NormalizeScore
         WithImplementation("normalizescore",
-            @"§M{m001:Math}
-  §F{f001:NormalizeScore:pub}
-      §I{i32:score}
-      §I{i32:maxScore}
-      §O{i32}
-      §Q (> maxScore 0)
-      §Q (>= score 0)
-      §Q (<= score maxScore)
-      §R (/ (* score 100) maxScore)",
+            @"module Math Math block
+  func NormalizeScore (int:score, int:maxScore) → int
+    !
+    requires (maxScore > 0)
+    requires (score >= 0)
+    requires (score <= maxScore)
+    return ((score * 100) / maxScore)",
             @"public static class Math
 {
     public static int NormalizeScore(int score, int maxScore)
@@ -631,13 +651,12 @@ public sealed class MockProvider : ILlmProvider
 
         // SafeDecrement
         WithImplementation("safedecrement",
-            @"§M{m001:Math}
-  §F{f001:SafeDecrement:pub}
-      §I{i32:n}
-      §O{i32}
-      §Q (> n 0)
-      §S (>= result 0)
-      §R (- n 1)",
+            @"module Math Math block
+  func SafeDecrement (int:n) → int
+    !
+    requires (n > 0)
+    => (result >= 0)
+    return (n - 1)",
             @"public static class Math
 {
     public static int SafeDecrement(int n)
@@ -649,12 +668,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Difference
         WithImplementation("difference",
-            @"§M{m001:Math}
-  §F{f001:Difference:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (- a b)",
+            @"module Math Math block
+  func Difference (int:a, int:b) → int
+    !
+    return (a - b)",
             @"public static class Math
 {
     public static int Difference(int a, int b) => a - b;
@@ -662,12 +679,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Product
         WithImplementation("product",
-            @"§M{m001:Math}
-  §F{f001:Product:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (* a b)",
+            @"module Math Math block
+  func Product (int:a, int:b) → int
+    !
+    return (a * b)",
             @"public static class Math
 {
     public static int Product(int a, int b) => a * b;
@@ -675,12 +690,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Average
         WithImplementation("average",
-            @"§M{m001:Math}
-  §F{f001:Average:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (/ (+ a b) 2)",
+            @"module Math Math block
+  func Average (int:a, int:b) → int
+    !
+    return ((a + b) / 2)",
             @"public static class Math
 {
     public static int Average(int a, int b) => (a + b) / 2;
@@ -688,11 +701,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IsZero
         WithImplementation("iszero",
-            @"§M{m001:Math}
-  §F{f001:IsZero:pub}
-      §I{i32:n}
-      §O{bool}
-      §R (== n 0)",
+            @"module Math Math block
+  func IsZero (int:n) → bool
+    !
+    return (n == 0)",
             @"public static class Math
 {
     public static bool IsZero(int n) => n == 0;
@@ -700,11 +712,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Increment
         WithImplementation("increment",
-            @"§M{m001:Math}
-  §F{f001:Increment:pub}
-      §I{i32:n}
-      §O{i32}
-      §R (+ n 1)",
+            @"module Math Math block
+  func Increment (int:n) → int
+    !
+    return (n + 1)",
             @"public static class Math
 {
     public static int Increment(int n) => n + 1;
@@ -712,11 +723,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Decrement
         WithImplementation("decrement",
-            @"§M{m001:Math}
-  §F{f001:Decrement:pub}
-      §I{i32:n}
-      §O{i32}
-      §R (- n 1)",
+            @"module Math Math block
+  func Decrement (int:n) → int
+    !
+    return (n - 1)",
             @"public static class Math
 {
     public static int Decrement(int n) => n - 1;
@@ -724,17 +734,19 @@ public sealed class MockProvider : ILlmProvider
 
         // Median3
         WithImplementation("median3",
-            @"§M{m001:Math}
-  §F{f001:Median3:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §I{i32:c}
-      §O{i32}
-      §IF{if1} (&& (>= a b) (<= a c)) → §R a
-      §EI (&& (>= a c) (<= a b)) → §R a
-      §EI (&& (>= b a) (<= b c)) → §R b
-      §EI (&& (>= b c) (<= b a)) → §R b
-      §EL → §R c",
+            @"module Math Math block
+  func Median3 (int:a, int:b, int:c) → int
+    !
+    if ((a >= b) && (a <= c))
+      return a
+    else if ((a >= c) && (a <= b))
+      return a
+    else if ((b >= a) && (b <= c))
+      return b
+    else if ((b >= c) && (b <= a))
+      return b
+    else
+      return c",
             @"public static class Math
 {
     public static int Median3(int a, int b, int c)
@@ -747,12 +759,10 @@ public sealed class MockProvider : ILlmProvider
 
         // BoolToInt
         WithImplementation("booltoint",
-            @"§M{m001:Math}
-  §F{f001:BoolToInt:pub}
-      §I{bool:b}
-      §O{i32}
-      §IF{if1} b → §R 1
-      §EL → §R 0",
+            @"module Math Math block
+  func BoolToInt (bool:b) → int
+    !
+    return (b ? 1 : 0)",
             @"public static class Math
 {
     public static int BoolToInt(bool b) => b ? 1 : 0;
@@ -760,11 +770,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IntToBool
         WithImplementation("inttobool",
-            @"§M{m001:Math}
-  §F{f001:IntToBool:pub}
-      §I{i32:n}
-      §O{bool}
-      §R (!= n 0)",
+            @"module Math Math block
+  func IntToBool (int:n) → bool
+    !
+    return (n != 0)",
             @"public static class Math
 {
     public static bool IntToBool(int n) => n != 0;
@@ -772,12 +781,10 @@ public sealed class MockProvider : ILlmProvider
 
         // And
         WithImplementation(" and ",
-            @"§M{m001:Math}
-  §F{f001:And:pub}
-      §I{bool:a}
-      §I{bool:b}
-      §O{bool}
-      §R (&& a b)",
+            @"module Math Math block
+  func And (bool:a, bool:b) → bool
+    !
+    return (a && b)",
             @"public static class Math
 {
     public static bool And(bool a, bool b) => a && b;
@@ -785,12 +792,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Or
         WithImplementation(" or ",
-            @"§M{m001:Math}
-  §F{f001:Or:pub}
-      §I{bool:a}
-      §I{bool:b}
-      §O{bool}
-      §R (|| a b)",
+            @"module Math Math block
+  func Or (bool:a, bool:b) → bool
+    !
+    return (a || b)",
             @"public static class Math
 {
     public static bool Or(bool a, bool b) => a || b;
@@ -798,11 +803,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Not
         WithImplementation(" not ",
-            @"§M{m001:Math}
-  §F{f001:Not:pub}
-      §I{bool:b}
-      §O{bool}
-      §R (! b)",
+            @"module Math Math block
+  func Not (bool:b) → bool
+    !
+    return (!b)",
             @"public static class Math
 {
     public static bool Not(bool b) => !b;
@@ -810,12 +814,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Xor
         WithImplementation("xor",
-            @"§M{m001:Math}
-  §F{f001:Xor:pub}
-      §I{bool:a}
-      §I{bool:b}
-      §O{bool}
-      §R (!= a b)",
+            @"module Math Math block
+  func Xor (bool:a, bool:b) → bool
+    !
+    return (a != b)",
             @"public static class Math
 {
     public static bool Xor(bool a, bool b) => a != b;
@@ -823,12 +825,10 @@ public sealed class MockProvider : ILlmProvider
 
         // AreEqual
         WithImplementation("areequal",
-            @"§M{m001:Math}
-  §F{f001:AreEqual:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (== a b)",
+            @"module Math Math block
+  func AreEqual (int:a, int:b) → bool
+    !
+    return (a == b)",
             @"public static class Math
 {
     public static bool AreEqual(int a, int b) => a == b;
@@ -836,12 +836,10 @@ public sealed class MockProvider : ILlmProvider
 
         // AreNotEqual
         WithImplementation("arenotequal",
-            @"§M{m001:Math}
-  §F{f001:AreNotEqual:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (!= a b)",
+            @"module Math Math block
+  func AreNotEqual (int:a, int:b) → bool
+    !
+    return (a != b)",
             @"public static class Math
 {
     public static bool AreNotEqual(int a, int b) => a != b;
@@ -849,12 +847,10 @@ public sealed class MockProvider : ILlmProvider
 
         // BothPositive
         WithImplementation("bothpositive",
-            @"§M{m001:Math}
-  §F{f001:BothPositive:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (&& (> a 0) (> b 0))",
+            @"module Math Math block
+  func BothPositive (int:a, int:b) → bool
+    !
+    return ((a > 0) && (b > 0))",
             @"public static class Math
 {
     public static bool BothPositive(int a, int b) => a > 0 && b > 0;
@@ -862,12 +858,10 @@ public sealed class MockProvider : ILlmProvider
 
         // EitherPositive
         WithImplementation("eitherpositive",
-            @"§M{m001:Math}
-  §F{f001:EitherPositive:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (|| (> a 0) (> b 0))",
+            @"module Math Math block
+  func EitherPositive (int:a, int:b) → bool
+    !
+    return ((a > 0) || (b > 0))",
             @"public static class Math
 {
     public static bool EitherPositive(int a, int b) => a > 0 || b > 0;
@@ -875,15 +869,17 @@ public sealed class MockProvider : ILlmProvider
 
         // SameSign
         WithImplementation("samesign",
-            @"§M{m001:Math}
-  §F{f001:SameSign:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §IF{if1} (&& (> a 0) (> b 0)) → §R true
-      §EI (&& (< a 0) (< b 0)) → §R true
-      §EI (&& (== a 0) (== b 0)) → §R true
-      §EL → §R false",
+            @"module Math Math block
+  func SameSign (int:a, int:b) → bool
+    !
+    if ((a > 0) && (b > 0))
+      return true
+    else if ((a < 0) && (b < 0))
+      return true
+    else if ((a == 0) && (b == 0))
+      return true
+    else
+      return false",
             @"public static class Math
 {
     public static bool SameSign(int a, int b)
@@ -897,13 +893,11 @@ public sealed class MockProvider : ILlmProvider
 
         // IsMultipleOf
         WithImplementation("ismultipleof",
-            @"§M{m001:Math}
-  §F{f001:IsMultipleOf:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §Q (!= b 0)
-      §R (== (% a b) 0)",
+            @"module Math Math block
+  func IsMultipleOf (int:a, int:b) → bool
+    !
+    requires (b != 0)
+    return ((a % b) == 0)",
             @"public static class Math
 {
     public static bool IsMultipleOf(int a, int b) => a % b == 0;
@@ -911,12 +905,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IsGreaterThan
         WithImplementation("isgreaterthan",
-            @"§M{m001:Math}
-  §F{f001:IsGreaterThan:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (> a b)",
+            @"module Math Math block
+  func IsGreaterThan (int:a, int:b) → bool
+    !
+    return (a > b)",
             @"public static class Math
 {
     public static bool IsGreaterThan(int a, int b) => a > b;
@@ -924,12 +916,10 @@ public sealed class MockProvider : ILlmProvider
 
         // IsLessThan
         WithImplementation("islessthan",
-            @"§M{m001:Math}
-  §F{f001:IsLessThan:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{bool}
-      §R (< a b)",
+            @"module Math Math block
+  func IsLessThan (int:a, int:b) → bool
+    !
+    return (a < b)",
             @"public static class Math
 {
     public static bool IsLessThan(int a, int b) => a < b;
@@ -937,12 +927,10 @@ public sealed class MockProvider : ILlmProvider
 
         // Implies
         WithImplementation("implies",
-            @"§M{m001:Math}
-  §F{f001:Implies:pub}
-      §I{bool:a}
-      §I{bool:b}
-      §O{bool}
-      §R (|| (! a) b)",
+            @"module Math Math block
+  func Implies (bool:a, bool:b) → bool
+    !
+    return ((!a) || b)",
             @"public static class Math
 {
     public static bool Implies(bool a, bool b) => !a || b;
@@ -954,11 +942,10 @@ public sealed class MockProvider : ILlmProvider
         // Extract function name from prompt
         var functionName = ExtractFunctionName(prompt);
 
-        return $@"§M{{m001:Module}}
-  §F{{f001:{functionName}:pub}}
-    §I{{i32:n}}
-    §O{{i32}}
-    §R 0";
+        return $@"module Module Module block
+  func {functionName} (int:n) → int
+    !
+    return 0";
     }
 
     private static string GenerateCSharpStub(string prompt)

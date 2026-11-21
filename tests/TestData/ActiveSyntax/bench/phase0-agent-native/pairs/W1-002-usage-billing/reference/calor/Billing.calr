@@ -1,0 +1,50 @@
+module Billing Billing block
+  module BillingModule partial
+    func NormalizeUsage private (int:units) → int
+      => (result >= 0)
+      => (result <= 100000)
+      if (units < 0)
+        return 0
+      if (units > 100000)
+        return 100000
+      return units
+
+    func BillBasic (int:units) → int
+      !
+      => (result >= 500)
+      => (result <= 70500)
+      let int:u = NormalizeUsage(units)
+      return (((u * 7) / 10) + 500)
+
+    func BillPro (int:units) → int
+      !
+      => (result >= 300)
+      => (result <= 80400)
+      let int:u = NormalizeUsage(units)
+      if (u <= 1000)
+        return (((u * 9) / 10) + 300)
+      let int:tier1 = ((1000 * 9) / 10)
+      let int:tier2 = (((u - 1000) * 8) / 10)
+      return ((tier1 + tier2) + 300)
+
+    func BillCapped (int:units, int:cap) → int
+      !
+      requires (cap >= 0)
+      => (result >= 0)
+      => (result <= cap)
+      let int:price = BillPro(units)
+      if (price > cap)
+        return cap
+      return price
+
+    func CheaperPlan (int:units) → int
+      !
+      => (result >= 0)
+      => (result <= 1)
+      let int:basic = BillBasic(units)
+      let int:pro = BillPro(units)
+      if (basic <= pro)
+        return 0
+      return 1
+
+

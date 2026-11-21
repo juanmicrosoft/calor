@@ -1,174 +1,218 @@
 ---
 layout: default
-title: Syntax Reference
+title: "Language Reference"
 nav_order: 4
 has_children: true
 permalink: /syntax-reference/
 ---
 
-# Syntax Reference
+# Language Reference
 
-Complete reference for Calor syntax. Calor uses Lisp-style expressions for all operations.
+<!-- Generated from website/content/syntax-reference/index.mdx by calor self-check docs --fix. Edit the source, not this file. -->
 
----
+This page explains the symbols and rules used in Calor files. It is a detailed
+reference for developers and coding agents, not a required first step for
+someone who is learning what Calor does.
 
-## Quick Reference Table
+Calor uses lowercase declaration headers, indentation and ordinary C# expression
+operators. The [generated current-language reference](https://calor.dev/docs/syntax-reference/current-language/)
+is the compiler-checked catalog of constructs and complete examples.
 
-| Element | Syntax | Example |
-|:--------|:-------|:--------|
-| Module | `§M{name}` | `§M{Calculator}` |
-| Function | `§F{name:visibility}` | `§F{Add:pub}` |
-| Async Function | `§AF{name:visibility}` | `§AF{FetchAsync:pub}` |
-| Method | `§MT{name:visibility}` | `§MT{Process:pub}` |
-| Async Method | `§AMT{name:visibility}` | `§AMT{ProcessAsync:pub}` |
-| Await | `§AWAIT expr` | `§AWAIT §C{GetAsync} §/C` |
-| Lambda (inline) | `(params) → expr` | `(x) → (* x 2)` |
-| Lambda (block) | `§LAM{params}` (indented body) | `§LAM{x:i32}` |
-| Delegate | `§DEL{name}` (indented signature) | `§DEL{Handler}` |
-| Event | `§EVT{name:vis:type}` | `§EVT{Click:pub:EventHandler}` |
-| Subscribe | `§SUB event handler` | `§SUB btn.Click OnClick` |
-| Unsubscribe | `§UNSUB event handler` | `§UNSUB btn.Click OnClick` |
-| Input | `§I{type:name}` | `§I{i32:x}` |
-| Output | `§O{type}` | `§O{i32}` |
-| Effects | `§E{codes}` | `§E{cw,fs:r,net:rw}` |
-| Requires | `§Q expr` | `§Q (>= x 0)` |
-| Ensures | `§S expr` | `§S (>= result 0)` |
-| For Loop | `§L{var:from:to:step}` | `§L{i:1:100:1}` |
-| While Loop | `§WH condition` | `§WH (> i 0)` |
-| Do-While Loop | `§DO{id}` (body indented) | `§DO{do1}` then `§/DO{do1} cond` |
-| If/ElseIf/Else | `§IF{id} cond` then `§EI` / `§EL` at same column | `§IF{if1} (> x 0)` |
-| Call | `§C{target}...§/C` | `§C{Math.Max} §A 1 §A 2 §/C` |
-| C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
-| Print | `§P expr` | `§P "Hello"` |
-| Return | `§R expr` | `§R (+ a b)` |
-| Binding | `§B{name} expr` | `§B{x} (+ 1 2)` (see [Bindings](/calor/syntax-reference/binding/)) |
-| Operations | `(op args...)` | `(+ a b)`, `(== x 0)` | <!-- drift:ignore -->
-| Block end | _dedent_ (Python-style) | _(no `§/X` needed)_ |
-| List | `§LIST{id:type}` | `§LIST{nums:i32}` |
-| Dictionary | `§DICT{id:kType:vType}` | `§DICT{ages:str:i32}` |
-| HashSet | `§HSET{id:type}` | `§HSET{tags:str}` |
-| Key-Value | `§KV key value` | `§KV "alice" 30` |
-| Push | `§PUSH{coll} value` | `§PUSH{nums} 5` |
-| Put | `§PUT{dict} key value` | `§PUT{ages} "bob" 25` |
-| Set Index | `§SETIDX{list} idx val` | `§SETIDX{nums} 0 10` |
-| Contains | `§HAS{coll} value` | `§HAS{nums} 5` |
-| Count | `§CNT{coll}` | `§CNT{nums}` |
-| Dict Foreach | `§EACHKV{id:k:v} dict` | `§EACHKV{e1:k:v} ages` |
-| Enum | `§EN{id:name}` | `§EN{e001:Color}` |
-| Enum Extension | `§EEXT{id:enumName}` | `§EEXT{ext001:Color}` |
-| Switch | `§W{id} expr` | `§W{sw1} score` |
-| Case | `§K pattern → result` | `§K 200 → "OK"` |
-| Wildcard | `§K _` | `§K _ → "default"` |
-| Relational | `§PREL{op} value` | `§PREL{gte} 90` |
-| Var Pattern | `§VAR{name}` | `§VAR{n}` |
-| Guard | `§WHEN condition` | `§WHEN (> n 0)` |
-| Refinement Type | `§RTYPE{id:Name:base} (pred)` | `§RTYPE{r1:NatInt:i32} (>= # INT:0)` |
-| Indexed Type | `§ITYPE{id:Name:base:size}` | `§ITYPE{it1:SizedList:List:n}` |
-| Proof Obligation | `§PROOF{id:desc} (expr)` | `§PROOF{p1:check} (>= x INT:0)` |
+## Quick reference table
 
----
+The entries below are syntax fragments. An effect or contract line belongs
+inside its function, before the first body statement.
+
+| Element | Native syntax |
+|:--------|:--------------|
+| Compilation unit | `module FileLabel Optional.Namespace` |
+| Language semantics version | `semver "2.0.0"` in the module body |
+| Named static container | An indented `module Utilities` |
+| Function or method | `func Add (int:a, int:b) → int` |
+| Parameter | `int:value` in the signature |
+| Return | `return a + b` |
+| Call | `Math.Max(a, b)` |
+| Immutable binding | `let int:count = 3` or `let count = 3` |
+| Mutable binding | `var int:count = 3` or `var count = 3` |
+| Assignment | `set count count + 1` |
+| Effects | `! cw, fs:w`; a bare `!` declares no effects |
+| Precondition | `requires divisor != 0` |
+| Postcondition | `=> result >= 0` |
+| Branch | `if condition`, `else if condition`, `else` |
+| Counted loop, snapshot bounds | `for i from 1 to 10 step 1` |
+| Collection iteration | `each item in items` |
+| While loop | `while condition` |
+| Lambda | `(int:x) ! => x * 2` |
+| Member access and indexing | `value.Name`, `items[index]` |
+| Interpolation | `"hello ${name}"` |
+| Block end | Dedent to the parent column |
+
+Use two spaces per indentation level. Expressions use parentheses, commas and
+brackets where C# uses them; there are no call or block closer tags.
+See [calls](https://calor.dev/docs/syntax-reference/calls/),
+[bindings](https://calor.dev/docs/syntax-reference/binding/) and
+[control flow](https://calor.dev/docs/syntax-reference/control-flow/) for complete examples.
+
+## Modules and namespaces
+
+The root module's first name is a compilation-unit label, not a namespace or a
+static class name. The optional second name supplies the C# namespace.
+Omitting it means the global namespace.
+
+An indented named module is different: it is a static container.
+
+```calor
+module LabelExample Demo
+  semver "2.0.0"
+  module Arithmetic
+    func Add (int:a, int:b) → int
+      !
+      return a + b
+
+  func Main () → int
+    !
+    return Arithmetic.Add(20, 22)
+```
+
+`Demo.DemoModule.Main()` returns `42`. `Arithmetic` is the named static
+container; `LabelExample` is neither that container nor the namespace.
+
+The optional `semver` line checks the language-semantics version, not the package
+version. A different major is an error; a newer minor produces a warning.
+
+Native header imports retain compilation-unit scope. C# namespace-local imports
+and more complex namespace topologies can require faithful converter
+preservation; moving an import is not a semantics-preserving shortcut.
 
 ## Types
 
-| Type | Description | C# Equivalent |
-|:-----|:------------|:--------------|
-| `i32` | 32-bit integer | `int` |
-| `i64` | 64-bit integer | `long` |
-| `f32` | 32-bit float | `float` |
-| `f64` | 64-bit float | `double` |
-| `str` | String | `string` |
-| `bool` | Boolean | `bool` |
-| `void` | No return value | `void` |
-| `?T` | Optional T | `T?` (nullable) |
-| `T!E` | Result (T or error E) | `Result<T, E>` |
+Use C# type names and type-first bindings and parameters.
 
----
+| Type | Meaning |
+|:-----|:--------|
+| `int`, `long` | Signed 32-bit and 64-bit integers |
+| `float`, `double` | Binary floating-point values |
+| `decimal` | Decimal arithmetic |
+| `string`, `char`, `bool` | Text, UTF-16 code unit, Boolean |
+| `void` | No body result |
+| `T?` | Nullable type |
+| `T[]` | Array |
+| `List<T>`, `Dictionary<TKey,TValue>` | Ordinary .NET generic collections |
+
+See [types](https://calor.dev/docs/syntax-reference/types/) for nullability, arrays, exceptions and
+collections, and [inheritance](https://calor.dev/docs/syntax-reference/inheritance/) for classes,
+constructors and interface dispatch.
 
 ## Operators
+
+Expressions use infix operators with C# precedence. Parentheses make grouping
+explicit: `a + b * c` and `(a + b) * c` are different expressions.
 
 | Category | Operators |
 |:---------|:----------|
 | Arithmetic | `+`, `-`, `*`, `/`, `%` |
 | Comparison | `==`, `!=`, `<`, `<=`, `>`, `>=` |
 | Logical | `&&`, `\|\|`, `!` |
-| String | `len`, `upper`, `lower`, `trim`, `contains`, `starts`, `ends`, `indexof`, `substr`, `replace`, `concat`, `equals` |
-| Char | `char-at`, `char-code`, `char-from-code`, `is-letter`, `is-digit`, `is-whitespace`, `is-upper`, `is-lower`, `char-upper`, `char-lower` |
-| Regex | `regex-test`, `regex-match`, `regex-replace`, `regex-split` |
-| StringBuilder | `sb-new`, `sb-append`, `sb-appendline`, `sb-insert`, `sb-remove`, `sb-clear`, `sb-tostring`, `sb-length` |
+| Conditional expression | `condition ? whenTrue : whenFalse` |
 
-All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`, `(upper s)`
-
----
+Integer arithmetic is checked by default. String operations use ordinary members
+such as `text.Length` and `text.Contains(part, System.StringComparison.Ordinal)`;
+see [string operations](https://calor.dev/docs/syntax-reference/string-operations/).
 
 ## Effect Codes
 
-| Code | Effect | Description |
-|:-----|:-------|:------------|
-| `cw` | Console write | `Console.WriteLine` |
-| `cr` | Console read | `Console.ReadLine` |
-| `fs:w` | File write | File system writes |
-| `fs:r` | File read | File system reads |
-| `net:rw` | Network | HTTP, sockets, etc. |
-| `db:rw` | Database | Database operations |
+| Code | Effect |
+|:-----|:-------|
+| `cw` | Console output |
+| `cr` | Console input |
+| `fs:r` | Filesystem read |
+| `fs:w` | Filesystem write |
+| `net:rw` | Network read/write |
+| `db:rw` | Database read/write |
+| `alloc` | Allocation |
+| `mut` | Heap mutation |
+| `throw` | Explicit exceptions |
 
----
+An effect row bounds the side effects of a function or callback. Common codes
+include `cw` and `cr` for console output and input, `fs:r` and `fs:w` for
+filesystem access, and `alloc`, `mut` and `throw` for allocation, mutation and
+exceptions. A call to an unresolved operation is not silently treated as pure.
 
-## ID Conventions
+Preconditions use `requires`; postconditions use `=>` and can refer to `result`.
+Runtime checks, effect enforcement and verifier proofs are separate mechanisms.
+See [effects](https://calor.dev/docs/syntax-reference/effects/) and
+[contracts](https://calor.dev/docs/syntax-reference/contracts/) for their exact boundaries.
 
-Stable IDs are **optional** on structural openers and are auto-assigned
-by the parser when omitted. Provide an explicit ID only when you want
-to reference the element from external tooling (e.g. `calor navigate`).
+## ID conventions
 
-| Element | Auto-assigned form | Explicit form |
-|:--------|:-------------------|:--------------|
-| Modules | `§M{Calculator}` | `§M{m001:Calculator}` |
-| Functions | `§F{Add:pub}` | `§F{f001:Add:pub}` |
-| Loops | `§L{i:1:10:1}` | `§L{for1:i:1:10:1}` |
-| Conditionals | none: an `§IF` statement always needs an ID | `§IF{if1} cond` |
+Declaration IDs do not appear in source. Tools maintain persistent identities in
+the project's `.calor/ids.json` sidecar and synchronize active compilation inputs.
+Use supported rename and move tools to carry identity across refactoring.
+Plain-text reconciliation refuses ambiguous matches.
 
----
+Names such as `count` and `items` are ordinary program identifiers, not identity
+fields. See [stable identifiers](https://calor.dev/docs/philosophy/stable-identifiers/).
 
-## Complete Example
+## Documentation comments
 
+Put `///` comments immediately before the declaration they document.
+Consecutive lines form one comment; a blank line or ordinary `//` comment
+ends the association. The formatter preserves documentation comments.
+`--require-docs` and `--strict-api` recognize them.
+
+```calor
+/// Arithmetic helpers.
+module DocumentedArithmetic
+  /// Adds two integers.
+  func Add (int:x, int:y) → int
+    !
+    return x + y
 ```
-§M{FizzBuzz}
-  §F{Main:pub}
-    §O{void}
-    §E{cw}
-    §L{i:1:100:1}
-      §IF (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+
+Version annotations also use documentation comments: `/// since 1.0.0`,
+`/// deprecated 2.0.0 Replacement`, and `/// breaking 3.0.0 "Description"`.
+They are not source identity fields. See the
+[generated catalog](https://calor.dev/docs/syntax-reference/current-language/#introduction-version-metadata)
+for the supported metadata forms.
+
+Frozen benchmark archives preserve the language originally measured.
+They are historical inputs, not current parser-compatibility examples.
+Active-syntax regression copies do not remeasure those experiments or change
+their ledgers and measured commits.
+
+## Complete example
+
+```calor
+module FizzBuzz
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i % 15 == 0
+        Console.WriteLine("FizzBuzz")
+      else if i % 3 == 0
+        Console.WriteLine("Fizz")
+      else if i % 5 == 0
+        Console.WriteLine("Buzz")
+      else
+        Console.WriteLine(i)
 ```
 
-Blocks are delimited by **indentation** (default 2 spaces per nesting <!-- drift:ignore -->
-level). There are no closer tags — an explicit `§/X` was removed in
-Phase 4d and now raises `Calor0830`. See
-[Structure Tags](/calor/syntax-reference/structure-tags/) for details.
+`Main()` prints the numbers 1 through 100, replacing multiples of three with
+`Fizz`, multiples of five with `Buzz`, and multiples of both with `FizzBuzz`.
+Blocks end by dedenting. The
+[control-flow reference](https://calor.dev/docs/syntax-reference/control-flow/) adds loops and
+other branching forms.
 
-The compiler diagnoses non-canonical indentation, and each of these
-diagnostics carries a machine-applicable fix (surfaced via `calor check`
-and the MCP `calor_check` tool; `calor format --heal` repairs the same
-issues at the source level):
+## Detailed reference
 
-| Code | Severity | Meaning |
-|:-----|:---------|:--------|
-| `Calor0008` | warning | Leading whitespace uses tabs. One warning per file with one fix edit per tab line (each tab becomes 2 spaces). Fires on legacy tab-indented files that previously parsed silently. |
-| `Calor0009` | warning | Indentation step is not 2 spaces (e.g. 3- or 4-space levels). The file still parses — indentation is stack-relative — but the fix re-indents every offending line to its canonical `2 × level` column. Fires on legacy 4-space files that previously parsed silently. |
-| `Calor0117` | error | A `§EI`/`§EL` clause sits in statement position because it does not align with any open `§IF` (usually dedented too far). When the current function contains a `§IF` and re-indenting would actually change the line, the fix re-indents the clause to that `§IF`'s column. |
-
----
-
-## Detailed Reference
-
-- [Structure Tags](/calor/syntax-reference/structure-tags/) - Modules, functions, block structure
-- [Types](/calor/syntax-reference/types/) - Type system, Option, Result
-- [Bindings](/calor/syntax-reference/binding/) - `§B` declarations and type inference
-- [Calls](/calor/syntax-reference/calls/) - `§C` calls in statement and expression context
-- [Expressions](/calor/syntax-reference/expressions/) - Lisp-style operators
-- [Control Flow](/calor/syntax-reference/control-flow/) - Loops, conditionals
-- [Contracts](/calor/syntax-reference/contracts/) - Requires, ensures
-- [Effects](/calor/syntax-reference/effects/) - Effect declarations
-- [String Operations](/calor/syntax-reference/string-operations/) - String, char, regex, StringBuilder operations
-- [Refinement Types](/calor/syntax-reference/refinement-types/) - Refinement types, indexed types, proof obligations
+- [Current language](https://calor.dev/docs/syntax-reference/current-language/) — generated construct catalog and executable examples
+- [Declaration structure](https://calor.dev/docs/syntax-reference/structure-tags/) — declarations and block organization
+- [Types](https://calor.dev/docs/syntax-reference/types/) — primitive types, nullability and collections
+- [Bindings](https://calor.dev/docs/syntax-reference/binding/) — immutable and mutable locals
+- [Calls](https://calor.dev/docs/syntax-reference/calls/) — arguments, overloads and by-reference calls
+- [Expressions](https://calor.dev/docs/syntax-reference/expressions/) — operators and expression forms
+- [Control flow](https://calor.dev/docs/syntax-reference/control-flow/) — loops, conditionals and matching
+- [Contracts](https://calor.dev/docs/syntax-reference/contracts/) — preconditions, postconditions and runtime guards
+- [Effects](https://calor.dev/docs/syntax-reference/effects/) — declarations and callback rows
+- [String operations](https://calor.dev/docs/syntax-reference/string-operations/) — strings, regex and formatting
+- [Value constraints](https://calor.dev/docs/syntax-reference/refinement-types/) — input contracts and their limits

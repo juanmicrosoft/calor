@@ -29,7 +29,7 @@ files = subprocess.run(["git","ls-files","*.calr"],capture_output=True,text=True
 # mutants (which carry §LAM) and a PP-W epoch's per-run archives. Excluded for the same
 # reason facts.py excludes the spike artifacts; keyed on the W-<three digits>- pair id.
 PPW = re.compile(r"^bench/phase0-agent-native/(pairs|epochs/[^/]+)/W-[0-9]{3}-")
-files = [f for f in files if not PPW.match(f)]
+files = [f for f in files if not PPW.match(f) and not f.startswith("tests/TestData/ActiveSyntax/")]
 hits=[]
 for f in files:
     L=open(f,encoding="utf-8",errors="replace").read().split("\n")

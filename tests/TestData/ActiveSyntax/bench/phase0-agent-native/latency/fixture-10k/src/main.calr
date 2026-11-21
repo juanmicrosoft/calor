@@ -1,0 +1,16 @@
+module Main Main block
+  module MainModule public
+    func Main public () → void
+      ! cw
+      let int:r1 = L1M14.L1M14Module.l1m14_fn07(3, 1)
+      let int:r2 = L1M19.L1M19Module.l1m19_fn03(6, 2)
+      let int:r3 = L1M26.L1M26Module.l1m26_fn05(9, 3)
+      let int:r4 = L1M32.L1M32Module.l1m32_fn02(12, 4)
+      let int:r5 = L1M31.L1M31Module.l1m31_fn13(15, 5)
+      let int:r6 = L1M35.L1M35Module.l1m35_fn09(18, 6)
+      System.Console.WriteLine(r1)
+      System.Console.WriteLine(r2)
+      System.Console.WriteLine(r3)
+      System.Console.WriteLine(r4)
+      System.Console.WriteLine(r5)
+      System.Console.WriteLine(r6)

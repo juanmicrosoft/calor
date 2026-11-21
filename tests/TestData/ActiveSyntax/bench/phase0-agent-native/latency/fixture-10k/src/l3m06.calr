@@ -1,0 +1,87 @@
+module L3M06 L3M06 block
+  module L3M06Module public
+
+    func l3m06_fn01 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23927)
+      if (x >= 23927)
+        return x
+      else
+        return 23927
+
+    func l3m06_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 14)
+
+    func l3m06_fn03 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 15)
+
+    func l3m06_fn04 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 47)
+
+    func l3m06_fn05 public (int:x, int:y) → int
+      !
+      requires (x > 1)
+      => (x >= 2)
+      let int:acc = ((x * 2) + y)
+      if (acc > 23934)
+        return (acc + 23934)
+      else
+        return ((acc * 2) + 23934)
+
+    func l3m06_fn06 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 81)
+
+    func l3m06_fn07 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 86)
+
+    func l3m06_fn08 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23941)
+      if (x >= 23941)
+        return x
+      else
+        return 23941
+
+    func l3m06_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 65)
+
+    func l3m06_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 75)
+
+    func l3m06_fn11 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23948)
+      if (x >= 23948)
+        return x
+      else
+        return 23948
+
+    func l3m06_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 20)
+
+    func l3m06_fn13 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 16)

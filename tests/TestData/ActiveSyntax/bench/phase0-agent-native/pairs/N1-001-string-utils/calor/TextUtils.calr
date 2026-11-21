@@ -1,0 +1,8 @@
+module TextUtils TextUtils block
+  module TextUtilsModule partial
+    func Slugify (string:s) → string
+      !
+      let string:lower = s.ToLowerInvariant()
+      return lower.Replace(" ", "-")
+
+

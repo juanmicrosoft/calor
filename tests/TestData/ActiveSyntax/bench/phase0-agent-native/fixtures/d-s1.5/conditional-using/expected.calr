@@ -1,0 +1,15 @@
+module Fixture Fixture overflow unchecked
+  pp FEATURE
+    using Number = System.Int32
+    module ConditionalValue
+      func Get () → Number
+        !
+        return 41
+
+
+  pp else
+    using Number = System.Int32
+    module ConditionalValue
+      func Get () → Number
+        !
+        return 42

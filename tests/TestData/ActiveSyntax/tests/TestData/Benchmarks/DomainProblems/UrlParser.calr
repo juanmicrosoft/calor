@@ -1,0 +1,20 @@
+module UrlParser UrlParser
+  module UrlParserModule
+    func HasProtocol public (bool:startsWithHttp) → bool
+      !
+      return startsWithHttp
+
+    func IsSecure public (bool:isHttps) → bool
+      !
+      return isHttps
+
+    func DefaultPort public (bool:isHttps) → int
+      !
+      if isHttps
+        return 443
+      else
+        return 80
+
+    func IsValidPort public (int:port) → bool
+      !
+      return port > 0 && port <= 65535

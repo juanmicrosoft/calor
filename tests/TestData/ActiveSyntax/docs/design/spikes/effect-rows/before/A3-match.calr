@@ -1,0 +1,30 @@
+module MatchAfter MatchAfter block
+  module MatchAfterModule partial
+    func MatchOption (bool:hasValue, int:value, Func<int, int>:onSome ! unknown, Func<int>:onNone ! unknown) → int
+      !
+      if hasValue
+        return onSome(value)
+      return onNone()
+
+    func Identity (int:x) → int
+      !
+      return x
+
+    func Zero () → int
+      !
+      return 0
+
+    func Shout (int:x) → int
+      ! cw
+      System.Console.WriteLine(x)
+      return x
+
+    func BothPure (bool:h, int:v) → int
+      !
+      return MatchOption(h, v, Identity, Zero)
+
+    func OneImpure (bool:h, int:v) → int
+      ! cw
+      return MatchOption(h, v, Shout, Zero)
+
+

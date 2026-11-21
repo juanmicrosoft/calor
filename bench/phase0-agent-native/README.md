@@ -63,6 +63,111 @@ compile multisets are frozen in `pairs/ppw-seeded-compiles.json` (regenerate wit
 
 Extends `tests/E2E/agent-tasks/run-agent-tests.sh` (live-agent harness, majority voting). Additions needed (tracked below): pair-manifest support, two-arm dispatch, held-out test execution via the calor-arm template, transcript capture for the `.g.cs` dead-end metric, per-epoch pins.
 
+### Opt-in initialized workspace (unregistered plumbing)
+
+`run-pair.sh --initialized-workspace` adds a separate `calor+initialized` arm.
+It runs the selected compiler's real `calor init --ai claude --project src/Src.csproj`
+inside a fresh temporary Git workspace and a disposable home. Generated `CLAUDE.md`,
+Claude hooks, MCP registration, configuration, and the actual `calor://primer` MCP
+response are archived before execution. Hooks resolve `calor` through a wrapper
+bound to the selected DLL; MCP retains the generated arguments with its executable
+bound to that DLL. The user's home and existing agent templates are not modified.
+
+The generated project is archived verbatim, then adapted to the existing arm's
+SDK/Tasks build pin. The adapter imports the selected arm's SDK after init's inline
+targets and disables its duplicate generated-C# inclusion target. This preserves
+effect enforcement, held-out tests, and `compilerHash` capture; it is not an evaluation
+of an unmodified global-tool build. The new arm has a separate current-syntax strict
+canary. Without the flag, the original template, canary, prompt, and result schema
+remain unchanged.
+
+Use an ordinary strict `calor`/`raw`, non-probe pair and an explicit **new**
+unregistered `--out` directory. Frozen/seeded/registered pairs, pinned epoch
+directories (including their descendants), policy-control arms, gateway/spending
+bindings, label overrides, and `--canary-only` are rejected. `--exemplar` remains
+additive and its bytes are included in the initialized-input archive.
+`--arm-repo-root` selects both the initializer and compilation product. An explicit
+`--calor-dll` must be a Release/Debug build inside that root, match its declared
+version, and match the compiler copied into its Release Tasks output. Missing init
+or primer support and mismatches fail closed; there is no parent-compiler fallback.
+
+Each run records `initialization` in `result.json` and `initialization.json`:
+selected root/commit/version, DLL SHA-256, actual init command, and SHA-256 identities
+for every archived workspace input, generated home registration, primer response,
+exemplar (if any), original arm template, and bound project. Initialization commands
+have the pair's timeout and terminate their own process group on timeout/cancellation.
+Post-kill pipe draining is capped at one second; if an escaped descendant retains
+stdout/stderr, the harness closes those pipes and allows at most one further second
+to reap the root. Failure to signal or reap is reported without masking the original
+timeout/cancellation. Controls exercise exited/live roots with escaped pipe holders
+and real SIGINT, not only descendants that remain in the killed group.
+
+The initialized/raw arm's generated `mcp-config.json` reaches the existing
+`run_agent` invocation through `--mcp-config` and `--strict-mcp-config`; no edit-mode
+gate omits it. A local, non-provider agent stub verifies the actual argv, working
+directory, root instructions/settings, selected `calor` shim, and real hook rejection.
+
+Zero-provider validation:
+
+```bash
+python3 -m unittest discover -s bench/phase0-agent-native/tests -p test_initialized_workspace.py -v
+```
+
+Build Release Compiler and Tasks first. Compiler-backed controls execute real init,
+MCP primer reads, strict SDK compilation, and all 11 held-out tests for a **temporary
+current-syntax copy** of `N1-001-string-utils`. They also compare the absent-flag
+runner with integration base `89f298e99`. Original pair/canary bytes are never
+rewritten. Null-agent controls are plumbing, not agent outcomes, token-savings
+measurements, or release-gate evidence; no model/budget/publication decision is added.
+
+### Explicit selected-arm canary (unregistered admission controls)
+
+`--arm-canary <file> --arm-canary-sha256 <lowercase SHA-256>` selects exact canary
+bytes for an ordinary Calor arm. Both flags are required. The runner snapshots
+the input once, verifies that snapshot before compilation, and builds it through
+the selected arm's SDK and Calor.Tasks. The selected CLI must belong to
+`--arm-repo-root`, match the Tasks compiler image, and report that root's version.
+No source translation or automatic current-syntax selection occurs.
+
+The checked-in `.calr.txt` files are test inputs, not active `.calr` corpus
+modules. The runner builds their exact bytes as `canary.calr` in its workspace.
+
+For a zero-provider effect-gate check after building Release Compiler and Tasks:
+
+```bash
+CANARY=bench/phase0-agent-native/tests/fixtures/harness-capture/current-unknown-effect.calr.txt
+PIN=$(shasum -a 256 "$CANARY" | cut -d' ' -f1)
+bash bench/phase0-agent-native/run-pair.sh \
+  --pair bench/phase0-agent-native/pairs/N1-001-string-utils --arm calor \
+  --canary-only --out /tmp/calor-selected-canary-new \
+  --arm-repo-root "$PWD" --calor-dll "$PWD/src/Calor.Compiler/bin/Release/net10.0/calor.dll" \
+  --arm-canary "$CANARY" --arm-canary-sha256 "$PIN"
+```
+
+`--out` must be an explicit, nonexistent, unregistered directory. Initialized
+arms, registered policy arms, frozen/seeded inputs, pinned epoch directories,
+spending/gateway bindings, and skipped canaries cannot use this override.
+Missing, empty, symlinked, or hash-mismatched input fails before admission.
+
+`arm-canary/` archives the selected bytes, input SHA-256, selected root/commit,
+CLI image SHA-256/version, rendered project, build output, and compiler build
+state. Explicit-selection preflight and run results carry `armCanaryInput`;
+each run retains the archive. Without these flags, original canary bytes,
+diagnostic classification, prompts, workspace inputs, and result schema stay
+unchanged, including the current compiler's rejection of historical source IDs.
+
+The ordinary current known-effect fixture keeps the original forbidden console
+write: `Calor0410` is an error under both current policies. The separate
+polymorphic-unknown fixture exercises the actual distinction: strict errors,
+permissive warns. The existing effect/policy classifiers are unchanged.
+Compiler-backed harness tests explicitly select these fixtures and use existing
+current pair sources only in temporary copies. This is admission/null-agent
+plumbing, not an agent outcome, token-savings measurement, or historical replay.
+
+```bash
+python3 -m unittest discover -s bench/phase0-agent-native/tests -p test_harness_capture.py -v
+```
+
 ### Per-run capture (v0.16 W1 — roadmap §3.1, gate 8, #1094)
 
 `run-pair.sh` and `run-bundle.sh` run the agent as

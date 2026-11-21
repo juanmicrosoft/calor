@@ -1,22 +1,23 @@
-§M{m001:ContractZ3Test}
-  §IFACE{i001:IService}
-    §MT{m001:Process} (i32:value) -> i32
-      §Q (>= value 0)
+module ContractZ3Test ContractZ3Test block
+  interface IService
+    func Process (int:value) → int
+      !
+      requires value >= 0
 
-  §CL{c001:ValidService:pub}
-    §IMPL{IService}
+  class ValidService
+    implements IService
 
-    §MT{mt001:Process:pub} (i32:value) -> i32
-      §Q (>= value -10)
-      §S (>= result 1)
-      §R (+ value 1)
+    func Process (int:value) → int
+      !
+      requires value >= -10
+      => result >= 1
+      return value + 1
 
+  class AnotherValidService
+    implements IService
 
-  §CL{c002:AnotherValidService:pub}
-    §IMPL{IService}
-
-    §MT{mt002:Process:pub} (i32:value) -> i32
-      §Q (>= value 0)
-      §S (>= result 10)
-      §R (+ value 10)
-
+    func Process (int:value) → int
+      !
+      requires value >= 0
+      => result >= 10
+      return value + 10

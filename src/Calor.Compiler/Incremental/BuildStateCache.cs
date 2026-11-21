@@ -25,18 +25,30 @@ internal sealed class BuildState
         BuildStateCache.CurrentCompilerSemanticsVersion;
 
     /// <summary>
-    /// Fingerprint of the cross-module function map and declared type contracts
-    /// under (G3/#809): emission qualifies cross-module calls from this map, so
-    /// a changed map (module added/removed/renamed, ambiguity introduced) must
-    /// invalidate every warm skip — a cached .g.cs may carry stale
-    /// qualification or stale effect-variance results. Null/empty when single-module.
+    /// Fingerprint of the cross-module function map and complete source snapshot.
+    /// Target-map changes invalidate every warm skip; source-only changes require
+    /// an independence proof before reusing a cached output and effect summary
+    /// (<see cref="CrossModuleCacheReuse"/>, shared by the CLI and the MSBuild task).
+    /// Null/empty when single-module.
     /// </summary>
     public string? CrossModuleMapHash { get; set; }
+    // Source-only changes can spare proven-independent outputs; changed targets
+    // or source paths must still discard every cached qualification.
+    public string? CrossModuleFunctionMapHash { get; set; }
     public string CompilerHash { get; set; } = "";
     public string OptionsHash { get; set; } = "";
     public string ManifestHash { get; set; } = "";
     public string OutputDirectory { get; set; } = "";
     public Dictionary<string, BuildFileEntry> Files { get; set; } = new();
+    // Validation evidence is not a reusable file entry: warning-bearing outputs
+    // participate in independence proofs but must still compile every time.
+    public Dictionary<string, ValidatedOutputEntry> ValidatedOutputs { get; set; } = new();
+}
+
+internal sealed class ValidatedOutputEntry
+{
+    public string OutputContentHash { get; set; } = "";
+    public bool IsNativeGlobalModule { get; set; }
 }
 
 internal sealed class BuildFileEntry
@@ -111,7 +123,10 @@ internal enum FileCacheMissReason
     OutputContentChanged,
     SourceMissing,
     SourceContentChanged,
-    CacheValidationFailed
+    CacheValidationFailed,
+    // The file is unchanged but another module's source changed, and the
+    // independence proof could not show its cached output is unaffected (#1732).
+    CrossModuleDependencyChanged
 }
 
 internal static class BuildStateCache
@@ -417,6 +432,10 @@ internal static class BuildStateCache
         {
             if (!Directory.Exists(root.Directory))
                 continue;
+            var identityStore = Ids.DeclarationIdentityStore.Find(Path.Combine(root.Directory, "__identity__.calr"));
+            if (identityStore != null && File.Exists(identityStore.SidecarPath)
+                && seen.Add(identityStore.SidecarPath))
+                manifestFiles.Add((root.Scope, identityStore.SidecarPath));
             foreach (var file in Directory.GetFiles(
                          root.Directory, "*.calor-effects.json", SearchOption.TopDirectoryOnly))
             {
@@ -542,6 +561,7 @@ internal static class BuildStateCache
         FileCacheMissReason.SourceMissing => "source-missing",
         FileCacheMissReason.SourceContentChanged => "source-content-changed",
         FileCacheMissReason.CacheValidationFailed => "cache-validation-failed",
+        FileCacheMissReason.CrossModuleDependencyChanged => "cross-module-dependency-changed",
         _ => throw new ArgumentOutOfRangeException(nameof(reason))
     };
 

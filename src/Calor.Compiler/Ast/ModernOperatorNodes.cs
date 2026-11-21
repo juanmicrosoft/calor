@@ -204,6 +204,22 @@ public sealed class TypeOfExpressionNode : ExpressionNode
 }
 
 /// <summary>
+/// A lexical checked/unchecked scope over an expression, including its conversions.
+/// </summary>
+public sealed class OverflowContextExpressionNode : ExpressionNode
+{
+    public ExpressionNode Operand { get; }
+    public bool IsChecked { get; }
+
+    public OverflowContextExpressionNode(TextSpan span, ExpressionNode operand, bool isChecked)
+        : base(span)
+    {
+        Operand = operand ?? throw new ArgumentNullException(nameof(operand));
+        IsChecked = isChecked;
+    }
+}
+
+/// <summary>
 /// Represents a nameof expression.
 /// (nameof value) generates: nameof(value)
 /// </summary>
@@ -228,12 +244,20 @@ public sealed class ExpressionCallNode : ExpressionNode
 {
     public ExpressionNode TargetExpression { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
+    public IReadOnlyList<string?>? ArgumentNames { get; }
+    public IReadOnlyList<string?>? ArgumentModifiers { get; }
+    public IReadOnlyList<string>? TypeArguments { get; }
 
-    public ExpressionCallNode(TextSpan span, ExpressionNode targetExpression, IReadOnlyList<ExpressionNode> arguments)
+    public ExpressionCallNode(TextSpan span, ExpressionNode targetExpression, IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames = null, IReadOnlyList<string?>? argumentModifiers = null,
+        IReadOnlyList<string>? typeArguments = null)
         : base(span)
     {
         TargetExpression = targetExpression ?? throw new ArgumentNullException(nameof(targetExpression));
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
+        TypeArguments = typeArguments;
     }
 
 

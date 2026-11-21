@@ -1,0 +1,10 @@
+{
+  "featureKey": "checked-expression",
+  "supportLevel": "Full",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "runtimeEntryPoint": "Run",
+  "runtimeExpectedInt": 124,
+  "convertedRuntimeEntryPoint": "Run",
+  "convertedExpectedUndefinedInt": 124,
+  "convertedExpectedDefinedInt": 124
+}

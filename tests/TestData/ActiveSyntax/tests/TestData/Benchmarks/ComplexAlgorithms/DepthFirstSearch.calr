@@ -1,0 +1,13 @@
+module DepthFirstSearch DepthFirstSearch
+  module DepthFirstSearchModule
+    func IsVisited public (int:node, int:visitedBitmask) → bool
+      !
+      return visitedBitmask != 0
+
+    func MarkVisited public (int:visitedCount) → int
+      !
+      return visitedCount + 1
+
+    func AllVisited public (int:visitedCount, int:totalNodes) → bool
+      !
+      return visitedCount == totalNodes

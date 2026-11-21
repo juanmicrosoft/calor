@@ -4,9 +4,10 @@ section: "benchmarking"
 order: 9
 ---
 
+> **Syntax and measurement:** Code illustrations use current native syntax. Calculator tables, token estimates and numerical results describe archived source; none has been remeasured for these illustrations.
 
 **Category:** Information Density
-**Static dashboard result:** C# scores higher (0.97x Calor/C# across 217 programs)
+**Historical static dashboard result:** C# scores higher (0.97x Calor/C# across 217 programs)
 
 See [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully) for the recorded source, corpus, and measurement method.
 **What it measures:** Semantic elements per token
@@ -25,7 +26,7 @@ Not all tokens carry equal semantic weight:
 
 - `public` carries visibility information
 - `{` carries only structural information
-- `§E{cw}` carries effect information
+- `! cw` carries effect information
 
 Languages that pack more meaning into fewer tokens use context windows more efficiently.
 
@@ -35,17 +36,20 @@ Languages that pack more meaning into fewer tokens use context windows more effi
 
 ### Semantic Elements Counted
 
-**Calor elements:**
+**Archived Calor calculator elements:**
+
+These named marker checks describe the recorded calculator and its old inputs,
+not the syntax agents should write now.
 | Element | What it represents |
 |:--------|:-------------------|
-| Modules (`§M{`) | Namespace/module |
-| Functions (`§F{`) | Function definition |
-| Variables (`§B{`) | Variable binding |
-| Type annotations (`§I{`, `§O{`) | Type information |
-| Contracts (`§Q`, `§S`) | Preconditions/postconditions |
-| Effects (`§E{`) | Side effect declarations |
-| Control flow (`§IF`, `§L`) | Branches and loops |
-| Expressions (`§C{`, operators) | Computations |
+| Module markers | Namespace/module signals in the archived representation |
+| Function markers | Function definition |
+| Binding markers | Variable binding |
+| Input/output markers | Type information |
+| Precondition/postcondition markers | Contracts |
+| Effect markers | Side effect declarations |
+| Branch/loop markers | Control flow |
+| Call markers and operators | Computations |
 
 **C# elements (via Roslyn):**
 | Element | What it represents |
@@ -88,20 +92,20 @@ This single line conveys:
 
 **Calor equivalent:**
 ```calor
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
+module Density
+  func Add (int:a, int:b) → int
+    !
+    return a + b
 ```
 
-Same semantics, but spread across more tokens.
+This preserves the Add signature and arithmetic. No current token count or
+density comparison has been measured for this native illustration.
 
-### 2. Indent Form Eliminates Most Closing Tags
+### 2. Current Blocks End at Dedent
 
-In v0.12 indent form, every structural block (`§M{…}`, `§F{…}`, `§CL{…}`, …)
-is terminated by dedent, so no structural closer is written. Current authored
-source uses only `§/C` for call argument lists and `§/LAM` for block lambdas.
+Indent form was introduced in v0.12. Current `module`, `func` and control-flow
+blocks end at dedent. Write neither structural closer tags nor the removed call
+and lambda closers; native calls use parentheses.
 
 C# closing braces (`}`) carry minimal semantic weight but are still counted as tokens.
 
@@ -109,8 +113,8 @@ C# closing braces (`}`) carry minimal semantic weight but are still counted as t
 
 Calor's effect declarations add semantic content that C# doesn't have:
 
-```calor
-§E{cw,fs:r,net:rw}    // 3+ semantic elements
+```calor-fragment
+! cw,fs:r,net:rw
 ```
 
 But C# has no equivalent, so it doesn't get penalized for missing this information.
@@ -121,20 +125,30 @@ But C# has no equivalent, so it doesn't get penalized for missing this informati
 
 ### Example: FizzBuzz
 
+The current illustration preserves the original 1 through 100 trace.
+`for i from 1 to 100 step 1` includes both bounds; it is not the half-open
+`in 1..100` form.
+
 **Calor:**
 ```calor
-§M{m001:FizzBuzz}
-  §F{f001:Main:pub}
-    §O{void}
-    §E{cw}
-    §L{for1:i:1:100:1}
-      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-      §EI (== (% i 3) 0) → §P "Fizz"
-      §EI (== (% i 5) 0) → §P "Buzz"
-      §EL → §P i
+module FizzBuzz
+  func Main () → void
+    ! cw
+    for i from 1 to 100 step 1
+      if i % 15 == 0
+        Console.WriteLine("FizzBuzz")
+      else if i % 3 == 0
+        Console.WriteLine("Fizz")
+      else if i % 5 == 0
+        Console.WriteLine("Buzz")
+      else
+        Console.WriteLine(i)
 ```
 
-| Element Type | Count |
+The following counts and token estimates belong to the archived example, not
+the native code above. They are retained as historical calculator output.
+
+| Element Type | Archived Count |
 |:-------------|:------|
 | Module | 1 |
 | Function | 1 |
@@ -203,9 +217,12 @@ still depends on what the calculator counts:
 Calor includes semantic elements C# doesn't have:
 - Explicit effects
 - First-class contracts
-- Optional explicit structural IDs
+- Structural IDs in the archived source
 
-These are counted as semantic elements but have no C# equivalent.
+The historical comparison depends on its calculator's element definitions.
+Current declaration IDs live in the per-project `.calor/ids.json` sidecar,
+maintained by project tools, not in authored source. The historical token
+estimates do not measure that sidecar or the current native spelling.
 
 ### Quality vs Quantity
 
@@ -222,7 +239,7 @@ Low density is acceptable when:
 1. **Explicitness has value** - Contracts, effects worth the tokens
 2. **Comprehension matters** - Clear structure aids understanding
 3. **Context is available** - Large context windows reduce pressure
-4. **Precision is needed** - IDs enable precise targeting
+4. **Precision is needed** - Sidecar identities support tool-driven targeting without source ID fields
 
 ---
 
@@ -239,14 +256,13 @@ Calor deliberately trades density for explicitness.
 
 ---
 
-## Improving Calor's Density
+## Historical Suggestions and Current Syntax
 
-Potential improvements (with tradeoffs):
-
-1. **Shorter tags** - `§F` could become `@F` (less distinctive)
-2. **Remove IDs** - Skip unique identifiers (lose precision)
-
-Note: Phase 4 already eliminated explicit closing tags via indent form (block boundaries are signalled by dedent), so the previous "implicit closing" suggestion has been realized.
+Earlier suggestions proposed shorter tags and removing source IDs. Current
+illustrations already use native words, dedent-based blocks and sidecar IDs.
+Removing ID fields from source does not remove identity tracking. This page
+does not propose another spelling or claim a new token saving; a current
+density result needs a separate measurement with recorded inputs and method.
 
 ---
 

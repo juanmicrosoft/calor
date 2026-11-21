@@ -229,10 +229,6 @@
   ],
   "namespaceDefaults": {
     "System.Data": ["db:rw"],
-    "System.Data.SqlClient": ["db:rw"],
-    "Microsoft.Data.SqlClient": ["db:rw"],
-    "Npgsql": ["db:rw"],
-    "MySql.Data": ["db:rw"],
-    "Microsoft.Data.Sqlite": ["db:rw"]
+    "System.Data.SqlClient": ["db:rw"]
   }
 }

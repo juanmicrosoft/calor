@@ -32,16 +32,18 @@ public class V017Round4FindingsTests
     public void CyclicTypeParameterConstraints_Report_InsteadOfOverflowingTheStack()
     {
         var result = Compile("""
-            §M{m001:Cyc}
-              §CL{c001:Box:pub}<T,U>
-                §WHERE T : U
-                §WHERE U : T
-                §MT{mt001:Take:pub} (str:s) -> i32
-                  §E{}
-                  §R INT:1
-                §MT{mt002:Go:pub} (T:a) -> i32
-                  §E{}
-                  §R §C{Take} §A a §/C
+            module Cyc Cyc block
+              class Box<T,U>
+                where T : U
+                where U : T
+
+                func Take (string:s) → int
+                  !
+                  return 1
+
+                func Go (T:a) → int
+                  !
+                  return Take(a)
             """);
 
         // Reaching this line at all is the finding: before the fix the test
@@ -65,21 +67,22 @@ public class V017Round4FindingsTests
     /// for every call carrying an i8/u8/i16/u16/f32 argument.
     /// </summary>
     [Theory]
-    [InlineData("f32")]
-    [InlineData("i8")]
-    [InlineData("u8")]
-    [InlineData("i16")]
-    [InlineData("u16")]
+    [InlineData("float")]
+    [InlineData("sbyte")]
+    [InlineData("byte")]
+    [InlineData("short")]
+    [InlineData("ushort")]
     public void DecoratedBuiltinArgument_StillReportsNoMatchingOverload(string calorType)
     {
         var result = Compile($$"""
-            §M{m001:Probe}
-              §F{f001:Take:pub} (str:s) -> i32
-                §E{}
-                §R INT:1
-              §F{f002:Go:pub} ({{calorType}}:x) -> i32
-                §E{}
-                §R §C{Take} §A x §/C
+            module Probe Probe block
+              func Take (string:s) → int
+                !
+                return 1
+
+              func Go ({{calorType}}:x) → int
+                !
+                return Take(x)
             """);
 
         Assert.Contains(
@@ -96,13 +99,14 @@ public class V017Round4FindingsTests
     public void UndeclaredNominalArgument_IsStillSuppressed()
     {
         var result = Compile("""
-            §M{m001:Probe}
-              §F{f001:Take:pub} (str:s) -> i32
-                §E{}
-                §R INT:1
-              §F{f002:Go:pub} (NotDeclaredAnywhere:x) -> i32
-                §E{}
-                §R §C{Take} §A x §/C
+            module Probe Probe block
+              func Take (string:s) → int
+                !
+                return 1
+
+              func Go (NotDeclaredAnywhere:x) → int
+                !
+                return Take(x)
             """);
 
         Assert.DoesNotContain(
@@ -125,15 +129,15 @@ public class V017Round4FindingsTests
     public void ModuleLevelGenericFunction_ResolvesThroughItsOwnConstraint()
     {
         var result = Compile("""
-            §M{m001:Reach}
-              §IFACE{i001:INote:pub}
-              §F{f001:Accept:pub} (INote:n) -> i32
-                §E{}
-                §R INT:1
-              §F{f002:Publish:pub}<TNote> (TNote:n) -> i32
-                §WHERE TNote : INote
-                §E{}
-                §R §C{Accept} §A n §/C
+            module Reach Reach block
+              func Accept (INote:n) → int
+                !
+                return 1
+              func Publish<TNote> (TNote:n) → int
+                where TNote : INote
+                !
+                return Accept(n)
+              interface INote
             """);
 
         Assert.DoesNotContain(
@@ -158,16 +162,17 @@ public class V017Round4FindingsTests
     public void PatternVariable_ShadowsModuleFunction_AndIsNotQualified()
     {
         var result = Compile("""
-            §M{m001:RefProbe}
-              §F{f001:value:pub} () -> i32
-                §E{}
-                §R INT:7
-              §CL{c001:Holder:pub}
-                §MT{mt001:Use:pub} (any:o) -> i32
-                  §E{}
-                  §IF{i1} (is o i32 value)
-                    §R value
-                  §R INT:0
+            module RefProbe RefProbe block
+              func value () → int
+                !
+                return 7
+
+              class Holder
+                func Use (object:o) → int
+                  !
+                  if (o is int value)
+                    return value
+                  return 0
             """);
 
         Assert.Contains("return value;", result.GeneratedCode);
@@ -187,19 +192,19 @@ public class V017Round4FindingsTests
     /// and without the parse error that used to make it visible.
     /// </summary>
     [Theory]
-    [InlineData("§PROP{p001:Name:str:pub:get,set} §E{cw}")]
-    [InlineData("§PROP{p001:Name:str:pub} §E{cw}")]
+    [InlineData("property string:Name ! cw\n      get\n      set")]
+    [InlineData("property string:Name ! cw")]
     public void PropertyRow_SurvivesACalorToCalorReEmit(string propertyLine)
     {
         var source = """
-            §M{m001:Holder}
-              §CL{c001:Box:pub}
+            module Holder Holder block
+              class Box
 
             """ + "    " + propertyLine + "\n";
 
         var reemitted = ReEmit(source);
 
-        Assert.Contains("§E{cw}", reemitted);
+        Assert.Contains("property string:Name ! cw", reemitted);
     }
 
     /// <summary>
@@ -209,12 +214,14 @@ public class V017Round4FindingsTests
     public void PropertyWithoutRow_GainsNoneOnReEmit()
     {
         var reemitted = ReEmit("""
-            §M{m001:Holder}
-              §CL{c001:Box:pub}
-                §PROP{p001:Name:str:pub:get,set}
+            module Holder Holder block
+              class Box
+                property string:Name
+                  get
+                  set
             """);
 
-        Assert.DoesNotContain("§E{", reemitted);
+        Assert.DoesNotContain("!", reemitted);
     }
 
     // =================================================================
@@ -252,7 +259,7 @@ public class V017Round4FindingsTests
             }
             """);
 
-        Assert.Contains($"§B{{{name}}}", calor);
+        Assert.Contains($"let {name} = ", calor);
         Assert.DoesNotContain("anonymous", calor);
     }
 
@@ -279,7 +286,7 @@ public class V017Round4FindingsTests
             }
             """);
 
-        Assert.Contains("§B{Seq<i32>:evens}", calor);
+        Assert.Contains("let IEnumerable<int>:evens = ", calor);
     }
 
     // ---------------------------------------------------------------------

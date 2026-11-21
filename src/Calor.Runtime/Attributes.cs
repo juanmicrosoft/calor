@@ -1,6 +1,22 @@
 namespace Calor.Runtime;
 
 /// <summary>
+/// Represents the absence of a meaningful value usable as a type parameter.
+/// </summary>
+public readonly struct Unit : IEquatable<Unit>
+{
+    public static readonly Unit Value = default;
+
+    public bool Equals(Unit other) => true;
+    public override bool Equals(object? obj) => obj is Unit;
+    public override int GetHashCode() => 0;
+    public override string ToString() => "()";
+
+    public static bool operator ==(Unit left, Unit right) => true;
+    public static bool operator !=(Unit left, Unit right) => false;
+}
+
+/// <summary>
 /// Marks a method as an Calor function with its original metadata.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Calor.Compiler.Tests" />
+    <InternalsVisibleTo Include="Calor.Conversion.Tests" />
     <InternalsVisibleTo Include="Calor.Enforcement.Tests" />
     <InternalsVisibleTo Include="Calor.ILAnalysis.Tests" />
     <InternalsVisibleTo Include="Calor.LanguageServer.Tests" />
@@ -14,6 +15,8 @@
          options `calor convert` builds (ConvertCommand.BuildCSharpToCalorOptions). -->
     <InternalsVisibleTo Include="Calor.RoundTrip.Harness" />
     <InternalsVisibleTo Include="Calor.RoundTrip.Harness.Tests" />
+    <!-- 0.30: the one-off legacy-syntax rewriter vendors the pre-cutover parser,
+         which builds AST nodes through internal constructors. -->
   </ItemGroup>
 
   <PropertyGroup>
@@ -30,6 +33,12 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- A CLI run is short and JIT-bound: one compile JIT-compiles ~14,000 methods, most of
+         them Roslyn's, and calls few of them often enough to gain from profile-guided
+         re-optimization. Turning tiered PGO off removes its instrumentation cost from that
+         startup. It changes no output. -->
+    <TieredPGO>false</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>
@@ -167,8 +176,8 @@
     <EmbeddedResource Include="..\..\bench\phase0-agent-native\metadata-references-manifest.json">
       <LogicalName>Calor.Compiler.Resources.metadata-references-manifest.json</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\tests\Calor.Evaluation\Skills\calor-language-skills.md">
-      <LogicalName>Calor.Compiler.Resources.calor-language-skills.md</LogicalName>
+    <EmbeddedResource Include="Resources\Teaching\Generated\*">
+      <LogicalName>Calor.Compiler.Resources.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

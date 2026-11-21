@@ -188,8 +188,8 @@ public class GenericCallTests
         var emitter = new CalorEmitter();
         var result = node.Accept(emitter);
 
-        Assert.Contains("items.Cast<i32>", result);
-        Assert.Contains("§C{", result);
+        Assert.Contains("items.Cast<int>", result);
+        Assert.Equal("items.Cast<int>()", result);
     }
 
     #endregion
@@ -296,6 +296,7 @@ public class GenericCallTests
         });
 
         Assert.False(compileResult.HasErrors, FormatDiagnostics(compileResult));
+        Assert.True(GeneratedCSharpCompiler.Validate(compileResult.GeneratedCode!).CompilationSuccess);
         return compileResult.GeneratedCode;
     }
 

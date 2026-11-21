@@ -4,6 +4,8 @@ section: "benchmarking"
 order: 11
 ---
 
+> **Syntax and measurement:** Code illustrations use current native syntax. Published numerical results remain historical; compiling and checking these illustrations does not rerun the benchmark.
+
 **Category:** Code Correctness
 **Historical dashboard result:** Calor wins (1.29x, deterministic estimation mode)
 
@@ -35,10 +37,10 @@ estimation mode because no LLM provider is configured; that separate result is
 
 | Scenario | Calor Approach | C# Approach |
 |:---------|:---------------|:------------|
-| Null input | Precondition `§Q (!= x null)` | Guard clause `x ?? throw` |
-| Division by zero | Precondition `§Q (!= b 0)` | Guard clause `if (b == 0)` |
-| Empty array | Precondition `§Q (> len 0)` | `if (arr.Length == 0)` |
-| Integer overflow | Postcondition on result | `checked { }` block |
+| Null input | Precondition `requires x != null` | Guard clause `x ?? throw` |
+| Division by zero | Precondition `requires b != 0` | Guard clause `if (b == 0)` |
+| Empty array | Precondition `requires arr.Length > 0` | `if (arr.Length == 0)` |
+| Integer overflow | Checked arithmetic; contracts constrain inputs and results | `checked { }` block |
 
 **Both approaches are valid.** The benchmark measures outcomes, not mechanisms.
 
@@ -146,18 +148,18 @@ Tests general boundary handling:
 
 **Calor Implementation:**
 ```calor
-§M{m001:Math}
-  §F{f001:FindMax:pub} ([i32]:arr) -> i32
-    §E{}
-    §Q (> §LEN arr 0)
-    §B{~max:i32} §IDX{arr} 0
-    §B{~i:i32} 1
-    §WH{wh1} (< i §LEN arr)
-      §B{current:i32} §IDX{arr} i
-      §IF{if1} (> current max)
-        §ASSIGN max current
-      §ASSIGN i (+ i 1)
-    §R max
+module Math
+  func FindMax (int[]:arr) → int
+    !
+    requires arr.Length > 0
+    var int:max = arr[0]
+    var int:i = 1
+    while i < arr.Length
+      let int:current = arr[i]
+      if current > max
+        set max current
+      set i (i + 1)
+    return max
 ```
 
 **C# Implementation:**
@@ -179,7 +181,15 @@ public static int FindMax(int[] arr)
 }
 ```
 
-Both implementations achieve 100% correctness. The benchmark recognizes both Calor's `ContractViolationException` and C#'s `ArgumentException` as valid contract enforcement.
+For non-null, non-empty arrays, both examples compute the same maximum, including
+single-element and all-negative inputs. The examples reject an empty array rather
+than return zero: with runtime contracts enabled, Calor raises
+`ContractViolationException`; C# raises `ArgumentException`.
+
+The original Calor precondition is deliberately unchanged. It accesses
+`arr.Length` without first checking for null, whereas the C# example explicitly
+throws `ArgumentNullException`. These examples do not establish equivalent null
+handling or exception types. No new 100% benchmark result is claimed here.
 
 ---
 
@@ -245,7 +255,10 @@ dotnet run --project tests/Calor.Evaluation -- correctness-benchmark --dry-run
 
 ---
 
-## Separate Executable Task-Runner Example
+## Archived Executable Task-Runner Example
+
+The following numerical example is separate from the current FindMax illustration.
+It is retained from the task-runner description, not newly measured by this page migration.
 
 ### Summary
 
@@ -269,7 +282,7 @@ dotnet run --project tests/Calor.Evaluation -- correctness-benchmark --dry-run
 In this executable task-runner example, both languages achieve equal
 correctness:
 
-- **Calor:** Preconditions (`§Q`) and postconditions (`§S`) provide contract-based protection
+- **Calor:** Preconditions and postconditions provide contract-based protection; current compatibility syntax uses `requires` and `=>`
 - **C#:** Guard clauses (`ArgumentException`, `ArgumentNullException`) provide equivalent protection
 
 The benchmark accepts **both mechanisms** as valid contract enforcement. This ensures a fair comparison of actual code quality rather than language-specific features.

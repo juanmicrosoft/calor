@@ -1,0 +1,14 @@
+module StringLib StringLib
+  module StringLibModule
+    func StringLength public (int:length) → int
+      !
+      => result >= 0
+      return length
+
+    func IsEmpty public (int:length) → bool
+      !
+      return length == 0
+
+    func Concat public (string:a, string:b) → string
+      !
+      return a

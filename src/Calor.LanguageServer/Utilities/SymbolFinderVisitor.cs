@@ -177,7 +177,8 @@ public sealed class SymbolFinderVisitor
                     // For loop variable is visible inside the loop
                     if (SpanContainsOffset(forStmt.Span))
                     {
-                        symbols.Add(new VisibleSymbol(forStmt.VariableName, "loop variable", "i32", forStmt.Span, forStmt));
+                        symbols.Add(new VisibleSymbol(forStmt.VariableName, "loop variable",
+                            forStmt.VariableType, forStmt.VariableSpan, forStmt));
                         CollectBindingsFromStatements(forStmt.Body, symbols);
                     }
                     break;
@@ -308,18 +309,6 @@ public sealed class SymbolFinderVisitor
                 symbols.Add(new VisibleSymbol(vPat.Name, "var pattern", null, vPat.Span, vPat));
                 break;
 
-            case SomePatternNode somePat:
-                CollectPatternVariables(somePat.InnerPattern, symbols);
-                break;
-
-            case OkPatternNode okPat:
-                CollectPatternVariables(okPat.InnerPattern, symbols);
-                break;
-
-            case ErrPatternNode errPat:
-                CollectPatternVariables(errPat.InnerPattern, symbols);
-                break;
-
             case PositionalPatternNode posPat:
                 foreach (var inner in posPat.Patterns)
                 {
@@ -349,7 +338,6 @@ public sealed class SymbolFinderVisitor
             case WildcardPatternNode:
             case LiteralPatternNode:
             case ConstantPatternNode:
-            case NonePatternNode:
             case RelationalPatternNode:
                 break;
         }
@@ -643,6 +631,10 @@ public sealed class SymbolFinderVisitor
                 VisitExpression(printStmt.Expression);
                 break;
 
+            case ExpressionStatementNode expressionStatement:
+                VisitExpression(expressionStatement.Expression);
+                break;
+
             case CallStatementNode callStmt:
                 VisitCallTarget(
                     callStmt.Target,
@@ -746,17 +738,25 @@ public sealed class SymbolFinderVisitor
 
     private void VisitForStatement(ForStatementNode forStmt)
     {
-        PushScope(ScopeKind.Loop, forStmt.Id);
+        PushScope(ScopeKind.Loop, forStmt.Span);
 
         // For loop variable
-        AddToScope(forStmt.VariableName, "loop variable", "i32", forStmt.Span, forStmt);
+        AddToScope(forStmt.VariableName, "loop variable", forStmt.VariableType, forStmt.VariableSpan, forStmt);
 
         // Check expressions
         if (SpanContainsOffset(forStmt.From.Span))
         {
             VisitExpression(forStmt.From);
         }
-        else if (SpanContainsOffset(forStmt.To.Span))
+        else if (forStmt.Condition != null && SpanContainsOffset(forStmt.Condition.Span))
+        {
+            VisitExpression(forStmt.Condition);
+        }
+        else if (forStmt.Update != null && SpanContainsOffset(forStmt.Update.Span))
+        {
+            VisitStatement(forStmt.Update);
+        }
+        else if (!forStmt.ReevaluatesCondition && SpanContainsOffset(forStmt.To.Span))
         {
             VisitExpression(forStmt.To);
         }
@@ -774,7 +774,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitWhileStatement(WhileStatementNode whileStmt)
     {
-        PushScope(ScopeKind.Loop, whileStmt.Id);
+        PushScope(ScopeKind.Loop, whileStmt.Span);
 
         if (SpanContainsOffset(whileStmt.Condition.Span))
         {
@@ -790,7 +790,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitDoWhileStatement(DoWhileStatementNode doWhileStmt)
     {
-        PushScope(ScopeKind.Loop, doWhileStmt.Id);
+        PushScope(ScopeKind.Loop, doWhileStmt.Span);
 
         if (SpanContainsOffset(doWhileStmt.Condition.Span))
         {
@@ -912,7 +912,7 @@ public sealed class SymbolFinderVisitor
 
     private void VisitForeachStatement(ForeachStatementNode foreachStmt)
     {
-        PushScope(ScopeKind.Loop, foreachStmt.Id);
+        PushScope(ScopeKind.Loop, foreachStmt.Span);
 
         AddToScope(foreachStmt.VariableName, "iteration variable",
             foreachStmt.VariableType, foreachStmt.Span, foreachStmt);
@@ -967,18 +967,6 @@ public sealed class SymbolFinderVisitor
                 AddToScope(vPat.Name, "var pattern", null, vPat.Span, vPat);
                 break;
 
-            case SomePatternNode somePat:
-                CollectPatternVariablesToScope(somePat.InnerPattern);
-                break;
-
-            case OkPatternNode okPat:
-                CollectPatternVariablesToScope(okPat.InnerPattern);
-                break;
-
-            case ErrPatternNode errPat:
-                CollectPatternVariablesToScope(errPat.InnerPattern);
-                break;
-
             case PositionalPatternNode posPat:
                 foreach (var inner in posPat.Patterns)
                 {
@@ -1008,7 +996,6 @@ public sealed class SymbolFinderVisitor
             case WildcardPatternNode:
             case LiteralPatternNode:
             case ConstantPatternNode:
-            case NonePatternNode:
             case RelationalPatternNode:
                 break;
         }
@@ -1038,12 +1025,15 @@ public sealed class SymbolFinderVisitor
 
     private void VisitDictionaryForeach(DictionaryForeachNode dictForeach)
     {
-        PushScope(ScopeKind.Loop, dictForeach.Id);
+        PushScope(ScopeKind.Loop, dictForeach.Span);
 
-        AddToScope(dictForeach.KeyName, "key variable", null, dictForeach.Span, dictForeach);
-        AddToScope(dictForeach.ValueName, "value variable", null, dictForeach.Span, dictForeach);
+        AddToScope(dictForeach.KeyName, "key variable", null, dictForeach.KeySpan, dictForeach);
+        AddToScope(dictForeach.ValueName, "value variable", null, dictForeach.ValueSpan, dictForeach);
 
-        VisitStatements(dictForeach.Body);
+        if (SpanContainsOffset(dictForeach.Dictionary.Span))
+            VisitExpression(dictForeach.Dictionary);
+        else
+            VisitStatements(dictForeach.Body);
 
         PopScope();
     }
@@ -1114,8 +1104,19 @@ public sealed class SymbolFinderVisitor
                 }
                 break;
 
+            case ExpressionCallNode computedCall:
+                if (SpanContainsOffset(computedCall.TargetExpression.Span))
+                    VisitExpression(computedCall.TargetExpression);
+                foreach (var argument in computedCall.Arguments)
+                {
+                    if (SpanContainsOffset(argument.Span))
+                        VisitExpression(argument);
+                }
+                break;
+
             case NewExpressionNode newExpr:
-                foreach (var argument in newExpr.Arguments)
+                foreach (var argument in newExpr.Arguments.Concat(
+                    newExpr.CollectionInitializers.SelectMany(entry => entry.Arguments)))
                 {
                     if (SpanContainsOffset(argument.Span))
                     {
@@ -1142,19 +1143,27 @@ public sealed class SymbolFinderVisitor
 
             case IntLiteralNode intLit:
                 _result = new SymbolLookupResult(
-                    intLit.Value.ToString(), "integer literal", "i32",
+                    intLit.Value.ToString(), "integer literal",
+                    (intLit.IsUnsigned, intLit.IsLong) switch
+                    {
+                        (true, true) => "ulong",
+                        (true, false) => "uint",
+                        (false, true) => "long",
+                        _ => "int",
+                    },
                     intLit.Span, null, intLit);
                 break;
 
             case FloatLiteralNode floatLit:
                 _result = new SymbolLookupResult(
-                    floatLit.Value.ToString(), "float literal", "f64",
+                    floatLit.Value.ToString(), "float literal",
+                    floatLit.IsDecimal ? "decimal" : floatLit.IsSingle ? "float" : "double",
                     floatLit.Span, null, floatLit);
                 break;
 
             case StringLiteralNode strLit:
                 _result = new SymbolLookupResult(
-                    $"\"{strLit.Value}\"", "string literal", "str",
+                    $"\"{strLit.Value}\"", "string literal", "string",
                     strLit.Span, null, strLit);
                 break;
 
@@ -1220,18 +1229,6 @@ public sealed class SymbolFinderVisitor
                         }
                     }
                 }
-                break;
-
-            case SomeExpressionNode someExpr:
-                VisitExpression(someExpr.Value);
-                break;
-
-            case OkExpressionNode okExpr:
-                VisitExpression(okExpr.Value);
-                break;
-
-            case ErrExpressionNode errExpr:
-                VisitExpression(errExpr.Error);
                 break;
 
             case ArrayAccessNode arrayAccess:
@@ -1360,16 +1357,9 @@ public sealed class SymbolFinderVisitor
                 else
                 {
                     _result = new SymbolLookupResult(
-                        "Length", "array length", "i32",
+                        "Length", "array length", "int",
                         arrayLen.Span, null, arrayLen);
                 }
-                break;
-
-            // None expression
-            case NoneExpressionNode noneExpr:
-                _result = new SymbolLookupResult(
-                    "None", "none literal", noneExpr.TypeName ?? "?T",
-                    noneExpr.Span, null, noneExpr);
                 break;
 
             // Range and index expressions
@@ -1518,7 +1508,7 @@ public sealed class SymbolFinderVisitor
                     break;
                 }
                 _result = new SymbolLookupResult(
-                    "Count", "count", "i32",
+                    "Count", "count", "int",
                     countNode.Span, null, countNode);
                 break;
 
@@ -1685,6 +1675,11 @@ public sealed class SymbolFinderVisitor
     private void PushScope(ScopeKind kind, string name)
     {
         _scopeStack.Add(new ScopeInfo(kind, name));
+    }
+
+    private void PushScope(ScopeKind kind, TextSpan span)
+    {
+        PushScope(kind, $"{span.Start}:{span.Length}");
     }
 
     private void PopScope()

@@ -1,0 +1,33 @@
+module TempConvert TempConvert block
+  module TempConvertModule partial
+    func CelsiusToFahrenheit (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= -459)
+      => (result <= 9032)
+      var int:c = celsius
+      if (c > 5000)
+        set c 5000
+      return (((c * 9) / 5) + 32)
+
+    func CelsiusToKelvin (int:celsius) → int
+      !
+      requires (celsius >= -273)
+      => (result >= 0)
+      => (result <= 5273)
+      var int:c = celsius
+      if (c > 5000)
+        set c 5000
+      return (c + 273)
+
+    func FahrenheitToCelsius (int:fahrenheit) → int
+      !
+      requires (fahrenheit >= -459)
+      => (result >= -273)
+      => (result <= 5000)
+      var int:f = fahrenheit
+      if (f > 9032)
+        set f 9032
+      return (((f - 32) * 5) / 9)
+
+

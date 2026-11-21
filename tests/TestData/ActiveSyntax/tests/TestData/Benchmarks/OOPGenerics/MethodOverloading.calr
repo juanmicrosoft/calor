@@ -1,0 +1,13 @@
+module MethodOverloading MethodOverloading
+  module MethodOverloadingModule
+    func AddInts public (int:a, int:b) → int
+      !
+      return a + b
+
+    func AddDoubles public (float:a, float:b) → float
+      !
+      return a + b
+
+    func AddThree public (int:a, int:b, int:c) → int
+      !
+      return (a + b) + c

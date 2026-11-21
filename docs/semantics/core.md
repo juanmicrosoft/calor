@@ -44,13 +44,12 @@ Calor prioritizes safety and predictability:
 
 ### 1.4 Agent Trainability
 
-Every semantic rule in this document:
-- Has a precise, unambiguous definition
-- Has corresponding test cases in `tests/Calor.Semantics.Tests/`
-- Is version-controlled (see `versioning.md`)
-- Is independent of backend implementation details
-
-Agents trained on these rules can generate correct code across compiler versions.
+The rules are version-controlled and intended to be backend-independent.
+Representative conformance tests live in `tests/Calor.Semantics.Tests/`;
+production regressions also live in the compiler, enforcement, conversion and
+verification suites. These references are not an exhaustive coverage claim.
+Pin the compiler and test upgrades rather than assuming every interaction is
+proved by the specification.
 
 ---
 
@@ -143,23 +142,31 @@ left ?? right
 Calor uses **lexical scoping** with parent chain lookup. See `src/Calor.Compiler/Binding/Scope.cs:74-82`.
 
 ```calor
-§B{x:i32} 1
-§IF{if1} true
-  §B{inner:i32} (+ x 1)
-  §P inner                     // Prints 2
-§P x                           // Prints 1 (outer x unchanged)
+module CoreScopes
+  func Read (bool:enter) → int
+    !
+    let int:outer = 1
+    if enter
+      let int:inner = outer + 1
+      return inner
+    return outer
 ```
+
+`Read(true)` returns 2; `Read(false)` returns 1. The inner scope can read the
+outer binding, but its own `inner` binding is not visible after that scope.
 
 ### 3.2 Shadowing
 
-Inner scope bindings **shadow** outer bindings with the same name.
+Name lookup selects the nearest visible declaration. This is not permission
+to reuse every spelling: duplicate declarations and C# local declaration-space
+rules can still reject a program. Use distinct names for nested locals.
 
 **Key Semantics:**
-- Inner binding takes precedence within its scope
-- Shadowing does NOT mutate the outer binding
-- When inner scope exits, outer binding is restored
+- A declaration is visible only in its applicable scope
+- Reading an outer binding does not mutate it
+- Leaving an inner scope does not change the outer binding
 
-**Test Reference:** `S5: InnerScope_ShadowsOuter`
+**Test Reference:** `S5: LexicalScoping_InnerReadsOuter`
 
 ### 3.3 Scope Resolution Order
 
@@ -173,8 +180,12 @@ Inner scope bindings **shadow** outer bindings with the same name.
 Return statements in nested scopes must correctly unwind to the function boundary.
 
 ```calor
-§IF{if1} true
-  §R INT:42   // Returns from function, not just if block
+module CoreNestedReturn
+  func Read (bool:early) → int
+    !
+    if early
+      return 42
+    return 7
 ```
 
 **Test Reference:** `S6: ReturnFromNestedScope`
@@ -188,10 +199,10 @@ Return statements in nested scopes must correctly unwind to the function boundar
 **Default Behavior:** TRAP (throw `OverflowException`)
 
 ```calor
-§M{m1:Overflow}
-  §F{f1:Increment:pub} (i32:value) -> i32
-    §E{}
-    §R (+ value INT:1)
+module CoreOverflow
+  func Increment public (int:value) → int
+    !
+    return value + 1
 // Increment(int.MaxValue) throws OverflowException.
 ```
 
@@ -238,15 +249,22 @@ introduce an intentionally different default policy.
 
 | Conversion | Behavior | Rationale |
 |------------|----------|-----------|
-| INT → FLOAT | Implicit (widening) | No precision loss |
-| FLOAT → INT | Explicit required | Potential precision loss |
+| `int` → `double` | Implicit widening | Every 32-bit integer is representable |
+| `double` → `int` | Explicit required | Fractional part discarded; checked range rules apply |
 | Narrowing conversions | Explicit required | Data may be lost |
 
 ```calor
-§B{i:i32} 42
-§B{f:f64} i                  // OK: implicit widening
-§B{j:i32} (cast i32 f)       // Required: explicit narrowing
+module CoreConversions
+  func Value () → int
+    !
+    let int:whole = 42
+    let double:widened = whole
+    let int:narrowed = (int)3.75
+    return (int)widened + narrowed
 ```
+
+`Value()` returns 45. Widening is not universally exact: large `long` values
+can lose precision when converted to `double`.
 
 **Test Reference:** `S8: NumericConversion_IntToFloat`
 
@@ -260,9 +278,9 @@ introduce an intentionally different default policy.
 
 | Type | Examples | Range |
 |------|----------|-------|
-| `INT` (i32) | `42`, `-1`, `0` | -2^31 to 2^31-1 |
-| `FLOAT` (f64) | `3.14`, `-0.5`, `1e10` | IEEE 754 double |
-| `BOOL` | `true`, `false` | - |
+| `int` | `42`, `-1`, `0` | -2^31 to 2^31-1 |
+| `double` | `3.14`, `-0.5`, `1e10` | IEEE 754 double |
+| `bool` | `true`, `false` | - |
 
 ---
 
@@ -273,27 +291,33 @@ Contracts are semantic constructs that specify behavioral requirements.
 ### 5.1 Preconditions (REQUIRES)
 
 ```calor
-§Q (> x 0)
+module CoreRequires
+  func Positive (int:x) → int
+    !
+    requires x > 0
+    return x
 ```
 
-**Semantics:**
+**Semantics with runtime checks enabled:**
 1. Evaluated **before** function body execution
 2. Has access to all function parameters
 3. If condition is `false`, throws `ContractViolationException`
-4. Exception message includes:
-   - Contract message (if specified)
-   - Function identifier
-   - Contract expression
+4. Debug mode carries source and condition metadata; release mode uses a
+   leaner exception. The function identifier is maintained by project tools.
 
 **Test Reference:** `S10: RequiresFails_ThrowsContractViolation`
 
 ### 5.2 Postconditions (ENSURES)
 
 ```calor
-§S (> result 0)
+module CoreEnsures
+  func Positive (int:x) → int
+    !
+    => result > 0
+    return x
 ```
 
-**Semantics:**
+**Semantics with runtime checks enabled:**
 1. Evaluated **after** function body, **before** return
 2. Has access to:
    - All function parameters
@@ -302,13 +326,11 @@ Contracts are semantic constructs that specify behavioral requirements.
 
 ### 5.3 Invariants
 
-```calor
-§IV (>= balance 0)
-```
-
-**Semantics:**
-- Evaluated at specified points (entry/exit of methods)
-- Applies to type-level state
+An invariant annotation is not an automatic type-level entry/exit guarantee.
+The production module emitter records module invariants as diagnostic comments;
+that does not establish a runtime check on every method. Use supported explicit
+preconditions and postconditions, and inspect their lowering. This specification
+does not claim complete class-invariant enforcement.
 
 ### 5.4 Contract Evaluation Order
 
@@ -316,34 +338,29 @@ Contracts are semantic constructs that specify behavioral requirements.
 2. Function body
 3. All ENSURES clauses (in declaration order)
 
+Both `debug` and `release` emit supported precondition and postcondition checks;
+`off` emits no precondition or postcondition guards. An explicit `proof`
+statement retains its separate runtime check unless eligible verification
+discharges it.
+Optional verification may remove only eligible clean proven postcondition
+guards. It does not remove preconditions based on satisfiability. Unsupported
+requested runtime lowering must fail rather than silently omit checks.
+
 ---
 
-## 6. Option<T> and Result<T,E>
+## 6. Nullable Values and Exceptions
 
-### 6.1 Option<T>
+The absence model is .NET nullability. `string?` permits a null reference;
+`int?` is a nullable value type. Values are ordinary values or `null`, with no
+special wrapper construction. Use `value ?? fallback` to supply a default.
 
-Represents an optional value: either `Some(value)` or `None`.
+Failure uses .NET exceptions: `throw` raises one, `try` / `catch` handle it,
+and `finally` runs cleanup. A bare `throw` in a catch rethrows. Explicit throw
+operations require their effect row; a pure row does not promise that checked
+arithmetic, indexing or every other operation cannot throw.
 
-```calor
-§SM INT:42       // Option<i32> containing 42
-§NN              // None, with element type supplied by the surrounding context
-```
-
-**Semantics:**
-- `Some(v)` wraps a value
-- `None` represents absence of value
-- Must be pattern-matched or explicitly unwrapped
-
-**Test Reference:** `S9: OptionNone_BehavesCorrectly`
-
-### 6.2 Result<T,E>
-
-Represents a computation that may fail: either `Ok(value)` or `Err(error)`.
-
-```calor
-§OK INT:42                    // Result<INT,E> success
-§ERR STR:"not found"          // Result<T,STRING> failure
-```
+Third-party generic types use ordinary library APIs, with no special language
+encoding or implicit conversion.
 
 ---
 
@@ -359,20 +376,21 @@ Effects track side-effect capabilities of functions.
 | Console Write | `cw` | Writes to console |
 | File Read | `fs:r` | Reads from files |
 | File Write | `fs:w` | Writes to files |
-| Network Read | `nr` | Network input |
-| Network Write | `nw` | Network output |
+| Network Read | `net:r` | Network input |
+| Network Write | `net:w` | Network output |
 | Mutation | `mut` | Mutates state |
-| Exception | `ex` | May throw |
+| Exception | `throw` | May throw |
 
 ### 7.2 Effect Declaration
 
-```calor
-§F{f001:readFile:pub}
-  §I{string:path}
-  §O{string}
-  §E{io=fs:r,ex=IOException}
-  ...
+```calor-fragment
+func ReadFile public (string:path) → string
+  ! fs:r
+  return System.IO.File.ReadAllText(path)
 ```
+
+This is a declaration fragment. Its call still requires valid framework
+metadata and the selected external effect contract.
 
 ### 7.3 Effect Enforcement
 
@@ -380,21 +398,31 @@ Functions may only:
 1. Perform effects they declare
 2. Call functions whose effects are subsets of their own
 
+That rule depends on selected-call coverage and reviewed external contracts.
+It is not a whole-program proof of arbitrary library behavior. Unknown calls
+are rejected under ordinary enforcement rather than assumed pure.
+
 ---
 
 ## 8. Match Expressions
 
 ### 8.1 Exhaustiveness
 
-Match expressions MUST be exhaustive. The compiler emits `Calor0500: NonExhaustiveMatch` if cases don't cover all possibilities.
+Match expressions should cover their input domain. `Calor0500:
+NonExhaustiveMatch` reports non-exhaustiveness where the checker can establish
+it. Include a fallback unless the covered cases are known to be exhaustive;
+do not assume complete reasoning about arbitrary guarded patterns.
 
 ### 8.2 Evaluation
 
 ```calor
-§W{sw1:expr} n
-  §K §VAR{x} §WHEN (> x 100) → "large"
-  §K 0 → "zero"
-  §K _ → "other"
+module CoreMatch
+  func Describe (int:n) → string
+    !
+    return match n
+      case var x when x > 100 → "large"
+      case 0 → "zero"
+      case _ → "other"
 ```
 
 **Semantics:**
@@ -414,13 +442,13 @@ Patterns are tried in **declaration order**. First matching pattern wins.
 
 ### 9.1 Try/Catch/Finally
 
-```calor
-§TR{tr1}
-  body
-§CA{ExceptionType:var}
-  handler
-§FI
-  cleanup
+```calor-fragment
+try
+  Work()
+catch System.InvalidOperationException:error
+  Handle(error)
+finally
+  Cleanup()
 ```
 
 **Semantics:**
@@ -435,7 +463,8 @@ Uncaught exceptions propagate up the call stack until caught or program terminat
 
 ### 9.3 Rethrow
 
-`§RT` re-throws the current exception, preserving the original stack trace.
+A bare `throw` inside a catch rethrows the current exception, preserving the
+original stack trace.
 
 ---
 
@@ -445,23 +474,32 @@ Uncaught exceptions propagate up the call stack until caught or program terminat
 
 | Category | Behavior | Examples |
 |----------|----------|----------|
-| Value Types | Copied on assignment | INT, FLOAT, BOOL, structs |
+| Value Types | Copied on assignment | `int`, `double`, `bool`, structs |
 | Reference Types | Reference copied | Classes, arrays, delegates |
 
 ### 10.2 Immutability
 
-By default, bindings are immutable:
+By default, bindings are immutable. Reassigning an immutable local is rejected
+with `Calor0213`:
 
-```calor
-§B{x:i32} 42
-§ASSIGN x 43             // ERROR Calor0213: x is immutable
+```calor expect=Calor0213
+module CoreReadOnly
+  func Value () → int
+    !
+    let int:x = 42
+    set x 43
+    return x
 ```
 
 Mutable bindings require explicit declaration:
 
 ```calor
-§B{~x:i32} 42
-§ASSIGN x 43             // OK
+module CoreMutable
+  func Value () → int
+    !
+    var int:x = 42
+    set x 43
+    return x
 ```
 
 ---
@@ -470,8 +508,8 @@ Mutable bindings require explicit declaration:
 
 ### 11.1 Semantics
 
-```calor
-§AWAIT expr
+```calor-fragment
+await expression
 ```
 
 **Semantics:**
@@ -483,8 +521,16 @@ Mutable bindings require explicit declaration:
 ### 11.2 ConfigureAwait
 
 ```calor
-§AWAIT{false} expr  // ConfigureAwait(false)
+module CoreConfiguredAwait
+  using System.Threading.Tasks
+  func Read async () → int
+    !
+    return await Task.FromResult(42).ConfigureAwait(false)
 ```
+
+`Read()` completes with 42. The compiler requires the actual selected awaiter
+and result facts; a similarly named custom method does not inherit a pure
+framework contract.
 
 ---
 
@@ -495,11 +541,11 @@ Mutable bindings require explicit declaration:
 | Code | Name | Description |
 |------|------|-------------|
 | Calor0122 | UnknownVisibility | Visibility slot holds a word that is not a visibility (parser) |
-| Calor0123 | TypeFirstBindingHeader | `§B{W:t}` spelled type-first but read name-first (parser) |
+| Calor0123 | TypeFirstBindingHeader | Historical name-first binding-header diagnostic; native typed bindings use `type:name` |
 | Calor0200 | UndefinedReference | Reference to undefined symbol |
 | Calor0201 | DuplicateDefinition | Symbol already defined |
 | Calor0202 | TypeMismatch | Type incompatibility |
-| Calor0213 | WriteToReadOnlyLocal | Write (`§ASSIGN`, compound, inc/dec, `ref`/`out`) to an immutable `§B` binding or a `§L` loop variable |
+| Calor0213 | WriteToReadOnlyLocal | Write (`set`, compound, inc/dec, `ref`/`out`) to an immutable `let` binding or a counted-loop variable |
 | Calor0300 | InvalidPrecondition | Malformed REQUIRES |
 | Calor0301 | InvalidPostcondition | Malformed ENSURES |
 | Calor0302 | ContractViolation | Runtime contract failure |
@@ -515,16 +561,11 @@ See `docs/semantics/versioning.md` for details on semantics versioning.
 
 **Current Version:** 2.0.0
 
-Modules can declare required semantics version:
-
-```calor
-§M{m001:MyModule}
-  §SEMVER{2.0.0}
-```
-
-A module that declares an older major (`§SEMVER{1.0.0}`) is refused with
-`Calor0701` — see `docs/semantics/versioning.md` §5 for the rule and the
-migration pointer.
+Native modules currently use the installed compiler's semantics. There is no
+native source-version declaration or compatibility gate. The retained
+compatibility helpers and their historical diagnostics do not establish that
+channel. Pin the compiler and test upgrades; see `versioning.md` for the
+distinction between current behavior and the historical declaration parser.
 
 ---
 

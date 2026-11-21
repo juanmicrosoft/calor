@@ -1,1034 +1,765 @@
 ---
 layout: default
-title: Structure Tags
+title: "Structure Tags"
 parent: Syntax Reference
 nav_order: 1
 ---
 
 # Structure Tags
 
+<!-- Generated from website/content/syntax-reference/structure-tags.mdx by calor self-check docs --fix. Edit the source, not this file. -->
+
+Calor declarations use lowercase keywords, space-separated headers and
+two-space indentation. The route retains its historical name, but active
+source uses `module`, `func`, `class` and the other native forms below.
+Expressions use infix operators and ordinary calls.
+
+The [generated current-language catalog](https://calor.dev/docs/syntax-reference/current-language/)
+is the shared vocabulary reference. Positive complete programs compile with
+normal effect enforcement; negative programs and fragments are explicitly marked.
+
 ## Raw C# blocks
 
-`§RAW ... §/RAW`, `§CS{...}`, and `§CSHARP{...}§/CSHARP` preserve their C#
-payload exactly. Their scanners recognize ordinary, verbatim, raw, and
-interpolated strings, character literals, line comments, block comments, and
-nested braces. Closing sentinel text inside any of those lexical forms does not
-terminate the block. This also applies to line and block comments on
-`#if`/`#elif`/`#else`/`#endif` directive lines. Directive lines use the same
-lexical handling as other C#: ordinary, verbatim, raw, and interpolated strings
-and character literals can contain sentinel text. Block comments always extend
-through their actual `*/`; directive-looking text inside a block comment has no
-special meaning.
-
-`§RAW` tracks nested `#if`/`#elif`/`#else`/`#endif` state. In known disabled
-regions, valid strings, characters, and comments are still recognized, so
-directive-looking lines inside a valid verbatim/raw/interpolated string or
-block comment remain inert. Scanning is recoverable: if such a construct is
-unterminated, the lexer resumes at real directive boundaries instead of letting
-malformed disabled text hide a later active branch or the Calor delimiter.
-`true`, `false`, `#define`/`#undef` symbols, and common boolean condition forms
-are evaluated. Unknown conditions are treated conservatively as active, and an
-ambiguous or unclosed conditional fails closed rather than truncating payload.
-
-Structure tags define the organization of Calor code: modules, functions, and their boundaries.
-
-> **Indent-only block structure.** Calor uses Python-style significant
-> indentation: a block opens with `§M`, `§F`, `§CL`, `§L`, `§IF`, … and
-> ends at the first line that **dedents** back to the parent column. No
-> closing tags are required. The compiler default is `2` spaces per
-> nesting level (mixing tabs and spaces is rejected). Legacy closer tags
-> (`§/M`, `§/F`, `§/L`, `§/I`, …) were **removed** in Phase 4d: an explicit
-> closer now raises `Calor0830`. A block is terminated by indentation
-> alone, so all examples below use the indent-only form. To migrate an
-> older corpus that still has closer lines, delete those lines — the
-> indentation already marks where each block ends.
-
----
+The converter can preserve unsupported C# at its owning compilation-unit,
+member or statement boundary. Its counted raw frames retain the payload's
+length, bytes and scope; they are preservation output, not a way to claim
+native syntax support or verified effects. Do not handwrite payload wrappers
+or move namespace-local imports into a different scope.
+Retain the original references and parse context when converting; missing
+metadata is not evidence that a replacement is equivalent.
 
 ## Modules
 
-Modules are like C# namespaces. They group related functions.
+The first `module` labels the compilation unit. It is **not** a namespace or
+a named static class. An optional namespace follows the label.
 
-### Syntax
+| Header | Namespace |
+|:-------|:----------|
+| `module FileLabel` | Global |
+| `module FileLabel Contoso.Tools` | File-scoped `Contoso.Tools` |
+| `module FileLabel Contoso.Tools block` | Block `Contoso.Tools` |
 
-```
-§M{name}
-  // contents
-```
+Without a namespace, declarations enter the global namespace and root functions
+emit in `GlobalModule`. With namespace `Demo`, root functions emit in
+`Demo.DemoModule`. The label itself does not become a CLR type.
+`block` requests a block namespace instead of a file-scoped namespace; it does
+not change the namespace's CLR identity.
 
-### Example
+### Oblivious nullability
 
-```
-§M{Calculator}
-  // functions go here
-```
-
-### Rules
-
-- `name` becomes the C# namespace
-- A module may declare the semantics version it was written for with
-  `§SEMVER{MAJOR.MINOR.PATCH}` (conventionally the first line of the module
-  body; any position among the module's items is accepted). Exactly one
-  spelling is valid — for example `§SEMVER{2.0.0}`, no sign, whitespace, caret,
-  or range. The major must match the compiler's: an older major
-  (`§SEMVER{1.0.0}`) is refused with `Calor0701` and a migration pointer, a
-  newer major is refused with `Calor0701`, a higher minor warns with
-  `Calor0700`, and a malformed, bracket-form, unterminated, or second `§SEMVER`
-  is a `Calor0702` error. Modules that declare nothing take the compiler's
-  version. See `docs/semantics/versioning.md`.
-- Each namespace segment is emitted as a valid C# identifier; keyword segments
-  are escaped independently (for example, `namespace.class` becomes
-  `@namespace.@class`)
-- The module block extends until the next line that dedents back to
-  column 0 (or end of file)
-- Legacy `§/M` closers were removed in Phase 4d; an explicit closer now
-  raises `Calor0830`. The module ends at the next dedent to column 0
-
----
-
-## Namespace Scopes
-
-`§NS` preserves lexical C# namespace declarations inside a module. The scope
-ID distinguishes separate declarations of the same namespace so local using
-aliases never leak between them.
+The file header can end with `nullable oblivious`, independently of
+`overflow checked` or `overflow unchecked`. Without this field, the existing
+checked nullability rules remain unchanged.
 
 ```calor
-§NS{ns1:Company.Product}
-  §U{Model:Company.Contracts.Model}
-  §CL{c1:Service:pub}
+module Legacy nullable oblivious
+  func Find public (string:key) → string
+    !
+    return null
 ```
 
-For a file-scoped namespace:
+In this module, an unannotated reference declaration makes no non-null promise:
+its C# metadata has `NullableAnnotation.None`. Explicit `string?` still has
+`Annotated` metadata. The policy also applies inside arrays and generic arguments;
+it does not change CLR types or turn an unknown value into a non-null value.
+As in C# with nullable annotations disabled, an oblivious value may be passed to
+a non-null parameter, used as a receiver, returned or bound without a `Calor0274`
+diagnostic. The module's own nulls are still checked. A value whose type carries an
+explicit `?` (anywhere, including array elements and generic arguments), a `null`
+literal, and a local the module may have set to null keep the ordinary receiving
+check. That last case covers a local initialized or assigned from `null` or a `T?`
+value, and a local whose non-null proof was lost: a `ref`/`out` write, or a deferred
+body that captured and rebound it. Outside a `nullable oblivious` module, oblivious
+metadata values are still treated as possibly null. This is a file-wide annotation
+context, not a way to disable Calor's type or effect checks.
+
+Generated C# disables only nullable **annotations**, while enabling nullable
+warnings. It suppresses `CS8669`, the generated-code warning for explicit `?`
+in an annotation-disabled context; receiving/type/effect errors are not suppressed.
+Mixed lexical annotation contexts are not represented by this header.
+
+### Named static containers
+
+A nested `module` declares a named static container. Its functions are
+implicitly static. Use this form instead of a static class declaration.
 
 ```calor
-§NS{ns2:Company.Product:file}
-  §CL{c2:FileScopedType:pub}
+module StructureModules Demo
+  using System
+
+  module Arithmetic
+    func Twice (int:value) → int
+      !
+      return value * 2
+
+  func Main () → int
+    !
+    return Arithmetic.Twice(21)
 ```
 
-For the C# global namespace:
+`Demo.DemoModule.Main()` returns `42`; the nested container is
+`Demo.Arithmetic`, not `Demo.StructureModules.Arithmetic`.
+
+<a id="namespace-scopes"></a>
+<a id="using-directives"></a>
+
+### Namespace and import scope
+
+Imports appear inside the file module. Ordinary `using` directives are
+compilation-unit imports, even under a header that names a namespace.
+`namespace using` places an import inside that named namespace; it is not a
+namespace declaration or block. It requires a named namespace in the module header.
 
 ```calor
-§NS{ns3:_global:global}
-  §CL{c3:GlobalType:pub}
+module BlockNamespace Demo.Tools block
+  using Text = System.Text
+  using static System.Math
+
+  class Box
+    field Text.StringBuilder?:Builder
+    func Read () → int
+      !
+      return 42
 ```
 
-`global`, `named`, and `file` are explicit scope markers. `global` means no C#
-namespace wrapper is emitted. `named` disambiguates the legal C# namespace name
-`_global` from the historical global-namespace spelling:
+The class is `Demo.Tools.Box`, and `new Demo.Tools.Box().Read()` returns `42`.
+The alias names `System.Text`; `Builder` is a nullable `StringBuilder` field.
+Other import forms include `using System.Text` and `global using System`.
+For namespace-local lookup, write `namespace using System.Text`,
+`namespace using static System.Math`, or `namespace using Text = System.Text`.
+Local aliases can shadow compilation-unit aliases without changing either target.
 
-```calor
-§NS{ns4:_global:named}
-  §CL{c4:Thing:pub} // C# identity: global::_global.Thing
-```
-
-Markers can be combined, for example `§NS{ns5:_global:named:file}`. For
-backward compatibility, legacy `§NS{id:_global}` still parses as the global
-namespace, but canonical re-emission adds the explicit `global` marker.
-
-Nested `§NS` blocks preserve nested namespace hierarchy. The optional `file`
-marker preserves a file-scoped namespace when it is the file's only namespace
-scope. C# conversion associates declarations with both their fully-qualified
-namespace and lexical scope identity.
-
-An empty `§NS` ends before the next namespace or module member at the same
-indentation, so a following sibling is never treated as its child. Continuation
-indentation inside expressions is balanced independently and cannot terminate
-the surrounding namespace scope.
-
----
-
-## Using Directives
-
-Using directives retain their complete C# meaning. Exact duplicates are removed
-using the full `(target, alias, static, global, namespace scope)` tuple;
-directives that share a target but differ in alias, flags, or scope remain
-distinct. Directives inside `§NS` are emitted inside that C# namespace scope;
-global and compilation-unit usings remain outside all namespace declarations.
-
-```calor
-§U{System.Collections.Generic}             // using System.Collections.Generic;
-§U{Gen:System.Collections.Generic}         // using Gen = System.Collections.Generic;
-§U{static:System.Math}                     // using static System.Math;
-§U{global:System.Text}                     // global using System.Text;
-§U{global:Gen:System.Collections.Generic}  // global using Gen = System.Collections.Generic;
-§U{global:static:System.Math}               // global using static System.Math;
-```
-
-Generated C# is standalone: namespace dependencies are registered from AST
-nodes and type references, and compilation does not require SDK implicit
-usings.
-
----
+**Namespace preservation boundary:** the native header represents one
+namespace scope. `ConvertProject` and `migrate --split-namespaces` can retain
+resolved imports in their original compilation-unit or namespace-local scope.
+Single-result `Convert` and `convert` retain the whole-file preservation boundary
+for namespace-local imports. Multiple namespace declarations,
+nested namespaces, and conditional or unsupported scoped-import topology still
+require preservation. Missing original names or references also prevent native
+scoped-import conversion; implicit generated imports are not a repair.
+A projection that changes declared type or nullability metadata also stays
+preserved, rather than receiving native credit.
+Do not flatten these boundaries and claim equivalent lookup behavior.
+Converter-preserved C# is not native language coverage, and raw payloads are not
+handwritten examples.
 
 ## Functions
 
-Functions are the primary code containers.
+Use the same `func` header for root functions, named-module functions and class
+methods. Parameters put the type before the name; `→` introduces the return type.
 
-### Syntax
+```calor-fragment
+func Name (int:value, string:text) → int
+func Hidden private () → void
+func Compute protected virtual (int:value) → int
+```
 
-```
-§F{name:visibility}
-  §I{type:param}       // inputs (0 or more)
-  §O{type}             // output (required)
-  §E{effects}          // effects (optional)
-  §Q condition         // preconditions (0 or more)
-  §S condition         // postconditions (0 or more)
-  // body
-```
+Root and named-module functions emit static methods. Ordinary class methods
+are instance methods unless declared `static`.
 
 ### Visibility
 
-| Value | Meaning | C# Equivalent |
-|:------|:--------|:--------------|
-| `pub` | Public | `public static` |
-| `pri` | Private to the Calor module | `private static` |
-
-Members of a class (`§MT`, `§FLD`, `§PROP`, `§CTOR`, `§EVT`, and so on) accept the full set
-of C# accessibility levels. Each has a short and a long spelling:
-
-| Short | Long | C# |
-|:------|:-----|:---|
-| `pub` | `public` | `public` |
-| `int` | `internal` | `internal` |
-| `prot`, `pro` | `protected` | `protected` |
-| `priv`, `pri` | `private` | `private` |
-| `prot-int` | `protected-internal` | `protected internal` |
-| `priv-prot` | `private-protected` | `private protected` |
-
-Any other word in a visibility slot is error `Calor0122`, and the message lists the
-words above. Before 0.27 an unknown word, such as the typo `:bogus`, compiled
-silently as `private`.
-
-Namespace scopes do not create separate Calor modules. A module function,
-including a private function, is callable from every `§NS` scope in the same
-`ModuleNode`; overload resolution still uses the declared signatures. Because
-those scopes emit as separate C# static classes, the compiler qualifies sibling
-calls and may widen the generated member to `internal` as an implementation
-detail. Private functions are never exported to another input file's
-cross-module call map.
+Public is the default. Write full accessibility keywords, not abbreviated
+header fields. The available member accessibilities correspond to C#:
+`public`, `private`, `internal`, `protected`, `protected internal`, and
+`private protected`. A visibility must also be legal in its containing scope;
+for example, a top-level class cannot be private.
 
 ### Examples
 
-**Simple function:**
-```
-§F{Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
+Effect and contract clauses precede the first body statement. Empty `!`
+declares a pure row; `! cw` admits console output.
+
+```calor
+module FunctionHeaders
+  func Add (int:a, int:b) → int
+    !
+    return a + b
+
+  func Divide (int:a, int:b) → int
+    !
+    requires b != 0
+    => result == a / b
+    return a / b
+
+  func PrintSum (int:a, int:b) → void
+    ! cw
+    Console.WriteLine(Add(a, b))
+
+  func Main () → int
+    !
+    return Add(2, 3) + Divide(10, 2)
 ```
 
-**Function with effects:**
-```
-§F{PrintSum:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{void}
-  §E{cw}
-  §P (+ a b)
-```
-
-**Function with contracts:**
-```
-§F{Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-```
-
----
+`Main()` returns `10`. `PrintSum(2, 3)` writes `5` followed by a newline.
+`requires` has no native custom-message clause; use an explicit condition
+and exception when an API needs a specific failure message.
+See [contracts](https://calor.dev/docs/syntax-reference/contracts/) and
+[effects](https://calor.dev/docs/syntax-reference/effects/) for their enforcement boundaries.
 
 ## Async Functions
 
-Async functions use `§AF` instead of `§F` and automatically wrap return types in `Task<T>`.
+Put `async` after the function name and before the parameters.
+The declared output describes the body result or an explicit .NET carrier.
 
-### Syntax
+```calor
+module AsyncFunctions
+  using System.Threading.Tasks
 
-```
-§AF{name:visibility}
-  §I{type:param}       // inputs (0 or more)
-  §O{type}             // output (auto-wrapped to Task<T>)
-  // body with §AWAIT expressions
-```
+  func Read async () → int
+    !
+    => result == 21
+    return await Task.FromResult(21)
 
-### Examples
+  func ExplicitTask async () → Task<int>
+    !
+    return await Task.FromResult(7)
 
-**Simple async function:**
-```
-§AF{FetchDataAsync:pub}
-  §I{str:url}
-  §O{str}
-  §B{result} §AWAIT §C{httpClient.GetStringAsync} §A url §/C
-  §R result
-```
+  func ExplicitValueTask async () → ValueTask<int>
+    ! alloc
+    return await new ValueTask<int>(9)
 
-Emits C#:
-```csharp
-public static async Task<string> FetchDataAsync(string url)
-{
-    var result = await httpClient.GetStringAsync(url);
-    return result;
-}
+  func Wait async () → void
+    !
+    await Task.CompletedTask
 ```
 
-**Async void function (returns Task):**
-```
-§AF{ProcessAsync:pub}
-  §O{void}
-  §AWAIT §C{Task.Delay} §A 1000 §/C
-```
+Awaiting `Read()` produces `21`. Its CLR return type is `Task<int>`, and its
+postcondition describes `21`, not the task. `ExplicitTask()` also returns
+`Task<int>`, without double wrapping. `ExplicitValueTask()` retains
+`ValueTask<int>` and produces `9`. `Wait()` returns a non-generic `Task`.
 
 ### Automatic Task Wrapping
 
-| Declared Output | Emitted Return Type |
-|:----------------|:--------------------|
-| `§O{void}` | `Task` |
-| `§O{i32}` | `Task<int>` |
-| `§O{str}` | `Task<string>` |
-| `§O{Task<i32>}` | `Task<int>` (no double-wrap) |
+| Async output | CLR carrier | Body result |
+|:-------------|:------------|:------------|
+| `int` | `Task<int>` | `int` |
+| `string` | `Task<string>` | `string` |
+| `void` | `Task` | No value |
+| `Task<int>` | `Task<int>` | `int` |
+| `ValueTask<int>` | `ValueTask<int>` | `int` |
+| Non-generic `Task` or `ValueTask` | Same carrier | No value |
 
----
+A synchronous function returning `Task<int>` is different: its body returns
+the task itself. A source type named `Task` or a custom `MyTask<T>` is not
+automatically treated as the .NET carrier.
 
 ## Async Methods
 
-Async methods in classes use `§AMT` instead of `§MT`.
+Class methods use the same header and carrier rules. Ordinary method modifiers
+remain in the header, for example `func Read async virtual () → int` or
+`func Read async static () → int`.
 
-### Syntax
+```calor
+module AsyncMethods
+  using System.Threading.Tasks
 
-```
-§AMT{id:name:visibility}
-  §I{type:param}
-  §O{type}
-  // body
-```
+  class DataService
+    func GetUserAsync async (int:id) → int
+      !
+      return await Task.FromResult(id + 1)
 
-### Example
-
-```
-§CL{c001:DataService:pub}
-  §AMT{mt001:GetUserAsync:pub}
-    §I{i32:id}
-    §O{User}
-    §B{user} §AWAIT §C{_repository.FindAsync} §A id §/C
-    §R user
+  func Main async () → int
+    ! alloc
+    let DataService:service = new DataService()
+    return await service.GetUserAsync(41)
 ```
 
-### Modifiers
-
-Async methods support the same modifiers as regular methods:
-
-```
-§AMT{mt001:ProcessAsync:pub:virt}    // public virtual async
-§AMT{mt002:HandleAsync:prot:ovr}     // protected override async
-§AMT{mt003:ComputeAsync:pub:stat}    // public static async
-```
-
----
+Awaiting `Main()` returns `42`. See
+[inheritance](https://calor.dev/docs/syntax-reference/inheritance/) for virtual, override,
+abstract, sealed and static method declarations.
 
 ## Await Expression
 
-Use `§AWAIT` to await async operations.
+Use `await expression` for an ordinary await.
 
-### Syntax
+```calor
+module AwaitExpressions
+  using System.Threading.Tasks
 
-```
-§AWAIT expression                    // Simple await
-§AWAIT{false} expression             // await with ConfigureAwait(false)
-§AWAIT{true} expression              // await with ConfigureAwait(true)
-```
-
-### Examples
-
-**Simple await:**
-```
-§B{data} §AWAIT §C{client.GetAsync} §A url §/C
+  func Main async () → int
+    !
+    let int:value = await Task.FromResult(42)
+    if await Task.FromResult(true)
+      return value
+    return 0
 ```
 
-**With ConfigureAwait(false) for library code:**
+Awaiting `Main()` returns `42`. Await can initialize a binding, supply a
+condition or appear in a return expression. Awaiting a non-generic carrier
+has no value; use it as a statement, as in `Wait` above, not as a binding
+initializer. Custom awaitables are not admitted merely by their names.
+
+### ConfigureAwait limitation
+
+The earlier constructed-type limitation is fixed. This .NET call now resolves
+under normal effect enforcement; awaiting `Read()` returns `42` with the pure
+row shown. The compiler retains the constructed `Task<int>` and awaiter types
+rather than rebuilding their identity from display strings.
+
+```calor
+module ConfigureAwaitLimit
+  using System.Threading.Tasks
+  func Read async () → int
+    !
+    return await Task.FromResult(42).ConfigureAwait(false)
 ```
-§B{data} §AWAIT{false} §C{client.GetAsync} §A url §/C
-```
 
-Emits: `var data = await client.GetAsync(url).ConfigureAwait(false);`
-
-### Using Await in Conditions and Expressions
-
-```
-§IF{if1} §AWAIT §C{IsValidAsync} §A id §/C
-  §P "Valid"
-
-§R §AWAIT §C{ComputeAsync} §A x §/C
-```
-
----
+The bool overload accepts both `false` and `true`. Configured non-generic
+`Task`, `ValueTask` and `ValueTask<T>` carriers are also supported. Receiver and
+argument effects still count, and a wrong argument cannot borrow this pure
+framework contract. This is not arbitrary custom-awaitable support or inference
+for an uninstantiated generic metadata definition.
 
 ## Lambda Expressions
 
-Lambda expressions create anonymous functions using `§LAM`/`§/LAM` blocks.
+Use `(type:name, ...) => expression`, or place an indented statement body after
+`=>`. Lambda effect rows follow the closing parameter parenthesis and precede
+`=>`. Keep those tokens on one line. There are no brace bodies or closing tags.
 
-### Syntax
-
-```
-§LAM{id:param1:type1}              // single parameter
-§LAM{id:param1:type1:param2:type2} // multiple parameters
-§LAM{id}                           // no parameters
-```
-
-The header encodes parameters as colon-separated `name:type` pairs after the ID.
-Parameters without known types use `object` as the default type.
-
-### Single Parameter
-
-```
-§B{doubler} §LAM{lam1:x:i32} (* x 2) §/LAM{lam1}
+```calor
+module LambdaExamples
+  func Main () → int
+    ! alloc
+    let Func<int,int>:twice ! = (int:x) ! => x * 2
+    let Func<int,int,int>:add ! = (int:a, int:b) ! => a + b
+    let Func<int>:answer ! = () ! => 7
+    let Func<int,int>:block ! = (int:x) ! =>
+      let int:next = x + 1
+      return next * 2
+    return twice(3) + add(2, 3) + answer() + block(2)
 ```
 
-Emits: `var doubler = (int x) => x * 2;`
+`Main()` returns `24`. The explicit pure rows describe these callables; an
+unannotated lambda is not automatically proof of purity. Delegate allocation
+is separate from invocation effects.
 
-### Multiple Parameters
-
-Parameters are listed as consecutive `name:type` pairs:
-
-```
-§B{add} §LAM{lam1:a:i32:b:i32} (+ a b) §/LAM{lam1}
-```
-
-Emits: `var add = (int a, int b) => a + b;`
-
-**Three parameters:**
-```
-§B{combine} §LAM{lam1:x:i32:y:str:z:bool} §C{Process} §A x §A y §A z §/C §/LAM{lam1}
-```
-
-### No Parameters
-
-```
-§B{getTime} §LAM{lam1} §C{DateTime.Now} §/C §/LAM{lam1}
-```
-
-### As LINQ Arguments
-
-Lambdas are commonly used as arguments inside `§C{...}` calls:
-
-```
-§C{numbers.Where} §A §LAM{lam1:n:i32} (!= (% n 3) 0) §/LAM{lam1} §/C
-§C{items.Select} §A §LAM{lam2:x:i32} (* x 2) §/LAM{lam2} §/C
-```
-
-### Statement Body Lambdas
-
-For multi-statement bodies, include statements between the tags:
-
-```
-§B{printer} §LAM{lam1:x:i32}
-§P x
-§P (* x 2)
-§/LAM{lam1}
-```
+Lambdas may capture enclosing variables and may be passed as call arguments,
+including LINQ arguments when the selected API and higher-order effect
+requirements are supported. Preserve the target delegate type and required
+row instead of assuming every callback is pure.
 
 ### Async Lambdas
 
-Add `async` after the ID, before parameters:
+An async lambda uses `async` before its parameter list:
 
+```calor
+module AsyncLambdas
+  using System.Threading.Tasks
+
+  func Main async () → int
+    ! alloc
+    let Func<int,Task<int>>:next ! = async (int:x) ! =>
+      return await Task.FromResult(x + 1)
+    return await next(41)
 ```
-§LAM{lam1:async:x:i32}
-§B{result} §AWAIT §C{ProcessAsync} §A x §/C
-§R result
-§/LAM{lam1}
+
+Awaiting `Main()` returns `42`. Its delegate returns `Task<int>`, while the
+lambda body returns an `int`.
+
+## Local Functions
+
+Bind a local helper to a lambda and declare it before use. Nested `func`
+declarations are not the local-callable form.
+
+```calor
+module LocalCallables
+  func Use (int:value) → int
+    ! alloc
+    let Func<int,int>:addOne ! = (int:x) ! => x + 1
+    return addOne(value)
 ```
 
-> **Note:** `§I{type:name}` inline parameter declarations are NOT supported inside
-> `§LAM` headers. All parameters must be encoded in the header using the
-> `name:type` pair format.
-
----
+`Use(2)` returns `3`. This is a delegate binding, not a forward-declared
+static local function. It does not authorize recursive or mutually recursive
+recipes. The converter lowers only supported C# local-function shapes;
+unsupported shapes remain explicitly preserved C#, not rewritten by guesswork.
+See the catalog's [lambda entry](https://calor.dev/docs/syntax-reference/current-language/#lambda-expression).
 
 ## Delegate Definitions
 
-Delegates define function signatures that can be passed as values.
+A delegate names a callable signature. Use inline parameters and an optional
+indented effect row. Delegates can appear at file or class scope.
 
-### Syntax
+```calor
+module DelegateDefinitions
+  delegate Calculator (int:a, int:b) → int
+    !
 
-```
-§DEL{id:name}
-  §I{type:param}       // parameters (0 or more)
-  §O{type}             // return type (optional for void)
-  §E{effects}          // effects (optional)
-```
+  delegate Logger (string:message) → void
+    ! cw
 
-### Examples
+  func Apply (Calculator:operation !, int:a, int:b) → int
+    !
+    return operation(a, b)
 
-**Calculator delegate:**
-```
-§DEL{d001:Calculator}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-```
-
-Emits: `public delegate int Calculator(int a, int b);`
-
-**Void delegate:**
-```
-§DEL{d001:Logger}
-  §I{str:message}
+  func Main () → int
+    ! alloc
+    let Calculator:add ! = (int:a, int:b) ! => a + b
+    return Apply(add, 2, 3)
 ```
 
-Emits: `public delegate void Logger(string message);`
-
-**Delegate with effects:**
-```
-§DEL{d001:FileProcessor}
-  §I{str:path}
-  §O{bool}
-  §E{fs:rw}
-```
-
----
+`Main()` returns `5`. The CLR `Calculator.Invoke` signature returns `int`
+and takes two `int` parameters; `Logger.Invoke` returns `void` and takes a
+`string`. Its `cw` row describes allowed callback effects, not automatic
+console output from declaring the delegate.
 
 ## Enum Definitions
 
-Enums define a set of named constants.
+An enum has indented members, optional explicit values and an optional CLR
+underlying type. The default underlying type is `int`.
 
-### Syntax
+```calor
+module EnumDefinitions
+  enum Color
+    Red
+    Green
+    Blue
 
-```
-§EN{id:Name}
-  Member1
-  Member2 = 1
-  Member3 = 2
-```
+  enum StatusCode
+    Ok = 200
+    NotFound = 404
+    Error = 500
 
-With underlying type:
-```
-§EN{id:Name:underlyingType}
-  ...
-```
+  enum Access byte
+    None = 0
+    Read = 1
+    Write = 2
 
-### Examples
-
-**Simple enum:**
-```
-§EN{e001:Color}
-  Red
-  Green
-  Blue
+  func Main () → bool
+    !
+    return Color.Red != Color.Blue && StatusCode.Ok != StatusCode.Error
 ```
 
-Emits:
-```csharp
-public enum Color
-{
-    Red,
-    Green,
-    Blue,
-}
-```
-
-**Enum with explicit values:**
-```
-§EN{e001:StatusCode}
-  Ok = 200
-  NotFound = 404
-  Error = 500
-```
-
-**Enum with underlying type:**
-```
-§EN{e001:Flags:u8}
-  None = 0
-  Read = 1
-  Write = 2
-```
-
-Emits:
-```csharp
-public enum Flags : byte
-{
-    None = 0,
-    Read = 1,
-    Write = 2,
-}
-```
-
----
+`Main()` returns `true`. `Color.Red` has value `0`, `StatusCode.NotFound`
+has value `404`, and `Access` has underlying CLR type `byte`.
+Names with bit-like values are not automatically a `[Flags]` declaration;
+add the ordinary attribute when that metadata is required.
 
 ## Enum Extension Methods
 
-Extension methods can be added to enums using `§EEXT` (Enum EXTension).
+Use a named static module, with `this` before the first parameter's type.
+There is no separate enum-extension declaration keyword.
 
-### Syntax
+```calor
+module EnumExtensions
+  enum Color
+    Red
+    Green
+    Blue
 
-```
-§EEXT{id:EnumName}
-  §F{f001:MethodName:pub}
-    §I{EnumName:self}
-    §O{returnType}
-    // body using self
-```
+  module ColorExtensions
+    func ToHex (this Color:self) → string
+      !
+      return match self
+        case Color.Red → "#FF0000"
+        case Color.Green → "#00FF00"
+        case Color.Blue → "#0000FF"
+        case _ → "unknown"
 
-The first parameter with the enum type (or named `self`) becomes the `this` parameter.
+    func IsPrimary (this Color:self) → bool
+      !
+      return self == Color.Red || self == Color.Green || self == Color.Blue
 
-### Example
-
-```
-§EN{e001:Color}
-  Red
-  Green
-  Blue
-
-§EEXT{ext001:Color}
-  §F{f001:ToHex:pub}
-    §I{Color:self}
-    §O{str}
-    §W{sw1} self
-    §K Color.Red → §R "#FF0000"
-    §K Color.Green → §R "#00FF00"
-    §K Color.Blue → §R "#0000FF"
-
-  §F{f002:IsPrimary:pub}
-    §I{Color:self}
-    §O{bool}
-    §R (|| (== self Color.Red) (|| (== self Color.Green) (== self Color.Blue)))
+  func Main () → string
+    !
+    return ColorExtensions.ToHex(Color.Red) + ":" + ColorExtensions.IsPrimary(Color.Blue)
 ```
 
-Emits:
-```csharp
-public enum Color
-{
-    Red,
-    Green,
-    Blue,
-}
+`Main()` returns `"#FF0000:True"` through normally enforced **native explicit
+static calls**. The binder retains the actual source enum owner and member
+identity when selecting the overload; it does not substitute an integer or a
+same-named metadata enum.
 
-public static class ColorExtensions
-{
-    public static string ToHex(this Color self)
-    {
-        return self switch
-        {
-            Color.Red => "#FF0000",
-            Color.Green => "#00FF00",
-            Color.Blue => "#0000FF",
-            _ => throw new ArgumentOutOfRangeException(nameof(self))
-        };
-    }
+The methods also carry CLR extension-method metadata. A C# caller evaluating
+`Color.Red.ToHex() + ":" + Color.Blue.IsPrimary()` gets the same string.
 
-    public static bool IsPrimary(this Color self)
-    {
-        return self == Color.Red || self == Color.Green || self == Color.Blue;
-    }
-}
+Native receiver-style calls are supported when the receiver and the first
+`this` parameter resolve to actual source enum types. The following program
+returns `"#FF0000"` under normal effect enforcement. The compiler selects the
+source method and emits its fully qualified static call:
+
+```calor
+module EnumReceiverLimit
+  enum Color
+    Red
+  module ColorExtensions
+    func ToHex (this Color:self) → string
+      !
+      return "#FF0000"
+  func Receiver () → string
+    !
+    return Color.Red.ToHex()
 ```
 
----
+This admission does not cover arbitrary object, generic, or metadata extension
+receivers. Ambiguous, inaccessible, or preserved competing declarations cannot
+borrow the source method's effect contract. Inherited enum instance-member
+names remain conservatively unresolved.
+
+Escaped enum member names also retain their source owner and member identity.
+The `@` escape is part of the source spelling, not a different member.
+This normally enforced program returns `7`:
+
+```calor
+module EscapedEnumLimit
+  enum Color
+    @event = 7
+  module Extensions
+    func Pick (Color:value) → int
+      !
+      return 7
+  func Main () → int
+    !
+    return Extensions.Pick(Color.@event)
+```
+
+An explicit `global::` qualifier in this argument position is not current
+native grammar. This complete negative reports `Calor0100`, not a successful
+escape from the shadowing parameter:
+
+```calor expect=Calor0100
+module GlobalEnumLimit
+  enum Color
+    Red
+  module Extensions
+    func Pick (Color:value) → int
+      !
+      return 7
+  func Main (int:Color) → int
+    !
+    return Extensions.Pick(global::Color.Red)
+```
 
 ## Event Definitions
 
-Events allow objects to notify subscribers of state changes.
+Use `event DelegateType:Name`, followed by visibility or supported modifiers
+when needed. A simple event has no body. A custom event pairs indented `add`
+and `remove` bodies.
 
-### Syntax
+```calor
+module EventDefinitions
+  delegate Handler (int:value) → void
+    ! unknown
 
-```
-§EVT{id:name:visibility:delegateType}
-```
+  class Publisher
+    event Handler:Changed
 
-| Part | Description |
-|:-----|:------------|
-| `id` | Unique identifier |
-| `name` | Event name |
-| `visibility` | `pub`, `pri`, `prot` |
-| `delegateType` | Delegate type for handlers |
-
-### Example
-
-```
-§CL{c001:Button:pub}
-  §EVT{e001:Click:pub:EventHandler}
-    §EVT{e002:ValueChanged:pub:EventHandler<ValueChangedEventArgs>}
+  class SubscriptionCounter
+    field int:Count = 0
+    event Handler:Changed
+      add
+        set Count Count + 1
+      remove
+        set Count Count + 10
 ```
 
-Emits:
-```csharp
-public class Button
-{
-    public event EventHandler Click;
-    public event EventHandler<ValueChangedEventArgs> ValueChanged;
-}
-```
-
----
+`Publisher.Changed` has CLR delegate type `Handler`. For
+`SubscriptionCounter.Changed`, adding and removing one handler through the CLR
+event API leaves `Count` equal to `11`. This accessor demonstrates bookkeeping;
+it does not store handlers or promise notification delivery.
+Named-module events are static; ordinary classes can explicitly declare
+`event Handler:Changed static`.
 
 ## Event Subscribe/Unsubscribe
 
-Use `§SUB` and `§UNSUB` to add or remove event handlers.
+**Native event subscription and unsubscription statements are not admitted.**
+Do not invent `+=` or `-=` statements or use retired subscription tags.
+The declarations and accessors above are native, but the CLR event API
+observation is not a native subscription example.
 
-### Syntax
-
-```
-§SUB eventRef handlerRef      // Subscribe
-§UNSUB eventRef handlerRef    // Unsubscribe
-```
-
-### Examples
-
-**Subscribe to event:**
-```
-§SUB button.Click OnButtonClick
-```
-
-Emits: `button.Click += OnButtonClick;`
-
-**Unsubscribe from event:**
-```
-§UNSUB button.Click OnButtonClick
-```
-
-Emits: `button.Click -= OnButtonClick;`
-
-**Subscribe with lambda:**
-```
-§SUB button.Click (sender, e) → §P "Clicked!"
-```
-
----
+When migrating a C# program that subscribes to an event, use the converter's
+preservation output and retain its original behavior. Preservation is not
+native authoring support. See the catalog's
+[event entry](https://calor.dev/docs/syntax-reference/current-language/#event-definition).
 
 ## Input Parameters
 
-Input parameters define function arguments.
+Function, method and delegate parameters are inline and comma-separated:
+`(int:x, string:name, bool:flag, int?:maybeValue)`. Types precede names.
+Parameter modifiers precede types, for example `ref int:value`,
+`out int:result`, `in int:value`, or `params int[]:items`.
+Defaults follow `=`, as in `int:increment = 1`.
 
-### Syntax
+```calor
+module ParameterArrays
+  func Total (params int[]:items) → int
+    !
+    var int:sum = 0
+    each int:item in items
+      set sum sum + item
+    return sum
 
-```
-§I{type:name}
-```
+  func Add (int:value, int:increment = 1) → int
+    !
+    return value + increment
 
-### Examples
-
-```
-§I{i32:x}           // int x
-§I{str:name}        // string name
-§I{bool:flag}       // bool flag
-§I{?i32:maybeVal}   // int? maybeVal (nullable)
-§I{[u8}:data}       // byte[] data
-§I{[str}:args}      // string[] args
-```
-
-### Multiple Parameters
-
-```
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §I{i32:c}
-  §O{i32}
-  §R (+ (+ a b) c)
+  func Main () → int
+    ! alloc
+    return Total(1, 2, 3) + Add(0)
 ```
 
----
+`Main()` returns `7`. See [calls](https://calor.dev/docs/syntax-reference/calls/) for named
+arguments, caller storage for `ref`/`out`, and their executable examples.
+Attribute metadata on a parameter goes after its name and before its effect
+row or default value.
 
 ## Output Type
 
-Every function must declare its output type.
+Write `→ Type` after the parameter list. Use `void` for no body result and
+bare `return` for an early void return. Examples include `→ int`,
+`→ string?`, `→ byte[]`, and `→ List<string>`.
 
-### Syntax
-
-```
-§O{type}
-```
-
-### Examples
-
-```
-§O{void}     // returns nothing
-§O{i32}      // returns int
-§O{str}      // returns string
-§O{?i32}     // returns nullable int
-§O{i32!str}  // returns Result<int, string>
-§O{[u8}}     // returns byte[]
-§O{[str}}    // returns string[]
-```
-
----
+The output type is a receiving boundary, not a conversion escape hatch.
+Arrays and collections retain their actual CLR types. Async outputs follow
+the carrier rules above; postconditions use the body `result`.
 
 ## Array Types
 
-Calor uses bracket notation `[T]` for array types, which aligns with common programming language conventions.
+Use `T[]`, not a prefix bracket form. Jagged arrays use `T[][]`, rectangular
+arrays use `T[,]`, and nullable elements use `T?[]`.
 
-### Syntax
+| Type | Meaning |
+|:-----|:--------|
+| `byte[]` | One-dimensional byte array |
+| `int[]` | One-dimensional integer array |
+| `string[]` | One-dimensional string array |
+| `int[][]` | Array of integer arrays |
+| `int[,]` | Rectangular two-dimensional integer array |
+| `int?[]` | Array of nullable integers |
 
-```
-[elementType]         // Single-dimensional array
-[[elementType]]       // Jagged array (array of arrays)
-```
+```calor
+module ArrayDeclarations
+  class DataProcessor
+    field byte[]?:Buffer
+    field int[]?:Indices
 
-### Examples
+    func ProcessData (string[]:args) → int
+      !
+      return args.Length
 
-| Calor Type | C# Equivalent |
-|:----------|:--------------|
-| `[u8]` | `byte[]` |
-| `[i32]` | `int[]` |
-| `[str]` | `string[]` |
-| `[bool]` | `bool[]` |
-| `[[i32]]` | `int[][]` |
-
-### Usage in Fields and Methods
-
-```
-§CL{c001:DataProcessor}
-  §FLD{[u8}:_buffer:priv}       // private byte[] _buffer
-  §FLD{[i32}:_indices:priv}     // private int[] _indices
-
-  §MT{m001:ProcessData:pub}
-    §I{[str}:args}              // string[] args parameter
-    §O{i32}
-    §R args.Length
+  func First (int[][]:rows) → int
+    !
+    return rows[0][0]
 ```
 
----
+`new DataProcessor().ProcessData(new string[] { "a", "b" })` returns `2`;
+`First(new int[][] { new int[] { 7 } })` returns `7`.
+The fields are nullable because this example does not initialize them.
+See [types](https://calor.dev/docs/syntax-reference/types/) for construction and nullability.
 
 ## Block Structure (Indentation)
 
-Calor blocks are delimited by **indentation**, like Python. A block
-opens with one of the structural tags (`§M`, `§F`, `§AF`, `§MT`,
-`§AMT`, `§CL`, `§IFACE`, `§L`, `§WH`, `§DO`, `§IF`, `§W`, `§TR`,
-`§LAM`, `§DEL`, `§EN`, `§EEXT`, `§PROP`) and ends at the next line that
-dedents back to (or past) the parent column.
+Bodies end at dedent. Indent each nested body two spaces; do not mix tabs and
+spaces. Branch continuations such as `else if` and `else` align with their
+`if`; `catch` and `finally` align with their `try`. A `case` is indented under
+its `match`, and statements in a case body are indented again.
 
-### Rules
-
-1. The compiler default is **2 spaces per nesting level**
-2. Tabs and spaces must not be mixed within a block
-3. Chain continuations (`§EI`, `§EL`, `§K`, `§WHEN`, `§CA`, `§FI`)
-   sit at the **same** column as their parent (`§IF`, `§W`, `§TR`),
-   not indented inside it <!-- drift:ignore -->
-4. Closer tags were removed in Phase 4d — an explicit `§/X` raises `Calor0830`
-
-### Example
-
-```
-§M{m1:Example}
-  §F{f1:Main:pub} () -> void
-    §E{cw}
-    §L{l1:i:1:10:1}
-      §IF{if1} (> i 5)
-        §P i
-      §EL
-        §P "small"
+```calor
+module IndentedBlocks
+  func Main () → int
+    !
+    var int:total = 0
+    for i from 1 to 3 step 1
+      if i > 1
+        set total total + i
+      else
+        set total total + 10
+    return total
 ```
 
-Each block above (`§IF`, `§L`, `§F`, `§M`) ends purely at its dedent —
-there are no closer tags. Writing an explicit `§/I`, `§/L`, `§/F`, or
-`§/M` now raises `Calor0830`.
+`Main()` returns `15`; the final `return` is outside the loop.
+Lambdas with statement bodies also end at dedent. There are no structural
+closing tags.
 
 ### Tag Reference
 
-| Opener | Purpose |
-|:-------|:--------|
-| `§M{name}` | Module |
-| `§F{name:vis}` | Function |
-| `§AF{name:vis}` | Async function |
-| `§CL{name}` | Class |
-| `§IFACE{name}` | Interface |
-| `§MT{name:vis}` | Method |
-| `§AMT{name:vis}` | Async method |
-| `§L{var:from:to:step}` | For loop |
-| `§WH cond` | While loop |
-| `§DO` | Do-while loop (condition on closing line during transition) |
-| `§IF cond` | Conditional (with `§EI` / `§EL` continuations) |
-| `§W expr` | Switch (with `§K` cases) |
-| `§TR` | Try (with `§CA` / `§FI`) |
-| `§LAM{params}` | Lambda (block body) |
-| `§DEL{name}` | Delegate definition |
-| `§EN{name}` | Enum |
-| `§EEXT{enumName}` | Enum extension methods |
-| `§PROP{name:type:vis}` | Property |
-| `§EVT{name:vis:type}` | Event (single line, no block) |
-| `§C{target}` | Call expression (`§/C` ends the argument list) |
-
----
+The historical heading is retained for incoming links. Use the
+[generated catalog](https://calor.dev/docs/syntax-reference/current-language/) for the full
+native declaration vocabulary, and
+[control flow](https://calor.dev/docs/syntax-reference/control-flow/) for `if`, `while`,
+`for`, `each`, `match`, `try` and their continuations.
 
 ## Generics
 
-Calor supports generic functions, classes, interfaces, and methods using angle bracket syntax.
-
-### Type Parameters
-
-Type parameters are declared using `<T>` suffix syntax after the tag attributes.
-
-```
-§F{id:name:vis}<T>         // Generic function with one type parameter
-§F{id:name:vis}<T, U>      // Generic function with two type parameters
-§CL{id:name}<T>            // Generic class
-§IFACE{id:name}<T>         // Generic interface
-§MT{id:name:vis}<T>        // Generic method
-```
-
-An **empty** `§IFACE` body — a marker interface — ends at the next type opener
-(`§CL`, `§IFACE`, `§EN`, `§D`, `§DEL`, or a `§CSHARP` block) that sits at
-**exactly the interface's own column**, because a same-column line produces no
-dedent for the parser to stop on:
+Add `<T>` or `<T, U>` after a function or type name. Place `where` constraints
+inside the declaration, before body statements. Generic type references use
+ordinary angle brackets, for example `Dictionary<string,List<int>>`.
 
 ```calor
-§M{m001:Contracts}
-  §IFACE{i001:IMarker}
-  §CL{c002:Impl:pub}       // sibling — ends the interface body
-    §IMPL{IMarker}
+module GenericDeclarations
+  interface IRepository<T>
+    where T : class
+    func Get (int:id) → T
+      !
+
+  class Box<T>
+    where T : class
+    func Echo (T:value) → T
+      !
+      return value
+
+  func Identity<T> (T:value) → T
+    !
+    return value
+
+  func Main () → int
+    !
+    return Identity<int>(42)
 ```
 
-An opener *indented* under the interface is not a sibling and is still a
-`Calor0100` error: interfaces cannot nest types. This makes `§IFACE` asymmetric
-with `§CL` / `§EN`, whose empty bodies do **not** stop at a same-column opener —
-a same-column type after an empty `§CL` is still read as nested. Only the
-interface case was a converter-reach blocker (#903 cluster 2), so only it was
-changed; the class and enum cases are tracked separately.
+`Main()` returns `42`. `IRepository<T>` and `Box<T>` retain their reference-type
+constraints. Methods use the same generic function header within a class.
+Other constraint forms include `where T : struct`, `where T : new()`, and
+`where T : class, IComparable<T>`. A constructor constraint is an obligation on
+the type argument, not permission to omit allocation effects.
 
-Variance is legal only on interface type parameters:
-
-```calor
-§IFACE{i001:IProducer}<out T>
-§IFACE{i002:IConsumer}<in T>
-```
-
-Using `in` or `out` on a class, function, or method type parameter is a
-`Calor0119` error.
-
-### Constraints
-
-Type parameter constraints are declared using `§WHERE` clauses.
-
-**New syntax (recommended):**
-```
-§WHERE T : class                    // T must be a reference type
-§WHERE T : class?                   // T may be a nullable reference type
-§WHERE T : struct                   // T must be a value type
-§WHERE T : unmanaged                // T must be unmanaged
-§WHERE T : notnull                  // T must be non-null
-§WHERE T : new()                    // T must have parameterless constructor
-§WHERE T : IComparable<T>           // T must implement interface
-§WHERE T : class, IComparable<T>    // Multiple constraints
-§WHERE T : default                  // Override or explicit-interface method only
-§WHERE T : allows ref struct        // Ref-struct anti-constraint
-```
-
-Using `default` on an interface/class type parameter, interface method,
-ordinary class method, or module function is a `Calor0120` error. It is
-preserved only on C#-legal override methods and explicit interface
-implementations.
-
-**Legacy syntax (still supported):**
-```
-§WR{T:class}                        // T must be a reference type
-§WR{T:IComparable}                  // T must implement interface
-```
-
-### Generic Type References
-
-Generic types are written inline using angle bracket syntax.
-
-```
-§I{List<T>:items}                   // Parameter of type List<T>
-§I{Dictionary<str, T>:lookup}       // Nested generic types
-§O{IEnumerable<T>}                  // Generic return type
-§FLD{List<T>:_items:pri}            // Generic field type
-```
-
-### Examples
-
-**Generic identity function:**
-```
-§F{f001:Identity:pub}<T>
-  §I{T:value}
-  §O{T}
-  §R value
-```
-
-**Generic class with constraint:**
-```
-§CL{c001:Repository:pub}<T>
-  §WHERE T : class
-  §FLD{List<T>:_items:pri}
-
-  §MT{m001:Add:pub}
-    §I{T:item}
-    §O{void}
-    §C{_items.Add} §A item §/C
-
-  §MT{m002:GetAll:pub}
-    §O{IReadOnlyList<T>}
-    §R _items
-```
-
-**Generic interface:**
-```
-§IFACE{i001:IRepository}<T>
-  §WHERE T : class
-  §MT{m001:Get}
-    §I{i32:id}
-    §O{T}
-```
-
----
+A marker interface can have no members. Sibling declarations still belong at
+the same indentation; do not rely on historical empty-block parsing quirks.
 
 ## C# Attributes
 
-C# attributes are preserved during conversion using inline bracket syntax `[@Attribute]`.
+Attach `[@AttributeName]` or `[@AttributeName(arguments)]` after a declaration
+header. Multiple attributes are adjacent. These are CLR attributes, not Calor
+effect or contract clauses.
 
-### Syntax
+```calor
+module AttributeDeclarations
+  class Data [@Serializable][@System.ComponentModel.Description("payload")]
+    property string?:Email [@System.ComponentModel.Description("address")]
+      get
+      set
 
-```
-§CL{id:name}[@AttributeName]
-§CL{id:name}[@AttributeName(args)]
-§MT{id:name:vis}[@Attr1][@Attr2]
-```
-
-### Examples
-
-**Class with routing attributes (ASP.NET Core):**
-```
-§CL{c001:JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
-  §MT{m001:Post:pub}[@HttpPost]
+    func Read (int:value [@System.ComponentModel.Description("input")] = 7) → int
+      !
+      return value
 ```
 
-**Property with validation:**
-```
-§PROP{p001:Email:str:pub}[@Required][@EmailAddress]
-  §GET
-    §SET
-```
+`new Data().Read()` returns `7`. Reflection sees `SerializableAttribute` and
+the description `"payload"` on `Data`, `"address"` on `Email`, and `"input"`
+on the `value` parameter.
 
-### Attribute Arguments
+Attributes are supported on classes, interfaces, methods, properties, fields
+and parameters; preserve the correct CLR target. Positional arguments use
+`[@Name(value)]`; named arguments use `[@Name(Key="value")]`; mixed arguments
+use `[@Name(value, Key="value")]`. Arguments must be valid attribute constants.
+Escape a literal interpolation placeholder as `"\${value}"` rather than
+turning an attribute argument into a runtime interpolated string.
 
-| Style | Syntax | Example |
-|:------|:-------|:--------|
-| No args | `[@Name]` | `[@ApiController]` |
-| Positional | `[@Name(value)]` | `[@Route("api/test")]` |
-| Named | `[@Name(Key="value")]` | `[@JsonProperty(PropertyName="id")]` |
-| Mixed | `[@Name(pos, Key=val)]` | `[@Range(1, 100, ErrorMessage="Invalid")]` |
-
-### Supported Elements
-
-Attributes can be attached to:
-- Classes: `§CL{...}[@attr]`
-- Interfaces: `§IFACE{...}[@attr]`
-- Methods: `§MT{...}[@attr]`
-- Properties: `§PROP{...}[@attr]`
-- Fields: `§FLD{...}[@attr]`
-- Parameters: `§I{type:name}[@attr]`
-
----
+Framework attributes such as ASP.NET routing and data-validation attributes
+also require their real framework references. An attribute name alone does
+not supply that dependency or implement its runtime behavior.
 
 ## Why Indent-Based Blocks?
 
-1. **Familiar to agents** - LLMs trained on Python have strong priors for indentation <!-- drift:ignore -->
-2. **Tag-light** - No `§/X` to type, no mismatched-closer errors
-3. **Refactoring safe** - Stable IDs on openers still survive code movement
-4. **Lower edit cost** - In edit-workload studies, indent form reduced agent token cost by ~16% with no regression in correctness
-
----
+Indentation makes lexical nesting visible without structural closing tokens.
+Declaration identity is maintained by tooling in `.calor/ids.json`, not IDs
+on source openers; use identity-aware rename and move tools.
+These design properties do not by themselves establish a measured token
+saving or a correctness improvement.
 
 ## Next
 
-- [Types](/calor/syntax-reference/types/) - Type system reference
+- [Types](https://calor.dev/docs/syntax-reference/types/) — CLR types, arrays and nullable values
+- [Inheritance](https://calor.dev/docs/syntax-reference/inheritance/) — classes and interfaces
+- [Generated catalog](https://calor.dev/docs/syntax-reference/current-language/) — shared native forms

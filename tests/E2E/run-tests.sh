@@ -48,6 +48,8 @@ run_scenario() {
     local run_script="$scenario_dir/run.sh"
     local verify_script="$scenario_dir/verify.sh"
     local output_file="$scenario_dir/output.g.cs"
+    local verification_dir="$scenario_dir"
+    local generated_dir=""
 
     # Check for required files
     if [[ ! -f "$input_file" && ! -f "$run_script" ]]; then
@@ -65,8 +67,14 @@ run_scenario() {
             return 0
         fi
     elif [[ -f "$input_file" ]]; then
-        # Compile Calor to C#
+        # Physical CLI output has sidecar IDs and #line paths; it is not the
+        # path-independent canonical golden embedded by calor self-test.
+        generated_dir=$(mktemp -d)
+        output_file="$generated_dir/output.g.cs"
+        verification_dir="$generated_dir"
         if ! "$COMPILER" --input "$input_file" --output "$output_file"; then
+            rm -f "$output_file"
+            rmdir "$generated_dir"
             fail "$scenario_name - compilation failed"
             return 0
         fi
@@ -75,19 +83,27 @@ run_scenario() {
     # Run verification script if present
     if [[ -f "$verify_script" ]]; then
         chmod +x "$verify_script"
-        if ! "$verify_script" "$scenario_dir"; then
+        if ! "$verify_script" "$verification_dir"; then
+            if [[ -n "$generated_dir" ]]; then
+                rm -f "$output_file"
+                rmdir "$generated_dir"
+            fi
             fail "$scenario_name - verification failed"
             return 0
         fi
     fi
 
+    if [[ -n "$generated_dir" ]]; then
+        rm -f "$output_file"
+        rmdir "$generated_dir"
+    fi
     pass "$scenario_name"
     return 0
 }
 
 cleanup() {
     info "Cleaning up generated files..."
-    find "$SCENARIOS_DIR" -name "*.g.cs" -delete 2>/dev/null || true
+    find "$SCENARIOS_DIR" -name "*.g.cs" ! -name "output.g.cs" -delete 2>/dev/null || true
     find "$SCENARIOS_DIR" -name ".workdir" -delete 2>/dev/null || true
     find "$SCENARIOS_DIR" -name "bin" -type d -exec rm -rf {} + 2>/dev/null || true
     find "$SCENARIOS_DIR" -name "obj" -type d -exec rm -rf {} + 2>/dev/null || true

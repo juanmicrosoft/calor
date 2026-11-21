@@ -23,7 +23,7 @@ public class CalorFormatterTests
     public void Format_MinimalModule_ProducesCorrectOutput()
     {
         var source = @"
-§M{m001:Test}
+module Test Test block
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -31,7 +31,7 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("m001", result);
+        Assert.Contains("module Test Test block", result);
         Assert.Contains("Test", result);
     }
 
@@ -40,9 +40,10 @@ public class CalorFormatterTests
     {
         // Simplified test without using directives which have complex parsing
         var source = @"
-§M{m001:Test}
-  §F{f001:Main:pub}
-    §O{void}
+module Test Test block
+  func Main () → void
+    !
+    return
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -62,12 +63,10 @@ public class CalorFormatterTests
     public void Format_FunctionWithParameters_IncludesTypeAndName()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -76,18 +75,17 @@ public class CalorFormatterTests
         var result = formatter.Format(module);
 
         Assert.Contains("Add", result);
-        Assert.Contains("pub", result);
+        Assert.Contains("func Add (int:a, int:b) → int", result);
     }
 
     [Fact]
     public void Format_FunctionWithEffects_IncludesEffectsDeclaration()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Print:pub}
-    §I{str:message}
-    §E{cw}
-    §C{Console.WriteLine} message
+module Test Test block
+  func Print (string:message)
+    ! cw
+    Console.WriteLine(message)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -104,14 +102,12 @@ public class CalorFormatterTests
     public void Format_FunctionWithContracts_IncludesPreconditionsAndPostconditions()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Divide:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (!= b 0)
-    §S (>= result 0)
-    §R (/ a b)
+module Test Test block
+  func Divide (int:a, int:b) → int
+    !
+    requires (b != 0)
+    => (result >= 0)
+    return (a / b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -131,11 +127,11 @@ public class CalorFormatterTests
     public void Format_BindStatement_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §O{i32}
-    §B{x} 42
-    §R x
+module Test Test block
+  func Test () → int
+    !
+    let x = 42
+    return x
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -150,14 +146,13 @@ public class CalorFormatterTests
     public void Format_IfStatement_FormatsWithIndentation()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §I{bool:cond}
-    §O{i32}
-    §IF{if1} cond
-      §R 1
-    §EL
-      §R 0
+module Test Test block
+  func Test (bool:cond) → int
+    !
+    if cond
+      return 1
+    else
+      return 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -165,19 +160,19 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("IF", result);
+        // The formatter canonicalizes an if/else that only returns into a conditional return.
+        Assert.Contains("(cond ? 1 : 0)", result);
     }
 
     [Fact]
     public void Format_ForLoop_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §O{void}
-    §E{cw}
-    §L{l1:i:0:10:1}
-      §C{Console.WriteLine} i
+module Test Test block
+  func Test () → void
+    ! cw
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -185,21 +180,19 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        // Formatter uses compact §L for loops instead of §FOR
-        Assert.Contains("§L{", result);
+        // Formatter uses the native for/from/to/step header
+        Assert.Contains("for i from 0 to 10 step 1", result);
     }
 
     [Fact]
     public void Format_WhileLoop_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §I{bool:running}
-    §O{void}
-    §E{cw}
-    §WH{w1} running
-      §P ""working""
+module Test Test block
+  func Test (bool:running) → void
+    ! cw
+    while running
+      Console.WriteLine(""working"")
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -207,23 +200,22 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        // Formatter uses compact §WH for while loops instead of §WHILE
-        Assert.Contains("§WH", result);
+        // Formatter uses the native while header
+        Assert.Contains("while running", result);
     }
 
     [Fact]
     public void Format_MatchStatement_FormatsWithCases()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §I{i32:x}
-    §O{i32}
-    §W{m1} x
-    §K §SM _
-      §R 1
-    §K §NN
-      §R 0
+module Test Test block
+  func Test (int:x) → int
+    !
+    match x
+      case null
+        return 1
+      case _
+        return 0
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -231,8 +223,8 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§W{", result);
-        Assert.Contains("§K", result);
+        Assert.Contains("match x", result);
+        Assert.Contains("case _", result);
     }
 
     #endregion
@@ -243,13 +235,13 @@ public class CalorFormatterTests
     public void Format_Literals_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §O{void}
-    §B{a} 42
-    §B{b} 3.14
-    §B{c} true
-    §B{d} ""hello""
+module Test Test block
+  func Test () → void
+    !
+    let a = 42
+    let b = 3.14
+    let c = true
+    let d = ""hello""
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -266,12 +258,10 @@ public class CalorFormatterTests
     public void Format_BinaryOperations_FormatsWithParentheses()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Test Test block
+  func Test (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -283,16 +273,17 @@ public class CalorFormatterTests
     }
 
     [Fact]
-    public void Format_OptionExpressions_FormatsCorrectly()
+    public void Format_NullableExpressions_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §O{i32}
-    §R §SM 42
-  §F{f002:Test2:pub}
-    §O{i32}
-    §R §NN{i32}
+module Test Test block
+  func Test () → int?
+    !
+    return 42
+
+  func Test2 () → int?
+    !
+    return null
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -300,21 +291,22 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§SM", result);
-        Assert.Contains("§NN", result);
+        Assert.Contains("42", result);
+        Assert.Contains("null", result);
     }
 
     [Fact]
-    public void Format_ResultExpressions_FormatsCorrectly()
+    public void Format_ReturnAndThrow_FormatsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §O{i32}
-    §R §OK 42
-  §F{f002:Test2:pub}
-    §O{str}
-    §R §ERR ""error""
+module Test Test block
+  func Test () → int
+    !
+    return 42
+
+  func Test2 () → string
+    !
+    throw new Exception(""error"")
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -322,8 +314,8 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("OK", result);
-        Assert.Contains("ERR", result);
+        Assert.Contains("42", result);
+        Assert.Contains("throw new Exception", result);
     }
 
     #endregion
@@ -334,18 +326,18 @@ public class CalorFormatterTests
     public void Format_NestedStatements_IndentsCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Test:pub}
-    §I{bool:a}
-    §I{bool:b}
-    §O{i32}
-    §IF{if1} a
-      §IF{if2} b
-        §R 2
-      §EL
-        §R 1
-    §EL
-      §R 0
+module Test Test block
+  func Test (bool:a, bool:b) → int
+    !
+    var int:result = 0
+    if a
+      if b
+        set result 2
+      else
+        set result 1
+    else
+      set result 0
+    return result
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -355,7 +347,7 @@ public class CalorFormatterTests
 
         // Check that nested IF is indented more than outer IF
         var lines = result.Split('\n');
-        var ifLines = lines.Where(l => l.TrimStart().StartsWith("§IF")).ToArray();
+        var ifLines = lines.Where(l => l.TrimStart().StartsWith("if ")).ToArray();
         Assert.True(ifLines.Length >= 2, "Should have at least 2 IF statements");
     }
 
@@ -368,12 +360,10 @@ public class CalorFormatterTests
     {
         // Test that basic formatting works and produces parseable output
         var source = @"
-§M{m001:Test}
-  §F{f001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
+module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)
 ";
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
@@ -382,47 +372,24 @@ public class CalorFormatterTests
         var formatted = formatter.Format(module);
 
         // Verify the formatted output contains key elements
-        Assert.Contains("m001", formatted);
-        Assert.Contains("f001", formatted);
+        Assert.Contains("module Test Test block", formatted);
+        Assert.Contains("func Add", formatted);
         Assert.Contains("Test", formatted);
         Assert.Contains("Add", formatted);
-        Assert.Contains("pub", formatted);
+        Assert.Contains("func Add (int:a, int:b) → int", formatted);
     }
-
     #endregion
-
     #region Foreach Formatting
-
-    [Fact]
-    public void Format_ForeachWithIndex_EmitsForeachBlock()
-    {
-        var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{void}
-                  §EACH{e001:item:i32:idx} items
-                      §P item
-            """;
-
-        var module = Parse(source, out var diagnostics);
-        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
-
-        var formatter = new CalorFormatter();
-        var result = formatter.Format(module);
-
-        Assert.Contains("§EACH{", result);
-        Assert.Contains("item:i32:idx", result);
-    }
 
     [Fact]
     public void Format_ForeachWithoutIndex_EmitsForeachBlockWithoutIndex()
     {
         var source = """
-            §M{m001:Test}
-              §F{f001:Main:pub}
-                  §O{void}
-                  §EACH{e001:item:i32} items
-                      §P item
+            module Test Test block
+              func Main () → void
+                !
+                each int:item in items
+                  Console.WriteLine(item)
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -431,10 +398,10 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        Assert.Contains("§EACH{", result);
-        Assert.Contains("item:i32", result);
-        // Variable should be just "item:i32" with no trailing :idx slot in indent form
-        Assert.DoesNotContain("item:i32:", result);
+        Assert.Contains("each int:item in items", result);
+        Assert.Contains("int:item", result);
+        // Variable should have no trailing index slot.
+        Assert.DoesNotContain("int:item,", result);
     }
 
     #endregion

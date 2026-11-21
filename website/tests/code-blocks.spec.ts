@@ -9,7 +9,7 @@ test('source fences identify Calor examples rather than defaulting to plain text
     for (const match of content.matchAll(/^```([^\n]*)\n([\s\S]*?)^```\s*$/gm)) {
       const firstCodeLine = match[2].split('\n').map(line => line.trim())
         .find(line => line && !line.startsWith('//')) || '';
-      if (!match[1].trim() && /^(§|\([+\-*/%<>=!&|])/.test(firstCodeLine)) missing.push(file);
+      if (!match[1].trim() && /^(module\b|func\b|§|\([+\-*/%<>=!&|])/.test(firstCodeLine)) missing.push(file);
     }
   }
   expect(missing).toEqual([]);

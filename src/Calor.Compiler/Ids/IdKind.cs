@@ -26,7 +26,7 @@ public enum IdKind
     /// <summary>Constructor declaration (§CTOR).</summary>
     Constructor,
 
-    /// <summary>Enum declaration (§EN/§ENUM).</summary>
+    /// <summary>Enum declaration (§EN).</summary>
     Enum,
 
     /// <summary>Enum extension declaration (§EXT).</summary>
@@ -45,5 +45,11 @@ public enum IdKind
     IndexedType,
 
     /// <summary>Indexer declaration (§IXER).</summary>
-    Indexer
+    Indexer,
+    Delegate,
+    Event,
+    Record,
+    Union,
+    Field,
+    Variant
 }

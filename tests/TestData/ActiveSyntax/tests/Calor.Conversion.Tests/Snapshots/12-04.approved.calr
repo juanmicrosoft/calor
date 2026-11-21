@@ -1,0 +1,11 @@
+module Test_12_04 Test_12_04 overflow unchecked
+  using System
+
+  class Utf8Example public
+    func GetGreeting public () → ReadOnlySpan<byte>
+      !
+      return "hello"u8
+
+    func GetHeader public () → ReadOnlySpan<byte>
+      !
+      return "Content-Type"u8

@@ -14,6 +14,8 @@
 #         validation: applies the reference solution instead of invoking the
 #         agent — zero API spend, exercises workspaces/shims/tests/metrics
 #   ./run-pair.sh ... --out epochs/dry-run-001                         # results dir
+#   ./run-pair.sh ... --arm-canary <file> --arm-canary-sha256 <sha256>
+#         explicit unregistered input; requires a new --out, never a frozen slot
 #
 # Iteration definition (gates doc §2): one harness-observed build-or-test
 # invocation following >=1 workspace edit. Observed via a `dotnet` PATH shim
@@ -174,6 +176,7 @@ RUNS=1
 RUN_OFFSET=0
 OUT_DIR="$SCRIPT_DIR/epochs/adhoc"
 NULL_AGENT=0
+INITIALIZED_WORKSPACE=0
 ITERATION_BUDGET=10
 TIMEOUT_SECS=600
 EXEMPLAR_FILE=""
@@ -197,6 +200,10 @@ ARM_CONFIG_KEY=""
 # agent exists, and it writes the same build state #1094 reads, so the arms' compilers can
 # be proven distinct before a single paid run instead of after collection.
 CANARY_ONLY=0
+ARM_CANARY_FILE=""
+ARM_CANARY_SHA256=""
+ARM_CANARY_INPUT_JSON=""
+INVOCATION_ARGS=("$@")
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -204,9 +211,18 @@ while [[ $# -gt 0 ]]; do
         --arm) ARM="$2"; shift 2 ;;
         --arm-config) ARM_CONFIG_KEY="$2"; shift 2 ;;
         --canary-only) CANARY_ONLY=1; shift ;;
+        --arm-canary)
+            [[ -z "$ARM_CANARY_FILE" && -n "${2:-}" ]] || { echo "Missing or duplicate --arm-canary" >&2; exit 2; }
+            ARM_CANARY_FILE="$2"; shift 2 ;;
+        --arm-canary-sha256)
+            [[ -z "$ARM_CANARY_SHA256" && -n "${2:-}" ]] || { echo "Missing or duplicate --arm-canary-sha256" >&2; exit 2; }
+            ARM_CANARY_SHA256="$2"; shift 2 ;;
         --runs) RUNS="$2"; shift 2 ;;
         --out) OUT_DIR="$2"; shift 2 ;;
         --null-agent) NULL_AGENT=1; shift ;;
+        --initialized-workspace)
+            [[ $INITIALIZED_WORKSPACE -eq 0 ]] || { echo "Duplicate --initialized-workspace" >&2; exit 2; }
+            INITIALIZED_WORKSPACE=1; shift ;;
         --exemplar) EXEMPLAR_FILE="$2"; shift 2 ;;
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
         --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
@@ -224,7 +240,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--canary-only] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--canary-only] [--runs N] [--null-agent] [--initialized-workspace] [--arm-canary <file> --arm-canary-sha256 <sha256>] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
 REDESIGNED_POLICY=0
 if [[ "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
     REDESIGNED_POLICY=1
@@ -265,6 +281,33 @@ else
 fi
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
 [[ -n "$ARM_CONFIG_KEY" ]] || ARM_CONFIG_KEY="$ARM"
+if [[ -n "$ARM_CANARY_FILE$ARM_CANARY_SHA256" ]]; then
+    [[ -n "$ARM_CANARY_FILE" && -n "$ARM_CANARY_SHA256" ]] \
+        || { echo "--arm-canary and --arm-canary-sha256 must be supplied together" >&2; exit 2; }
+    [[ "$ARM" == "calor" && $REDESIGNED_POLICY -eq 0 && $INITIALIZED_WORKSPACE -eq 0 \
+       && -z "$PPW_SPEND_TICKET$PPW_GATEWAY_CLIENT$PPW_SOURCE_INSPECTOR_RUNTIME" \
+       && "${CALOR_P0_SKIP_ARM_CANARY:-0}" != "1" ]] \
+        || { echo "Selected canary requires an ordinary, unregistered Calor arm with an executed canary" >&2; exit 2; }
+    [[ "$OUT_DIR" != "$SCRIPT_DIR/epochs/adhoc" && ! -e "$OUT_DIR" && ! -L "$OUT_DIR" ]] \
+        || { echo "Selected canary requires --out pointing to a new unregistered directory" >&2; exit 3; }
+fi
+if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+    for flag in --arm --arm-config --arm-repo-root --calor-dll --out --runs --run-offset --exemplar --edit-mechanism; do
+        count=0
+        for arg in "${INVOCATION_ARGS[@]}"; do
+            [[ "$arg" != "$flag" ]] || count=$((count + 1))
+        done
+        [[ $count -le 1 ]] || { echo "Duplicate initialized-arm flag: $flag" >&2; exit 2; }
+    done
+    [[ "$ARM" == "calor" && "$ARM_CONFIG_KEY" == "calor" && "$EDIT_MECHANISM" == "raw" \
+       && $CANARY_ONLY -eq 0 && -z "$PPW_SPEND_TICKET$PPW_GATEWAY_CLIENT$PPW_SOURCE_INSPECTOR_RUNTIME" \
+       && -z "$ARM_LABEL_OVERRIDE" ]] \
+        || { echo "Initialized workspace requires a new ordinary calor/raw arm, not a registered slot or canary-only invocation" >&2; exit 2; }
+    [[ "$RUNS" =~ ^[1-9][0-9]*$ && "$RUN_OFFSET" =~ ^[0-9]+$ ]] \
+        || { echo "Initialized workspace requires positive --runs and nonnegative --run-offset" >&2; exit 2; }
+    [[ "$OUT_DIR" != "$SCRIPT_DIR/epochs/adhoc" && ! -e "$OUT_DIR" ]] \
+        || { echo "Initialized workspace requires --out pointing to a new unregistered directory" >&2; exit 3; }
+fi
 case "$EDIT_MECHANISM" in
     raw) ;;
     mcp-file)
@@ -313,7 +356,16 @@ fi
 if [[ -n "$ARM_LABEL_OVERRIDE" ]]; then
     ARM_LABEL="$ARM_LABEL_OVERRIDE"
 fi
+[[ $INITIALIZED_WORKSPACE -eq 0 ]] || ARM_LABEL="${ARM_LABEL}+initialized"
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
+if [[ -n "$ARM_CANARY_FILE" ]]; then
+    python3 "$HARNESS_CAPTURE" canary-admission "$PAIR_DIR/pair.json" "$OUT_DIR"
+fi
+if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+    python3 "$HARNESS_CAPTURE" initialized-arm-admission "$PAIR_DIR/pair.json" "$ARM_CONFIG_KEY" "$ARM" --output "$OUT_DIR"
+    [[ ! -d "$PAIR_DIR/smoke" && ! -f "$PAIR_DIR/defect.json" ]] \
+        || { echo "Initialized workspace currently supports non-probe pairs only" >&2; exit 3; }
+fi
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
 SOURCE_FRAGMENT_GLOB="*.calr"
 SOURCE_ASSEMBLY_ENABLED=0
@@ -387,17 +439,28 @@ if [[ -n "$CALOR_DLL_OVERRIDE" ]]; then
     # arm would otherwise register `dotnet <bogus> mcp` (a server that never
     # starts), strand the agent behind the .calr edit hook, and fabricate
     # guaranteed-failure data — the hazard the mcp-file gate below guards.
-    if ! dotnet "$CALOR_CLI_DLL" --help >/dev/null 2>&1; then
+    if [[ $INITIALIZED_WORKSPACE -eq 0 && -z "$ARM_CANARY_FILE" ]] && ! dotnet "$CALOR_CLI_DLL" --help >/dev/null 2>&1; then
         echo "ERROR: --calor-dll is not a runnable calor CLI (dotnet '$CALOR_CLI_DLL' --help failed)" >&2
         exit 2
     fi
 else
     for cli_cfg in Release Debug; do
-        if [[ -f "$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
-            CALOR_CLI_DLL="$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
+        cli_root="$REPO_ROOT"
+        [[ $INITIALIZED_WORKSPACE -eq 0 && -z "$ARM_CANARY_FILE" ]] || cli_root="$ARM_REPO_ROOT"
+        if [[ -f "$cli_root/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
+            CALOR_CLI_DLL="$cli_root/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
             break
         fi
     done
+fi
+if [[ $INITIALIZED_WORKSPACE -eq 1 && -z "$CALOR_CLI_DLL" ]]; then
+    echo "ERROR: initialized workspace requires a built selected-arm compiler" >&2
+    exit 3
+fi
+if [[ -n "$ARM_CANARY_FILE" ]]; then
+    python3 "$HARNESS_CAPTURE" select-canary "$ARM_CANARY_FILE" "$ARM_CANARY_SHA256" \
+        "$OUT_DIR/arm-canary" "$ARM_REPO_ROOT" "$CALOR_CLI_DLL" --timeout "$TIMEOUT_SECS"
+    ARM_CANARY_INPUT_JSON="$(cat "$OUT_DIR/arm-canary/input.json")"
 fi
 if [[ "$ARM" == "calor" && -z "$CALOR_CLI_DLL" ]]; then
     echo "WARNING: calor.dll not found (build src/Calor.Compiler first); calor-arm records will carry envelope_valid=null and empty edit_target_ids" >&2
@@ -488,6 +551,7 @@ policy_changed() {  # <workspace> <run output>; return 0 means invalid
 # Prints the reason and returns 1 when the arm cannot honor its configuration.
 # ---------------------------------------------------------------------------
 PERMISSIVE_CANARY="$SCRIPT_DIR/templates/calor-arm/permissive-canary.calr"
+[[ -z "$ARM_CANARY_FILE" ]] || PERMISSIVE_CANARY="$OUT_DIR/arm-canary/source.calr"
 if [[ "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
     # Named effects are errors under both redesigned policies. Only an unresolved
     # callback call witnesses the registered strict/permissive distinction.
@@ -506,12 +570,30 @@ arm_canary() {
     fi
     mkdir -p "$dir/src"
     render_template "$dir/src/Src.csproj"
-    cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        # New, unregistered arm control; never rewrite the historical canary.
+        printf '§M{InitializedArmCanary}\n  §F{Quiet:pub} () -> void\n    §E{}\n    §P "laundered"\n' > "$dir/src/canary.calr"
+    else
+        cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
+    fi
+    if [[ -n "$ARM_CANARY_FILE" && "$(shasum -a 256 "$dir/src/canary.calr" | cut -d' ' -f1)" != "$ARM_CANARY_SHA256" ]]; then
+        echo "INVALID: selected canary snapshot changed before compilation" >&2
+        return 1
+    fi
     out="$(cd "$dir/src" && CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en dotnet build --nologo -v q 2>&1)" || rc=$?
     # The canary builds through the arm's own Calor.Tasks, so it leaves the same
     # obj/calor/.calor-build-state.json #1094 archives per run — which makes the arm's
     # compilerHash observable BEFORE any agent is invoked. Read here, while $dir lives.
     ARM_CANARY_COMPILER_HASH="$(python3 "$HARNESS_CAPTURE" build-state "$dir/src/obj/calor/.calor-build-state.json" 2>/dev/null | jq -r '.compilerHash // empty')"
+    if [[ -n "$ARM_CANARY_FILE" ]]; then
+        printf '%s\n' "$out" > "$OUT_DIR/arm-canary/build.log"
+        cp "$dir/src/Src.csproj" "$OUT_DIR/arm-canary/Src.csproj"
+        if [[ -z "$ARM_CANARY_COMPILER_HASH" ]]; then
+            echo "INVALID: selected canary build did not attest its compilerHash" >&2
+            return 1
+        fi
+        cp "$dir/src/obj/calor/.calor-build-state.json" "$OUT_DIR/arm-canary/calor-build-state.json"
+    fi
 
     # Task-assembly mismatch first: it explains every other symptom. MSB4062 is
     # included so a MISSING/unloadable Calor.Tasks.dll is diagnosed as what it is
@@ -654,7 +736,25 @@ materialize() {
     cp -R "$PAIR_DIR/$FIXTURE_DIR/." "$ws/src/"
     cp "$PAIR_DIR/spec.md" "$ws/spec.md"
 
-    if [[ "$ARM" == "calor" ]]; then
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        [[ ! -e "$ws/src/Src.csproj" ]] || { echo "Refusing to overwrite an existing fixture project" >&2; exit 3; }
+        cat > "$ws/src/Src.csproj" <<'EOF'
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+EOF
+        render_template "$ws_out/arm-template.csproj"
+        local init_exemplar_args=()
+        [[ -z "$EXEMPLAR_FILE" ]] || init_exemplar_args=(--exemplar "$EXEMPLAR_FILE")
+        python3 "$HARNESS_CAPTURE" initialize-workspace "$ws" "$ws_out" "$ARM_REPO_ROOT" \
+            "$CALOR_CLI_DLL" "$ws_out/arm-template.csproj" --timeout "$TIMEOUT_SECS" \
+            ${init_exemplar_args[@]+"${init_exemplar_args[@]}"}
+    elif [[ "$ARM" == "calor" ]]; then
         # Per-arm-native (A-1.3): the TEMPLATE comes from the arm's own product
         # checkout — the control arm's registered configuration includes its
         # template exactly as archived (pre-verify-gate), not main's. The
@@ -796,7 +896,7 @@ PROBEPROJ
     # in BOTH arms — "fixed, not agent-editable" must be enforced, not
     # asserted (review of #810 finding 4); the .smokehash re-check at
     # extract time backstops non-hook edit paths.
-    if [[ ($NULL_AGENT -eq 0) && ( "$ARM" == "calor" || -d "$PAIR_DIR/smoke" ) ]]; then
+    if [[ $INITIALIZED_WORKSPACE -eq 0 && ($NULL_AGENT -eq 0) && ( "$ARM" == "calor" || -d "$PAIR_DIR/smoke" ) ]]; then
         mkdir -p "$ws/.claude"
         local calr_block=""
         if [[ "$EDIT_MECHANISM" == "mcp-file" ]]; then
@@ -879,6 +979,10 @@ write_shim() {
     local real_dotnet
     real_dotnet="$(command -v dotnet)"
     mkdir -p "$shim_dir"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        printf '#!/usr/bin/env bash\nexec %q %q "$@"\n' "$real_dotnet" "$CALOR_CLI_DLL" > "$shim_dir/calor"
+        chmod +x "$shim_dir/calor"
+    fi
     cat > "$shim_dir/dotnet" <<EOF
 #!/usr/bin/env bash
 set -uo pipefail
@@ -1561,6 +1665,16 @@ extract_metrics() {
           tokens:{input:$tin, output:$tout}, tokenUsage:$token_usage,
           nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
+    if [[ -n "$ARM_CANARY_FILE" ]]; then
+        jq --argjson input "$ARM_CANARY_INPUT_JSON" '. + {armCanaryInput:$input}' \
+            "$ws_out/result.json" > "$ws_out/.canary-result.json"
+        mv "$ws_out/.canary-result.json" "$ws_out/result.json"
+    fi
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        jq --slurpfile init "$ws_out/initialization.json" '. + {initialization:$init[0]}' \
+            "$ws_out/result.json" > "$ws_out/.initialized-result.json"
+        mv "$ws_out/.initialized-result.json" "$ws_out/result.json"
+    fi
     cat "$ws_out/result.json"
 }
 
@@ -1613,6 +1727,16 @@ write_invalid_result() {
              | .tokenUsage={source:"missing",reason:"terminal-invalid"}
            else . end' \
         > "$ws_out/result.json"
+    if [[ -n "$ARM_CANARY_FILE" ]]; then
+        jq --argjson input "$ARM_CANARY_INPUT_JSON" '. + {armCanaryInput:$input}' \
+            "$ws_out/result.json" > "$ws_out/.canary-result.json"
+        mv "$ws_out/.canary-result.json" "$ws_out/result.json"
+    fi
+    if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+        jq --slurpfile init "$ws_out/initialization.json" '. + {initialization:$init[0]}' \
+            "$ws_out/result.json" > "$ws_out/.initialized-result.json"
+        mv "$ws_out/.initialized-result.json" "$ws_out/result.json"
+    fi
     cat "$ws_out/result.json"
 }
 
@@ -1631,10 +1755,12 @@ if [[ $CANARY_ONLY -eq 1 ]]; then
     jq -n --arg key "$ARM_CONFIG_KEY" --arg arm "$ARM_LABEL" --arg root "$ARM_REPO_ROOT" \
           --arg kind "$CONTROL_ARM_KIND" --arg status "$ARM_CANARY_STATUS" \
           --arg hash "${ARM_CANARY_COMPILER_HASH:-}" \
+          --argjson input "${ARM_CANARY_INPUT_JSON:-null}" \
         '{armConfigKey:$key, arm:$arm, repoRoot:$root,
           controlArmKind:(if $kind == "" then null else $kind end),
           armCanary:$status,
-          compilerHash:(if $hash == "" then null else $hash end)}'
+          compilerHash:(if $hash == "" then null else $hash end)}
+         | if $input == null then . else . + {armCanaryInput:$input} end'
     exit 0
 fi
 
@@ -1649,6 +1775,10 @@ fi
 
 for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM_LABEL/run-$run"
+    if [[ $INITIALIZED_WORKSPACE -eq 1 && -e "$WS_OUT" ]]; then
+        echo "Initialized workspace output already exists; use a new unregistered output directory: $WS_OUT" >&2
+        exit 3
+    fi
     mkdir -p "$WS_OUT"
 
     # Invalid-run re-attempt loop (gates doc §0.2): a detected-invalid run is
@@ -1665,6 +1795,11 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         # every contract-bearing calor-arm pair then fails held-out runs with
         # FileNotFoundException. One physical path removes the ambiguity.
         WS="$(cd "$WS" && pwd -P)"
+        if [[ $INITIALIZED_WORKSPACE -eq 1 ]]; then
+            trap '[[ -z "${WS:-}" ]] || rm -rf "$WS"' EXIT
+            git -c init.templateDir= init --quiet "$WS"
+            python3 "$HARNESS_CAPTURE" isolate-workspace "$WS"
+        fi
         SHIM_DIR="$WS_OUT/.shim"
         [[ -n "$PPW_GATEWAY_CLIENT" ]] && SHIM_DIR="$WS/.ppw-shim"
 
@@ -1673,6 +1808,7 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
             python3 "$HARNESS_CAPTURE" isolate-workspace "$WS_OUT"
         fi
         materialize "$WS" "$WS_OUT"
+        [[ -z "$ARM_CANARY_FILE" ]] || cp -R "$OUT_DIR/arm-canary" "$WS_OUT/arm-canary"
         write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
         if [[ $REDESIGNED_POLICY -eq 1 ]]; then
             python3 "$HARNESS_CAPTURE" policy-snapshot "$WS" > "$WS_OUT/policy-before.json"

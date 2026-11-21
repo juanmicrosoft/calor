@@ -226,7 +226,7 @@ public static class HookCommand
             var systemMessage = $"This is a Calor-first project. Create an .calr file instead: {suggestedPath}\n\n" +
                                 $"Calor has formal semantics v{SemanticsVersion.VersionString}. Key rules:\n" +
                                 "- Overflow traps, evaluation is left-to-right\n" +
-                                $"- Always add §SEMVER{{{SemanticsVersion.VersionString}}} to modules\n\n" +
+                                "- Native source uses the installed compiler's semantics; pin the compiler version\n\n" +
                                 "Use @calor for syntax, @calor-semantics for behavior rules.";
             response = new GeminiDenyResponse
             {
@@ -305,7 +305,8 @@ public static class HookCommand
                                   "IMPORTANT: Calor has formal semantics that differ from C#:\n" +
                                   "  - Integer overflow TRAPS (throws OverflowException)\n" +
                                   "  - Evaluation is strictly left-to-right\n" +
-                                  $"  - Always include §SEMVER{{{SemanticsVersion.VersionString}}} in modules\n\n" +
+                                  $"  - This compiler implements semantics v{SemanticsVersion.VersionString}\n" +
+                                  $"  - Pin the compiler version and declare semver \"{SemanticsVersion.VersionString}\" in the module\n\n" +
                                   "Use /calor skill for syntax, /calor-semantics for behavior rules.";
 
                 return (1, blockReason, suggestedPath);
@@ -375,7 +376,7 @@ public static class HookCommand
             name: "tool-input",
             description: "The JSON tool input from the AI agent");
 
-        var command = new Command("validate-calr-content", "Check .calr file content for semantic version declaration")
+        var command = new Command("validate-calr-content", "Report native .calr syntax diagnostics without blocking the write")
         {
             inputArgument
         };
@@ -397,8 +398,8 @@ public static class HookCommand
     }
 
     /// <summary>
-    /// Validates .calr file content for semantic version declaration.
-    /// Returns (0, warning) - always allows but may warn if §SEMVER is missing.
+    /// Checks supplied .calr content with the native parser.
+    /// Always allows the write; full compilation remains a separate check.
     /// </summary>
     public static (int ExitCode, string? Warning) ValidateCalrContent(string toolInputJson)
     {
@@ -420,21 +421,17 @@ public static class HookCommand
                 return (0, null);
             }
 
-            // Check if content contains §SEMVER declaration
             if (string.IsNullOrEmpty(content))
             {
                 return (0, null);
             }
 
-            // Look for §SEMVER{x.y.z}. The legacy bracket form §SEMVER[x.y.z] is not
-            // a declaration — the lexer rejects it with Calor0702 — so it does not
-            // satisfy the presence check either.
-            if (!content.Contains("§SEMVER{"))
-            {
-                return (0, $"REMINDER: Add §SEMVER{{{SemanticsVersion.VersionString}}} to your module for semantic versioning");
-            }
-
-            return (0, null);
+            var diagnostics = new DiagnosticBag();
+            var tokens = new Lexer(content, diagnostics).TokenizeAllForParser();
+            new Parser(tokens, diagnostics).Parse();
+            return (0, diagnostics.HasErrors
+                ? "Calor source syntax diagnostics:\n" + string.Join("\n", diagnostics.Errors)
+                : null);
         }
         catch (JsonException)
         {
@@ -626,11 +623,11 @@ public static class HookCommand
         }
         else
         {
-            var systemMessage = "ID validation failed. Key rules:\n" +
-                                "- NEVER modify existing IDs\n" +
-                                "- OMIT IDs for new declarations (run `calor ids assign`)\n" +
-                                "- NEVER copy IDs when extracting code\n" +
-                                "- Run `calor ids check .` before commit";
+            var systemMessage = "Project declaration identity could not be preserved.\n" +
+                                "- Declarations have no IDs in source; tooling maintains .calor/ids.json\n" +
+                                "- Use transactional rename/move tools to preserve exact identity\n" +
+                                "- Run `calor ids sync .` to recover pending transactions\n" +
+                                "- Resolve ambiguous edits explicitly; never choose an ID by guesswork";
             response = new GeminiDenyResponse
             {
                 Decision = "deny",
@@ -643,7 +640,7 @@ public static class HookCommand
     }
 
     /// <summary>
-    /// Validates IDs in .calr file content.
+    /// Validates proposed source against registered project identity without writing source or sidecar.
     /// Returns (0, null) to allow, (1, reason) to block.
     /// </summary>
     public static (int ExitCode, string? BlockReason) ValidateIds(string toolInputJson)
@@ -693,60 +690,13 @@ public static class HookCommand
                 return (0, null);
             }
 
-            // Scan IDs in the new content
-            var scanner = new IdScanner();
-            var newEntries = scanner.Scan(module, path);
-
-            // Check for issues
-            var isTestPath = IdValidator.IsTestPath(path);
-            var result = IdChecker.Check(newEntries, allowTestIds: isTestPath);
-
-            // Check for duplicates within the file
-            if (result.DuplicateGroups.Count > 0)
-            {
-                var first = result.DuplicateGroups[0][0];
-                return (1, $"BLOCKED: Duplicate ID '{first.Id}' detected in {Path.GetFileName(path)}.\n" +
-                          "Each declaration must have a unique ID.\n" +
-                          "Run `calor ids assign --fix-duplicates` to fix.");
-            }
-
-            // Check for ID churn if the file already exists
-            if (File.Exists(path))
-            {
-                var existingContent = File.ReadAllText(path);
-                var existingDiagnostics = new DiagnosticBag();
-                existingDiagnostics.SetFilePath(path);
-
-                var existingLexer = new Lexer(existingContent, existingDiagnostics);
-                var existingTokens = existingLexer.TokenizeAllForParser();
-
-                if (!existingDiagnostics.HasErrors)
-                {
-                    var existingParser = new Parser(existingTokens, existingDiagnostics);
-                    var existingModule = existingParser.Parse();
-
-                    if (!existingDiagnostics.HasErrors)
-                    {
-                        var existingScanner = new IdScanner();
-                        var existingEntries = existingScanner.Scan(existingModule, path);
-
-                        // Detect ID churn
-                        var churn = IdChecker.DetectIdChurn(existingEntries, newEntries);
-                        if (churn.Count > 0)
-                        {
-                            var (old, @new) = churn[0];
-                            return (1, $"BLOCKED: ID churn detected for {old.Kind} '{old.Name}'.\n" +
-                                      $"  Existing ID: {old.Id}\n" +
-                                      $"  New ID: {@new.Id}\n\n" +
-                                      "IDs are immutable. NEVER modify an existing ID.\n" +
-                                      "If you need to rename, preserve the ID.");
-                        }
-                    }
-                }
-            }
-
-            // All checks passed
+            // Read-only reconciliation rejects ambiguous continuity and invalid identity storage.
+            DeclarationIdentityStore.AttachIfRegistered(Path.GetFullPath(path), content, module);
             return (0, null);
+        }
+        catch (DeclarationIdentityException ex)
+        {
+            return (1, $"BLOCKED: {ex.Message}");
         }
         catch (JsonException)
         {

@@ -1,6 +1,7 @@
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 
 namespace Calor.LanguageServer.Documentation;
 
@@ -25,17 +26,14 @@ public sealed class TagDocumentationProvider
     /// <summary>
     /// Gets documentation for a specific Calor tag.
     /// </summary>
-    /// <param name="tag">The tag without braces (e.g., "§NEW", "§F", "§L")</param>
+    /// <param name="tag">The native keyword or operator.</param>
     /// <returns>Tag documentation if found, null otherwise.</returns>
     public TagDocumentation? GetTagDocumentation(string tag)
     {
         if (string.IsNullOrEmpty(tag))
             return null;
 
-        // Normalize the tag - remove any trailing content after the tag name
-        var normalizedTag = NormalizeTag(tag);
-
-        if (_tagDocs.TryGetValue(normalizedTag, out var doc))
+        if (_tagDocs.TryGetValue(tag, out var doc))
             return doc;
 
         return null;
@@ -46,68 +44,30 @@ public sealed class TagDocumentationProvider
     /// </summary>
     /// <param name="text">The source text</param>
     /// <param name="offset">The character offset</param>
-    /// <returns>The tag if found (e.g., "§NEW"), null otherwise.</returns>
+    /// <returns>The native syntax token if found, null otherwise.</returns>
     public static string? ExtractTagAtPosition(string text, int offset)
     {
         if (string.IsNullOrEmpty(text) || offset < 0 || offset >= text.Length)
             return null;
 
-        // Find the start of the tag (§ character)
-        var tagStart = -1;
-        for (var i = offset; i >= 0; i--)
+        foreach (var token in new Lexer(text, new DiagnosticBag()).Tokenize())
         {
-            if (text[i] == '§')
-            {
-                tagStart = i;
-                break;
-            }
-            // Stop if we hit whitespace or delimiters that indicate we're not on a tag
-            // Braces, parentheses, etc. mean we've moved past the tag name
-            if (char.IsWhiteSpace(text[i]) || text[i] == '{' || text[i] == '}' ||
-                text[i] == '(' || text[i] == ')' || text[i] == '[' || text[i] == ']')
-            {
-                break;
-            }
+            if (token.Span.Contains(offset))
+                return GetSyntaxTag(token, text);
+            if (token.Span.Start > offset)
+                return null;
         }
-
-        if (tagStart < 0)
-            return null;
-
-        // Extract the tag name (letters after §, optionally with / for closing tags)
-        var tagEnd = tagStart + 1;
-        var hasSlash = false;
-
-        // Check for closing tag
-        if (tagEnd < text.Length && text[tagEnd] == '/')
-        {
-            hasSlash = true;
-            tagEnd++;
-        }
-
-        // Collect letters (and some special chars like ?)
-        while (tagEnd < text.Length && (char.IsLetter(text[tagEnd]) || text[tagEnd] == '?' || text[tagEnd] == '!'))
-        {
-            tagEnd++;
-        }
-
-        if (tagEnd <= tagStart + 1 + (hasSlash ? 1 : 0))
-            return null;
-
-        // Check that the cursor position is within the tag itself
-        // (between tagStart and tagEnd), not after it
-        if (offset > tagEnd)
-            return null;
-
-        var tag = text[tagStart..tagEnd];
-
-        // For closing tags, return the opening tag equivalent
-        if (hasSlash && tag.Length > 2)
-        {
-            return "§" + tag[2..];
-        }
-
-        return tag;
+        return null;
     }
+
+    internal static string? GetSyntaxTag(Token token, string source)
+        => !(token.Span.Start > 0 && source[token.Span.Start - 1] == '§')
+            && !(token.Span.Start > 1 && source.AsSpan(token.Span.Start - 2, 2).SequenceEqual("§/"))
+            && (token.IsKeyword || token.Kind is TokenKind.Arrow or TokenKind.FatArrow
+                or TokenKind.Exclamation or TokenKind.RangeOp)
+            && Instance._tagDocs.ContainsKey(token.Text)
+            ? token.Text
+            : null;
 
     /// <summary>
     /// Gets all available tags.
@@ -119,101 +79,25 @@ public sealed class TagDocumentationProvider
     /// </summary>
     public bool IsLoaded => _isLoaded;
 
-    private static string NormalizeTag(string tag)
-    {
-        // Remove closing tag slash
-        if (tag.StartsWith("§/"))
-            return "§" + tag[2..];
-
-        return tag;
-    }
-
     private bool LoadDocumentation()
     {
-        try
+        var json = Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+            "Calor.Compiler.Resources.calor-syntax-documentation.json");
+        var doc = JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
+        if (doc?.Tags is not { Count: > 0 })
+            throw new InvalidDataException("Packaged syntax documentation has no hover tags.");
+        foreach (var (tag, info) in doc.Tags)
         {
-            string? json = null;
-
-            // Try embedded resource from Calor.Compiler
-            var compilerAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name == "Calor.Compiler");
-
-            if (compilerAssembly != null)
+            _tagDocs[tag] = new TagDocumentation
             {
-                var resourceName = "Calor.Compiler.Resources.calor-syntax-documentation.json";
-                using var stream = compilerAssembly.GetManifestResourceStream(resourceName);
-                if (stream != null)
-                {
-                    using var reader = new StreamReader(stream);
-                    json = reader.ReadToEnd();
-                }
-            }
-
-            // Fall back to file system (for development)
-            if (json == null)
-            {
-                var projectRoot = FindProjectRoot();
-                if (projectRoot != null)
-                {
-                    var filePath = Path.Combine(projectRoot, "src", "Calor.Compiler", "Resources", "calor-syntax-documentation.json");
-                    if (File.Exists(filePath))
-                    {
-                        json = File.ReadAllText(filePath);
-                    }
-                }
-            }
-
-            if (json == null)
-                return false;
-
-            var doc = JsonSerializer.Deserialize<SyntaxDocumentation>(json, JsonOptions);
-            if (doc?.Tags == null)
-                return false;
-
-            foreach (var (tag, info) in doc.Tags)
-            {
-                _tagDocs[tag] = new TagDocumentation
-                {
-                    Tag = tag,
-                    Name = info.Name,
-                    Syntax = info.Syntax,
-                    Description = info.Description,
-                    CSharpEquivalent = info.CSharpEquivalent
-                };
-            }
-
-            return _tagDocs.Count > 0;
+                Tag = tag,
+                Name = info.Name,
+                Syntax = info.Syntax,
+                Description = info.Description,
+                CSharpEquivalent = info.CSharpEquivalent
+            };
         }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static string? FindProjectRoot()
-    {
-        var startDirs = new[]
-        {
-            Directory.GetCurrentDirectory(),
-            AppDomain.CurrentDomain.BaseDirectory
-        };
-
-        foreach (var startDir in startDirs)
-        {
-            var dir = startDir;
-            for (var i = 0; i < 10 && dir != null; i++)
-            {
-                if (File.Exists(Path.Combine(dir, "Calor.sln")) ||
-                    Directory.Exists(Path.Combine(dir, ".git")))
-                {
-                    return dir;
-                }
-                var parent = Directory.GetParent(dir);
-                dir = parent?.FullName;
-            }
-        }
-
-        return null;
+        return true;
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -253,7 +137,7 @@ public sealed class TagDocumentationProvider
 public sealed class TagDocumentation
 {
     /// <summary>
-    /// The tag itself (e.g., "§NEW", "§F").
+    /// The native keyword or operator (e.g., "new", "func").
     /// </summary>
     public required string Tag { get; init; }
 
@@ -263,7 +147,7 @@ public sealed class TagDocumentation
     public required string Name { get; init; }
 
     /// <summary>
-    /// Full syntax pattern (e.g., "§NEW{ClassName}(args)§/NEW").
+    /// Full syntax pattern (e.g., "new ClassName(args)").
     /// </summary>
     public required string Syntax { get; init; }
 

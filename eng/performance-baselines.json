@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "warmupRuns": 1,
   "measuredRuns": 3,
-  "expectedTestCount": 28,
-  "expectedTestCountNote": "#1420: 21 -> 25, four Z3ConsumerGuardTests facts. Binding scaling guard: 25 -> 26. #1115: 26 -> 28, deterministic pipeline work/allocation baseline and taint-iteration reset/interprocedural accounting. Memory budgets now retain the measured bound module, timing uses fractional milliseconds, and verification paths warm before measurements independently of class order. The 24.0s aggregate ceiling is unchanged; no CI calibration is claimed.",
+  "expectedTestCount": 40,
+  "expectedTestCountNote": "#1420: 21 -> 25, four Z3ConsumerGuardTests facts. Binding scaling guard: 25 -> 26. #1115: 26 -> 28, deterministic pipeline work/allocation baseline and taint-iteration reset/interprocedural accounting. Memory budgets now retain the measured bound module, timing uses fractional milliseconds, and verification paths warm before measurements independently of class order. The 24.0s aggregate ceiling is unchanged; no CI calibration is claimed. 0.30 (#1730): 28 -> 40 to match the manifest pin from complete passing runs (6cdd6a343, which updated eng/test-manifest.json only); budgets and ceilings unchanged.",
   "metrics": {
     "performance-suite-seconds": {
       "maximumMedian": 24.0,

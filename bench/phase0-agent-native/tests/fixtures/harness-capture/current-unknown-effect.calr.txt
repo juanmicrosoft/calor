@@ -1,0 +1,7 @@
+§M{UnknownEffectCanary}
+  §F{Invoke:pub}<eff e> (Func<i32>:callback §E{e}) -> i32
+    §E{e}
+    §R §C{callback} §/C
+  §F{Quiet:pub} (Func<i32>:callback) -> i32
+    §E{}
+    §R §C{Invoke} §A callback §/C

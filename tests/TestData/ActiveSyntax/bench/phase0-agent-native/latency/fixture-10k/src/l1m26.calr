@@ -1,0 +1,115 @@
+module L1M26 L1M26 block
+  module L1M26Module public
+
+    func l1m26_fn01 public (int:x, int:y) → int
+      !
+      requires (x > 3)
+      => (x >= 4)
+      let int:acc = ((x * 5) + y)
+      if (acc > 21337)
+        return (acc + 21337)
+      else
+        return ((acc * 2) + 21337)
+
+    func l1m26_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M11.L2M11Module.l2m11_fn06(x, 56)
+      let int:v2 = L2M17.L2M17Module.l2m17_fn12(x, 31)
+      return ((v1 + v2) + y)
+
+    func l1m26_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21344)
+      let int:total = ((x * 2) + y)
+      if (total > 21344)
+        return 21344
+      return total
+
+    func l1m26_fn04 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21351)
+      if (x >= 21351)
+        return x
+      else
+        return 21351
+
+    func l1m26_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M16.L2M16Module.l2m16_fn13(x, 88)
+      return (v1 + y)
+
+    func l1m26_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M22.L2M22Module.l2m22_fn06(x, 42)
+      let int:v2 = L2M13.L2M13Module.l2m13_fn12(x, 62)
+      return ((v1 + v2) + y)
+
+    func l1m26_fn07 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21358)
+      let int:total = ((x * 3) + y)
+      if (total > 21358)
+        return 21358
+      return total
+
+    func l1m26_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 3) + y)
+      if (acc > 21365)
+        return (acc + 21365)
+      else
+        return ((acc * 2) + 21365)
+
+    func l1m26_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21372)
+      if (x >= 21372)
+        return x
+      else
+        return 21372
+
+    func l1m26_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21379)
+      if (x >= 21379)
+        return x
+      else
+        return 21379
+
+    func l1m26_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21386)
+      let int:total = ((x * 3) + y)
+      if (total > 21386)
+        return 21386
+      return total
+
+    func l1m26_fn12 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 2) + y)
+      if (acc > 21393)
+        return (acc + 21393)
+      else
+        return ((acc * 2) + 21393)
+
+    func l1m26_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 21400)
+      let int:total = ((x * 5) + y)
+      if (total > 21400)
+        return 21400
+      return total

@@ -39,10 +39,15 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
         for (var warmup = 0; warmup < 5; warmup++)
             Measure(source);
 
+        // Re-registered in 0.30 (g7) for the native workload. The earlier 11,266,312 was the legacy
+        // workload's. The same harness measures 11,424,056 at 1bc5faa31, the last commit before the
+        // source projection reached binding (bind 2,798,408 of it). Now: bind ~2,940,000, with no
+        // projection built. The +142 KB is linear in statements and sits in for-loop binding
+        // (loop-discovery flow state added by binder commits since 1bc5faa31); CFG and taint +6 KB.
 #if DEBUG
-        const long baselineBytes = 11_681_288;
+        const long baselineBytes = 12_047_536;
 #else
-        const long baselineBytes = 11_266_312;
+        const long baselineBytes = 11_564_224;
 #endif
         for (var run = 0; run < 5; run++)
         {
@@ -50,7 +55,9 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
             var actual = Measure(source);
             var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             output.WriteLine($"{actual}; allocated bytes: {allocated}");
-            Assert.Equal(new Counters(4729, 1351, 580, 760, 580), actual);
+            // Native syntax lexes this workload into 3,427 tokens (legacy section syntax: 4,527);
+            // bound nodes, CFG blocks/edges and taint iterations are unchanged from the legacy workload.
+            Assert.Equal(new Counters(3427, 1351, 580, 760, 580), actual);
             Assert.InRange(allocated, baselineBytes * 98 / 100, baselineBytes * 102 / 100);
         }
     }
@@ -60,14 +67,17 @@ public sealed class DeterministicPerformanceTests(ITestOutputHelper output)
     {
         var diagnostics = new DiagnosticBag();
         var source = """
-            §M{m001:TaintCounters}
-              §F{f001:Identity:pub} (i32:value) -> i32
-                §R value
-              §F{f002:Caller:pub} (i32:value) -> i32
-                §WH{w001} (> value INT:0)
-                  §B{copy:i32} §C{Identity} §A value §/C
-                  §R copy
-                §R INT:0
+            module TaintCounters TaintCounters block
+              func Identity (int:value) → int
+                !
+                return value
+
+              func Caller (int:value) → int
+                !
+                while (value > 0)
+                  let int:copy = Identity(value)
+                  return copy
+                return 0
             """;
         var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
         var module = new Binder(diagnostics).Bind(new Parser(tokens, diagnostics).Parse());

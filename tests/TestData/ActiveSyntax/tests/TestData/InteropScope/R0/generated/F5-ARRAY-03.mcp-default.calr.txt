@@ -1,0 +1,9 @@
+module ConvertedModule overflow unchecked
+  using System
+
+  module Probe
+    func Run public () → string
+      ! alloc
+      let int[]:one = new int[] { 3, 1, 2 }
+      let int[,]:two = new int[,] { { 1, 2 }, { 3, 4 } }
+      return one[0] + "|" + one.Length + "|" + two[1, 0] + "|" + two.Length

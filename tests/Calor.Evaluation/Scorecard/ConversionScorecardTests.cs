@@ -24,8 +24,12 @@ public class ConversionScorecardTests
     // 0.25 F3 (#847): 94 -> 95 fully converted, 074_LocalFunctions converts natively in place.
     // 0.28 (#1679): 94 -> 95. 092_Events.cs snapshots the delegate before hoisting an
     // initializer proved to run no user code. Round-trip stays 98.
-    private const int BASELINE_FULLY_CONVERTED = 95;
-    private const int BASELINE_ROUNDTRIP = 98;
+    // 0.30: full indexer parameters and generic sized arrays survive reparse.
+    // Built-in unary plus retains numeric promotion through a native cast.
+    // Generic ref T uses native parameter/argument modifiers without copying storage.
+    // Native record classes close unchanged original cases 044 and 100.
+    private const int BASELINE_FULLY_CONVERTED = 100;
+    private const int BASELINE_ROUNDTRIP = 100;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
     {
@@ -112,14 +116,42 @@ public class ConversionScorecardTests
     }
 
     [Fact]
-    public void RecordInterop_IsNotReportedAsNativeFeatureConversion()
+    public void RecordClasses_AreNativeWithoutPreservation()
     {
         Assert.Contains("record", Scorecard.ByFeature);
         var records = Scorecard.ByFeature["record"];
 
         Assert.Equal(2, records.Total);
-        Assert.Equal(0, records.Passed);
-        Assert.Equal(0, records.Rate);
+        Assert.Equal(2, records.Passed);
+        Assert.Equal(1, records.Rate);
+        foreach (var id in new[] { "044", "100" })
+        {
+            var result = Assert.Single(Scorecard.Results.Where(result => result.Id == id));
+            Assert.Equal(SnippetStatus.FullyConverted, result.Status);
+            Assert.Equal(0, result.InteropPreservationCount);
+            Assert.Equal(0, result.SemanticLossCount);
+            Assert.True(result.RoundTripSuccess);
+        }
+    }
+
+    [Fact]
+    public void BuiltInUnaryPlus_IsNativeWithoutPreservation()
+    {
+        var result = Assert.Single(Scorecard.Results.Where(result => result.Id == "017"));
+        Assert.Equal(SnippetStatus.FullyConverted, result.Status);
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.SemanticLossCount);
+        Assert.True(result.RoundTripSuccess);
+    }
+
+    [Fact]
+    public void GenericRefMethod_IsNativeWithoutPreservation()
+    {
+        var result = Assert.Single(Scorecard.Results.Where(result => result.Id == "086"));
+        Assert.Equal(SnippetStatus.FullyConverted, result.Status);
+        Assert.Equal(0, result.InteropPreservationCount);
+        Assert.Equal(0, result.SemanticLossCount);
+        Assert.True(result.RoundTripSuccess);
     }
 
     [Fact]

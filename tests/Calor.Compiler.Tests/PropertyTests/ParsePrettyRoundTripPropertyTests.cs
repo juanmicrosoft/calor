@@ -27,19 +27,17 @@ public class ParsePrettyRoundTripPropertyTests
     /// </summary>
     public static Arbitrary<string> SmallCalorPrograms()
     {
-        // Typed literals the P statement definitely accepts.
+        // Literals the print statement definitely accepts.
         var literals = new[]
         {
-            "INT:0", "INT:1", "INT:42", "INT:-7",
-            "STR:\"hello\"", "STR:\"world\"", "STR:\"\"",
-            "BOOL:true", "BOOL:false",
+            "0", "1", "42", "-7",
+            "\"hello\"", "\"world\"", "\"\"",
+            "true", "false",
         };
 
         var literalGen = Gen.Elements(literals);
-        var statementGen = literalGen.Select(lit => $"    §P {lit}");
+        var statementGen = literalGen.Select(lit => $"    Console.WriteLine({lit})");
         var stmtCountGen = Gen.Choose(1, 3);
-        var funcIdGen = Gen.Choose(1, 999).Select(n => $"f{n:D3}");
-        var modIdGen = Gen.Choose(1, 999).Select(n => $"m{n:D3}");
 
         // Module name generator — restrict to a safe alphabet.
         var modNameChar = Gen.Elements("ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray());
@@ -52,15 +50,13 @@ public class ParsePrettyRoundTripPropertyTests
             select head + new string(tail);
 
         return Arb.From(
-            from modId in modIdGen
             from modName in modNameGen
-            from funcId in funcIdGen
             from stmtCount in stmtCountGen
             from stmts in Gen.ArrayOf(stmtCount, statementGen)
             select
-                $"§M{{{modId}:{modName}}}\n"
-                + $"  §F{{{funcId}:Main:pub}} () -> void\n"
-                + "    §E{cw}\n"
+                $"module {modName} {modName} block\n"
+                + "  func Main () → void\n"
+                + "    ! cw\n"
                 + string.Join("\n", stmts)
                 + "\n");
     }

@@ -1,0 +1,33 @@
+module ExpressionBodied ExpressionBodied
+  module ExpressionBodiedModule
+    func Double public (int:x) → int
+      !
+      return x * 2
+
+    func Triple public (int:x) → int
+      !
+      return x * 3
+
+    func Square public (int:x) → int
+      !
+      return x * x
+
+    func Increment public (int:x) → int
+      !
+      return x + 1
+
+    func Decrement public (int:x) → int
+      !
+      return x - 1
+
+    func IsPositive public (int:x) → bool
+      !
+      return x > 0
+
+    func IsNegative public (int:x) → bool
+      !
+      return x < 0
+
+    func Negate public (int:x) → int
+      !
+      return 0 - x

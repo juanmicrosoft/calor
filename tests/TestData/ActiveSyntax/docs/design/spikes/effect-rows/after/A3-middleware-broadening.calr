@@ -1,0 +1,14 @@
+module MiddlewareBroadening MiddlewareBroadening block
+  interface IPipelineBehavior
+    func Handle <! e> (int:request, Func<int>:next ! e) → int
+      ! e
+
+  class LoggingBehavior
+    implements IPipelineBehavior
+
+    func Handle <! e> (int:request, Func<int>:next ! e) → int
+      ! cw, e
+      System.Console.WriteLine("before")
+      return next()
+
+

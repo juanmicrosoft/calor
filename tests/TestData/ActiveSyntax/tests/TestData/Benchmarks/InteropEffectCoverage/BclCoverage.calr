@@ -1,0 +1,17 @@
+module BclUsage BclUsage
+  module BclUsageModule
+    func LogMessage public (string:message) → void
+      ! cw
+      System.Console.WriteLine(message)
+
+    func ConcatStrings public (string:a, string:b) → string
+      !
+      return string.Concat(a, b)
+
+    func GetLength public (string:s) → int
+      !
+      return s.Length
+
+    func ToUpperCase public (string:s) → string
+      !
+      return s.ToUpper()

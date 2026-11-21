@@ -159,7 +159,7 @@ CASE X9b-FLD-with-sameline-E  args: (none)  exit: 0
 ------------------------------------------------------------------------------
 §M{m001:X9}
   §CL{c001:Counter:pub}
-    §FLD{Action<i32>:onChange:pri} §E{cw}
+    §FLD{Action<i32>:onChange:priv} §E{cw}
     §MT{mt001:Bump:pub} (i32:n) -> void
       §E{cw}
       §C{onChange} §A n §/C
@@ -235,7 +235,7 @@ CASE X13-field-delegate-invocation  args: (none)  exit: 1
 ------------------------------------------------------------------------------
 §M{m001:X13}
   §CL{c001:Counter:pub}
-    §FLD{Action<i32>:onChange:pri}
+    §FLD{Action<i32>:onChange:priv}
     §MT{mt001:Bump:pub} (i32:n) -> void
       §E{}
       §C{onChange} §A n §/C
@@ -253,4 +253,3 @@ CASE X14-lambda-bound-local  args: (none)  exit: 0
     §R §C{f} §A INT:1 §/C
 ------------------------------------------------------------------------------
 Compilation successful: X14-lambda-bound-local.g.cs
-

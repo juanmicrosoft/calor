@@ -1,0 +1,15 @@
+module InitializerInteropTest InitializerInteropTest
+  using System.Collections.Generic
+
+  class Bag
+    property List<int>:Items = new List<int>() { 1 }
+      get public
+
+  module InitializerInteropTest
+    func Verify () → int
+      !
+      => result == 33
+      let bag = new Bag()
+      bag.Items.Add(2)
+      bag.Items.Add(3)
+      return ((bag.Items.Count * 10) + bag.Items[2])

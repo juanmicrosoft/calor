@@ -1,0 +1,10 @@
+module Inventory Inventory block
+  module InventoryModule partial
+    func AddItem (Dictionary<string, int>:items, string:name, int:qty) → void
+      ! mut
+      if items.ContainsKey(name)
+        set items[name] (items[name] + qty)
+      else
+        set items[name] qty
+
+

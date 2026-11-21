@@ -22,7 +22,7 @@ public class Foo
 }";
         var result = converter.Convert(csharp, "Test.cs");
         Assert.NotNull(result.CalorSource);
-        Assert.Contains("§CSHARP{", result.CalorSource);
+        Assert.Contains("raw ", result.CalorSource);
     }
 
     [Fact]
@@ -42,6 +42,6 @@ public class Foo
 }";
         var result = converter.Convert(csharp, "Test.cs");
         Assert.NotNull(result.CalorSource);
-        Assert.DoesNotContain("§CSHARP{", result.CalorSource);
+        RawFrameAssertions.AssertFramed(result.CalorSource, present: false);
     }
 }

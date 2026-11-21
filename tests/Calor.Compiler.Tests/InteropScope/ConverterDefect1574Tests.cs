@@ -70,9 +70,13 @@ public class ConverterDefect1574Tests
         // Codex review round 2 reproducers.
         ("R2-self-initializer", "public static class Probe { public static string Run() { int x = x = 1; return x.ToString(); } }", "preserved"),
         ("R2-type-named-like-builtin", "namespace N { public sealed class String { } public static class Probe { public static string Run() { N.String a; N.String b; a = b = new N.String(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "preserved"),
-        ("R2-oblivious-target", "#nullable enable\npublic static class Probe {\n#nullable disable annotations\n    static string value;\n#nullable enable annotations\n    public static string Run() { object? r = value = null; return r == null ? \"null\" : \"set\"; } }", "native"),
+        // 0.30: one `nullable oblivious` module policy cannot represent lexical changes of the
+        // annotation context, so the mixed-context file is preserved; the same chain in a file
+        // that is oblivious throughout converts natively.
+        ("R2-oblivious-target", "#nullable enable\npublic static class Probe {\n#nullable disable annotations\n    static string value;\n#nullable enable annotations\n    public static string Run() { object? r = value = null; return r == null ? \"null\" : \"set\"; } }", "preserved"),
+        ("R2-oblivious-module-target", "public static class Probe {\n    static string value;\n    public static string Run() { object r = value = null; return r == null ? \"null\" : \"set\"; } }", "native"),
         // Codex review round 3 reproducers.
-        ("R3-type-named-like-calor-alias", "namespace N { public sealed class Str { } public static class Probe { public static string Run() { N.Str a; N.Str b; a = b = new N.Str(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "preserved"),
+        ("R3-type-named-like-calor-alias", "namespace N { public sealed class Str { } public static class Probe { public static string Run() { N.Str a; N.Str b; a = b = new N.Str(); return object.ReferenceEquals(a, b) ? \"same\" : \"different\"; } } }", "native"),
         ("R3-allow-null-target", "#nullable enable\nusing System.Diagnostics.CodeAnalysis;\npublic static class Probe { [AllowNull] public static string Value = \"\"; static string? F() { return Value = null; } public static string Run() => F() == null ? \"null\" : \"set\"; }", "preserved"),
         // Codex verification pass reproducers (approved exception): `using` aliases in the temp's
         // displayed type, and nullability attributes on a property setter's parameter.
@@ -130,8 +134,8 @@ public class ConverterDefect1574Tests
     public void ChainedAssignment_BindsTheRightHandSideOnce()
     {
         var calor = Convert(Rows().Single(r => r.Id == "CH-locals").Source);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"§C\{G\}"));
-        Assert.Matches(@"§B\{~(_asg\d+):i32\} §C\{G\}\s+§ASSIGN y \1\s+§ASSIGN x \1", calor);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(calor, @"\bG\(\)"));
+        Assert.Matches(@"var int:(_asg\d+) = G\(\)\s+set y \1\s+set x \1", calor);
     }
 
     [Fact]
@@ -155,29 +159,37 @@ public class ConverterDefect1574Tests
         Assert.DoesNotContain("= @default", compiled.GeneratedCode);
     }
 
-    // Item 4: `default!` for a type that may be a non-nullable reference; built-in value types keep `default`.
+    // Item 4: a lowered `out string` must not raise CS8600. 0.30: the oblivious source converts to
+    // a `nullable oblivious` module, whose C# disables annotations, so the null start value of the
+    // lowered local is not a nullable-to-non-null conversion; built-in value types keep `default`.
     [Fact]
     public void LoweredOutString_CompilesWithoutCS8600()
     {
         var calor = Convert(Rows().Single(r => r.Id == "OS-out-string").Source);
+        Assert.Contains(" nullable oblivious\n", calor);
         var compiled = Program.Compile(calor, "os.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
-        Assert.Contains("string value = default!;", compiled.GeneratedCode);
+        Assert.Contains("#nullable disable annotations", compiled.GeneratedCode);
+        Assert.Contains("string value = unchecked((string)null);", compiled.GeneratedCode);
         Assert.DoesNotContain(CSharpDiagnostics(compiled.GeneratedCode), id => id == "CS8600");
-        // Control: the same program with `default` raises CS8600.
-        Assert.Contains(CSharpDiagnostics(compiled.GeneratedCode.Replace("default!;", "default;")), id => id == "CS8600");
-        var ints = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §R n\n",
+        // Control: the same null start value in an annotated context raises CS8600.
+        Assert.Contains(CSharpDiagnostics(compiled.GeneratedCode
+            .Replace("#nullable disable annotations", "#nullable enable")
+            .Replace("string value = unchecked((string)null);", "string value = null;")), id => id == "CS8600");
+        var ints = Program.Compile("module P P block\n  func Run () → int\n    !\n    var int:n = default\n    return n\n",
             "i.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Contains("int n = default;", ints.GeneratedCode);
     }
 
-    // Codex round 2: the temp for an oblivious reference target is nullable, like the target's own
-    // converted declaration, so the generated C# gains no CS8600.
+    // Codex round 2: the temp for an oblivious reference target is oblivious, like the target's
+    // own converted declaration, so the generated C# gains no CS8600. 0.30: that is a plain
+    // `string` in a `nullable oblivious` module (the mixed-context row is preserved instead).
     [Fact]
-    public void ObliviousTarget_TempIsNullable_AndCompilesWithoutCS8600()
+    public void ObliviousTarget_TempIsOblivious_AndCompilesWithoutCS8600()
     {
-        var calor = Convert(Rows().Single(r => r.Id == "R2-oblivious-target").Source);
-        Assert.Matches(@"§B\{~_asg\d+:\?str\} null", calor);
+        var calor = Convert(Rows().Single(r => r.Id == "R2-oblivious-module-target").Source);
+        Assert.Contains(" nullable oblivious\n", calor);
+        Assert.Matches(@"var string:_asg\d+ = null", calor);
         var compiled = Program.Compile(calor, "oblivious.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
         Assert.DoesNotContain(CSharpDiagnostics(compiled.GeneratedCode), id => id == "CS8600");
@@ -186,12 +198,14 @@ public class ConverterDefect1574Tests
     // ---- Item 3: a bare binding's next-line initializer keeps its meaning and now warns. ----
 
     [Theory]
-    [InlineData("    §B{~n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n", true)]   // the pitfall: same indent
-    [InlineData("    §B{n:i32}\n    §C{System.Math.Abs} §A -7 §/C\n", true)]
-    [InlineData("    §B{~n:i32} §C{System.Math.Abs} §A -7 §/C\n", false)]   // control: same line
+    [InlineData("    var int:n = System.Math.Abs(-7)\n", false)]   // control: same line
     public void BareBindingNextLineInitializer_WarnsWithoutChangingMeaning(string binding, bool warns)
     {
-        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n" + binding + "    §R n\n",
+        // The two legacy pitfall rows have no native form: a native bare binding is `default`.
+        var header = binding.TrimStart().StartsWith('§')
+            ? "§M{P}\n  §F{Run:pub} () -> i32\n    §E{}\n"
+            : "module P P block\n  func Run () → int\n    !\n";
+        var result = Program.Compile(header + binding + (binding.TrimStart().StartsWith('§') ? "    §R n\n" : "    return n\n"),
             "next.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.Equal(warns, result.Diagnostics.Any(d => d.Code == DiagnosticCode.BareBindingNextLineInitializer && !d.IsError));
@@ -201,7 +215,7 @@ public class ConverterDefect1574Tests
     [Fact]
     public void ExplicitDefaultInitializer_DoesNotWarn()
     {
-        var result = Program.Compile("§M{m1:P}\n  §F{f1:Run:pub} () -> i32\n    §E{}\n    §B{~n:i32} `default`\n    §ASSIGN n 7\n    §R n\n",
+        var result = Program.Compile("module P P block\n  func Run () → int\n    !\n    var int:n = default\n    set n 7\n    return n\n",
             "default.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics.Errors));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.BareBindingNextLineInitializer);

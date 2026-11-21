@@ -1,0 +1,17 @@
+module DivisionContracts DivisionContracts
+  module DivisionContractsModule
+    func SafeDiv public (int:a, int:b) → int
+      !
+      requires b != 0
+      return a / b
+
+    func SafeMod public (int:a, int:b) → int
+      !
+      requires b != 0
+      => result >= 0
+      return a % b
+
+    func DivRemainder public (int:a, int:b) → int
+      !
+      requires b != 0
+      return a - ((a / b) * b)

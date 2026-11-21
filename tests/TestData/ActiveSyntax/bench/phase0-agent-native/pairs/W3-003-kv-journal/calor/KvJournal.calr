@@ -1,0 +1,7 @@
+module KvJournal KvJournal block
+  module KvJournalModule partial
+    func Set (string:path, string:key, string:value) → void
+      ! fs:w
+      File.AppendAllText(path, (key + ("=" + (value + "\n"))))
+
+

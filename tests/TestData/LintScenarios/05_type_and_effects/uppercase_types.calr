@@ -1,13 +1,16 @@
-§M{m1:Types}
-  §F{f1:GetVoid:pub} () -> void
-    §R
+module Types Types block
+  func GetVoid () → void
+    !
+    return
 
-  §F{f2:GetInt:pub} () -> i32
-    §R 42
+  func GetInt () → int
+    !
+    return 42
 
-  §F{f3:GetString:pub} () -> str
-    §R "hello"
+  func GetString () → string
+    !
+    return "hello"
 
-  §F{f4:GetBool:pub} () -> bool
-    §R true
-
+  func GetBool () → bool
+    !
+    return true

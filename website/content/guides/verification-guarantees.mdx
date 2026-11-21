@@ -187,8 +187,10 @@ Neither effect controls nor `--transpile-only` bypass those errors.
 Effect enforcement is also on by default. Interop assumptions propagate, and
 override/interface effect variance is checked. Calling a function
 value — a callback parameter, a bound lambda, a callback field — is not an
-error: the compiler reads the callback's own `§E{…}` and charges it to the
-caller. `Calor0418` is reserved for invoking something that is provably not a
+error: the compiler reads the callback's own native effect row and charges it
+to the caller. For example, `Func<int,int>:callback ! cw` permits console writes;
+the containing function needs its own `! cw` declaration too.
+`Calor0418` is reserved for invoking something that is provably not a
 function at all.
 
 Contract proofs do not establish effect completeness. Indexed heap stores,

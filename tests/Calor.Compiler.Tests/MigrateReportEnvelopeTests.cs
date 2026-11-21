@@ -56,4 +56,38 @@ public class MigrateReportEnvelopeTests : IDisposable
         Assert.True(data.TryGetProperty("fileResults", out var fileResults));
         Assert.Equal(1, fileResults.GetArrayLength());
     }
+
+    [Theory]
+    [InlineData("public class C { public int Get() => 1; }")]
+    [InlineData("public class C { ~C() { /* \u03c0 */ } }\r\n")]
+    public void MigrateReport_ReceiptRefreshAndEditedOutputAreTruthful(string source)
+    {
+        var original = Path.Combine(_tempDir, "C.cs");
+        var output = Path.Combine(_tempDir, "C.calr");
+        var receipt = output + ".conversion.json";
+        var report = Path.Combine(_tempDir, "report.json");
+        File.WriteAllText(original, source);
+        for (var generation = 0; generation < 2; generation++)
+        {
+            var result = CliTestHarness.RunCli(_tempDir,
+                "migrate", _tempDir, "--report", report, "--skip-verify", "--skip-analyze");
+            Assert.True(result.ExitCode == 0, result.StdErr);
+            using var json = JsonDocument.Parse(File.ReadAllText(report));
+            var file = Assert.Single(json.RootElement.GetProperty("data").GetProperty("fileResults").EnumerateArray());
+            Assert.True(file.GetProperty("outputWritten").GetBoolean());
+            var context = Calor.Compiler.Migration.ConversionReceipt.Deserialize(File.ReadAllText(receipt));
+            Assert.Equal(source, context.Original.Text);
+            Assert.Equal(File.ReadAllText(output), context.GeneratedCalor);
+        }
+        File.AppendAllText(output, "// user edit\r\n");
+        var editedOutput = File.ReadAllBytes(output);
+        var savedReceipt = File.ReadAllBytes(receipt);
+        Assert.Equal(1, CliTestHarness.RunCli(_tempDir,
+            "migrate", _tempDir, "--report", report, "--skip-verify", "--skip-analyze").ExitCode);
+        Assert.Equal(editedOutput, File.ReadAllBytes(output));
+        Assert.Equal(savedReceipt, File.ReadAllBytes(receipt));
+        using var refused = JsonDocument.Parse(File.ReadAllText(report));
+        var failed = Assert.Single(refused.RootElement.GetProperty("data").GetProperty("fileResults").EnumerateArray());
+        Assert.False(failed.TryGetProperty("outputWritten", out _));
+    }
 }

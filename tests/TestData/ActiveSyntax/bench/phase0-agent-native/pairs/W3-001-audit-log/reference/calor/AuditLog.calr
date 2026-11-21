@@ -1,0 +1,25 @@
+module AuditLog AuditLog block
+  module AuditLogModule partial
+    func Append (string:path, string:entry) → void
+      ! fs:w
+      File.AppendAllText(path, (entry + "\n"))
+
+    func CountEntries (string:path) → int
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return 0
+      let string[]:lines = File.ReadAllLines(path)
+      return lines.Length
+
+    func LastEntry (string:path) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      let string[]:lines = File.ReadAllLines(path)
+      if (lines.Length == 0)
+        return ""
+      return lines[(lines.Length - 1)]
+
+

@@ -63,10 +63,10 @@ public sealed class WatchRebuildTelemetryTests : IDisposable
     public async Task Rebuild_ReportsElapsedWallTime()
     {
         File.WriteAllText(Path.Combine(_root, "mod.calr"), """
-            §M{m001:WatchMod}
-              §F{f001:answer:pub}
-                §O{i32}
-                §R INT:42
+            module WatchMod
+              func answer public () → int
+                !
+                return 42
             """);
 
         var result = await RunInitialRebuildAsync("text", rebuildLogPath: null);
@@ -80,10 +80,10 @@ public sealed class WatchRebuildTelemetryTests : IDisposable
     public async Task Rebuild_WritesWatchRebuildRecord_WhenLogConfigured()
     {
         File.WriteAllText(Path.Combine(_root, "mod.calr"), """
-            §M{m001:WatchMod}
-              §F{f001:answer:pub}
-                §O{i32}
-                §R INT:42
+            module WatchMod
+              func answer public () → int
+                !
+                return 42
             """);
         var logPath = Path.Combine(_root, "watch-rebuilds.jsonl");
 
@@ -104,10 +104,10 @@ public sealed class WatchRebuildTelemetryTests : IDisposable
     public async Task Rebuild_NoLogConfigured_WritesNoTelemetry()
     {
         File.WriteAllText(Path.Combine(_root, "mod.calr"), """
-            §M{m001:WatchMod}
-              §F{f001:answer:pub}
-                §O{i32}
-                §R INT:42
+            module WatchMod
+              func answer public () → int
+                !
+                return 42
             """);
 
         await RunInitialRebuildAsync("text", rebuildLogPath: null);

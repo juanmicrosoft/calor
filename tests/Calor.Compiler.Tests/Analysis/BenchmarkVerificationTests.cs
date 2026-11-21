@@ -66,8 +66,8 @@ public class BenchmarkVerificationTests
     public void SqlInjection_VulnerableQuery_DetectsInjection()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableQuery:pub}
+§M{Test}
+  §F{VulnerableQuery:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
@@ -88,8 +88,8 @@ public class BenchmarkVerificationTests
     public void SqlInjection_SafeParameterizedQuery_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeQuery:pub}
+§M{Test}
+  §F{SafeQuery:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
@@ -110,8 +110,8 @@ public class BenchmarkVerificationTests
     public void SqlInjection_EscapedInput_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeEscaped:pub}
+§M{Test}
+  §F{SafeEscaped:pub}
       §I{string:user_input}
       §O{string}
       §B{escaped:string} (CALL sql_escape user_input)
@@ -134,8 +134,8 @@ public class BenchmarkVerificationTests
     {
         // db.execute_with_param_logging should NOT be excluded — it's a real sink
         var source = @"
-§M{m001:Test}
-  §F{f001:ParamLogging:pub}
+§M{Test}
+  §F{ParamLogging:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
@@ -156,8 +156,8 @@ public class BenchmarkVerificationTests
     {
         // db.execute_param should still be excluded — it's a parameterized query
         var source = @"
-§M{m001:Test}
-  §F{f001:ExecuteParam:pub}
+§M{Test}
+  §F{ExecuteParam:pub}
       §I{string:user_input}
       §O{string}
       §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
@@ -181,8 +181,8 @@ public class BenchmarkVerificationTests
     public void CommandInjection_VulnerableShellExec_DetectsInjection()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableShell:pub}
+§M{Test}
+  §F{VulnerableShell:pub}
       §I{string:user_input}
       §O{i32}
       §B{cmd:string} (+ STR:""ls -la "" user_input)
@@ -202,8 +202,8 @@ public class BenchmarkVerificationTests
     public void CommandInjection_SafeWhitelisted_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeWhitelist:pub}
+§M{Test}
+  §F{SafeWhitelist:pub}
       §I{i32:option}
       §O{i32}
       §IF (== option INT:1)
@@ -230,12 +230,11 @@ public class BenchmarkVerificationTests
     public void PathTraversal_VulnerableFileRead_DetectsTraversal()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableRead:pub}
-      §I{string:user_path}
-      §O{string}
-      §B{content:string} (CALL file.read user_path)
-      §R content";
+module Test Test block
+  func VulnerableRead (string:user_path) → string
+    !
+    let string:content = file.read(user_path)
+    return content";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -250,12 +249,12 @@ public class BenchmarkVerificationTests
     public void PathTraversal_SafeConstantPath_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeConstant:pub}
-      §O{string}
-      §B{path:string} STR:""/etc/config.json""
-      §B{content:string} (CALL file.read path)
-      §R content";
+module Test Test block
+  func SafeConstant () → string
+    !
+    let string:path = ""/etc/config.json""
+    let string:content = file.read(path)
+    return content";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -274,12 +273,10 @@ public class BenchmarkVerificationTests
     public void DivByZero_VulnerableDivision_DetectsRisk()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §R (/ x y)";
+module Test Test block
+  func VulnerableDiv (int:x, int:y) → int
+    !
+    return (x / y)";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -294,15 +291,13 @@ public class BenchmarkVerificationTests
     public void DivByZero_SafeWithGuard_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeDiv:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF{i1} (!= y INT:0)
-        §R (/ x y)
-      §EL
-        §R INT:0";
+module Test Test block
+  func SafeDiv (int:x, int:y) → int
+    !
+    if (y != 0)
+      return (x / y)
+    else
+      return 0";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -317,11 +312,10 @@ public class BenchmarkVerificationTests
     public void DivByZero_DivisionByLiteral_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeLiteralDiv:pub}
-      §I{i32:x}
-      §O{i32}
-      §R (/ x INT:2)";
+module Test Test block
+  func SafeLiteralDiv (int:x) → int
+    !
+    return (x / 2)";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -340,11 +334,11 @@ public class BenchmarkVerificationTests
     public void NullDeref_VulnerableAccess_DetectsRisk()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableNull:pub}
-      §I{Option<i32>:maybeNull}
-      §O{i32}
-      §R §C{maybeNull.Unwrap} §/C";
+module Test Test block
+  func VulnerableNull () → int
+    !
+    let int[]:maybeNull = null
+    return maybeNull.Length";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -352,29 +346,28 @@ public class BenchmarkVerificationTests
         var diagnostics = RunBugPatternAnalysis(module!);
 
         Assert.True(
-            HasDiagnosticCode(diagnostics, DiagnosticCode.UnsafeUnwrap),
-            "Unchecked Option unwrap should be reported");
+            HasDiagnosticCode(diagnostics, DiagnosticCode.NullDereference),
+            "Unchecked array dereference should be reported");
     }
 
     [Fact]
     public void NullDeref_SafeNullCheck_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeNull:pub}
-      §I{Option<i32>:maybeNull}
-      §O{i32}
-      §IF{i1} (== maybeNull §NN{i32})
-        §R INT:0
-      §R §C{maybeNull.Unwrap} §/C";
+module Test Test block
+  func SafeNull (int[]?:maybeNull) → int
+    !
+    if (maybeNull == null)
+      return 0
+    return maybeNull.Length";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
 
         var diagnostics = RunBugPatternAnalysis(module!);
 
-        Assert.False(HasDiagnosticCode(diagnostics, DiagnosticCode.UnsafeUnwrap),
-            "Option guard should prevent unsafe unwrap warning");
+        Assert.False(HasDiagnosticCode(diagnostics, DiagnosticCode.NullDereference),
+            "Null guard should prevent dereference warning");
     }
 
     #endregion
@@ -385,12 +378,10 @@ public class BenchmarkVerificationTests
     public void Bounds_VulnerableArrayAccess_DetectsRisk()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:VulnerableBounds:pub}
-      §I{i32[]:items}
-      §I{i32:index}
-      §O{i32}
-      §R §IDX items index";
+module Test Test block
+  func VulnerableBounds (int[]:items, int:index) → int
+    !
+    return items[index]";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -406,16 +397,14 @@ public class BenchmarkVerificationTests
     public void Bounds_SafeBoundsCheck_NoWarning()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:SafeBounds:pub}
-      §I{i32[]:items}
-      §I{i32:index}
-      §O{i32}
-      §IF{i1} (< index INT:0)
-        §R INT:-1
-      §IF{i2} (>= index §LEN items)
-        §R INT:-1
-      §R §IDX items index";
+module Test Test block
+  func SafeBounds (int[]:items, int:index) → int
+    !
+    if (index < 0)
+      return -1
+    if (index >= items.Length)
+      return -1
+    return items[index]";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
@@ -434,8 +423,8 @@ public class BenchmarkVerificationTests
     public void Integration_SafeFunction_NoWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:CompletelySecure:pub}
+§M{Test}
+  §F{CompletelySecure:pub}
       §I{i32:x}
       §I{i32:y}
       §O{i32}
@@ -464,8 +453,8 @@ public class BenchmarkVerificationTests
     public void Integration_VulnerableFunction_MultipleWarnings()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:InsecureFunction:pub}
+§M{Test}
+  §F{InsecureFunction:pub}
       §I{string:user_input}
       §I{i32:divisor}
       §O{i32}

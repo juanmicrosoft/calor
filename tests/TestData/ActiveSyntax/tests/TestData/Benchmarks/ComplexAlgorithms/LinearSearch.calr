@@ -1,0 +1,13 @@
+module LinearSearch LinearSearch
+  module LinearSearchModule
+    func IsMatch public (int:value, int:target) → bool
+      !
+      return value == target
+
+    func NotFound public () → int
+      !
+      return 0 - 1
+
+    func HasMore public (int:index, int:length) → bool
+      !
+      return index < length

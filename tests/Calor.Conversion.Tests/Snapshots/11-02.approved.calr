@@ -1,5 +1,5 @@
-§M{m001:Test_11_02:overflow=unchecked}
-  §EN{e001:Priority:int}
+§M{Test_11_02:overflow=unchecked}
+  §EN{Priority:int}
     Low
     Medium
     High

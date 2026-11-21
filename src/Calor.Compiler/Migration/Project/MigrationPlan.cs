@@ -30,6 +30,7 @@ public sealed class MigrationPlan
 /// </summary>
 public sealed class MigrationPlanEntry
 {
+    internal int? NamespaceIndex { get; init; }
     public required string SourcePath { get; init; }
     public required string OutputPath { get; set; }
     public required FileConvertibility Convertibility { get; init; }
@@ -65,6 +66,12 @@ public enum FileConvertibility
 /// </summary>
 public sealed class MigrationPlanOptions
 {
+    /// <summary>
+    /// Opt in to one native output per distinct, split-safe top-level namespace.
+    /// Requires lossless, all-branches conversion. The default remains one output per source.
+    /// </summary>
+    public bool SplitNamespaces { get; set; }
+
     /// <summary>Whether to include test files.</summary>
     public bool IncludeTests { get; set; } = true;
 
@@ -131,6 +138,9 @@ public sealed class MigrationPlanOptions
     /// <summary>Conversion fidelity. Lossless is the safe default.</summary>
     public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
 
+    /// <summary>System-only context; evaluated project opt-out takes precedence.</summary>
+    public bool IncludeImplicitSystemUsing { get; set; } = true;
+
     /// <summary>Conditional-compilation handling. Preserving every branch is the default.</summary>
     public PreprocessorConversionMode PreprocessorMode { get; set; } =
         PreprocessorConversionMode.PreserveAllBranches;
@@ -150,10 +160,4 @@ public sealed class MigrationPlanOptions
         Microsoft.CodeAnalysis.DocumentationMode.Parse;
     public Dictionary<string, string> ParseFeatures { get; init; } =
         new(StringComparer.Ordinal);
-
-    /// <summary>
-    /// When true (default), the emitter elides redundant §/C closers for zero-arg §C calls (v0.6.1 default).
-    /// Set to false to emit v0.6.0-compatible output where every §C has an explicit §/C.
-    /// </summary>
-    public bool UseImplicitCallCloser { get; set; } = true;
 }

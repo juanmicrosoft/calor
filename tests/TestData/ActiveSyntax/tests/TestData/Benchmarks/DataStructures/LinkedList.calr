@@ -1,0 +1,16 @@
+module LinkedList LinkedList
+  module LinkedListModule
+    func IsEmpty public (int:size) → bool
+      !
+      return size == 0
+
+    func Size public (int:count) → int
+      !
+      return count
+
+    func NewSize public (int:oldSize, bool:isAdd) → int
+      !
+      if isAdd
+        return oldSize + 1
+      else
+        return oldSize - 1

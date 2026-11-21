@@ -7,7 +7,8 @@ namespace Calor.Compiler.Ast;
 /// </summary>
 public abstract class TypeDefinitionNode : AstNode
 {
-    public string Id { get; }
+    public string Id => ToolingId ?? LocalId;
+    public string LocalId { get; }
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public AttributeCollection Attributes { get; }
@@ -20,7 +21,7 @@ public abstract class TypeDefinitionNode : AstNode
         TextSpan? identifierSpan = null)
         : base(span)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        LocalId = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
@@ -135,7 +136,7 @@ public sealed class VariantDefinitionNode : AstNode
 
 /// <summary>
 /// Represents a type reference with optional generic arguments.
-/// Example: Result[INT, STRING], Option[Person]
+/// Example: Dictionary&lt;str, i32&gt;, List&lt;Person&gt;
 /// </summary>
 public sealed class TypeReferenceNode : AstNode
 {
@@ -160,7 +161,7 @@ public sealed class TypeReferenceNode : AstNode
 
 /// <summary>
 /// Represents a record instantiation expression.
-/// §RECORD[type=Person] §FIELD[name=Name] STR:"Alice" §FIELD[name=Age] INT:30
+/// Emits named constructor arguments: §NEW{Person} §A[Name] "Alice" §A[Age] 30.
 /// </summary>
 public sealed class RecordCreationNode : ExpressionNode
 {
@@ -227,84 +228,12 @@ public sealed class FieldAccessNode : ExpressionNode
 }
 
 /// <summary>
-/// Represents an Option.Some expression.
-/// §SOME expression
-/// </summary>
-public sealed class SomeExpressionNode : ExpressionNode
-{
-    public ExpressionNode Value { get; }
-
-    public SomeExpressionNode(TextSpan span, ExpressionNode value)
-        : base(span)
-    {
-        Value = value ?? throw new ArgumentNullException(nameof(value));
-    }
-
-
-}
-
-/// <summary>
-/// Represents an Option.None expression.
-/// §NONE[type=xxx]
-/// </summary>
-public sealed class NoneExpressionNode : ExpressionNode
-{
-    public string? TypeName { get; }
-    public TextSpan? TypeNameSpan { get; }
-
-    public NoneExpressionNode(
-        TextSpan span,
-        string? typeName,
-        TextSpan? typeNameSpan = null)
-        : base(span)
-    {
-        TypeName = typeName;
-        TypeNameSpan = typeName == null ? null : typeNameSpan ?? TextSpan.Empty;
-    }
-
-
-}
-
-/// <summary>
-/// Represents a Result.Ok expression.
-/// §OK expression
-/// </summary>
-public sealed class OkExpressionNode : ExpressionNode
-{
-    public ExpressionNode Value { get; }
-
-    public OkExpressionNode(TextSpan span, ExpressionNode value)
-        : base(span)
-    {
-        Value = value ?? throw new ArgumentNullException(nameof(value));
-    }
-
-
-}
-
-/// <summary>
-/// Represents a Result.Err expression.
-/// §ERR expression
-/// </summary>
-public sealed class ErrExpressionNode : ExpressionNode
-{
-    public ExpressionNode Error { get; }
-
-    public ErrExpressionNode(TextSpan span, ExpressionNode error)
-        : base(span)
-    {
-        Error = error ?? throw new ArgumentNullException(nameof(error));
-    }
-
-
-}
-
-/// <summary>
 /// Represents an enum member in an enum definition.
 /// </summary>
 public sealed class EnumMemberNode : AstNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string? Value { get; }
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
@@ -312,14 +241,17 @@ public sealed class EnumMemberNode : AstNode
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = span;
         Value = value;
         CSharpAttributes = Array.Empty<CalorAttributeNode>();
     }
 
-    public EnumMemberNode(TextSpan span, string name, string? value, IReadOnlyList<CalorAttributeNode> csharpAttributes)
+    public EnumMemberNode(TextSpan span, string name, string? value, IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Value = value;
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
     }

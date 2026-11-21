@@ -1,7 +1,7 @@
-§M{m001:Test_03_01:overflow=unchecked}
-  §CL{c001:Guard:pub}
-    §MT{m002:Classify:pub} (i32:value) -> str
-      §IF{if003} (> value 0)
+§M{Test_03_01:overflow=unchecked}
+  §CL{Guard:pub}
+    §MT{Classify:pub} (i32:value) -> str
+      §IF (> value 0)
         §R "positive"
       §EI (< value 0)
         §R "negative"

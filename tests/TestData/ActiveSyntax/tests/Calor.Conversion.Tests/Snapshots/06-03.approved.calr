@@ -1,0 +1,7 @@
+module Test_06_03 Test_06_03 overflow unchecked
+  class PatternDemo public
+    func GetLength public (object:value) → int
+      !
+      if value is string text
+        return text.Length
+      return 0

@@ -1,0 +1,32 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_30t955s89rqr",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "FizzBuzz",
+      "Signature": ""
+    },
+    {
+      "Id": "m_zwn4cnabkfg3",
+      "File": "input.calr",
+      "Container": "FizzBuzz",
+      "Kind": 0,
+      "Name": "FizzBuzzModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_2vdj2e2dxq13",
+      "File": "input.calr",
+      "Container": "FizzBuzz.FizzBuzzModule\u00600",
+      "Kind": 5,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

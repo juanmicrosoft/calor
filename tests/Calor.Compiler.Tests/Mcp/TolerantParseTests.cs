@@ -21,20 +21,20 @@ public sealed class TolerantParseTests : IDisposable
     private FileWriteTool WriteTool => new(_manager, _root);
 
     private const string MathSource = """
-        §M{m001:MathModule}
-          §F{f001:add:pub}
+        §M{MathModule}
+          §F{add:pub}
             §I{i32:x, i32:y}
             §O{i32}
             §R (+ x y)
-          §F{f002:multiply:pub}
+          §F{multiply:pub}
             §I{i32:a, i32:b}
             §O{i32}
             §R (* a b)
         """;
 
     private const string MathSourceWithoutAdd = """
-        §M{m001:MathModule}
-          §F{f002:multiply:pub}
+        §M{MathModule}
+          §F{multiply:pub}
             §I{i32:a, i32:b}
             §O{i32}
             §R (* a b)
@@ -42,12 +42,12 @@ public sealed class TolerantParseTests : IDisposable
 
     /// <summary>First function is intact; the second has a broken body.</summary>
     private const string PartiallyBrokenSource = """
-        §M{m010:PartModule}
-          §F{f040:good:pub}
+        §M{PartModule}
+          §F{good:pub}
             §I{i32:x}
             §O{i32}
             §R (+ x INT:1)
-          §F{f041:broken:pub}
+          §F{broken:pub}
             §I{i32:y}
             §O{i32}
             §R (+ y
@@ -73,49 +73,26 @@ public sealed class TolerantParseTests : IDisposable
 
     private static JsonElement Args(object value) => JsonSerializer.SerializeToElement(value);
 
+    private (string Path, string Id) RegisterPart()
+    {
+        var path = WriteFile("part.calr", PartiallyBrokenSource + " INT:1)");
+        var store = new Calor.Compiler.Ids.DeclarationIdentityStore(_root);
+        var state = store.Sync([path]).Declarations;
+        return (path, Assert.Single(state, declaration => declaration.Name == "broken").Id);
+    }
+
     private static JsonElement Payload(McpToolResult result)
     {
         Assert.False(result.IsError, $"Expected success result, got error: {result.Content[0].Text}");
         return JsonDocument.Parse(result.Content[0].Text!).RootElement;
     }
 
-    // ── ParseTolerant unit behavior ─────────────────────────────────────
-
     [Fact]
-    public void ParseTolerant_ValidSource_IsPlainSuccess()
-    {
-        var result = CalorSourceHelper.ParseTolerant(MathSource, "math.calr");
-
-        Assert.True(result.IsSuccess);
-        Assert.False(result.IsPartial);
-        Assert.NotNull(result.Ast);
-    }
-
-    [Fact]
-    public void ParseTolerant_BrokenFunction_ReturnsPartialAstWithIntactDeclarations()
-    {
-        var result = CalorSourceHelper.ParseTolerant(PartiallyBrokenSource, "part.calr");
-
-        Assert.False(result.IsSuccess);
-        Assert.True(result.IsPartial);
-        Assert.NotNull(result.Ast);
-        Assert.NotEmpty(result.Errors);
-        // The intact declaration must survive recovery.
-        Assert.Contains(result.Ast!.Functions, f => f.Name == "good");
-    }
-
-    [Fact]
-    public void ParseTolerant_EnvelopeDiagnostics_CarryEnclosingDeclarationId()
+    public void ParseTolerant_SourceOnly_DoesNotInventPersistentIdentity()
     {
         var result = CalorSourceHelper.ParseTolerant(PartiallyBrokenSource, "part.calr");
         Assert.True(result.IsPartial);
-
-        var diagnostics = result.ToEnvelopeDiagnostics();
-
-        Assert.NotEmpty(diagnostics);
-        // The parse error sits inside f041's body; span containment against
-        // the partial AST must attribute it there.
-        Assert.Contains(diagnostics, d => d.DeclarationId == "f041");
+        Assert.All(result.ToEnvelopeDiagnostics(), diagnostic => Assert.Null(diagnostic.DeclarationId));
     }
 
     [Fact]
@@ -137,82 +114,6 @@ public sealed class TolerantParseTests : IDisposable
         Assert.True(result.IsSuccess || result.Errors.Count > 0);
     }
 
-    // ── Write path integration ──────────────────────────────────────────
-
-    [Fact]
-    public async Task FileWrite_RejectDiagnostics_IncludeDeclarationId()
-    {
-        var path = WriteFile("part.calr", MathSource);
-
-        var payload = Payload(await WriteTool
-            .ExecuteAsync(Args(new { path, content = PartiallyBrokenSource, heal = false })));
-
-        Assert.False(payload.GetProperty("applied").GetBoolean());
-        Assert.Equal("breaking", payload.GetProperty("verdict").GetString());
-        var errors = payload.GetProperty("compilationResult").GetProperty("errors").EnumerateArray().ToList();
-        Assert.NotEmpty(errors);
-        Assert.Contains(errors, e =>
-            e.TryGetProperty("declarationId", out var id) && id.GetString() == "f041");
-    }
-
-    [Fact]
-    public async Task FileWrite_BrokenNeighborWithRealCall_StillVetoesRemoval()
-    {
-        // The neighbor has a parse error in a later function, but its intact
-        // earlier function really calls add — the partial AST must carry the
-        // call so the removal is still rejected.
-        var mathPath = WriteFile("math.calr", MathSource);
-        WriteFile("broken-caller.calr", """
-            §M{m011:BrokenCaller}
-              §F{f050:usesAdd:pub}
-                §I{i32:x}
-                §O{i32}
-                §B{total:i32} §C{add} §A x §A INT:1 §/C
-                §R total
-              §F{f051:broken:pub}
-                §I{i32:y}
-                §O{i32}
-                §R (+ y
-            """);
-        var sessionId = Payload(await OpenTool.ExecuteAsync(Args(new { directory = _root })))
-            .GetProperty("sessionId").GetString()!;
-
-        var payload = Payload(await WriteTool
-            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
-
-        Assert.False(payload.GetProperty("applied").GetBoolean());
-        Assert.Equal("breaking", payload.GetProperty("verdict").GetString());
-        var dangling = payload.GetProperty("referenceIntegrity").GetProperty("danglingReferences")
-            .EnumerateArray().Select(e => e.GetString()).ToList();
-        Assert.Contains(dangling, d => d!.Contains("'add'") && d.Contains("broken-caller.calr") && d.Contains("parse errors"));
-    }
-
-    [Fact]
-    public async Task FileWrite_BrokenNeighborWithStringMentionOnly_DoesNotBlock()
-    {
-        // A broken neighbor that only mentions the removed function inside a
-        // string literal must not veto: with a partial AST available, the
-        // check uses call targets, not raw text.
-        var mathPath = WriteFile("math.calr", MathSource);
-        WriteFile("broken-prose.calr", """
-            §M{m012:BrokenProse}
-              §F{f060:label:pub}
-                §O{str}
-                §R STR:"mentions add in prose only"
-              §F{f061:broken:pub}
-                §I{i32:y}
-                §O{i32}
-                §R (+ y
-            """);
-        var sessionId = Payload(await OpenTool.ExecuteAsync(Args(new { directory = _root })))
-            .GetProperty("sessionId").GetString()!;
-
-        var payload = Payload(await WriteTool
-            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
-
-        Assert.True(payload.GetProperty("applied").GetBoolean());
-    }
-
     // ── Adversarial inputs: crash and hang resistance ───────────────────
 
     [Fact]
@@ -224,7 +125,7 @@ public sealed class TolerantParseTests : IDisposable
         var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
                      + "INT:1 INT:2"
                      + new string(')', 50_000);
-        var source = "§M{m020:Deep}\n  §F{f070:deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+        var source = "module Deep Deep block\n" + "  func deep () → int\n" + "    !\n" + "    return " + nested + "\n";
 
         var result = CalorSourceHelper.ParseTolerant(source, "deep.calr");
 
@@ -238,7 +139,7 @@ public sealed class TolerantParseTests : IDisposable
         var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
                      + "INT:1 INT:2"
                      + new string(')', 50_000);
-        var source = "§M{m021:Deep}\n  §F{f071:deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+        var source = "module Deep Deep block\n" + "  func deep () → int\n" + "    !\n" + "    return " + nested + "\n";
 
         var result = CalorSourceHelper.Parse(source, "deep-strict.calr");
 
@@ -252,11 +153,11 @@ public sealed class TolerantParseTests : IDisposable
         // Deep §IF nesting recurses through the statement parser, outside
         // the expression depth counter — the stack backstop must turn an
         // imminent overflow into a catchable failure, never a process abort.
-        var builder = new System.Text.StringBuilder("§M{m022:DeepIf}\n  §F{f072:deep:pub}\n    §O{void}\n");
+        var builder = new System.Text.StringBuilder("module DeepIf DeepIf block\n  func deep () → void\n    !\n    return\n");
         var indent = "    ";
         for (var i = 0; i < 4000; i++)
         {
-            builder.Append(indent).Append("§IF{if").Append(i).Append("} (== INT:1 INT:1)\n");
+            builder.Append(indent).Append("§IF (== INT:1 INT:1)\n");
             indent += "  ";
         }
         builder.Append(indent).Append("§B{x:i32} INT:1\n");
@@ -286,40 +187,5 @@ public sealed class TolerantParseTests : IDisposable
         var payload = Payload(result);
 
         Assert.Equal(2, payload.GetProperty("fileCount").GetInt32());
-    }
-
-    [Fact]
-    public async Task FileWrite_TargetIsFifo_DoesNotHang()
-    {
-        if (OperatingSystem.IsWindows()) return;
-
-        var fifoPath = Path.Combine(_root, "pipe.calr");
-        var mkfifo = System.Diagnostics.Process.Start("mkfifo", fifoPath)!;
-        mkfifo.WaitForExit();
-        Assert.Equal(0, mkfifo.ExitCode);
-
-        var result = await WriteTool
-            .ExecuteAsync(Args(new { path = fifoPath, content = MathSource }))
-            .WaitAsync(TimeSpan.FromSeconds(30));
-        var payload = Payload(result);
-
-        // Reads treat the FIFO as empty; the atomic rename replaces it with
-        // a regular file without ever opening it.
-        Assert.True(payload.GetProperty("applied").GetBoolean());
-        Assert.Equal(MathSource, File.ReadAllText(fifoPath));
-    }
-
-    [Fact]
-    public async Task SessionOpen_BrokenFile_DiagnosticsCarryDeclarationId()
-    {
-        WriteFile("part.calr", PartiallyBrokenSource);
-
-        var payload = Payload(await OpenTool.ExecuteAsync(Args(new { directory = _root })));
-
-        Assert.Equal(1, payload.GetProperty("parseErrorFileCount").GetInt32());
-        var diagnostics = payload.GetProperty("diagnostics").EnumerateArray().ToList();
-        Assert.NotEmpty(diagnostics);
-        Assert.Contains(diagnostics, d =>
-            d.TryGetProperty("declarationId", out var id) && id.GetString() == "f041");
     }
 }

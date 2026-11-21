@@ -1,0 +1,12 @@
+module ResultType ResultType
+  module ResultTypeModule
+    func IsSuccess public (bool:succeeded) → bool
+      !
+      return succeeded
+
+    func ValueOrDefault public (int:value, int:defaultVal, bool:hasValue) → int
+      !
+      if hasValue
+        return value
+      else
+        return defaultVal

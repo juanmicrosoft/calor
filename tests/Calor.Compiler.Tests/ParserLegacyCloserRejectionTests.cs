@@ -36,12 +36,10 @@ public class ParserLegacyCloserRejectionTests
     public void IndentFormSource_NoLegacyDiagnostic()
     {
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
+            module Calc Calc block
+              func Add (int:a, int:b) → int
+                !
+                return a + b
             """;
         var (diags, hasErrors) = Parse(src);
         Assert.False(hasErrors, "Indent-form source must parse cleanly");
@@ -49,146 +47,19 @@ public class ParserLegacyCloserRejectionTests
     }
 
     [Fact]
-    public void LegacyCloserFunction_EmitsCalor0830()
-    {
-        const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
-              §/F{f1}
-            §/M{m1}
-            """;
-        var (diags, hasErrors) = Parse(src);
-        Assert.True(hasErrors, "Source with legacy structural closers must error");
-        var legacy = diags.Where(d => d.Code == DiagnosticCode.LegacyCloserForm).ToList();
-        Assert.NotEmpty(legacy);
-        Assert.Contains(legacy, d => d.Message.Contains("§/F", StringComparison.Ordinal));
-        Assert.Contains(legacy, d => d.Message.Contains("§/M", StringComparison.Ordinal));
-    }
-
-    [Fact]
     public void RetainedCloser_DoWhile_NoDiagnostic()
     {
         // §/DO carries the do-while loop condition — retained.
         const string src = """
-            §M{m1:Calc}
-              §F{f1:Tick:pub}
+            §M{Calc}
+              §F{Tick:pub}
                 §O{void}
                 §B{~i:i32} (INT:0)
-                §DO{d1}
+                §DO
                   §= ~i (+ i (INT:1))
-                §/DO{d1} (< i (INT:10))
+                §/DO (< i (INT:10))
             """;
         var (diags, _) = Parse(src);
-        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.LegacyCloserForm);
-    }
-
-    [Fact]
-    public void LegacyCloser_Message_DoesNotRecommendCalorFormat()
-    {
-        // calor format / calor lint --fix parse first and abort on
-        // Calor0830, so they cannot heal closer-form. The message must
-        // not send users to a command that can't fix the file.
-        const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
-                §O{i32}
-                §R (INT:1)
-              §/F{f1}
-            §/M{m1}
-            """;
-        var (diags, _) = Parse(src);
-        var legacy = diags.Where(d => d.Code == DiagnosticCode.LegacyCloserForm).ToList();
-        Assert.NotEmpty(legacy);
-        Assert.All(legacy, d =>
-            Assert.DoesNotContain("calor format", d.Message, StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(legacy, d => d.Message.Contains("delete the closer line", StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact]
-    public void LegacyCloser_CarriesSuggestedFix_ThatDeletesTheCloser()
-    {
-        const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
-                §O{i32}
-                §R (INT:1)
-              §/F{f1}
-            §/M{m1}
-            """;
-        var bag = ParseBag(src);
-
-        var fixes = bag.DiagnosticsWithFixes
-            .Where(d => d.Code == DiagnosticCode.LegacyCloserForm)
-            .ToList();
-
-        // One fix per structural closer (§/F and §/M).
-        Assert.Equal(2, fixes.Count);
-        Assert.All(fixes, dwf =>
-        {
-            var edit = Assert.Single(dwf.Fix.Edits);
-            // Deletion: empty replacement that starts at column 1 of the closer line.
-            Assert.Equal(string.Empty, edit.NewText);
-            Assert.Equal(1, edit.StartColumn);
-            // The removal range covers the closer keyword and its {id} payload.
-            Assert.True(edit.EndColumn > edit.StartColumn);
-        });
-    }
-
-    [Fact]
-    public void ApplyingLegacyCloserFix_YieldsCleanIndentOnlySource()
-    {
-        const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
-              §/F{f1}
-            §/M{m1}
-            """;
-        var bag = ParseBag(src);
-        var healed = ApplyFixes(src, bag);
-
-        Assert.DoesNotContain("§/", healed);
-
-        var (diags, hasErrors) = Parse(healed);
-        Assert.False(hasErrors, "Healed source must parse cleanly");
-        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.LegacyCloserForm);
-    }
-
-    [Fact]
-    public void ApplyingBareLegacyCloserFix_NoIdPayload_YieldsCleanIndentOnlySource()
-    {
-        // Bare closers (no {id}) are the common modern form — exercise the
-        // path where the removal range is computed from the closer keyword
-        // length alone (no brace tokens to peek).
-        const string src = """
-            §M{m1:Calc}
-              §F{f1:Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
-              §/F
-            §/M
-            """;
-        var bag = ParseBag(src);
-
-        var fixes = bag.DiagnosticsWithFixes
-            .Where(d => d.Code == DiagnosticCode.LegacyCloserForm)
-            .ToList();
-        Assert.Equal(2, fixes.Count);
-
-        var healed = ApplyFixes(src, bag);
-        Assert.DoesNotContain("§/", healed);
-
-        var (diags, hasErrors) = Parse(healed);
-        Assert.False(hasErrors, "Healed source must parse cleanly");
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.LegacyCloserForm);
     }
 

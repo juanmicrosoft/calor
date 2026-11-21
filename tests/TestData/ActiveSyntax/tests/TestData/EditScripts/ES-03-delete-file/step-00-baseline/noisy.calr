@@ -1,0 +1,4 @@
+module Noisy
+  func Silent () → void
+    !
+    Console.WriteLine("noisy")

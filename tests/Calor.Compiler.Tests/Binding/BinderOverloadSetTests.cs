@@ -97,6 +97,59 @@ public class BinderOverloadSetTests
             && d.Severity == DiagnosticSeverity.Error);
     }
 
+    [Theory]
+    [InlineData("sbyte", -129L, false)]
+    [InlineData("sbyte", -128L, true)]
+    [InlineData("sbyte", 127L, true)]
+    [InlineData("sbyte", 128L, false)]
+    [InlineData("byte", -1L, false)]
+    [InlineData("byte", 0L, true)]
+    [InlineData("byte", 255L, true)]
+    [InlineData("byte", 256L, false)]
+    [InlineData("short", -32769L, false)]
+    [InlineData("short", -32768L, true)]
+    [InlineData("short", 32767L, true)]
+    [InlineData("short", 32768L, false)]
+    [InlineData("ushort", -1L, false)]
+    [InlineData("ushort", 0L, true)]
+    [InlineData("ushort", 65535L, true)]
+    [InlineData("ushort", 65536L, false)]
+    [InlineData("uint", -1L, false)]
+    [InlineData("uint", 0L, true)]
+    [InlineData("uint", 2147483647L, true)]
+    [InlineData("ulong", -1L, false)]
+    [InlineData("ulong", 0L, true)]
+    [InlineData("ulong", 9223372036854775807L, true)]
+    [InlineData("byte", 2147483648L, false)]
+    [InlineData("char", 65L, false)]
+    public void IntegerLiteralConversions_RetainTheirActualTypeAndRange(
+        string parameterType, long value, bool matches)
+    {
+        var caller = Func("f2", "Caller", "int", [],
+            new ReturnStatementNode(S, new CallExpressionNode(S, "Pick", [new IntLiteralNode(S, value)])));
+        var (bound, diagnostics) = Bind(
+            Func("f1", "Pick", "int", [(parameterType, "value")]), caller);
+        Assert.Equal(!matches, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(bound.Functions.Single(function => function.Symbol.Name == "Caller").Body[0])
+                .Expression);
+        if (matches)
+            Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "Pick").Symbol, call.ResolvedSymbol);
+        else
+            Assert.Null(call.ResolvedSymbol);
+    }
+
+    [Fact]
+    public void IntegerLiteralConversions_DoNotReclassifyImmutableIntegerVariablesAsConstants()
+    {
+        var caller = Func("f2", "Caller", "int", [],
+            new BindStatementNode(S, "value", "int", false, new IntLiteralNode(S, 1), new AttributeCollection()),
+            new ReturnStatementNode(S, new CallExpressionNode(S, "Pick", [new ReferenceNode(S, "value")])));
+        var (_, diagnostics) = Bind(Func("f1", "Pick", "int", [("byte", "value")]), caller);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
     [Fact]
     public void SecondOverload_NoLongerSilentlyDropped()
     {

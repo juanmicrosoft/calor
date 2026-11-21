@@ -1,0 +1,12 @@
+module NestedMatch NestedMatch
+  module NestedMatchModule
+    func ClassifyPair public (bool:aPositive, bool:bPositive) → int
+      !
+      if aPositive && bPositive
+        return 1
+      else if !aPositive && !bPositive
+        return 3
+      else if aPositive
+        return 4
+      else
+        return 2

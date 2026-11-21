@@ -13,11 +13,14 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_EmptyQuery_ReturnsAllSymbolsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Add:pub}
-                §R 0
-              §F{f002:Subtract:pub}
-                §R 0
+            module TestModule TestModule block
+              func Add ()
+                !
+                return 0
+
+              func Subtract ()
+                !
+                return 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -33,11 +36,14 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_SpecificQuery_FiltersResultsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Calculate:pub}
-                §R 0
-              §F{f002:Process:pub}
-                §R 0
+            module TestModule TestModule block
+              func Calculate ()
+                !
+                return 0
+
+              func Process ()
+                !
+                return 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -54,11 +60,12 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_ClassQuery_ReturnsClassesAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:PersonService}
-                §FLD{i32:dummy:pri}
-              §CL{c002:OrderService}
-                §FLD{i32:dummy:pri}
+            module TestModule TestModule block
+              class PersonService internal
+                field int:dummy private
+
+              class OrderService internal
+                field int:dummy private
             """;
 
         var workspace = CreateWorkspace(source);
@@ -76,14 +83,15 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_MethodQuery_ReturnsMethodsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add:pub}
-                  §O{i32}
-                  §R 0
-                §MT{m002:Multiply:pub}
-                  §O{i32}
-                  §R 0
+            module TestModule TestModule block
+              class Calculator internal
+                func Add () → int
+                  !
+                  return 0
+
+                func Multiply () → int
+                  !
+                  return 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -100,11 +108,10 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_EnumQuery_ReturnsEnumsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:StatusCode}
-              Ok = 200
-              NotFound = 404
-              §/EN{e001}
+            module TestModule TestModule block
+              enum StatusCode
+                Ok = 200
+                NotFound = 404
             """;
 
         var workspace = CreateWorkspace(source);
@@ -121,12 +128,11 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_EnumMemberQuery_ReturnsEnumMembersAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
-              Red
-              Green
-              Blue
-              §/EN{e001}
+            module TestModule TestModule block
+              enum Color
+                Red
+                Green
+                Blue
             """;
 
         var workspace = CreateWorkspace(source);
@@ -143,8 +149,8 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_InterfaceQuery_ReturnsInterfacesAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IRepository}
+            module TestModule TestModule block
+              interface IRepository
             """;
 
         var workspace = CreateWorkspace(source);
@@ -161,10 +167,10 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_FieldQuery_ReturnsFieldsAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
-                §FLD{str:firstName:priv}
-                §FLD{str:lastName:priv}
+            module TestModule TestModule block
+              class Person internal
+                field string:firstName private
+                field string:lastName private
             """;
 
         var workspace = CreateWorkspace(source);
@@ -182,9 +188,10 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_NoMatches_ReturnsEmptyAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §R 0
+            module TestModule TestModule block
+              func Test ()
+                !
+                return 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -200,9 +207,10 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_CaseInsensitiveSearchAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:CalculateTotal:pub}
-                §R 0
+            module TestModule TestModule block
+              func CalculateTotal ()
+                !
+                return 0
             """;
 
         var workspace = CreateWorkspace(source);
@@ -218,11 +226,11 @@ public class WorkspaceSymbolHandlerTests
     public async Task Handle_SymbolsIncludeContainerNameAsync()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Calculator}
-                §MT{m001:Add:pub}
-                  §O{i32}
-                  §R 0
+            module TestModule TestModule block
+              class Calculator internal
+                func Add () → int
+                  !
+                  return 0
             """;
 
         var workspace = CreateWorkspace(source);

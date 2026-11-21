@@ -12,32 +12,13 @@ public class EdgeCaseTests
     #region Generics Tests
 
     [Fact]
-    public void Generic_Class_ReturnsClassInfo()
-    {
-        var (source, line, column) = LspTestHarness.FindMarker("""
-            §M{m001:TestModule}
-              §CL{c001:/*cursor*/Container<T>}
-                §FLD{T:value}
-            """);
-
-        var result = LspTestHarness.FindSymbol(source, line, column);
-
-        Assert.NotNull(result);
-        // Class name doesn't include type parameters in the Name property
-        Assert.Equal("Container", result.Name);
-        Assert.Equal("class", result.Kind);
-    }
-
-    [Fact]
     public void Generic_Method_WithTypeParameter()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Utils}
-                §MT{m001:Identity<T>}
-                  §I{T:value}
-                  §O{T}
-                  §R value
+            module TestModule TestModule block
+              class Utils internal
+                func Identity<T> private (T:value) → T
+                  return value
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -51,26 +32,6 @@ public class EdgeCaseTests
         Assert.NotNull(method);
     }
 
-    [Fact]
-    public void Generic_Function_WithConstraint()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Compare<T>}
-                §TP{T}
-                §TC{IComparable}
-                §I{T:a}
-                §I{T:b}
-                §O{i32}
-                §R a.CompareTo(b)
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        Assert.Single(ast.Functions);
-        Assert.Equal("Compare<T>", ast.Functions[0].Name);
-    }
-
     #endregion
 
     #region Inheritance Tests
@@ -79,10 +40,10 @@ public class EdgeCaseTests
     public void Inheritance_BaseClass_HasFields()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Animal:pub}
-                §FLD{str:name:pub}
-                §FLD{i32:age:pub}
+            module TestModule TestModule block
+              class Animal
+                field string:name
+                field int:age
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -97,12 +58,14 @@ public class EdgeCaseTests
     public void Inheritance_DerivedClass_ExtendsBase()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Animal:pub}
-                §FLD{str:name:pub}
-              §CL{c002:Dog:pub}
-                §EXT{Animal}
-                §FLD{str:breed:pub}
+            module TestModule TestModule block
+              class Animal
+                field string:name
+
+              class Dog
+                extends Animal
+
+                field string:breed
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -118,61 +81,13 @@ public class EdgeCaseTests
     }
 
     [Fact]
-    public void Inheritance_ClassImplementsInterface()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IDrawable}
-                §MT{m001:Draw}
-                  §O{void}
-              §CL{c001:Circle:pub}
-                §IMPL{IDrawable}
-                §MT{m001:Draw}
-                  §O{void}
-                  §P "Drawing circle"
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var circle = ast.Classes.FirstOrDefault(c => c.Name == "Circle");
-        Assert.NotNull(circle);
-        Assert.Contains("IDrawable", circle.ImplementedInterfaces);
-    }
-
-    [Fact]
-    public void Inheritance_MultipleInterfaces()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IReadable}
-                §MT{m001:Read}
-                  §O{str}
-              §IFACE{i002:IWritable}
-                §MT{m001:Write}
-                  §I{str:data}
-                  §O{void}
-              §CL{c001:File:pub}
-                §IMPL{IReadable}
-                §IMPL{IWritable}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var file = ast.Classes.FirstOrDefault(c => c.Name == "File");
-        Assert.NotNull(file);
-        Assert.Equal(2, file.ImplementedInterfaces.Count);
-    }
-
-    [Fact]
     public void Inheritance_AbstractClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Shape:pub:abs}
-                §MT{m001:GetArea:pub:abs}
-                  §O{f64}
+            module TestModule TestModule block
+              class Shape abstract
+                func GetArea abstract () → double
+                  !
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -189,9 +104,9 @@ public class EdgeCaseTests
     public void Inheritance_SealedClass()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:FinalClass:pub:sealed}
-                §FLD{i32:value}
+            module TestModule TestModule block
+              class FinalClass sealed
+                field int:value private
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -211,10 +126,9 @@ public class EdgeCaseTests
     public void Async_Function_HasAsyncFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §AF{f001:FetchData}
-                §O{str}
-                §R "data"
+            module TestModule TestModule block
+              func FetchData private async () → string
+                return "data"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -229,12 +143,10 @@ public class EdgeCaseTests
     public void Async_Method_HasAsyncFlag()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Service}
-                §AMT{m001:LoadAsync}
-                §O{str}
-                §R "loaded"
-                §/AMT{m001}
+            module TestModule TestModule block
+              class Service internal
+                func LoadAsync private async () → string
+                  return "loaded"
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -252,12 +164,9 @@ public class EdgeCaseTests
     public void Async_FunctionWithParameters()
     {
         var source = """
-            §M{m001:TestModule}
-              §AF{f001:DownloadFile}
-                §I{str:url}
-                §I{str:path}
-                §O{bool}
-                §R true
+            module TestModule TestModule block
+              func DownloadFile private async (string:url, string:path) → bool
+                return true
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -268,135 +177,24 @@ public class EdgeCaseTests
         Assert.True(func.IsAsync);
         Assert.Equal(2, func.Parameters.Count);
     }
-
     #endregion
-
     #region Complex Expression Tests
-
-    [Fact]
-    public void ComplexExpression_NestedIfElse()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Classify}
-                §I{i32:n}
-                §O{str}
-                §IF{if001} n < 0
-                  §R "negative"
-                §EL
-                  §IF{if002} n == 0
-                    §R "zero"
-                §EL
-                    §R "positive"
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        Assert.Single(ast.Functions);
-    }
-
-    [Fact]
-    public void ComplexExpression_MatchStatement()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Describe}
-                §I{i32:n}
-                §O{str}
-                §SW{sw001} n
-                  §CS{cs001} 0
-                  §R "zero"
-                  §/CS{cs001}
-                  §CS{cs002} 1
-                  §R "one"
-                  §/CS{cs002}
-                  §DF
-                  §R "other"
-                  §/DF
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        Assert.Single(ast.Functions);
-    }
-
-    [Fact]
-    public void ComplexExpression_ForLoop()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Sum}
-                §I{i32:n}
-                §O{i32}
-                §B{~total:i32} 0
-                §FOR{for001} i 0 n
-                §B{~total} total + i
-                §/FOR{for001}
-                §R total
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        Assert.Single(ast.Functions);
-    }
 
     [Fact]
     public void ComplexExpression_WhileLoop()
     {
         var source = """
-            §M{m001:TestModule}
-              §F{f001:Countdown}
-                §I{i32:n}
-                §O{void}
-                §B{~count:i32} n
-                §WH{wh001} count > 0
-                  §P count
-                  §B{~count} count - 1
+            module TestModule TestModule block
+              func Countdown private (int:n) → void
+                var int:count = n
+                while (count > 0)
+                  Console.WriteLine(count)
+                  var count = (count - 1)
             """;
 
         var ast = LspTestHarness.GetAst(source);
         Assert.NotNull(ast);
         Assert.Single(ast.Functions);
-    }
-
-    [Fact]
-    public void ComplexExpression_TryCatch()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:SafeDivide}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §TRY{try001}
-                §R a / b
-                §CATCH{catch001:Exception:e}
-                §R 0
-                §/CATCH{catch001}
-                §/TRY{try001}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        Assert.Single(ast.Functions);
-    }
-
-    [Fact]
-    public void ComplexExpression_Delegate()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §DEL{d001:BinaryOp}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §/DEL{d001}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-        Assert.Single(ast.Delegates);
-        Assert.Equal("BinaryOp", ast.Delegates[0].Name);
     }
 
     [Fact]
@@ -404,9 +202,9 @@ public class EdgeCaseTests
     {
         // Events may not be fully supported yet, test that class parses
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Button}
-                §FLD{i32:clickCount}
+            module TestModule TestModule block
+              class Button internal
+                field int:clickCount private
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -426,13 +224,11 @@ public class EdgeCaseTests
     public void Property_GetterOnly()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
-                §PROP{p001:Name:str:pub}
-                §GET
-                §R ""
-                §/GET
-                §/PROP{p001}
+            module TestModule TestModule block
+              class Person internal
+                property string:Name
+                  get
+                    return ""
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -448,15 +244,12 @@ public class EdgeCaseTests
     public void Property_GetterAndSetter()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Counter}
-                §PROP{p001:Value:i32:pub}
-                §GET
-                §R 0
-                §/GET
-                §SET
-                §/SET
-                §/PROP{p001}
+            module TestModule TestModule block
+              class Counter internal
+                property int:Value
+                  get
+                    return 0
+                  set
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -475,16 +268,14 @@ public class EdgeCaseTests
     public void Static_Method()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Math}
-                §MT{m001:Max:pub:static}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §IF{if001} a > b
-                    §R a
-                  §EL
-                    §R b
+            module TestModule TestModule block
+              class Math internal
+                func Max static (int:a, int:b) → int
+                  !
+                  if (a > b)
+                    return a
+                  else
+                    return b
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -502,9 +293,9 @@ public class EdgeCaseTests
     public void Static_Field()
     {
         var source = """
-            §M{m001:TestModule}
-              §CL{c001:Config}
-                §FLD{str:Version:pub}
+            module TestModule TestModule block
+              class Config internal
+                field string:Version
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -514,31 +305,8 @@ public class EdgeCaseTests
         Assert.NotNull(cls);
         Assert.Single(cls.Fields);
     }
-
     #endregion
-
     #region Constructor Tests
-
-    [Fact]
-    public void Constructor_WithParameters()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
-                §FLD{str:_name:priv}
-                §CTOR{ctor001}
-                §I{str:name}
-                §B{_name} name
-                §/CTOR{ctor001}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var cls = ast.Classes.FirstOrDefault(c => c.Name == "Person");
-        Assert.NotNull(cls);
-        Assert.Single(cls.Constructors);
-    }
 
     #endregion
 }

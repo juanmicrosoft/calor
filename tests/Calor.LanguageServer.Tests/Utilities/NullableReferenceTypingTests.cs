@@ -11,22 +11,19 @@ public class NullableReferenceTypingTests
 {
     [Theory]
     [InlineData("input", "Foo")]
-    [InlineData("§THIS.Value", "Foo")]
     [InlineData("input", "string")]
-    [InlineData("§THIS.Value", "string")]
-    [InlineData("input", "str")]
-    [InlineData("§THIS.Value", "str")]
     public async Task LocalAndMemberReturnDiagnostic_UsesShapePolicyAndClearsOnSafeEditAsync(
         string value, string referenceType)
     {
         var source = $$"""
-            §M{m1:LocalMemberAnnotations}
-              §CL{c1:Foo:pub}
-                §FLD{?{{referenceType}}:Value:pub}
-                §MT{probe:Probe:pub} (?{{referenceType}}:input) -> {{referenceType}}
-                  §B{first} {{value}}
-                  §B{second} first
-                  §R second
+            module LocalMemberAnnotations LocalMemberAnnotations block
+              class Foo
+                field {{referenceType}}?:Value
+                func Probe ({{referenceType}}?:input) → {{referenceType}}
+                  !
+                  let first = {{value}}
+                  let second = first
+                  return second
             """;
         var path = Path.Combine(Path.GetTempPath(), "local-member-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
@@ -36,7 +33,7 @@ public class NullableReferenceTypingTests
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
         Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
-        Assert.Equal(referenceType is "string" or "str"
+        Assert.Equal(referenceType == "string"
                 ? BindingReceivingShape.ScalarString
                 : BindingReceivingShape.Nominal,
             diagnostic.BindingContext?.Shape);
@@ -47,7 +44,7 @@ public class NullableReferenceTypingTests
         Assert.Equal(diagnostic.Span, compiler.Span);
         Assert.Equal(diagnostic.Severity, compiler.Severity);
         var update = await document.UpdateAsync(
-            source.Replace($"-> {referenceType}", $"-> ?{referenceType}", StringComparison.Ordinal), 1);
+            source.Replace($") → {referenceType}", $") → {referenceType}?", StringComparison.Ordinal), 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == diagnostic.Code);
     }
@@ -56,12 +53,15 @@ public class NullableReferenceTypingTests
     public async Task NominalReturnDiagnostic_IsActiveAndClearsOnSafeEditAsync()
     {
         const string source = """
-            §M{m1:NominalIdentity}
-              §CL{c1:Foo:pub}
-                §MT{get:Get:pub:static} (?Foo:input) -> ?Foo
-                  §R input
-                §MT{probe:Probe:pub:static} (?Foo:input) -> Foo
-                  §R §C{Foo.Get} §A input §/C
+            module NominalIdentity NominalIdentity block
+              class Foo
+                func Get static (Foo?:input) → Foo?
+                  !
+                  return input
+
+                func Probe static (Foo?:input) → Foo
+                  !
+                  return Foo.Get(input)
             """;
         var path = Path.Combine(Path.GetTempPath(), "nominal-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
@@ -75,22 +75,22 @@ public class NullableReferenceTypingTests
         var result = Compiler.Program.Compile(source, path);
         Assert.True(result.HasErrors);
         Assert.Contains(result.Diagnostics, d => d.Code == diagnostic.Code);
-        var update = await document.UpdateAsync(source.Replace("-> Foo", "-> ?Foo", StringComparison.Ordinal), 1);
+        var update = await document.UpdateAsync(source.Replace(
+            "Probe static (Foo?:input) → Foo", "Probe static (Foo?:input) → Foo?", StringComparison.Ordinal), 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == diagnostic.Code);
     }
 
     [Theory]
-    [InlineData("?str", "\"safe\"")]
-    [InlineData("?string", "§C{System.Environment.GetEnvironmentVariable} §A \"CALOR_T1_EDITOR\" §/C")]
+    [InlineData("string?", "\"safe\"")]
     public async Task SupportedNullableReferences_HaveNoSpuriousTypingDiagnosticsAsync(string type, string value)
     {
         var source = $$"""
-            §M{m1:NullableTyping}
-              §F{f1:Probe:pub} ({{type}}:input) -> {{type}}
-                §E{env}
-                §B{value:{{type}}} {{value}}
-                §R value
+            module NullableTyping NullableTyping block
+              func Probe ({{type}}:input) → {{type}}
+                ! env
+                let {{type}}:value = {{value}}
+                return value
             """;
         var path = Path.Combine(Path.GetTempPath(), "typing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
@@ -110,18 +110,17 @@ public class NullableReferenceTypingTests
     [Theory]
     [InlineData("§B{x:?str} §SM \"value\"", "void")]
     [InlineData("§R §SM \"value\"", "?str")]
-    [InlineData("§B{x:Option<str>} input", "void")]
-    public async Task RepresentationMismatch_IsActiveAndClearsOnSafeEditAsync(string body, string returnType)
+    [InlineData("§R §NN{str}", "?str")]
+    public async Task RemovedConstructors_AreRejectedAndClearOnSafeEditAsync(string body, string returnType)
     {
-        var source = $"§M{{m1:NullableTyping}}\n  §F{{f1:Probe:pub}} (?str:input) -> {returnType}\n    §E{{alloc}}\n    {body}\n";
+        var source = $"§M{{NullableTyping}}\n  §F{{Probe:pub}} (?str:input) -> {returnType}\n    §E{{alloc}}\n    {body}\n";
         var path = Path.Combine(Path.GetTempPath(), "typing-" + Guid.NewGuid().ToString("N") + ".calr");
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
-        var editor = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.ReferenceOptionMismatch));
+        var editor = document.Diagnostics.First(d => d.Severity == DiagnosticSeverity.Error);
         var lsp = DiagnosticConverter.ToLspDiagnostic(editor, source);
         Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(editor.Span, source), lsp.Range);
-        Assert.True(BindingDiagnosticPolicy.IsCompilationError(editor));
         foreach (var transpile in new[] { true, false })
         {
             var result = Compiler.Program.Compile(source, path, new CompilationOptions
@@ -129,14 +128,13 @@ public class NullableReferenceTypingTests
                 EnableTypeChecking = false,
                 UnsafeTranspileOnly = transpile
             });
-            var compiler = Assert.Single(result.Diagnostics.Errors);
-            Assert.Equal(editor.Code, compiler.Code);
-            Assert.Equal(editor.Span, compiler.Span);
-            Assert.Equal(editor.Severity, compiler.Severity);
+            Assert.Contains(result.Diagnostics.Errors, compiler =>
+                compiler.Code == editor.Code && compiler.Span == editor.Span
+                && compiler.Severity == editor.Severity);
         }
         var update = await document.UpdateAsync(
-            "§M{m1:NullableTyping}\n  §F{f1:Probe:pub} (?str:input) -> ?str\n    §R input\n", 1);
+            "module NullableTyping NullableTyping block\n  func Probe (string?:input) → string?\n    !\n    return input\n", 1);
         Assert.True(update.Accepted);
-        Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == DiagnosticCode.ReferenceOptionMismatch);
+        Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 }

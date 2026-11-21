@@ -25,8 +25,8 @@ The `format` command formats Calor source files according to the canonical Calor
 # Format a single file (output to stdout)
 calor format MyModule.calr
 
-# Format and overwrite the file (explicitly acknowledge the experimental writer)
-calor format MyModule.calr --write --experimental
+# Format and overwrite the file after validation
+calor format MyModule.calr --write
 
 # Check if files are formatted (for CI)
 calor format src/*.calr --check
@@ -42,17 +42,17 @@ calor format MyModule.calr --diff
 | Option | Short | Default | Description |
 |:-------|:------|:--------|:------------|
 | `--check` | `-c` | `false` | Check if files are formatted without modifying (exit 1 if not) |
-| `--write` | `-w` | `false` | Write back; requires `--experimental` or `CALOR_EXPERIMENTAL_FORMAT_WRITE=1` |
+| `--write` | `-w` | `false` | Write back after lossless validation |
 | `--diff` | `-d` | `false` | Show diff of formatting changes |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--heal` | — | `false` | Best-effort source repair; review every reported control-flow guess |
 | `--format` | — | `text` | `text` or schema 2.0 `json`; no `-f` alias |
-| `--experimental` | — | `false` | Acknowledge known formatter write defects |
+| `--experimental` | — | `false` | Deprecated compatibility flag; validated writes are enabled by default |
 
-> **Release policy:** the write path can rewrite identifiers and drop
-> comments. `format --write` is refused with `Calor1346` unless you pass
-> `--experimental` or set `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`. Read-only stdout,
-> `--check`, and `--diff` remain available without acknowledgment.
+The writer preserves names, comments, strings and other non-trivia tokens.
+It validates generated C# and idempotence. When semantic errors prevent those
+checks, it leaves the source unchanged and reports a conservative fallback.
+Review changes rather than treating formatting as semantic repair.
 
 ---
 
@@ -61,11 +61,12 @@ calor format MyModule.calr --diff
 The Calor formatter applies these rules:
 
 - 2 spaces per indentation level
-- Single space after structure tags
-- Single space around operators in expressions
-- No trailing whitespace
-- One blank line between functions
-- Newline at end of file
+- Preserve native declaration and expression tokens, including operator spelling
+- Remove eligible trailing whitespace outside comments and protected payloads
+- Preserve comments, blank-line structure and existing line endings
+
+It does not rewrite operator spacing, add modifiers, rename declarations or
+migrate retired syntax.
 
 ---
 

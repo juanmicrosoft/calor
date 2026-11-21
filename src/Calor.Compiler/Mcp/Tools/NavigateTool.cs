@@ -171,7 +171,7 @@ public sealed class NavigateTool : McpToolBase
             if (IsPositionInNode(line, cls.Span))
             {
                 if (cls.Name == identifier)
-                    return CreateDefinitionInfo(cls.Name, "class", cls.Span, source);
+                    return CreateDefinitionInfo(cls.Name, cls.IsRecord ? "record" : "class", cls.Span, source);
 
                 foreach (var field in cls.Fields)
                 {
@@ -218,7 +218,7 @@ public sealed class NavigateTool : McpToolBase
         foreach (var cls in ast.Classes)
         {
             if (cls.Name == identifier)
-                return CreateDefinitionInfo(cls.Name, "class", cls.Span, source);
+                return CreateDefinitionInfo(cls.Name, cls.IsRecord ? "record" : "class", cls.Span, source);
         }
 
         foreach (var iface in ast.Interfaces)
@@ -437,7 +437,7 @@ public sealed class NavigateTool : McpToolBase
 
         foreach (var cls in ast.Classes)
         {
-            if (cls.Name == name) return "class";
+            if (cls.Name == name) return cls.IsRecord ? "record" : "class";
             foreach (var method in cls.Methods)
             {
                 if (method.Name == name) return "method";
@@ -595,16 +595,17 @@ public sealed class NavigateTool : McpToolBase
             }
         }
 
-        if (kindFilter == null || kindFilter == "class")
+        if (kindFilter == null || kindFilter == "class" || kindFilter == "record")
         {
             foreach (var cls in ast.Classes)
             {
-                if (MatchesQuery(cls.Name, queryLower))
+                if ((kindFilter == null || kindFilter == (cls.IsRecord ? "record" : "class"))
+                    && MatchesQuery(cls.Name, queryLower))
                 {
                     results.Add(new SymbolMatch
                     {
                         Name = cls.Name,
-                        Kind = "class",
+                        Kind = cls.IsRecord ? "record" : "class",
                         FilePath = filePath,
                         Line = cls.Span.Line,
                         Column = cls.Span.Column,
@@ -1097,11 +1098,13 @@ public sealed class NavigateTool : McpToolBase
         {
             Found = true,
             Name = cls.Name,
-            Kind = "class",
+            Kind = cls.IsRecord ? "record" : "class",
             Modifiers = modifiers.Count > 0 ? modifiers : null,
             BaseClass = cls.BaseClass,
             Interfaces = cls.ImplementedInterfaces.Count > 0 ? cls.ImplementedInterfaces.ToList() : null,
-            Signature = $"class {cls.Name}" + (cls.BaseClass != null ? $" : {cls.BaseClass}" : ""),
+            Signature = $"{(cls.IsRecord ? "record" : "class")} {cls.Name}"
+                + (cls.RecordParameters == null ? "" : $"({string.Join(", ", cls.RecordParameters.Select(parameter => $"{parameter.TypeName} {parameter.Name}"))})")
+                + (cls.BaseClass != null ? $" : {cls.BaseClass}" : ""),
             MemberCount = cls.Fields.Count + cls.Properties.Count + cls.Methods.Count
         };
     }

@@ -1,0 +1,115 @@
+module L2M29 L2M29 block
+  module L2M29Module public
+
+    func l2m29_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M31.L3M31Module.l3m31_fn04(x, 26)
+      let int:v2 = L3M06.L3M06Module.l3m06_fn02(x, 33)
+      return ((v1 + v2) + y)
+
+    func l2m29_fn02 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23206)
+      let int:total = ((x * 3) + y)
+      if (total > 23206)
+        return 23206
+      return total
+
+    func l2m29_fn03 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23213)
+      let int:total = ((x * 2) + y)
+      if (total > 23213)
+        return 23213
+      return total
+
+    func l2m29_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23220)
+      let int:total = ((x * 3) + y)
+      if (total > 23220)
+        return 23220
+      return total
+
+    func l2m29_fn05 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23227)
+      if (x >= 23227)
+        return x
+      else
+        return 23227
+
+    func l2m29_fn06 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 23234)
+      let int:total = ((x * 5) + y)
+      if (total > 23234)
+        return 23234
+      return total
+
+    func l2m29_fn07 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 23241)
+        return (acc + 23241)
+      else
+        return ((acc * 2) + 23241)
+
+    func l2m29_fn08 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 2) + y)
+      if (acc > 23248)
+        return (acc + 23248)
+      else
+        return ((acc * 2) + 23248)
+
+    func l2m29_fn09 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 23255)
+      if (x >= 23255)
+        return x
+      else
+        return 23255
+
+    func l2m29_fn10 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 2) + y)
+      if (acc > 23262)
+        return (acc + 23262)
+      else
+        return ((acc * 2) + 23262)
+
+    func l2m29_fn11 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 5) + y)
+      if (acc > 23269)
+        return (acc + 23269)
+      else
+        return ((acc * 2) + 23269)
+
+    func l2m29_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M14.L3M14Module.l3m14_fn05(x, 80)
+      let int:v2 = L3M18.L3M18Module.l3m18_fn06(x, 42)
+      return ((v1 + v2) + y)
+
+    func l2m29_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M25.L3M25Module.l3m25_fn11(x, 10)
+      return (v1 + y)

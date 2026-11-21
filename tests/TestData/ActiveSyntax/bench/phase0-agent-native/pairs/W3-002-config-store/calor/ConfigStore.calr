@@ -1,0 +1,16 @@
+module ConfigStore ConfigStore block
+  module ConfigStoreModule partial
+    func Get (string:path, string:key) → string
+      ! fs:r
+      let bool:exists = File.Exists(path)
+      if (!exists)
+        return ""
+      let string:prefix = (key + "=")
+      let string[]:lines = File.ReadAllLines(path)
+      each line in lines
+        let bool:matches = line.StartsWith(prefix)
+        if matches
+          return line.Substring(prefix.Length)
+      return ""
+
+

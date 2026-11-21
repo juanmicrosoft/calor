@@ -62,12 +62,9 @@ public sealed class CrossModuleEffectEnforcementPass
         IReadOnlyList<(ModuleNode Ast, string FilePath)> modules,
         CrossModuleEffectRegistry registry)
     {
-        var summaries = new List<(EffectSummary, string)>(modules.Count);
-        foreach (var (ast, path) in modules)
-        {
-            summaries.Add((EffectSummaryBuilder.Build(ast), path));
-        }
-        return Enforce(summaries, registry);
+        // The driver's cross-module map, as `calor build` passes it: without it a
+        // qualified call into another module is not recognized as one.
+        return Enforce(EffectSummaryBuilder.BuildAll(modules), registry);
     }
 
     /// <summary>

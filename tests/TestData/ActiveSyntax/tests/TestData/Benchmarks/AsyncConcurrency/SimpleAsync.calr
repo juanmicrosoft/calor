@@ -1,0 +1,9 @@
+module SimpleAsync SimpleAsync
+  module SimpleAsyncModule
+    func GetValue public async () → int
+      ! net
+      return 42
+
+    func Fallback public () → int
+      !
+      return 0

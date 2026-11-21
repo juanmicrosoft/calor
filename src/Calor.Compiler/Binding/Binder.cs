@@ -1,15 +1,42 @@
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Compiler.Binding;
+
+internal sealed record SourceProjection(ModuleNode Module, string Path, string Source,
+    string Marker, IReadOnlyList<AstNode> Callables);
+
+internal sealed record SourceCallable(MethodNode Declaration, ClassDefinitionNode Owner,
+    FunctionSymbol Symbol, TypeSymbol OwnerSymbol);
+
+// Binding consumes project source evidence without depending on effect enforcement.
+internal interface ISourceBindingContext
+{
+    IReadOnlyList<SourceProjection> CompanionSources(string? sourcePath, ContractMode mode);
+    // One annotated image of every module of the pass, shared by every projection that
+    // binds a module of it (null when there is none to share).
+    CallGraphAnalysis.SharedProjectionImage? SharedImage(string? sourcePath, ContractMode mode) => null;
+    SourceCallable? FindCallable(AstNode declaration);
+}
 
 /// <summary>
 /// Performs semantic analysis and builds the bound tree.
 /// </summary>
 public sealed class Binder
 {
+    internal IReadOnlyDictionary<string, CrossModuleFunctionTarget>? CrossModuleFunctionModules { get; init; }
+    internal ISourceBindingContext? CrossModuleTypes { get; init; }
+    internal Dictionary<SymbolId, SourceCallable> ExternalSourceCalls { get; } = [];
+    internal IReadOnlyDictionary<AstNode, FunctionSymbol> FunctionSymbols => _functionSymbols;
+    internal IReadOnlyDictionary<ClassDefinitionNode, TypeSymbol> ClassSymbols => _classSymbols;
+    private readonly string? _sourcePath;
+    internal Dictionary<TextSpan, string> CrossModuleCallTargets { get; } = new();
+    internal Dictionary<TextSpan, FunctionSymbol> SourceExtensionCallTargets { get; } = new();
     internal delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
 
     private static readonly IReadOnlyDictionary<Type, ExpressionBinder> ExpressionBinders =
@@ -31,7 +58,6 @@ public sealed class Binder
             [typeof(ConditionalExpressionNode)] = static (binder, expression) => binder.BindConditionalExpression((ConditionalExpressionNode)expression),
             [typeof(DecimalLiteralNode)] = static (_, expression) => new BoundDecimalLiteral(expression.Span, ((DecimalLiteralNode)expression).Value),
             [typeof(DictionaryCreationNode)] = static (binder, expression) => binder.BindDictionaryCreation((DictionaryCreationNode)expression),
-            [typeof(ErrExpressionNode)] = static (binder, expression) => binder.BindErrExpression((ErrExpressionNode)expression),
             [typeof(ExistsExpressionNode)] = static (binder, expression) => binder.BindExistsExpression((ExistsExpressionNode)expression),
             [typeof(ExpressionCallNode)] = static (binder, expression) => binder.BindExpressionCall((ExpressionCallNode)expression),
             [typeof(FallbackExpressionNode)] = static (binder, expression) => binder.BindFallbackInterop((FallbackExpressionNode)expression),
@@ -49,12 +75,12 @@ public sealed class Binder
             [typeof(MatchExpressionNode)] = static (binder, expression) => binder.BindMatchExpression((MatchExpressionNode)expression),
             [typeof(MultiDimArrayAccessNode)] = static (binder, expression) => binder.BindMultiDimArrayAccess((MultiDimArrayAccessNode)expression),
             [typeof(MultiDimArrayCreationNode)] = static (binder, expression) => binder.BindMultiDimArrayCreation((MultiDimArrayCreationNode)expression),
-            [typeof(NameOfExpressionNode)] = static (_, expression) => new BoundStringLiteral(expression.Span, ((NameOfExpressionNode)expression).Name),
+            [typeof(NameOfExpressionNode)] = static (binder, expression) => binder.BindStringLiteral(
+                new StringLiteralNode(expression.Span, ((NameOfExpressionNode)expression).Name)),
             [typeof(NewExpressionNode)] = static (binder, expression) => binder.BindNewExpression((NewExpressionNode)expression),
-            [typeof(NoneExpressionNode)] = static (binder, expression) => binder.BindNoneExpression((NoneExpressionNode)expression),
             [typeof(NullCoalesceNode)] = static (binder, expression) => binder.BindNullCoalesce((NullCoalesceNode)expression),
             [typeof(NullConditionalNode)] = static (binder, expression) => binder.BindNullConditional((NullConditionalNode)expression),
-            [typeof(OkExpressionNode)] = static (binder, expression) => binder.BindOkExpression((OkExpressionNode)expression),
+            [typeof(OverflowContextExpressionNode)] = static (binder, expression) => binder.BindOverflowContext((OverflowContextExpressionNode)expression),
             [typeof(PointerDereferenceNode)] = static (binder, expression) => binder.BindPointerDereference((PointerDereferenceNode)expression),
             [typeof(RangeExpressionNode)] = static (binder, expression) => binder.BindRangeExpression((RangeExpressionNode)expression),
             [typeof(RawCSharpExpressionNode)] = static (binder, expression) => binder.BindRawCSharpInterop((RawCSharpExpressionNode)expression),
@@ -63,7 +89,6 @@ public sealed class Binder
             [typeof(SelfRefNode)] = static (binder, expression) => binder.BindSelfReference((SelfRefNode)expression),
             [typeof(SetCreationNode)] = static (binder, expression) => binder.BindSetCreation((SetCreationNode)expression),
             [typeof(SizeOfNode)] = static (binder, expression) => binder.BindSizeOf((SizeOfNode)expression),
-            [typeof(SomeExpressionNode)] = static (binder, expression) => binder.BindSomeExpression((SomeExpressionNode)expression),
             [typeof(StackAllocNode)] = static (binder, expression) => binder.BindStackAlloc((StackAllocNode)expression),
             [typeof(StringBuilderOperationNode)] = static (binder, expression) => binder.BindStringBuilderOperation((StringBuilderOperationNode)expression),
             [typeof(StringLiteralNode)] = static (binder, expression) => binder.BindStringLiteral((StringLiteralNode)expression),
@@ -89,34 +114,93 @@ public sealed class Binder
     private readonly string _sourceIdentity;
     private Scope _scope;
     private readonly Dictionary<AstNode, FunctionSymbol> _functionSymbols = new();
+    private readonly Dictionary<AwaitExpressionNode, BoundStructuralExpression> _boundAwaits =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<AwaitExpressionNode, BoundStructuralExpression> BoundAwaits => _boundAwaits;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundSourceEnumConstants =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundSourceEnumConstants =>
+        _boundSourceEnumConstants;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundSourceStaticFieldReads =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundSourceStaticFieldReads =>
+        _boundSourceStaticFieldReads;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundMetadataConstants =
+        new(ReferenceEqualityComparer.Instance);
+    /// <summary>
+    /// Every source field symbol of the module, with whether it is `const` and, when its value
+    /// is the same in every configuration, its initializer (overload resolution reads it).
+    /// </summary>
+    private readonly Dictionary<VariableSymbol, (bool IsConst, ExpressionNode? Initializer)> _sourceFieldConstants =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundMetadataConstants =>
+        _boundMetadataConstants;
+    private readonly Dictionary<ExpressionNode, BoundFieldAccessExpression> _boundMetadataStaticFieldReads =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundFieldAccessExpression> BoundMetadataStaticFieldReads =>
+        _boundMetadataStaticFieldReads;
+    private readonly Dictionary<ExpressionNode, BoundExpression> _boundContractExpressions = new();
+    internal IReadOnlyDictionary<ExpressionNode, BoundExpression> BoundContractExpressions =>
+        _boundContractExpressions;
+    private readonly Dictionary<ExpressionNode, BoundCallExpression> _boundVerificationCalls =
+        new(ReferenceEqualityComparer.Instance);
+    internal IReadOnlyDictionary<ExpressionNode, BoundCallExpression> BoundVerificationCalls =>
+        _boundVerificationCalls;
+    private bool _bindingContract;
+    private Verification.ModuleInheritanceResult? _contractInheritance;
+    internal Verification.ModuleInheritanceResult? ContractInheritance => _contractInheritance;
+    internal bool IsStaticSourceMethod(FunctionSymbol symbol) => _staticMethodSymbols.Contains(symbol);
+    private readonly HashSet<FunctionSymbol> _staticMethodSymbols = new();
     private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
+    private readonly Dictionary<EventDefinitionNode, VariableSymbol> _eventSymbols = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ClassDefinitionNode, ClassDefinitionNode> _containingClasses = new();
     private readonly Dictionary<ClassDefinitionNode, string> _qualifiedClassNames = new();
     private readonly Dictionary<ClassDefinitionNode, SymbolId> _classSymbolIds = new();
     private readonly Dictionary<ClassDefinitionNode, TypeSymbol> _classSymbols = new();
     private readonly Dictionary<string, ClassDefinitionNode> _classesByQualifiedName = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ClassDefinitionNode>> _classesBySimpleName = new(StringComparer.Ordinal);
+    private readonly Dictionary<SymbolId, (TypeSymbol Symbol, InterfaceDefinitionNode Declaration)> _interfacesBySymbolId = new();
+    private readonly Dictionary<SymbolId, IReadOnlyList<VariableSymbol>> _enumMembers = new();
     private readonly Dictionary<string, DelegateDefinitionNode> _delegateDefinitions = new(StringComparer.Ordinal);
     private readonly Dictionary<VariableSymbol, VariableSymbol> _flowNarrowingSources = new();
+    // 0.30: storage in a `nullable oblivious` module that may hold a null the module itself
+    // introduced (a null or ?T initializer, any reassignment, a ref/out write, a lost
+    // non-null proof). Such storage is no longer merely oblivious, so it keeps the
+    // conservative Calor0274 checks. Flow-insensitive within a module by design.
+    private readonly HashSet<VariableSymbol> _obliviousNullTaintedStorage = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<(VariableSymbol? Receiver, VariableSymbol Member), VariableSymbol>
+        _memberFlowStorages = new();
     private readonly Dictionary<VariableSymbol, CallableMutationSummary> _callableState =
         new(ReferenceEqualityComparer.Instance);
     private List<CallableMutationWrite>? _deferredCallableWrites;
     private bool _isDiscoveringLoopCallables;
     private readonly Dictionary<string, HashSet<string>> _topLevelFunctionLookupNames = new(StringComparer.Ordinal);
-    private readonly Dictionary<CSharpInteropBlockNode, IReadOnlySet<string>> _interopMethodNames = new();
+    private readonly Dictionary<CSharpInteropBlockNode, IReadOnlySet<(string Name, int Arity)>> _interopMethodArities = new();
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
     // Insertion order of _symbolsById. Loop discovery removes the symbols it
     // added; rebuilding the module's map from this list keeps the published
     // enumeration order equal to declaration order without copying the whole
     // map at every loop.
     private readonly List<SymbolId> _symbolOrder = new();
-    private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
+    // The TypeSymbol values of _symbolsById, in its enumeration order. Type lookups
+    // scan this on every variable reference; rebuilding it from the whole map (which
+    // also holds every local) each time made binding quadratic in module size.
+    // Reset whenever a TypeSymbol enters or leaves the map. Other entries can come
+    // and go without moving the TypeSymbols' relative enumeration order.
+    private TypeSymbol[]? _sourceTypeSymbols;
+    private readonly Dictionary<SymbolId, int> _declarationIdOccurrences = new();
+    private readonly Dictionary<(SymbolId Context, string Kind), SymbolId> _snapshotLocalContexts = new();
+    private readonly System.Buffers.ArrayBufferWriter<byte> _localIdentityBytes = new(256);
+    private System.Text.Json.Utf8JsonWriter? _localIdentityWriter;
     // While a loop body is bound for discovery, each declaration-id counter
     // change is journaled (previous value, 0 = absent) so it can be undone.
-    private List<(string Key, int Previous)>? _declarationOccurrenceJournal;
+    private List<(SymbolId Key, int Previous)>? _declarationOccurrenceJournal;
     private IReadOnlySet<string> _declaredReferenceTypes = new HashSet<string>(StringComparer.Ordinal);
     private SymbolId _moduleSymbolId;
+    private HashSet<string> _toolingIds = new(StringComparer.Ordinal);
     private SymbolId _declarationContext;
+    private string _transientBindingId = "";
     private string? _currentClassName;
     private ClassDefinitionNode? _currentClass;
 
@@ -127,6 +211,7 @@ public sealed class Binder
     private Scope? _currentClassScope;
     private SymbolId _currentClassIdentity;
     private string? _currentNamespaceIdentity;
+    private string? _currentNamespaceScopeId;
     private bool _isStaticContext;
 
     /// <summary>#943 (D1 RO-NULL-2): the current callable's ref/out/in parameters, which may alias.</summary>
@@ -146,6 +231,18 @@ public sealed class Binder
     /// that cost unless they need it. Null until first BCL-shaped resolve.
     /// </summary>
     private Metadata.MetadataBinder? _metadataBinder;
+    private readonly Dictionary<SymbolId, IReadOnlyDictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>>
+        _metadataTypeParameterScopes = new();
+    private IReadOnlyList<UsingDirectiveNode> _metadataUsings = [];
+    private IReadOnlyDictionary<string, NamespaceScopeInfo> _metadataNamespaceScopes =
+        new Dictionary<string, NamespaceScopeInfo>();
+    private readonly Dictionary<(string? Scope, string? Namespace, string Name, int Arity),
+        (bool Handled, Microsoft.CodeAnalysis.INamedTypeSymbol? Type)> _scopedMetadataTypes = new();
+    private ModuleNode? _asyncTypeModule;
+    private Analysis.CallGraphAnalysis.OperatorBindings? _sourceCallConversions;
+    // The annotated C# binding image disables this to prevent recursive rebinding.
+    internal bool ResolveSourceCallConversions { get; init; } = true;
+    internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
 
     /// <summary>
     /// v0.14 §S4 (nullability workstream / issue #875) — declared return
@@ -159,11 +256,13 @@ public sealed class Binder
     /// their return type is inferred, not the enclosing function's declaration.
     /// </summary>
     private string? _currentFunctionReturnType;
+    private BoundTypes.NullableAnnotation _declaredReferenceAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
 
     public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _sourceIdentity = SymbolSourceIdentity.Canonicalize(sourceIdentity);
+        _sourcePath = sourceIdentity;
         _scope = new Scope();
     }
 
@@ -206,8 +305,17 @@ public sealed class Binder
         string callTarget,
         IReadOnlyList<BoundExpression> args,
         IReadOnlyList<string?>? argumentNames,
-        IReadOnlyList<string?>? argumentModifiers)
+        IReadOnlyList<string?>? argumentModifiers,
+        BoundExpression? computedReceiver = null,
+        IReadOnlyList<string>? typeArguments = null,
+        ExpressionCallNode? contextualCall = null)
     {
+        if (args.Where((argument, index) => argument.HasUnknownInferredType
+                || argument is BoundVariableExpression { Variable: { Id.IsNone: true, Name: var name } }
+                    && (name != "_" || argumentModifiers?.ElementAtOrDefault(index) != "out")).Any()
+            || computedReceiver?.HasUnknownInferredType == true
+            || computedReceiver is BoundVariableExpression { Variable.Id.IsNone: true })
+            return null;
         // BCL-shape heuristic: receiver contains at least one dot AND starts
         // with System./Microsoft. or a capitalized identifier followed by a dot.
         var lastDot = callTarget.LastIndexOf('.');
@@ -215,7 +323,7 @@ public sealed class Binder
         var receiverName = callTarget[..lastDot];
         var methodName = callTarget[(lastDot + 1)..];
         if (string.IsNullOrEmpty(receiverName) || string.IsNullOrEmpty(methodName)) return null;
-        if (!(receiverName.StartsWith("System.", StringComparison.Ordinal)
+        if (computedReceiver is null && !(receiverName.StartsWith("System.", StringComparison.Ordinal)
               || receiverName.StartsWith("Microsoft.", StringComparison.Ordinal)))
         {
             return null;
@@ -223,11 +331,31 @@ public sealed class Binder
 
         var binder = GetOrCreateMetadataBinder();
         if (binder is null) return null;
+        if (computedReceiver is not null
+            && NullabilityChecker.GetMethodInputArrayType(computedReceiver) is null
+            && (computedReceiver.Type is BoundTypes.NominalBoundType { Declaration: not null }
+                || ResolveClass(computedReceiver.Type.DisplayString) is not null))
+            return null;
+        if (computedReceiver?.Type is BoundTypes.UnresolvedBoundType
+            || computedReceiver is BoundCallExpression { ResolvedSymbol: null, ResolvedMetadataMethod: null,
+                Type.DisplayString: "OBJECT" })
+            return null;
+        if (computedReceiver is not null && args.Any(argument =>
+            argument.Type is BoundTypes.UnresolvedBoundType
+            || argument is BoundCallExpression { ResolvedSymbol: null, ResolvedMetadataMethod: null,
+                Type.DisplayString: "OBJECT" }
+            || argument is BoundVariableExpression
+                { Variable: { IsTypeInferred: true, TypeName: "OBJECT", InferredReferenceType: null } }))
+            return null;
 
         // Member reads and their receiving calls must use the same actual reference set.
         var ctx = binder.Context;
-        var receiverType = ctx.TryResolveType(receiverName);
-        if (receiverType is null) return null;
+        var receiverType = computedReceiver is null ? ctx.TryResolveType(receiverName)
+            : ResolveMetadataArrayReceiver(computedReceiver);
+        if (receiverType is null && computedReceiver is not null
+            && NullabilityChecker.GetMethodInputArrayType(computedReceiver) is null)
+            receiverType = ResolveComputedMetadataType(ctx, computedReceiver.Type.DisplayString);
+        if (receiverType is null) return ResolveContextualCall();
 
         // Argument types: use each BoundExpression's Type.DisplayString to
         // find a Roslyn type. The Calor short names (STRING/INT/BOOL/…) are
@@ -246,7 +374,6 @@ public sealed class Binder
             var arrayType = NullabilityChecker.GetMethodInputArrayType(args[i]);
             var display = args[i].Type.DisplayString;
             // Strip only recognized nullable annotations for metadata lookup.
-            // Explicit runtime Option<T> retains its distinct representation.
             var trimmed = display;
             while (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
             {
@@ -254,8 +381,13 @@ public sealed class Binder
             }
             var t = arrayType is not null
                 ? GetMetadataArrayInputType(ctx, arrayType)
-                : ResolveBclArgumentType(ctx, trimmed) ?? ctx.TryResolveType("System.Object");
-            if (t is null) return null;
+                : args[i].Type is BoundTypes.NominalBoundType
+                    { RoslynSymbol: { IsValueType: true, IsGenericType: false,
+                        SpecialType: not Microsoft.CodeAnalysis.SpecialType.None } primitive }
+                    ? primitive
+                : (computedReceiver is null ? ResolveBclArgumentType(ctx, trimmed) : ResolveComputedMetadataType(ctx, display))
+                    ?? (computedReceiver is null ? ctx.TryResolveType("System.Object") : null);
+            if (t is null) return ResolveContextualCall();
             var modifier = argumentModifiers != null && i < argumentModifiers.Count
                 ? argumentModifiers[i]
                 : null;
@@ -270,18 +402,391 @@ public sealed class Binder
             metaArgs[i] = new Metadata.MetadataArgument(t, refKind, name);
         }
 
-        var result = binder.ResolveCall(receiverType, methodName, metaArgs);
-        if (!result.IsResolved) return null;
+        Microsoft.CodeAnalysis.ITypeSymbol[] explicitTypes = [];
+        if (typeArguments is { Count: > 0 })
+        {
+            var resolvedTypes = typeArguments.Select(type => ResolveComputedMetadataType(ctx, type)).ToArray();
+            if (resolvedTypes.Any(type => type is null))
+                return null;
+            explicitTypes = resolvedTypes.OfType<Microsoft.CodeAnalysis.ITypeSymbol>().ToArray();
+        }
+        var imports = computedReceiver is null ? null : MetadataExtensionImports(ctx);
+        var result = computedReceiver is null ? binder.ResolveCall(receiverType, methodName, metaArgs)
+            : binder.ResolveExpressionCall(receiverType, methodName, metaArgs, explicitTypes,
+                computedReceiver is BoundTypeReferenceExpression, imports: imports);
+        if (!result.IsResolved) return ResolveContextualCall();
 
         if (result.Symbol!.IsGenericMethod && metaArgs.Any(argument => argument.Type is Microsoft.CodeAnalysis.IArrayTypeSymbol))
         {
-            var preserved = binder.ResolveCall(receiverType, methodName, metaArgs, preserveArrayAnnotations: true);
+            var preserved = computedReceiver is null
+                ? binder.ResolveCall(receiverType, methodName, metaArgs, preserveArrayAnnotations: true)
+                : binder.ResolveExpressionCall(receiverType, methodName, metaArgs, explicitTypes,
+                    computedReceiver is BoundTypeReferenceExpression, preserveArrayAnnotations: true,
+                    imports: imports);
             if (!Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(result.Symbol, preserved.Symbol))
                 return null;
             // Accurate method-input facts must not implicitly expand initialization/return policy.
             result = preserved with { LegacyReturnType = result.GetReturnBoundTypeEx() };
         }
         return result;
+
+        Metadata.MetadataBinderResult? ResolveContextualCall()
+        {
+            if (contextualCall is null || !ResolveSourceCallConversions || _asyncTypeModule is null)
+                return null;
+            // Only the complete image can name source payloads inside metadata
+            // containers. Its selected signature is typing evidence, not an effect grant.
+            return SourceCallBindings().ContextualMetadataCalls.TryGetValue(contextualCall, out var selected)
+                ? selected : null;
+        }
+    }
+
+    private Microsoft.CodeAnalysis.ITypeSymbol? ResolveComputedMetadataType(
+        Metadata.MetadataContext context, string typeName)
+        => ResolveComputedMetadataType(context, typeName, _currentNamespaceScopeId,
+            _currentNamespaceIdentity, _currentClassName, null);
+
+    private Microsoft.CodeAnalysis.ITypeSymbol? ResolveComputedMetadataType(
+        Metadata.MetadataContext context, string typeName, string? namespaceScopeId,
+        string? namespaceIdentity, string? containingTypeName, IReadOnlySet<string>? declaredTypeParameters)
+    {
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referent))
+        {
+            var inner = ResolveComputedMetadataType(context, referent, namespaceScopeId,
+                namespaceIdentity, containingTypeName, declaredTypeParameters);
+            return inner?.IsValueType == true
+                ? context.TryResolveType("System.Nullable`1")?.Construct(inner)
+                : inner?.WithNullableAnnotation(Microsoft.CodeAnalysis.NullableAnnotation.Annotated);
+        }
+        if (declaredTypeParameters?.Contains(typeName.TrimStart('@')) == true)
+            return null;
+        if (declaredTypeParameters is not null
+            && TrySplitArrayTypeSpelling(typeName, out var element, out var rank, out var arrayAnnotation,
+                _declaredReferenceAnnotation))
+            return ResolveComputedMetadataType(context, element, namespaceScopeId,
+                    namespaceIdentity, containingTypeName, declaredTypeParameters) is { } arrayElement
+                ? context.HostCompilationForBinder.CreateArrayTypeSymbol(arrayElement, rank, arrayElement.NullableAnnotation)
+                    .WithNullableAnnotation(arrayAnnotation == BoundTypes.NullableAnnotation.Annotated
+                        ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                        : arrayAnnotation == BoundTypes.NullableAnnotation.Oblivious
+                            ? Microsoft.CodeAnalysis.NullableAnnotation.None : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated)
+                : null;
+        if (declaredTypeParameters is null && GetTypeParameterConstraints(typeName) is not null)
+            return ResolveMetadataTypeParameter(context, typeName);
+        if (declaredTypeParameters is not null
+            && ResolveSourceType(TypeIdentity.ToLookupName(typeName), containingTypeName,
+                namespaceIdentity, namespaceScopeId).Handled)
+            return null;
+        if (ResolveClass(typeName) is not null
+            || SourceTypeSymbols().Any(type =>
+                type.Name == typeName || type.QualifiedName == TypeIdentity.ToLookupName(typeName)))
+            return null;
+        if (typeName is "OBJECT" or "object")
+            return PreserveDeclaredAnnotation(context.TryResolveType("System.Object"));
+        if (TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
+        {
+            if (declaredTypeParameters?.Contains(name.TrimStart('@')) == true
+                || ResolveTypeSymbol(name, arguments.Count) is not null)
+                return null;
+            var metadataName = TypeIdentity.MapShortTypeNameToFullName(typeName);
+            if (!metadataName.Contains('`'))
+                metadataName = (name is "Func" or "Action" ? $"System.{name}" : name) + $"`{arguments.Count}";
+            var scoped = ResolveScopedMetadataType(context, name, arguments.Count,
+                namespaceScopeId, namespaceIdentity);
+            var definition = scoped.Handled ? scoped.Type : context.TryResolveType(metadataName);
+            var types = arguments.Select(argument => ResolveComputedMetadataType(context, argument,
+                namespaceScopeId, namespaceIdentity, containingTypeName, declaredTypeParameters)).ToArray();
+            return definition is not null && definition.Arity == types.Length && types.All(type => type is not null)
+                ? PreserveDeclaredAnnotation(definition.Construct(types.OfType<Microsoft.CodeAnalysis.ITypeSymbol>().ToArray()))
+                : null;
+        }
+        var resolved = ResolveScopedMetadataType(context, typeName, 0,
+            namespaceScopeId, namespaceIdentity);
+        return PreserveDeclaredAnnotation(resolved.Handled ? resolved.Type : ResolveBclArgumentType(context, typeName));
+
+        Microsoft.CodeAnalysis.ITypeSymbol? PreserveDeclaredAnnotation(Microsoft.CodeAnalysis.ITypeSymbol? type) =>
+            declaredTypeParameters is not null && type?.IsReferenceType == true
+                ? type.WithNullableAnnotation(_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+                    ? Microsoft.CodeAnalysis.NullableAnnotation.None : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated)
+                : type;
+    }
+
+    private readonly Dictionary<string, bool> _metadataNamespaces = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The namespace imports a member call's metadata probe carries: the module's
+    /// plain <c>using N</c> directives visible from the current namespace scope,
+    /// limited to namespaces this metadata set actually contains. They put the
+    /// extension methods the generated C# can see (for example
+    /// <c>LoggerExtensions.LogInformation</c> under
+    /// <c>using Microsoft.Extensions.Logging</c>) in scope for the probe. Alias and
+    /// static imports are left out, so an extension they would supply stays
+    /// unresolved. Empty when the scope ancestry is not valid.
+    /// </summary>
+    private IReadOnlyList<string> MetadataExtensionImports(Metadata.MetadataContext context)
+    {
+        var visibleScopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = _currentNamespaceScopeId; id is not null;)
+        {
+            if (!visibleScopes.Add(id) || !_metadataNamespaceScopes.TryGetValue(id, out var scope))
+                return [];
+            id = scope.ParentScopeId;
+        }
+        return _metadataUsings
+            .Where(import => (import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId))
+                && import.Alias is null && !import.IsStatic)
+            .Select(import => import.Namespace.StartsWith("global::", StringComparison.Ordinal)
+                ? import.Namespace["global::".Length..]
+                : import.Namespace)
+            .Where(name => name.Length > 0 && MetadataNamespaceExists(context, name))
+            .Distinct(StringComparer.Ordinal)
+            .Select(name => "using " + string.Join(".", name.Split('.').Select(segment => "@" + segment.TrimStart('@'))) + ";")
+            .ToArray();
+    }
+
+    private bool MetadataNamespaceExists(Metadata.MetadataContext context, string name)
+    {
+        if (_metadataNamespaces.TryGetValue(name, out var exists))
+            return exists;
+        Microsoft.CodeAnalysis.INamespaceSymbol? current = context.HostCompilationForBinder.GlobalNamespace;
+        foreach (var segment in name.Split('.'))
+        {
+            var part = segment.TrimStart('@');
+            current = current?.GetNamespaceMembers().FirstOrDefault(member => member.Name == part);
+        }
+        return _metadataNamespaces[name] = current is not null;
+    }
+
+    private (bool Handled, Microsoft.CodeAnalysis.INamedTypeSymbol? Type) ResolveScopedMetadataType(
+        Metadata.MetadataContext context, string name, int arity, string? scopeId, string? namespaceIdentity)
+    {
+        var key = (scopeId, namespaceIdentity, name, arity);
+        if (_scopedMetadataTypes.TryGetValue(key, out var cached))
+            return cached;
+
+        var scopes = new List<NamespaceScopeInfo>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = scopeId; id is not null;)
+        {
+            if (!visited.Add(id) || !_metadataNamespaceScopes.TryGetValue(id, out var scope))
+            {
+                _diagnostics.ReportInfo(TextSpan.Empty, DiagnosticCode.SignatureUnresolved,
+                    "Metadata lookup requires a valid lexical namespace scope ancestry.");
+                return _scopedMetadataTypes[key] = (true, null);
+            }
+            scopes.Add(scope);
+            id = scope.ParentScopeId;
+        }
+        scopes.Reverse();
+        var visibleScopes = scopes.Select(scope => scope.Id).ToHashSet(StringComparer.Ordinal);
+        var imports = _metadataUsings.Where(import =>
+            import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId)).ToArray();
+        // Predefined keywords do not depend on imports; retain their existing binding/nullability path.
+        if (imports.Length == 0 && string.IsNullOrEmpty(namespaceIdentity)
+            && SyntaxFactory.ParseTypeName(name) is PredefinedTypeSyntax)
+            return _scopedMetadataTypes[key] = (false, null);
+
+        var emitter = new CodeGen.CSharpEmitter();
+        var source = new System.Text.StringBuilder();
+        // The production emitter always imports System, including in otherwise import-free modules.
+        source.AppendLine("using System;");
+        foreach (var import in imports.Where(import => import.NamespaceScopeId is null))
+            source.AppendLine(import.Accept(emitter));
+        var namespaceCount = 0;
+        string NamespaceSpelling(string value) =>
+            string.Join(".", value.Split('.').Select(segment => "@" + segment.TrimStart('@')));
+        foreach (var scope in scopes)
+        {
+            if (!scope.IsGlobal && scope.Name.Length > 0)
+            {
+                source.Append("namespace ").Append(NamespaceSpelling(scope.Name)).AppendLine(" {");
+                namespaceCount++;
+            }
+            foreach (var import in imports.Where(import => import.NamespaceScopeId == scope.Id))
+                source.AppendLine(import.Accept(emitter));
+        }
+        if (scopes.Count == 0 && !string.IsNullOrEmpty(namespaceIdentity))
+        {
+            source.Append("namespace ").Append(NamespaceSpelling(namespaceIdentity)).AppendLine(" {");
+            namespaceCount++;
+        }
+        var spelling = arity == 0 ? name : name + "<" + new string(',', arity - 1) + ">";
+        source.Append("class __CalorMetadataTypeLookup_").Append(Guid.NewGuid().ToString("N"))
+            .Append(" { static global::System.Type Resolve() => typeof(").Append(spelling).AppendLine("); }");
+        source.Append('}', namespaceCount);
+        var tree = CSharpSyntaxTree.ParseText(source.ToString());
+        var compilation = context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>().Single().Type;
+        var diagnostics = model.GetDiagnostics();
+        var symbol = model.GetTypeInfo(syntax).Type;
+        var ambiguous = diagnostics.Any(diagnostic => diagnostic.Id is "CS0104" or "CS0576" or "CS1537");
+        // Missing peer imports do not invalidate an independently resolved BCL type.
+        // Errors at the lookup itself and conflicting imports still veto its identity.
+        if (!ambiguous && !diagnostics.Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
+                && (!diagnostic.Location.IsInSource
+                    || diagnostic.Location.SourceSpan.IntersectsWith(syntax.Span)))
+            && symbol is Microsoft.CodeAnalysis.INamedTypeSymbol { TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error } named)
+            return _scopedMetadataTypes[key] = (true, named.IsUnboundGenericType ? named.OriginalDefinition : named);
+
+        var head = name.Split('.')[0].TrimStart('@');
+        var alias = !name.StartsWith("global::", StringComparison.Ordinal)
+            && imports.Any(import => import.Alias == head);
+        return _scopedMetadataTypes[key] = (alias || ambiguous, null);
+    }
+
+    private Microsoft.CodeAnalysis.ITypeParameterSymbol? ResolveMetadataTypeParameter(
+        Metadata.MetadataContext context, string name)
+    {
+        if (!_metadataTypeParameterScopes.TryGetValue(_declarationContext, out var symbols))
+        {
+            var parameters = (_currentMemberTypeParameters ?? [])
+                .Concat(_currentClass?.TypeParameters ?? [])
+                .ToArray();
+            if (parameters.DistinctBy(parameter => parameter.Name).Count() != parameters.Length)
+            {
+                _diagnostics.ReportInfo(parameters[0].Span, DiagnosticCode.SignatureUnresolved,
+                    "Metadata binding cannot flatten shadowed class and member type-parameter identities.");
+                _metadataTypeParameterScopes.Add(_declarationContext,
+                    new Dictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>());
+                return null;
+            }
+            if (parameters.SelectMany(parameter => parameter.Constraints)
+                .Where(constraint => constraint.TypeName is not null)
+                .Any(constraint => TypeIdentity.TrySplitGeneric(constraint.TypeName!, out var root, out var arguments)
+                    ? ResolveTypeSymbol(root, arguments.Count) is not null
+                    : ResolveTypeSymbol(constraint.TypeName!) is not null))
+            {
+                _diagnostics.ReportInfo(parameters[0].Span, DiagnosticCode.SignatureUnresolved,
+                    "Metadata binding requires the declared identity of a source-defined generic constraint.");
+                _metadataTypeParameterScopes.Add(_declarationContext,
+                    new Dictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>());
+                return null;
+            }
+            var emitter = new CodeGen.CSharpEmitter();
+            var names = string.Join(", ", parameters.Select(parameter => "@" + parameter.Name));
+            var constraints = string.Join(" ", parameters.Where(parameter => parameter.Constraints.Count > 0)
+                .Select(parameter => $"where @{parameter.Name} : "
+                    + string.Join(", ", parameter.Constraints.Select(constraint => constraint.Accept(emitter)))));
+            var tree = CSharpSyntaxTree.ParseText(
+                "using System; using System.Collections.Generic; using System.Threading.Tasks;\n"
+                + $"class __CalorTypeParameters<{names}> {constraints} {{ }}");
+            var compilation = context.HostCompilationForBinder.AddSyntaxTrees(tree);
+            var model = compilation.GetSemanticModel(tree);
+            symbols = model.GetDiagnostics().Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                    ? new Dictionary<string, Microsoft.CodeAnalysis.ITypeParameterSymbol>()
+                    : tree.GetRoot().DescendantNodes().OfType<TypeParameterSyntax>()
+                        .Select(parameter => model.GetDeclaredSymbol(parameter))
+                        .OfType<Microsoft.CodeAnalysis.ITypeParameterSymbol>()
+                        .ToDictionary(parameter => parameter.Name, StringComparer.Ordinal);
+            _metadataTypeParameterScopes.Add(_declarationContext, symbols);
+        }
+        return symbols.GetValueOrDefault(name.TrimStart('@'));
+    }
+
+    private Metadata.MetadataBinderResult? TryResolveInstanceArrayCall(
+        CallExpressionNode call, BoundExpression? receiver)
+    {
+        if (call.Arguments.Count != 0 || call.TypeArguments is { Count: > 0 }
+            || receiver is null or BoundTypeReferenceExpression
+            || ResolveMetadataArrayReceiver(receiver) is not { } receiverType)
+            return null;
+
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata is null)
+            return null;
+        var result = metadata.ResolveCall(receiverType, call.Target[(call.Target.LastIndexOf('.') + 1)..], []);
+        return result.Symbol is { IsStatic: false, IsGenericMethod: false, Parameters.Length: 0,
+            ReturnType: Microsoft.CodeAnalysis.IArrayTypeSymbol }
+            ? result
+            : null;
+    }
+
+    private Microsoft.CodeAnalysis.ITypeSymbol? ResolveMetadataArrayReceiver(BoundExpression receiver)
+    {
+        if (receiver.HasUnknownInferredType)
+            return null;
+        if (NullabilityChecker.GetMethodInputArrayType(receiver) is { } array)
+        {
+            var context = GetOrCreateMetadataBinder()?.Context;
+            if (context is null)
+                return null;
+            if (GetMetadataArrayInputType(context, array) is { } metadataArray)
+                return metadataArray;
+            // Source elements have no metadata symbol. The established array still
+            // inherits System.Array; do not invent a substitute element type.
+            var element = array.ElementType;
+            while (element is BoundTypes.ArrayBoundType nested)
+                element = nested.ElementType;
+            return array.NullableAnnotation != BoundTypes.NullableAnnotation.Annotated
+                && element is BoundTypes.NominalBoundType { Declaration: { Id.IsNone: false } declaration }
+                && !declaration.QualifiedName.Contains('`')
+                && !TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(declaration.Name))
+                && _symbolsById.TryGetValue(declaration.Id, out var actual)
+                && ReferenceEquals(actual, declaration)
+                && IsSourceTypeAccessible(declaration)
+                    ? context.HostCompilationForBinder.GetSpecialType(Microsoft.CodeAnalysis.SpecialType.System_Array)
+                    : null;
+        }
+        if (receiver.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } symbol })
+            return symbol;
+        if (receiver.Type is BoundTypes.GenericInstantiationBoundType { RoslynSymbol: { } constructed })
+            return constructed;
+        if (receiver is not BoundVariableExpression { Variable: { IsTypeInferred: false } variable }
+            || receiver.Type is not BoundTypes.NominalBoundType { Declaration: null }
+            || _currentMemberTypeParameters?.Any(parameter => parameter.Name == variable.TypeName) == true
+            || _currentClass?.TypeParameters.Any(parameter => parameter.Name == variable.TypeName) == true
+            || SourceTypeSymbols().Any(type => type.Name == variable.TypeName))
+            return null;
+
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata is null)
+            return null;
+        return ResolveComputedMetadataType(metadata.Context, variable.TypeName)
+            is Microsoft.CodeAnalysis.INamedTypeSymbol { IsReferenceType: true } resolved ? resolved : null;
+    }
+
+    private Microsoft.CodeAnalysis.IPropertySymbol? ResolveMetadataArrayProperty(
+        BoundExpression receiver, string memberName)
+    {
+        return ResolveMetadataArrayReceiver(receiver) is Microsoft.CodeAnalysis.INamedTypeSymbol receiverType
+            && GetOrCreateMetadataBinder()?.ResolveMemberRead(
+                receiverType, memberName, receiver is BoundTypeReferenceExpression, out _)
+                is Microsoft.CodeAnalysis.IPropertySymbol { Type: Microsoft.CodeAnalysis.IArrayTypeSymbol } property
+                ? property : null;
+    }
+
+    private Microsoft.CodeAnalysis.IPropertySymbol? ResolveMetadataScalarArrayProperty(
+        BoundExpression receiver, string memberName)
+    {
+        var receiverType = ResolveMetadataArrayReceiver(receiver);
+        var arrayBase = receiverType is Microsoft.CodeAnalysis.IArrayTypeSymbol array
+            ? array.BaseType
+            : NullabilityChecker.GetMethodInputArrayType(receiver) is not null
+                && receiverType is Microsoft.CodeAnalysis.INamedTypeSymbol
+                    { SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Array } sourceArrayBase
+                    ? sourceArrayBase : null;
+        return receiver is not BoundTypeReferenceExpression
+            && arrayBase is not null
+            && GetOrCreateMetadataBinder()?.ResolveMemberRead(arrayBase, memberName, false, out _)
+                is Microsoft.CodeAnalysis.IPropertySymbol
+                {
+                    IsStatic: false, Parameters.Length: 0,
+                    Type.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Int32
+                        or Microsoft.CodeAnalysis.SpecialType.System_Int64
+                        or Microsoft.CodeAnalysis.SpecialType.System_Boolean
+                } property ? property : null;
+    }
+
+    private static bool IsArrayReceiver(BoundExpression receiver)
+    {
+        var typeName = receiver.Type.DisplayString;
+        return receiver.Type is BoundTypes.ArrayBoundType
+            || receiver.MethodInputArrayType is not null
+            || typeName.EndsWith("[]", StringComparison.Ordinal)
+            || typeName.StartsWith("ARRAY[element=", StringComparison.Ordinal) && typeName.EndsWith(']');
     }
 
     // Exact analysis identities use CLR names, not C# keywords or reference-nullability syntax.
@@ -317,7 +822,8 @@ public sealed class Binder
                 ? context.HostCompilationForBinder.CreateArrayTypeSymbol(element, array.Rank, element.NullableAnnotation)
                 : null,
             BoundTypes.NominalBoundType { RoslynSymbol: { } nominalSymbol } => nominalSymbol,
-            BoundTypes.NominalBoundType nominal when TypeIdentity.Canonicalize(nominal.QualifiedName) == "STRING" =>
+            BoundTypes.GenericInstantiationBoundType { RoslynSymbol: { } genericSymbol } => genericSymbol,
+            BoundTypes.NominalBoundType { Declaration: null, QualifiedName: "STRING" or "string" or "str" } =>
                 context.TryResolveType("System.String"),
             BoundTypes.PrimitiveBoundType primitive when IsBuiltInValueTypeName(primitive.Name) =>
                 context.TryResolveType(TypeIdentity.MapShortTypeNameToFullName(primitive.Name)),
@@ -413,7 +919,7 @@ public sealed class Binder
         {
             if (functionType.ParameterTypes[index] is not BoundTypes.NominalBoundType parameter
                 || !IsScalarStringTypeName(parameter.QualifiedName)
-                || parameter.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated)
+                || parameter.NullableAnnotation != BoundTypes.NullableAnnotation.NotAnnotated)
             {
                 continue;
             }
@@ -490,15 +996,22 @@ public sealed class Binder
         BoundTypes.BoundType target,
         bool isExpandedParams,
         HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)> reported,
-        bool replacesNativeOverloadError = false)
+        bool replacesNativeOverloadError = false,
+        bool isInstanceReceiver = false)
     {
-        if (!NullabilityChecker.IsPossiblyNullAssignedTo(
-                argument, target, BindingReceivingBoundary.MethodArgument, out var arrayMismatch))
+        if (IsObliviousFlowInObliviousModule(argument))
+            return;
+        var arrayMismatch = NullabilityChecker.ArrayMismatch.None;
+        if (isInstanceReceiver
+            ? !argument.HasUnknownInferredType
+                && NullabilityChecker.GetAnnotation(argument.Type) == BoundTypes.NullableAnnotation.NotAnnotated
+            : !NullabilityChecker.IsPossiblyNullAssignedTo(
+                argument, target, BindingReceivingBoundary.MethodArgument, out arrayMismatch))
             return;
 
         var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target);
         if (target is BoundTypes.ArrayBoundType)
-            targetShapeLabel = $"'{target.DisplayString}'";
+            targetShapeLabel = $"'{AttributeHelper.ToSurfaceSpelling(target.DisplayString)}'";
         if (!reported.Add((argument.Span, parameterName, targetShapeLabel)))
             return;
         var receivingPosition = isExpandedParams ? "Expanded argument to element of params parameter" : "Argument to parameter";
@@ -506,13 +1019,17 @@ public sealed class Binder
         var message = $"{receivingPosition} '{parameterName}' declares non-nullable {targetShapeLabel} " +
             $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
             $"Change the {parameterPart} type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.";
+        if (isInstanceReceiver)
+            message = $"Instance receiver for '{parameterName}' must be proven non-null, " +
+                $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
+                "Add an explicit non-null guard, a non-null fallback, or use conditional access.";
         if (arrayMismatch != NullabilityChecker.ArrayMismatch.None)
         {
             var components = arrayMismatch switch
             {
                 NullabilityChecker.ArrayMismatch.Container => "array container",
-                NullabilityChecker.ArrayMismatch.Elements => "STRING array elements",
-                _ => "array container and STRING elements"
+                NullabilityChecker.ArrayMismatch.Elements => "string array elements",
+                _ => "array container and string elements"
             };
             var supplied = NullabilityChecker.GetMethodInputArrayType(argument)!;
             message = $"{receivingPosition} '{parameterName}' requires non-null {components} of {targetShapeLabel}, " +
@@ -520,6 +1037,8 @@ public sealed class Binder
                 $"element annotation: '{NullabilityChecker.GetAnnotation(supplied.ElementType)?.ToString() ?? "unsupported"}'). " +
                 "Change the affected receiving annotation or explicitly validate the relevant container/elements.";
         }
+        if (DescribeClosedGenericReceiving(argument, target) is { } genericMessage)
+            message = $"{receivingPosition} '{parameterName}': {genericMessage}";
         var context = BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, target);
         if (replacesNativeOverloadError && context.Shape == BindingReceivingShape.ScalarString)
             context = context with { ReplacesNativeOverloadError = true };
@@ -531,6 +1050,22 @@ public sealed class Binder
             context);
     }
 
+    private void ValidateStringInstanceReceiver(
+        BoundExpression receiver, Microsoft.CodeAnalysis.IMethodSymbol? method)
+    {
+        if (method is not { IsStatic: false,
+                MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary or Microsoft.CodeAnalysis.MethodKind.PropertyGet,
+                ContainingType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }
+            || method.Locations.Any(location => location.IsInSource))
+            return;
+
+        // The callvirt null check precedes the contracted body and can dispatch
+        // through exception resource lookup. A selected member is not a receiver proof.
+        ValidateCallArgument(receiver, method.ToDisplayString(),
+            Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType),
+            false, [], isInstanceReceiver: true);
+    }
+
     private static BoundTypes.BoundType? TryBuildBclArgumentTarget(Microsoft.CodeAnalysis.ITypeSymbol type)
     {
         if (type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String)
@@ -538,6 +1073,12 @@ public sealed class Binder
 
         if (type is Microsoft.CodeAnalysis.IArrayTypeSymbol)
             return Metadata.MetadataBinderResult.ToBoundType(type);
+
+        if (Metadata.MetadataBinderResult.ToBoundType(type) is BoundTypes.GenericInstantiationBoundType
+            { TypeArguments: [BoundTypes.NominalBoundType element] } referenceGeneric
+            && NullabilityChecker.IsReferenceContainerDefinition(referenceGeneric.Definition)
+            && NullabilityChecker.IsClosedSourceReference(element))
+            return referenceGeneric;
 
         var nominal = Metadata.MetadataBinderResult.ToNominalBoundType(type);
         if (nominal.IsKnownReferenceType)
@@ -670,31 +1211,120 @@ public sealed class Binder
         public void Dispose() => _binder._currentFunctionReturnType = _previous;
     }
 
-    public BoundModule Bind(ModuleNode module)
+    public BoundModule Bind(ModuleNode module) => Bind(module, null);
+
+    internal void ValidateCallableEffectRows(DiagnosticBag diagnostics)
     {
+        foreach (var position in UnannotatedCallablePositions())
+            diagnostics.ReportError(position.Span, DiagnosticCode.MissingCallableEffectRow,
+                "A callback parameter or return type requires an explicit effect row. "
+                + "Use '! unknown' when no invocation contract is known; this does not authorize calling it.");
+    }
+
+    internal void MaterializeUnknownCallableRows()
+    {
+        foreach (var position in UnannotatedCallablePositions())
+        {
+            var row = new EffectsNode(position.Span, new Dictionary<string, string> { ["unknown"] = "*" });
+            if (position is ParameterNode parameter)
+                parameter.Row = row;
+            else if (position is OutputNode output)
+                output.Row = row;
+        }
+    }
+
+    private IEnumerable<AstNode> UnannotatedCallablePositions()
+    {
+        foreach (var (declaration, symbol) in _functionSymbols)
+        {
+            var (parameters, output) = declaration switch
+            {
+                FunctionNode function => (function.Parameters, function.Output),
+                MethodNode method => (method.Parameters, method.Output),
+                MethodSignatureNode method => (method.Parameters, method.Output),
+                OperatorOverloadNode op => (op.Parameters, op.Output),
+                ConstructorNode constructor => (constructor.Parameters, (OutputNode?)null),
+                _ => (Array.Empty<ParameterNode>(), (OutputNode?)null)
+            };
+            for (var index = 0; index < parameters.Count; index++)
+                if (parameters[index].Row == null && symbol.Parameters[index].FunctionType != null)
+                    yield return parameters[index];
+            if (output is { Row: null } && symbol.ReturnFunctionType != null)
+                yield return output;
+        }
+        foreach (var (name, declaration) in _delegateDefinitions)
+        {
+            foreach (var parameter in declaration.Parameters)
+                if (parameter.Row == null && TryBuildParameterFunctionType(parameter, [], name) != null)
+                    yield return parameter;
+            if (declaration.Output is { Row: null } output
+                && TryBuildReturnFunctionType(output, [], name) != null)
+                yield return output;
+        }
+    }
+
+    internal BoundModule Bind(ModuleNode module, Verification.ModuleInheritanceResult? contractInheritance,
+        bool declarationsOnly = false)
+    {
+        _contractInheritance = contractInheritance;
+        _declaredReferenceAnnotation = module.HasObliviousNullability()
+            ? BoundTypes.NullableAnnotation.Oblivious : BoundTypes.NullableAnnotation.NotAnnotated;
+        _obliviousNullTaintedStorage.Clear();
         using var diagnosticContext = _diagnostics.EnterBindingContext();
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
+        _metadataUsings = module.Usings;
+        _metadataNamespaceScopes = module.NamespaceScopes.ToDictionary(scope => scope.Id, StringComparer.Ordinal);
+        _scopedMetadataTypes.Clear();
+        _asyncTypeModule = module;
+        _sourceCallConversions = null;
         _scope = new Scope();
         _functionSymbols.Clear();
+        _boundAwaits.Clear();
+        _boundSourceEnumConstants.Clear();
+        _boundSourceStaticFieldReads.Clear();
+        _sourceFieldConstants.Clear();
+        _boundMetadataConstants.Clear();
+        _boundMetadataStaticFieldReads.Clear();
+        _boundContractExpressions.Clear();
+        _boundVerificationCalls.Clear();
+        CrossModuleCallTargets.Clear();
+        SourceExtensionCallTargets.Clear();
+        ExternalSourceCalls.Clear();
+        _staticMethodSymbols.Clear();
         _functionNamespaces.Clear();
         _classScopes.Clear();
+        _eventSymbols.Clear();
+        _containingClasses.Clear();
         _qualifiedClassNames.Clear();
         _classSymbolIds.Clear();
         _classSymbols.Clear();
         _classesByQualifiedName.Clear();
+        _interfacesBySymbolId.Clear();
+        _enumMembers.Clear();
         _classesBySimpleName.Clear();
         _delegateDefinitions.Clear();
         _flowNarrowingSources.Clear();
+        _memberFlowStorages.Clear();
         _topLevelFunctionLookupNames.Clear();
         _symbolsById.Clear();
+        _sourceTypeSymbols = null;
+        _metadataTypeParameterScopes.Clear();
         _symbolOrder.Clear();
         _declarationIdOccurrences.Clear();
+        _snapshotLocalContexts.Clear();
         _localFunctionSymbols.Clear();
         _boundLocalFunctions.Clear();
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
-        _moduleSymbolId = SymbolId.Create("source", _sourceIdentity, "module", module.Id);
+        _currentNamespaceScopeId = null;
+        _transientBindingId = CreateSnapshotIdentityKey(module, out var hasToolingIdentity);
+        _toolingIds = hasToolingIdentity
+            ? Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
+        _moduleSymbolId = module.ToolingId != null
+            ? SymbolId.Create("declaration", module.ToolingId)
+            : SymbolId.Create("source", _sourceIdentity, "module", module.Name);
         _declarationContext = _moduleSymbolId;
 
         var functions = new List<BoundFunction>();
@@ -706,9 +1336,22 @@ public sealed class Binder
         CollectDelegateDefinitions(module);
 
         RegisterTopLevelFunctions(module);
+        CheckGeneratedModuleNameCollisions(module);
         RegisterAdditionalTypes(module);
         foreach (var cls in module.Classes)
             RegisterClassTree(cls, _moduleSymbolId, null);
+
+        if (declarationsOnly)
+            return new BoundModule(module.Span, module.Name, [],
+                _symbolOrder.ToDictionary(id => id, id => _symbolsById[id]));
+
+        foreach (var variable in _symbolsById.Values.OfType<VariableSymbol>().Where(variable =>
+                     (variable.IsField || variable.IsProperty) && variable.MethodInputArrayType is not null))
+        {
+            if (TryBuildMethodInputArrayType(variable.TypeName, out var array,
+                    declaringTypeName: variable.DeclaringTypeName))
+                variable.MethodInputArrayType = array;
+        }
 
         // v0.15 E2 slice b, pin P6.
         CheckEffectRowPlacement(module);
@@ -719,6 +1362,15 @@ public sealed class Binder
         foreach (var cls in module.Classes)
             BindClassMembers(cls, functions);
 
+        foreach (var (owner, declaration) in _interfacesBySymbolId.Values)
+        {
+            foreach (var method in declaration.Methods.Where(method =>
+                         method.Preconditions.Count > 0 || method.Postconditions.Count > 0))
+            {
+                functions.Add(BindInterfaceContracts(owner, declaration, method));
+            }
+        }
+
         functions.AddRange(_boundLocalFunctions);
 
         return new BoundModule(
@@ -728,12 +1380,53 @@ public sealed class Binder
             _symbolOrder.ToDictionary(id => id, id => _symbolsById[id]));
     }
 
+    private BoundFunction BindInterfaceContracts(
+        TypeSymbol owner, InterfaceDefinitionNode declaration, MethodSignatureNode method)
+    {
+        var declarationScope = _scope.CreateChild();
+        foreach (var member in declaration.Methods)
+            declarationScope.TryDeclareOverload(GetCallableLookupName(member.Name), _functionSymbols[member], out _);
+        var functionScope = declarationScope.CreateChild();
+        using var scope = PushScope(functionScope);
+        using var typeParameters = PushMemberTypeParameters(
+            declaration.TypeParameters.Concat(method.TypeParameters).ToArray());
+        var symbol = _functionSymbols[method];
+        using var identity = PushDeclarationContext(symbol.Id);
+        var previousClassName = _currentClassName;
+        var previousNamespaceIdentity = _currentNamespaceIdentity;
+        var previousNamespaceScopeId = _currentNamespaceScopeId;
+        _currentClassName = owner.QualifiedName;
+        _currentNamespaceIdentity = declaration.NamespaceIdentity;
+        _currentNamespaceScopeId = declaration.NamespaceScopeId;
+        try
+        {
+            DeclareParameters(symbol.Parameters, method.Parameters);
+            return new BoundFunction(method.Span, symbol, [], functionScope,
+                ExtractMethodEffects(method.Effects), BoundMemberKind.Method, owner.QualifiedName)
+            {
+                ContractConditions = BindContracts(method.Preconditions, method.Postconditions, symbol.BodyReturnType)
+            };
+        }
+        finally
+        {
+            _currentClassName = previousClassName;
+            _currentNamespaceIdentity = previousNamespaceIdentity;
+            _currentNamespaceScopeId = previousNamespaceScopeId;
+        }
+    }
+
     private void RegisterTopLevelFunctions(ModuleNode module)
     {
+        var ambiguousKeys = module.Functions.GroupBy(function =>
+            CallableIdentityKey(function.Name, function.Parameters, function.TypeParameters, function.NamespaceIdentity))
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
         foreach (var function in module.Functions)
         {
+            var fallbackKey = CallableIdentityKey(function.Name, function.Parameters, function.TypeParameters, function.NamespaceIdentity);
+            if (ambiguousKeys.Contains(fallbackKey))
+                fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(_moduleSymbolId, "function", function.Id, function.Name),
+                CreateDeclarationId(_moduleSymbolId, "function", function.Id, fallbackKey),
                 function.Name,
                 function.Output?.TypeName ?? "VOID",
                 GetCallableTypeParameters(
@@ -746,7 +1439,8 @@ public sealed class Binder
                 definitionSpan: function.Span,
                 output: function.Output,
                 effectParameters: function.EffectParameters,
-                lexicalTypeContext: function.NamespaceIdentity);
+                lexicalTypeContext: function.NamespaceIdentity,
+                isAsync: function.IsAsync);
             _functionSymbols.Add(function, symbol);
             _functionNamespaces.Add(symbol.Id, function.NamespaceIdentity);
 
@@ -774,28 +1468,12 @@ public sealed class Binder
     {
         foreach (var @interface in module.Interfaces)
         {
-            RegisterTypeSymbol(
-                _moduleSymbolId,
-                "interface",
-                @interface.Id,
-                @interface.Name,
-                GetQualifiedTypeName(@interface),
-                Visibility.Public,
-                @interface.IdentifierSpan,
-                @interface.Span);
+            RegisterInterface(@interface, _moduleSymbolId, GetQualifiedTypeName(@interface));
         }
 
         foreach (var @enum in module.Enums)
         {
-            RegisterTypeSymbol(
-                _moduleSymbolId,
-                "enum",
-                @enum.Id,
-                @enum.Name,
-                GetQualifiedTypeName(@enum),
-                @enum.Visibility,
-                @enum.IdentifierSpan,
-                @enum.Span);
+            RegisterEnum(@enum, _moduleSymbolId, GetQualifiedTypeName(@enum));
         }
 
         foreach (var @delegate in module.Delegates)
@@ -812,7 +1490,27 @@ public sealed class Binder
         }
     }
 
-    private void RegisterTypeSymbol(
+    private void CheckGeneratedModuleNameCollisions(ModuleNode module)
+    {
+        var fallbackNamespace = module.Name == "_global" ? "" : module.Name;
+        var generatedNames = module.Functions
+            .Select(function => function.NamespaceIdentity ?? fallbackNamespace)
+            .Distinct(StringComparer.Ordinal)
+            .Select(ns => (Namespace: ns, Name: string.IsNullOrEmpty(ns)
+                ? "GlobalModule" : ns.Split('.').Last() + "Module"))
+            .ToHashSet();
+        foreach (var cls in module.Classes)
+        {
+            if (cls.TypeParameters.Count == 0
+                && generatedNames.Contains((cls.NamespaceIdentity ?? fallbackNamespace, cls.Name)))
+            {
+                _diagnostics.ReportError(cls.IdentifierSpan, DiagnosticCode.DuplicateDefinition,
+                    $"Type '{cls.Name}' collides with the generated module in the same namespace.");
+            }
+        }
+    }
+
+    private TypeSymbol RegisterTypeSymbol(
         SymbolId parentIdentity,
         string kind,
         string stableAstId,
@@ -822,8 +1520,8 @@ public sealed class Binder
         Parsing.TextSpan declarationSpan,
         Parsing.TextSpan definitionSpan)
     {
-        TrackSymbol(new TypeSymbol(
-            CreateDeclarationId(parentIdentity, kind, stableAstId, name),
+        var symbol = new TypeSymbol(
+            CreateDeclarationId(parentIdentity, kind, stableAstId, qualifiedName),
             name,
             qualifiedName,
             visibility,
@@ -833,9 +1531,50 @@ public sealed class Binder
             // symbol is what lets a consumer ask the type instead of the string.
             isDelegate: kind == "delegate")
         {
-            IsReferenceType = kind is "interface" or "delegate"
-        });
+            IsReferenceType = kind is "interface" or "delegate",
+            IsEnum = kind == "enum"
+        };
+        TrackSymbol(symbol);
+        return symbol;
+    }
 
+    private void RegisterEnum(EnumDefinitionNode declaration, SymbolId parentIdentity, string qualifiedName)
+    {
+        var owner = RegisterTypeSymbol(parentIdentity, "enum", declaration.Id, declaration.Name,
+            qualifiedName, declaration.Visibility, declaration.IdentifierSpan, declaration.Span);
+        _enumMembers.Add(owner.Id, declaration.Members.Select(member =>
+        {
+            var symbol = new VariableSymbol(
+                CreateDeclarationId(owner.Id, "enum-member", stableAstId: null, member.Name),
+                member.Name, qualifiedName, isMutable: false, declarationSpan: member.IdentifierSpan,
+                declaringTypeName: qualifiedName, isField: true, isStatic: true)
+            {
+                IsEnumMember = true
+            };
+            TrackSymbol(symbol);
+            return symbol;
+        }).ToArray());
+    }
+
+    private void RegisterInterface(InterfaceDefinitionNode declaration, SymbolId parentIdentity, string qualifiedName)
+    {
+        var owner = RegisterTypeSymbol(parentIdentity, "interface", declaration.Id, declaration.Name,
+            qualifiedName, declaration.Visibility, declaration.IdentifierSpan, declaration.Span);
+        _interfacesBySymbolId.Add(owner.Id, (owner, declaration));
+        foreach (var method in declaration.Methods)
+        {
+            var lookupName = $"{qualifiedName}.{GetCallableLookupName(method.Name)}";
+            var symbol = CreateFunctionSymbol(
+                CreateDeclarationId(owner.Id, "interface-method", method.Id,
+                    CallableIdentityKey(method.Name, method.Parameters, method.TypeParameters)),
+                $"{qualifiedName}.{method.Name}", method.Output?.TypeName ?? "VOID",
+                GetCallableTypeParameters(method.Name, method.TypeParameters.Select(parameter => parameter.Name)),
+                method.Parameters, method.IdentifierSpan, Visibility.Public, qualifiedName, method.Span,
+                output: method.Output, effectParameters: method.EffectParameters);
+            _functionSymbols.Add(method, symbol);
+            if (!_scope.TryDeclareOverload(lookupName, symbol, out var duplicate))
+                ReportDuplicateSignature(method.Span, lookupName, symbol, duplicate);
+        }
     }
 
     private void RegisterClassTree(
@@ -843,7 +1582,7 @@ public sealed class Binder
         SymbolId parentIdentity,
         string? containingTypeName)
     {
-        var classIdentity = CreateDeclarationId(parentIdentity, "class", cls.Id, cls.Name);
+        var classIdentity = CreateDeclarationId(parentIdentity, cls.IsModule ? "module" : cls.IsRecord ? "record" : "class", cls.Id, GetQualifiedTypeName(cls));
         var qualifiedClassName = containingTypeName == null
             ? GetQualifiedTypeName(cls)
             : $"{containingTypeName}.{GetTypeNameWithArity(cls.Name, cls.TypeParameters.Count)}";
@@ -856,15 +1595,34 @@ public sealed class Binder
             cls.IdentifierSpan,
             cls.Span)
         {
-            IsReferenceType = !cls.IsStruct
+            IsReferenceType = !cls.IsStruct,
+            IsRecord = cls.IsRecord
         };
         TrackSymbol(classSymbol);
 
         _classScopes.Add(cls, classScope);
+        if (containingTypeName is not null)
+            _containingClasses.Add(cls, _classesByQualifiedName[containingTypeName]);
         _qualifiedClassNames.Add(cls, qualifiedClassName);
         _classSymbolIds.Add(cls, classIdentity);
         _classSymbols.Add(cls, classSymbol);
+        if (_classesByQualifiedName.TryGetValue(qualifiedClassName, out var previous)
+            && (cls.IsModule || previous.IsModule)
+            && !(cls.IsModule && previous.IsModule && cls.IsPartial && previous.IsPartial))
+        {
+            _diagnostics.ReportError(cls.IdentifierSpan, DiagnosticCode.DuplicateDefinition,
+                $"Module/type name '{qualifiedClassName}' is already defined in this namespace or containing type.");
+        }
         _classesByQualifiedName[qualifiedClassName] = cls;
+        if (cls.IsModule
+            && (cls.IsAbstract || cls.IsSealed || cls.IsStruct || cls.IsReadOnly
+                || cls.BaseClass != null || cls.ImplementedInterfaces.Count > 0
+                || cls.Indexers.Count > 0 || cls.OperatorOverloads.Count > 0
+                || cls.Constructors.Any(constructor => !constructor.IsStatic)))
+        {
+            _diagnostics.ReportError(cls.IdentifierSpan, DiagnosticCode.InvalidReference,
+                $"Module '{qualifiedClassName}' cannot declare instance-type modifiers, inheritance, indexers, operators, or instance constructors.");
+        }
         var simpleLookupName = GetTypeNameWithArity(
             cls.Name,
             cls.TypeParameters.Count);
@@ -881,7 +1639,7 @@ public sealed class Binder
             var (field, conditionalAlternative) = fields[fieldIndex];
             var isMutable = !field.Modifiers.HasFlag(MethodModifiers.Readonly);
             var symbol = CreateVariable(
-                CreateDeclarationId(classIdentity, "field", stableAstId: null, field.Name),
+                CreateDeclarationId(classIdentity, "field", field.ToolingId, field.Name),
                 field.Name,
                 field.TypeName,
                 isMutable,
@@ -891,7 +1649,7 @@ public sealed class Binder
                 visibility: field.Visibility,
                 declaringTypeName: qualifiedClassName,
                 isField: true,
-                isStatic: field.IsStatic,
+                isStatic: field.IsStatic || field.Modifiers.HasFlag(MethodModifiers.Const),
                 conditionalAlternative: conditionalAlternative,
                 // v0.14 nullability workstream (task #3) — inherit declared
                 // STRING nullability on fields so subsequent references
@@ -903,6 +1661,12 @@ public sealed class Binder
                 // type-parameter list, so no `eff` binders are in scope.
                 functionType: TryBuildFunctionType(
                     field.TypeName, field.Row, binders: null, qualifiedClassName));
+            // 0.30 overloads: a `const` field's value decides C#'s constant conversions
+            // (`byte` accepts a constant int 1). A const declared under a preprocessor branch
+            // may have another value in another configuration, so its value is not known.
+            _sourceFieldConstants[symbol] = field.Modifiers.HasFlag(MethodModifiers.Const)
+                ? (true, conditionalAlternative == null ? field.DefaultValue : null)
+                : (false, null);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -943,14 +1707,49 @@ public sealed class Binder
             }
         }
 
+        foreach (var (evt, alternative) in EnumerateEventRegistrations(cls))
+        {
+            var symbol = CreateVariable(
+                CreateDeclarationId(classIdentity, "event", evt.ToolingId, evt.Name),
+                evt.Name, evt.DelegateType, isMutable: true, isParameter: false,
+                ParameterModifier.None, evt.Span,
+                visibility: evt.Visibility, declaringTypeName: qualifiedClassName,
+                isField: !evt.HasAccessors, isStatic: evt.IsStatic,
+                conditionalAlternative: alternative,
+                functionType: TryBuildEventFunctionType(evt),
+                eventDeclaration: evt);
+            _eventSymbols.Add(evt, symbol);
+            if (!classScope.TryDeclare(symbol))
+                _diagnostics.ReportError(evt.Span, DiagnosticCode.DuplicateDefinition,
+                    $"Event '{evt.Name}' is already defined in '{qualifiedClassName}'");
+        }
+
         var methods = EnumerateMethodRegistrations(cls).ToArray();
+        var ambiguousMethodKeys = methods.GroupBy(item =>
+            CallableIdentityKey(item.Method.Name, item.Method.Parameters, item.Method.TypeParameters))
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
         for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
         {
             var (method, conditionalAlternative) = methods[methodIndex];
+            var fallbackKey = CallableIdentityKey(method.Name, method.Parameters, method.TypeParameters);
+            if (ambiguousMethodKeys.Contains(fallbackKey))
+                fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
+            var extensionParameters = method.Parameters
+                .Select((parameter, index) => (parameter, index))
+                .Where(item => item.parameter.Modifier.HasFlag(ParameterModifier.This))
+                .ToArray();
+            if (extensionParameters.Length > 0
+                && (!cls.IsStatic || !method.IsStatic || containingTypeName is not null
+                    || cls.TypeParameters.Count > 0
+                    || extensionParameters.Length != 1 || extensionParameters[0].index != 0))
+            {
+                _diagnostics.ReportError(method.IdentifierSpan, DiagnosticCode.InvalidReference,
+                    $"Extension function '{method.Name}' must be static in a non-nested, non-generic module, with 'this' only on its first parameter.");
+            }
             var lookupName = GetCallableLookupName(method.Name);
             var qualifiedLookupName = $"{qualifiedClassName}.{lookupName}";
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(classIdentity, "method", method.Id, method.Name),
+                CreateDeclarationId(classIdentity, "method", method.Id, fallbackKey),
                 $"{qualifiedClassName}.{method.Name}",
                 method.Output?.TypeName ?? "VOID",
                 GetCallableTypeParameters(
@@ -963,8 +1762,11 @@ public sealed class Binder
                 method.Span,
                 conditionalAlternative,
                 output: method.Output,
-                effectParameters: method.EffectParameters);
+                effectParameters: method.EffectParameters,
+                isAsync: method.IsAsync);
             _functionSymbols.Add(method, symbol);
+            if (method.IsStatic)
+                _staticMethodSymbols.Add(symbol);
 
             if (!classScope.TryDeclareOverload(lookupName, symbol, out var duplicate))
             {
@@ -977,13 +1779,20 @@ public sealed class Binder
         }
 
         var constructors = EnumerateConstructorRegistrations(cls).ToArray();
+        var ambiguousConstructorKeys = constructors.GroupBy(item =>
+                CallableIdentityKey(item.Constructor.IsStatic ? ".cctor" : ".ctor", item.Constructor.Parameters, []))
+            .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
         for (var constructorIndex = 0; constructorIndex < constructors.Length; constructorIndex++)
         {
             var (constructor, conditionalAlternative) = constructors[constructorIndex];
             var constructorName = constructor.IsStatic ? ".cctor" : ".ctor";
             var qualifiedLookupName = $"{qualifiedClassName}.{constructorName}";
+            var fallbackKey = CallableIdentityKey(constructorName, constructor.Parameters, []);
+            if (ambiguousConstructorKeys.Contains(fallbackKey))
+                fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(classIdentity, "constructor", constructor.Id, constructorName),
+                CreateDeclarationId(classIdentity, "constructor", constructor.Id,
+                    fallbackKey),
                 qualifiedLookupName,
                 "VOID",
                 Array.Empty<string>(),
@@ -1023,27 +1832,11 @@ public sealed class Binder
         }
         foreach (var nested in cls.NestedInterfaces)
         {
-            RegisterTypeSymbol(
-                classIdentity,
-                "interface",
-                nested.Id,
-                nested.Name,
-                $"{qualifiedClassName}.{nested.Name}",
-                Visibility.Public,
-                nested.IdentifierSpan,
-                nested.Span);
+            RegisterInterface(nested, classIdentity, $"{qualifiedClassName}.{nested.Name}");
         }
         foreach (var nested in cls.NestedEnums)
         {
-            RegisterTypeSymbol(
-                classIdentity,
-                "enum",
-                nested.Id,
-                nested.Name,
-                $"{qualifiedClassName}.{nested.Name}",
-                nested.Visibility,
-                nested.IdentifierSpan,
-                nested.Span);
+            RegisterEnum(nested, classIdentity, $"{qualifiedClassName}.{nested.Name}");
         }
         foreach (var nested in cls.NestedDelegates)
         {
@@ -1152,6 +1945,16 @@ public sealed class Binder
     private static IEnumerable<EventDefinitionNode> EnumerateEvents(ClassDefinitionNode cls) =>
         cls.Events.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Events));
 
+    private static IEnumerable<(EventDefinitionNode Event, ConditionalAlternative? Alternative)>
+        EnumerateEventRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var evt in cls.Events)
+            yield return (evt, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+            foreach (var evt in branch.Events)
+                yield return (evt, alternative);
+    }
+
     private static IEnumerable<OperatorOverloadNode> EnumerateOperators(ClassDefinitionNode cls) =>
         cls.OperatorOverloads.Concat(
             EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.OperatorOverloads));
@@ -1172,8 +1975,16 @@ public sealed class Binder
         // parameter row may mention (§7.2).
         OutputNode? output = null,
         IReadOnlyList<EffectParameterInfo>? effectParameters = null,
-        string? lexicalTypeContext = null)
+        string? lexicalTypeContext = null,
+        bool isAsync = false)
     {
+        var classTypeParameters = containingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(containingTypeName, out var declaringClass)
+                ? ReturnShape.GetCallableTypeParameters(declaringClass, _asyncTypeModule)
+                    .Select(parameter => parameter.Name)
+                : [];
+        var returnShape = ReturnShape.GetAsyncReturnTypes(returnType, isAsync, _asyncTypeModule,
+            typeParameters.Concat(classTypeParameters));
         var parameterSymbols = parameters
             .Select((parameter, index) => CreateVariable(
                 CreateDeclarationId(id, "parameter", stableAstId: null, parameter.Name),
@@ -1191,19 +2002,19 @@ public sealed class Binder
                 // (unblocks the pin test
                 // Calor0272_StillFires_For_ParameterReference_KnownLimitation).
                 // parameter.TypeName is already ExpandType'd by the
-                // parser (?string → OPTION[inner=STRING]); the helper
+                // parser (?string → NULLABLE[inner=STRING]); the helper
                 // handles both forms. Scoped to STRING per §D6.
                 nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName),
                 // v0.15 E2 slice b — position 4/5's row (§3.3). Null unless the
                 // parameter both carries a §E and spells a function type.
-                functionType: TryBuildFunctionType(
-                    parameter.TypeName, parameter.Row, effectParameters,
+                functionType: TryBuildParameterFunctionType(
+                    parameter, effectParameters,
                     containingTypeName ?? lexicalTypeContext)))
             .ToArray();
         var symbol = new FunctionSymbol(
             id,
             name,
-            returnType,
+            returnShape.CallableType,
             parameterSymbols,
             typeParameters,
             declarationSpan,
@@ -1213,8 +2024,9 @@ public sealed class Binder
             conditionalAlternative)
         {
             // v0.15 E2 slice b — position 6's row (§3.3).
-            ReturnFunctionType = TryBuildFunctionType(
-                output?.TypeName, output?.Row, effectParameters,
+            BodyReturnType = returnShape.BodyType,
+            ReturnFunctionType = isAsync ? null : TryBuildReturnFunctionType(
+                output, effectParameters,
                 containingTypeName ?? lexicalTypeContext),
         };
         TrackSymbol(symbol);
@@ -1241,7 +2053,9 @@ public sealed class Binder
         BoundTypes.NominalBoundType? inferredReferenceType = null,
         bool isTypeInferred = false,
         BoundTypes.ArrayBoundType? methodInputArrayType = null,
-        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null)
+        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null,
+        bool hasUnknownInferredType = false,
+        EventDefinitionNode? eventDeclaration = null)
     {
         var symbol = new VariableSymbol(
             id,
@@ -1261,8 +2075,10 @@ public sealed class Binder
             nullableAnnotation,
             functionType)
         {
+            EventDeclaration = eventDeclaration,
             InferredReferenceType = inferredReferenceType,
             IsTypeInferred = isTypeInferred,
+            HasUnknownInferredType = hasUnknownInferredType,
             MethodInputArrayType = methodInputArrayType
                 ?? (TryBuildMethodInputArrayType(typeName, out var arrayType) ? arrayType : null),
             GenericNullabilityType = genericNullabilityType
@@ -1288,11 +2104,18 @@ public sealed class Binder
         BoundTypes.NominalBoundType? inferredReferenceType = null,
         bool isTypeInferred = false,
         BoundTypes.ArrayBoundType? methodInputArrayType = null,
-        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null)
+        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null,
+        bool hasUnknownInferredType = false)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
+        if (!_snapshotLocalContexts.TryGetValue((context, kind), out var snapshotContext))
+        {
+            snapshotContext = context.Append("snapshot", _transientBindingId, kind);
+            _snapshotLocalContexts.Add((context, kind), snapshotContext);
+        }
         return CreateVariable(
-            CreateDeclarationId(context, kind, stableAstId: null, name),
+            RegisterDeclarationOccurrence(snapshotContext.AppendEscapedSuffix(
+                LocalIdentitySuffix(name, typeName, declarationSpan.Start))),
             name,
             typeName,
             isMutable,
@@ -1305,7 +2128,293 @@ public sealed class Binder
             inferredReferenceType: inferredReferenceType,
             isTypeInferred: isTypeInferred,
             methodInputArrayType: methodInputArrayType,
-            genericNullabilityType: genericNullabilityType);
+            genericNullabilityType: genericNullabilityType,
+            hasUnknownInferredType: hasUnknownInferredType);
+    }
+
+    private string LocalIdentitySuffix(string name, string typeName, int start)
+    {
+        _localIdentityBytes.Clear();
+        _localIdentityWriter ??= new System.Text.Json.Utf8JsonWriter(_localIdentityBytes);
+        var writer = _localIdentityWriter;
+        writer.Reset(_localIdentityBytes);
+        writer.WriteStartObject();
+        writer.WriteString("name"u8, name);
+        writer.WriteString("typeName"u8, typeName);
+        writer.WriteNumber("Start"u8, start);
+        writer.WriteEndObject();
+        writer.Flush();
+        static bool Unescaped(byte value) => value is >= (byte)'a' and <= (byte)'z'
+            or >= (byte)'A' and <= (byte)'Z' or >= (byte)'0' and <= (byte)'9'
+            or (byte)'-' or (byte)'_' or (byte)'.' or (byte)'~';
+        var length = 8; // /name%3A
+        foreach (var value in _localIdentityBytes.WrittenSpan) length += Unescaped(value) ? 1 : 3;
+        return string.Create(length, _localIdentityBytes.WrittenMemory, static (result, bytes) =>
+        {
+            "/name%3A".AsSpan().CopyTo(result);
+            var index = 8;
+            const string hex = "0123456789ABCDEF";
+            foreach (var value in bytes.Span)
+            {
+                if (Unescaped(value)) result[index++] = (char)value;
+                else
+                {
+                    result[index++] = '%';
+                    result[index++] = hex[value >> 4];
+                    result[index++] = hex[value & 15];
+                }
+            }
+        });
+    }
+
+    private static string SnapshotIdentityKey(ModuleNode module) =>
+        CreateSnapshotIdentityKey(module, out _);
+
+    private static string CreateSnapshotIdentityKey(ModuleNode module, out bool hasToolingIdentity)
+    {
+        // Snapshot-local handles must change after edits, not between identical compilations.
+        // Tooling and parser identities are metadata, not part of the syntax fingerprint.
+        using var text = new SnapshotHashWriter();
+        var pending = new Stack<AstNode>();
+        var visited = System.Threading.Interlocked.Exchange(ref SnapshotVisited, null)
+            ?? new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var children = new List<AstNode>();
+        hasToolingIdentity = false;
+        try
+        {
+            pending.Push(module);
+            while (pending.TryPop(out var node))
+            {
+                if (!visited.Add(node)) continue;
+                // Separate callable bodies and type-kind validation retain the declaration inventory.
+                hasToolingIdentity |= node.ToolingId != null
+                    || node is LocalFunctionStatementNode or TypeDefinitionNode;
+                text.Append(node.GetType().FullName!);
+                text.Append(":");
+                text.Append(node.Span.Start);
+                text.Append(":");
+                text.Append(node.Span.Length);
+                foreach (var plan in SnapshotProperties.GetOrAdd(node.GetType(), static type =>
+                {
+                    var children = RecursiveAstWalker.GetAllChildProperties(type);
+                    return type.GetProperties().Where(property => property.CanRead
+                        && property.GetIndexParameters().Length == 0
+                        && property.Name is not ("Id" or "LocalId" or "ToolingId"))
+                        .OrderBy(property => property.Name, StringComparer.Ordinal)
+                        .Select(property =>
+                        {
+                            var valueType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                            return new SnapshotProperty(property,
+                                valueType.IsPrimitive || valueType.IsEnum || valueType == typeof(string) || valueType == typeof(decimal),
+                                children.Contains(property));
+                        }).ToArray();
+                }))
+                {
+                    var property = plan.Property;
+                    if (property.Name == nameof(AstNode.Span) && property.DeclaringType == typeof(AstNode))
+                    {
+                        text.ResetJson();
+                        WriteSnapshotSpan(text.Json, node.Span);
+                        text.Append("|Span=");
+                        text.AppendJson();
+                        continue;
+                    }
+                    var value = property.GetValue(node);
+                    text.ResetJson();
+                    if (value == null) text.Json.WriteNullValue();
+                    else if (plan.Scalar)
+                        text.Json.WriteStringValue(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture));
+                    else if (!WriteSnapshotMetadata(text.Json, value, text.MapEntries))
+                    {
+                        if (value is AstNode or IEnumerable<AstNode>
+                            || plan.Child) continue;
+                        var valueType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                        throw new InvalidOperationException($"Unsupported identity snapshot metadata: {node.GetType().Name}.{property.Name} ({valueType.Name}).");
+                    }
+                    text.Append("|");
+                    text.Append(property.Name);
+                    text.Append("=");
+                    text.AppendJson();
+                }
+                text.Append(Environment.NewLine);
+                children.Clear();
+                foreach (var property in RecursiveAstWalker.GetAllChildProperties(node.GetType()))
+                    CollectSnapshotChildren(property.GetValue(node), children);
+                // The global visited set preserves first-visit order without per-node deduplication.
+                for (var index = children.Count - 1; index >= 0; index--) pending.Push(children[index]);
+            }
+            return text.Finish();
+        }
+        finally
+        {
+            visited.Clear();
+            // Retain one small scratch set, never ASTs or large-module working storage.
+            if (visited.EnsureCapacity(0) <= 4096)
+                System.Threading.Interlocked.CompareExchange(ref SnapshotVisited, visited, null);
+        }
+    }
+
+    private static void CollectSnapshotChildren(object? value, List<AstNode> children)
+    {
+        switch (value)
+        {
+            case AstNode node: children.Add(node); break;
+            case ObjectInitializerAssignment initializer: children.Add(initializer.Value); break;
+            case InlineRefinementInfo refinement: children.Add(refinement.Predicate); break;
+            case IReadOnlyList<AstNode> nodes:
+                for (var index = 0; index < nodes.Count; index++)
+                    if (nodes[index] is { } child) children.Add(child);
+                break;
+            case System.Collections.IEnumerable sequence when value is not string:
+                foreach (var item in sequence) CollectSnapshotChildren(item, children);
+                break;
+        }
+    }
+
+    private sealed record SnapshotProperty(System.Reflection.PropertyInfo Property, bool Scalar, bool Child);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, SnapshotProperty[]> SnapshotProperties = new();
+    private static HashSet<AstNode>? SnapshotVisited;
+
+    private sealed class SnapshotHashWriter : IDisposable
+    {
+        private readonly System.Security.Cryptography.IncrementalHash _hash =
+            System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        private readonly System.Text.Encoder _encoder = System.Text.Encoding.UTF8.GetEncoder();
+        private readonly byte[] _bytes = new byte[4096];
+        private readonly System.Buffers.ArrayBufferWriter<byte> _jsonBytes = new(512);
+        public System.Text.Json.Utf8JsonWriter Json { get; }
+        public List<KeyValuePair<string, string>> MapEntries { get; } = new();
+        public SnapshotHashWriter() => Json = new(_jsonBytes);
+
+        public void Append(ReadOnlySpan<char> text)
+        {
+            while (!text.IsEmpty)
+            {
+                _encoder.Convert(text, _bytes, false, out var characters, out var bytes, out _);
+                _hash.AppendData(_bytes.AsSpan(0, bytes));
+                text = text[characters..];
+            }
+        }
+
+        public void Append(int value)
+        {
+            Span<char> text = stackalloc char[32];
+            if (!value.TryFormat(text, out var length))
+            {
+                Append(value.ToString());
+                return;
+            }
+            Append(text[..length]);
+        }
+
+        public void ResetJson()
+        {
+            _jsonBytes.Clear();
+            Json.Reset(_jsonBytes);
+        }
+
+        public void AppendJson()
+        {
+            Json.Flush();
+            _hash.AppendData(_jsonBytes.WrittenSpan);
+        }
+
+        public string Finish()
+        {
+            _encoder.Convert(ReadOnlySpan<char>.Empty, _bytes, true, out _, out var bytes, out _);
+            _hash.AppendData(_bytes.AsSpan(0, bytes));
+            return Convert.ToHexString(_hash.GetHashAndReset());
+        }
+
+        public void Dispose()
+        {
+            Json.Dispose();
+            _hash.Dispose();
+        }
+    }
+
+    private static bool WriteSnapshotMetadata(System.Text.Json.Utf8JsonWriter writer, object value,
+        List<KeyValuePair<string, string>> mapEntries)
+    {
+        switch (value)
+        {
+            case AttributeCollection attributes:
+                WriteSnapshotMap(writer, attributes.All(), mapEntries); break;
+            case IReadOnlyDictionary<string, string> map:
+                WriteSnapshotMap(writer, map, mapEntries); break;
+            case IReadOnlyList<string> strings:
+                System.Text.Json.JsonSerializer.Serialize(writer, strings); break;
+            case IReadOnlyList<int> ordinals:
+                System.Text.Json.JsonSerializer.Serialize(writer, ordinals); break;
+            case IReadOnlyList<EffectParameterInfo> parameters:
+                System.Text.Json.JsonSerializer.Serialize(writer, parameters); break;
+            case IReadOnlyList<NamespaceScopeInfo> scopes:
+                System.Text.Json.JsonSerializer.Serialize(writer, scopes.Select(scope => new { scope.Name, scope.FullName, scope.IsFileScoped, scope.Span, scope.Kind })); break;
+            case IReadOnlyList<TextSpan> spans:
+                System.Text.Json.JsonSerializer.Serialize(writer, spans); break;
+            case IReadOnlyList<ObjectInitializerAssignment> initializers:
+                System.Text.Json.JsonSerializer.Serialize(writer, initializers.Select(initializer => initializer.PropertyName)); break;
+            case IReadOnlyList<CalorAttributeArgument> arguments:
+                System.Text.Json.JsonSerializer.Serialize(writer, arguments.Select(argument => new { argument.Name, Value = argument.GetCalorFormattedValue() })); break;
+            case InlineRefinementInfo refinement:
+                System.Text.Json.JsonSerializer.Serialize(writer, refinement.BaseTypeName); break;
+            case TextSpan span:
+                WriteSnapshotSpan(writer, span); break;
+            case DateOnly date:
+                System.Text.Json.JsonSerializer.Serialize(writer, date); break;
+            case DateTime date:
+                System.Text.Json.JsonSerializer.Serialize(writer, date); break;
+            default: return false;
+        }
+        return true;
+    }
+
+    private static void WriteSnapshotSpan(System.Text.Json.Utf8JsonWriter writer, TextSpan span)
+    {
+        writer.WriteStartObject();
+        writer.WriteNumber("Start"u8, span.Start);
+        writer.WriteNumber("Length"u8, span.Length);
+        writer.WriteNumber("Line"u8, span.Line);
+        writer.WriteNumber("Column"u8, span.Column);
+        writer.WriteNumber("End"u8, span.End);
+        writer.WriteEndObject();
+    }
+
+    private static void WriteSnapshotMap(System.Text.Json.Utf8JsonWriter writer,
+        IEnumerable<KeyValuePair<string, string>> map, List<KeyValuePair<string, string>> entries)
+    {
+        entries.Clear();
+        foreach (var pair in map) entries.Add(pair);
+        entries.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
+        writer.WriteStartArray();
+        foreach (var pair in entries)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("Key"u8, pair.Key);
+            writer.WriteString("Value"u8, pair.Value);
+            writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
+    }
+
+    private static string CallableIdentityKey(
+        string name,
+        IReadOnlyList<ParameterNode> parameters,
+        IReadOnlyList<TypeParameterNode> typeParameters,
+        string? namespaceIdentity = null)
+    {
+        var names = typeParameters.Select(parameter => parameter.Name).ToArray();
+        return System.Text.Json.JsonSerializer.Serialize(new
+        {
+            namespaceIdentity,
+            name,
+            arity = names.Length,
+            parameters = parameters.Select(parameter => new
+            {
+                type = TypeIdentity.CanonicalizeSignature(parameter.TypeName, names),
+                modifier = parameter.Modifier.ToString()
+            })
+        });
     }
 
     private SymbolId CreateDeclarationId(
@@ -1314,10 +2423,15 @@ public sealed class Binder
         string? stableAstId,
         string fallbackName)
     {
-        var baseId = !string.IsNullOrWhiteSpace(stableAstId)
-            ? parent.Append(kind, $"ast:{stableAstId}")
+        var baseId = stableAstId != null && _toolingIds.Contains(stableAstId)
+            ? SymbolId.Create("declaration", stableAstId)
             : parent.Append(kind, $"name:{fallbackName}");
-        var key = baseId.Value;
+        return RegisterDeclarationOccurrence(baseId);
+    }
+
+    private SymbolId RegisterDeclarationOccurrence(SymbolId baseId)
+    {
+        var key = baseId;
         if (!_declarationIdOccurrences.TryGetValue(key, out var occurrence))
         {
             _declarationOccurrenceJournal?.Add((key, 0));
@@ -1342,12 +2456,17 @@ public sealed class Binder
             reference.Span);
     }
 
+    private TypeSymbol[] SourceTypeSymbols() =>
+        _sourceTypeSymbols ??= _symbolsById.Values.OfType<TypeSymbol>().ToArray();
+
     private void TrackSymbol(Symbol symbol)
     {
         if (!symbol.Id.IsNone)
         {
             _symbolsById.Add(symbol.Id, symbol);
             _symbolOrder.Add(symbol.Id);
+            if (symbol is TypeSymbol)
+                _sourceTypeSymbols = null;
         }
     }
 
@@ -1451,7 +2570,8 @@ public sealed class Binder
                 scope = _scope.CreateChild();
             var function = local.Function;
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(enclosing, "localfunction", function.Id, function.Name),
+                CreateDeclarationId(enclosing, "localfunction", function.Id,
+                    CallableIdentityKey(function.Name, function.Parameters, function.TypeParameters)),
                 function.Name,
                 function.Output?.TypeName ?? "VOID",
                 Array.Empty<string>(),
@@ -1460,8 +2580,10 @@ public sealed class Binder
                 Visibility.Private,
                 containingTypeName: null,
                 definitionSpan: function.Span,
-                output: function.Output);
+                output: function.Output,
+                isAsync: function.IsAsync);
             _localFunctionSymbols.Add(symbol);
+            _functionSymbols[function] = symbol;
             if (!scope.TryDeclareOverload(function.Name, symbol, out var duplicate))
                 ReportDuplicateSignature(function.Span, function.Name, symbol, duplicate);
             locals.Add((function, symbol));
@@ -1488,13 +2610,15 @@ public sealed class Binder
                 using var _s = PushScope(bodyScope);
                 using var _c = PushStaticContext(true);
                 using var _identity = PushDeclarationContext(symbol.Id);
-                using var _returnCtx = PushReturnTypeContext(symbol.ReturnType);
+                using var _returnCtx = PushReturnTypeContext(symbol.BodyReturnType);
                 DeclareParameters(symbol.Parameters, function.Parameters);
+                var contracts = BindContracts(function.Preconditions, function.Postconditions, symbol.BodyReturnType);
                 var body = BindStatements(function.Body);
                 _boundLocalFunctions.Add(new BoundFunction(function.Span, symbol, body, bodyScope,
                     Array.Empty<string>(), BoundMemberKind.LocalFunction, containingTypeName: null)
                 {
-                    EnclosingSymbolId = enclosing
+                    EnclosingSymbolId = enclosing,
+                    ContractConditions = contracts
                 });
             }
             finally
@@ -1535,13 +2659,16 @@ public sealed class Binder
         var functionSymbol = _functionSymbols[func];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
         // v0.14 §S4 — expose the declared return type to BindReturnStatement.
-        using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
+        using var _returnCtx = PushReturnTypeContext(functionSymbol.BodyReturnType);
         var previousNamespaceIdentity = _currentNamespaceIdentity;
+        var previousNamespaceScopeId = _currentNamespaceScopeId;
         _currentNamespaceIdentity = func.NamespaceIdentity;
+        _currentNamespaceScopeId = func.NamespaceScopeId;
 
         try
         {
             DeclareParameters(functionSymbol.Parameters, func.Parameters);
+            var contracts = BindContracts(func.Preconditions, func.Postconditions, functionSymbol.BodyReturnType);
 
             // Bind body
             var boundBody = BindStatements(func.Body);
@@ -1550,11 +2677,15 @@ public sealed class Binder
             // Extract declared effects for taint analysis
             var declaredEffects = ExtractEffects(func);
 
-            return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects);
+            return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects)
+            {
+                ContractConditions = contracts
+            };
         }
         finally
         {
             _currentNamespaceIdentity = previousNamespaceIdentity;
+            _currentNamespaceScopeId = previousNamespaceScopeId;
         }
     }
 
@@ -1568,6 +2699,11 @@ public sealed class Binder
         for (var index = 0; index < symbols.Count; index++)
         {
             var symbol = symbols[index];
+            // Parameter registration precedes source type registration.
+            if (TryBuildMethodInputArrayType(symbol.TypeName, out var array))
+                symbol.MethodInputArrayType = array;
+            symbol.GenericNullabilityType = TryBuildClosedReferenceGeneric(symbol.TypeName)
+                ?? symbol.GenericNullabilityType;
             if (!_scope.TryDeclare(symbol))
             {
                 var suggestedName = GenerateUniqueName(symbol.Name);
@@ -1576,6 +2712,30 @@ public sealed class Binder
                     symbol.Name,
                     suggestedName);
             }
+        }
+    }
+
+    private IReadOnlyList<BoundExpression> BindContracts(
+        IReadOnlyList<RequiresNode> preconditions,
+        IReadOnlyList<EnsuresNode> postconditions,
+        string returnType)
+    {
+        var previous = _bindingContract;
+        _bindingContract = true;
+        try
+        {
+            var conditions = preconditions.Select(precondition => BindExpression(precondition.Condition)).ToList();
+            using var scope = PushScope(_scope.CreateChild());
+            if (!ReturnShape.IsVoidType(returnType))
+                _scope.TryDeclare(CreateLocalVariable("result", returnType, isMutable: false,
+                    isParameter: true, ParameterModifier.None, Parsing.TextSpan.Empty, "contract-result",
+                    nullableAnnotation: TryReadDeclaredStringAnnotation(returnType)));
+            conditions.AddRange(postconditions.Select(postcondition => BindExpression(postcondition.Condition)));
+            return conditions;
+        }
+        finally
+        {
+            _bindingContract = previous;
         }
     }
 
@@ -1640,6 +2800,10 @@ public sealed class Binder
                 && DefinitelyTerminates(ifStatement.ThenBody))
             {
                 DeclareFailedConditionPatterns(ifStatement.Condition, boundIf.Condition);
+                if (ifStatement.Condition is BinaryOperationNode guard
+                    && IsSelectedBuiltInNullGuard(guard)
+                    && _sourceCallConversions?.TerminatingNullGuardConditions.Contains(guard) == true)
+                    DeclareFailedNullEqualityConditionPatterns(guard, boundIf.Condition);
             }
         }
         return result;
@@ -1677,6 +2841,7 @@ public sealed class Binder
             AssignmentStatementNode assign => BindAssignmentStatement(assign),
             CompoundAssignmentStatementNode compound => BindCompoundAssignment(compound),
             ForeachStatementNode forEach => BindForeachStatement(forEach),
+            DictionaryForeachNode deconstruction => BindDeconstructionForeach(deconstruction),
             UsingStatementNode usingStmt => BindUsingStatement(usingStmt),
             ThrowStatementNode throwStmt => new BoundThrowStatement(throwStmt.Span,
                 throwStmt.Exception != null ? BindExpression(throwStmt.Exception) : null),
@@ -1689,14 +2854,14 @@ public sealed class Binder
             SyncBlockNode sync => BindSyncBlock(sync),
             PrintStatementNode print => new BoundExpressionStatement(print.Span,
                 BindExpression(print.Expression)),
-            // Passthrough nodes — no executable semantics
+            // Comments have no executable semantics; preserved C# remains opaque.
             FallbackCommentNode => null,
-            RawCSharpNode => null,
+            RawCSharpNode => BindUnsupportedStatement(stmt),
             // 0.25 F3 (#847): bound as its own callable (BindLocalFunctions).
             LocalFunctionStatementNode => null,
             PreprocessorDirectiveNode preprocessor => BindPreprocessorDirective(preprocessor),
-            EventSubscribeNode => ScanUnboundWrites(stmt),
-            EventUnsubscribeNode => ScanUnboundWrites(stmt),
+            EventSubscribeNode subscribe => BindEventSubscription(subscribe, subscribe.Event, subscribe.Handler, adding: true),
+            EventUnsubscribeNode unsubscribe => BindEventSubscription(unsubscribe, unsubscribe.Event, unsubscribe.Handler, adding: false),
             // Unknown — explicit unsupported node, NOT null
             _ => BindUnsupportedStatement(stmt)
         };
@@ -1711,13 +2876,14 @@ public sealed class Binder
     private BoundCallStatement BindCallStatement(CallStatementNode call)
     {
         var args = BindCallArguments(call.Arguments, call.ArgumentModifiers);
-        var receiverSymbol = ResolveCallReceiver(
+        var isEventCall = TryGetEventStorage(call, out var eventStorage, out var eventType);
+        var receiverSymbol = isEventCall ? eventStorage : ResolveCallReceiver(
             call.Target,
             call.ReceiverSpan ?? call.CalleeSpan);
         var receiverTypeSymbol = receiverSymbol == null
             ? ResolveCallReceiverType(call.Target)
             : null;
-        var resolution = ResolveCall(
+        var resolution = isEventCall ? OverloadResolutionResult.NotFound() : ResolveCall(
             call.Span,
             call.Target,
             args,
@@ -1725,24 +2891,32 @@ public sealed class Binder
             call.ArgumentModifiers,
             call.TypeArguments,
             allowNullableStringCompatibility: true);
-        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
+        var bclResolution = !isEventCall && resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
             ? TryResolveBclCall(call.Target, args, call.ArgumentNames, call.ArgumentModifiers)
             : null;
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(call.Target, receiverSymbol, args, resolution, bclResolution);
         InvalidateMutatingCallArguments(args, call.ArgumentModifiers, resolution, bclResolution);
-        var callable = ResolveCallableStorage(call.Target, receiverSymbol);
+        var callable = isEventCall ? eventStorage.StorageIdentity : ResolveCallableStorage(call.Target, receiverSymbol);
         var callableEffects = InvalidateDeferredCallTarget(callable);
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
             call.Target,
             receiverSymbol,
             receiverTypeSymbol);
-        var receiver = BuildCallReceiver(
+        var receiver = isEventCall
+            ? new BoundVariableExpression(call.CalleeSpan, eventStorage, typeOverride: eventType)
+            : BuildCallReceiver(
             call.Target,
             call.ReceiverSpan ?? call.CalleeSpan,
             receiverSymbol,
             receiverTypeSymbol,
             resolvedTypeName);
+
+        if (resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
+            && receiver is not null)
+            ValidateStringInstanceReceiver(receiver, TryResolveBclCall(
+                $"{receiver.Type.FullyQualifiedName}.{resolvedMethodName}", args,
+                call.ArgumentNames, call.ArgumentModifiers, receiver, call.TypeArguments)?.Symbol);
 
         var boundCall = new BoundCallStatement(
             call.Span,
@@ -1752,7 +2926,8 @@ public sealed class Binder
             call.ArgumentNames,
             call.ArgumentModifiers,
             receiverSymbol,
-            WithLocalFunctionCandidates(call.Target, resolution.Functions),
+            resolution.Kind == OverloadResolutionKind.UnresolvedArguments ? []
+                : WithLocalFunctionCandidates(call.Target, resolution.Functions),
             call.CalleeSpan,
             call.ReceiverSpan,
             resolution.Kind == OverloadResolutionKind.Inaccessible,
@@ -1760,7 +2935,8 @@ public sealed class Binder
             receiverTypeSymbol,
             resolvedTypeName,
             resolvedMethodName,
-            (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+            (isEventCall ? eventType.ParameterTypes.Select(type => type.DisplayString)
+                : bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
                 ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
@@ -1770,16 +2946,20 @@ public sealed class Binder
             CallableStorageIdentity = callable,
             ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
-            SelectedOverloadMatches = resolution.Matches
+            SelectedOverloadMatches = resolution.Matches,
+            HasOpaqueOverloads = resolution.HasOpaqueOverloads,
+            HasUnresolvedArguments = resolution.Kind == OverloadResolutionKind.UnresolvedArguments
         };
         return boundCall;
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
     {
-        var expr = ret.Expression != null ? BindExpression(ret.Expression) : null;
-        var incompatibleRepresentation = expr is not null && _currentFunctionReturnType is not null
-            && CheckReferenceOptionRepresentation(_currentFunctionReturnType, expr);
+        var expr = ret.Expression is LambdaExpressionNode { IsAsync: true } asyncLambda
+            ? BindExpression(asyncLambda, TryBuildFunctionType(_currentFunctionReturnType, null, null))
+            : ret.Expression != null ? BindExpression(ret.Expression) : null;
+        if (expr is not null && _currentFunctionReturnType is not null)
+            CheckMetadataArrayToCollection(expr, _currentFunctionReturnType, ret.Span, "Return");
 
         // v0.14 §S4 nullability check (issue #875, D2 predicate). Return-site
         // sibling of the §S3b BindBindStatement check. Fires when the current
@@ -1791,16 +2971,17 @@ public sealed class Binder
         // returns silently pass. Current semantics produces binder Errors;
         // BindingDiagnosticPolicy keeps these analysis-only. Unsupported
         // major versions are rejected before binding, not compiled in Info mode.
-        if (!incompatibleRepresentation
-            && expr != null
+        if (expr != null
             && _currentFunctionReturnType != null
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
+            && !IsObliviousFlowInObliviousModule(expr)
             && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
         {
             var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
             _diagnostics.Report(
                 expr.Span,
                 DiagnosticCode.NullableReturnFromNonNullable,
+                DescribeClosedGenericReceiving(expr, stringTarget!) ??
                 $"Return declares non-nullable {targetShapeLabel} but the returned value may be null " +
                 $"(source annotation: '{DescribeAnnotation(expr)}'). " +
                 $"Change the return type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
@@ -1814,32 +2995,37 @@ public sealed class Binder
     private BoundForStatement BindForStatement(ForStatementNode forStmt)
     {
         using var _ = PushScope(_scope.CreateChild());
+        var from = BindExpression(forStmt.From);
+        var snapshotTo = !forStmt.ReevaluatesCondition ? BindExpression(forStmt.To) : null;
+        var step = !forStmt.ReevaluatesCondition && forStmt.Step != null ? BindExpression(forStmt.Step) : null;
 
         // Declare loop variable
         var loopVar = CreateLocalVariable(
             forStmt.VariableName,
-            "INT",
+            forStmt.VariableType,
             isMutable: true,
             isParameter: false,
             ParameterModifier.None,
             forStmt.VariableSpan,
             "for");
-        loopVar.IsLoopVariable = true; // #1550
+        loopVar.IsLoopVariable = !forStmt.ReevaluatesCondition;
         if (!_scope.TryDeclare(loopVar))
         {
             _diagnostics.ReportError(forStmt.Span, DiagnosticCode.DuplicateDefinition,
                 $"Variable '{forStmt.VariableName}' is already defined");
         }
 
-        var from = BindExpression(forStmt.From);
-        var to = BindExpression(forStmt.To);
-        var step = forStmt.Step != null ? BindExpression(forStmt.Step) : null;
+        var condition = forStmt.Condition != null ? BindExpression(forStmt.Condition) : null;
+        var to = snapshotTo ?? BindExpression(forStmt.To);
+        if (forStmt.Condition != null && condition != null)
+            DeclareSuccessfulConditionPatterns(forStmt.Condition, condition);
+        var update = forStmt.Update != null ? BindStatement(forStmt.Update) : null;
         PrepareLoopCallableState(forStmt.Body);
         var headerCallables = CaptureCallableState();
         var body = BindStatements(forStmt.Body);
         JoinCallableState(headerCallables);
 
-        return new BoundForStatement(forStmt.Span, loopVar, from, to, step, body);
+        return new BoundForStatement(forStmt.Span, loopVar, from, to, step, body, condition, update);
     }
 
     private BoundWhileStatement BindWhileStatement(WhileStatementNode whileStmt)
@@ -1871,7 +3057,7 @@ public sealed class Binder
         // Copying both module-wide maps here made binding quadratic in module
         // size (one full copy per loop).
         var symbolCount = _symbolOrder.Count;
-        var declarationJournal = new List<(string Key, int Previous)>();
+        var declarationJournal = new List<(SymbolId Key, int Previous)>();
         _declarationOccurrenceJournal = declarationJournal;
         var expressionsBound = ExpressionsBound;
         var misplacedRows = _misplacedRowsReported.ToArray();
@@ -1881,6 +3067,7 @@ public sealed class Binder
         _isDiscoveringLoopCallables = true;
         CallableMutationSummary summary;
         HashSet<string> byReferenceWrites = new(StringComparer.Ordinal);
+        var memberReceiverWrites = new List<BoundExpression>();
         var aliasInvalidationsBefore = _aliasInvalidations;
         var loopMayWriteAliases = false;
         try
@@ -1902,12 +3089,20 @@ public sealed class Binder
                     byReferenceWrites.UnionWith(ByReferenceWrittenNames(expressionModifiers, expressionArguments));
                 else if (node is BoundCallStatement { ArgumentModifiers: { } statementModifiers, Arguments: var statementArguments })
                     byReferenceWrites.UnionWith(ByReferenceWrittenNames(statementModifiers, statementArguments));
+                if (node.DirectWriteTarget is { } writtenTarget)
+                    memberReceiverWrites.Add(writtenTarget);
             }
             // Every aliased-storage change the body binds (calls, stores, using, foreach, events) was
             // seen by the statement and expression hooks during this discovery pass.
             loopMayWriteAliases = _aliasInvalidations != aliasInvalidationsBefore;
             summary = new CallableMutationSummary
             {
+                Mutations = GetDeferredMutations(boundCondition, body)
+                    .Select(variable => variable.StorageIdentity)
+                    .Where(variable => variable is
+                        { IsField: false, IsProperty: false, MethodInputArrayType: not null })
+                    .Distinct<VariableSymbol>(ReferenceEqualityComparer.Instance)
+                    .ToArray(),
                 Alternatives = GetDeferredCallEffects(boundCondition, body).ToArray(),
                 Writes = _deferredCallableWrites.ToArray()
             };
@@ -1918,7 +3113,8 @@ public sealed class Binder
             RestoreFlowNarrowingState(flow);
             _diagnostics.RestoreCheckpoint(diagnostics);
             for (var index = _symbolOrder.Count - 1; index >= symbolCount; index--)
-                _symbolsById.Remove(_symbolOrder[index]);
+                if (_symbolsById.Remove(_symbolOrder[index], out var removed) && removed is TypeSymbol)
+                    _sourceTypeSymbols = null;
             _symbolOrder.RemoveRange(symbolCount, _symbolOrder.Count - symbolCount);
             _declarationOccurrenceJournal = null;
             for (var index = declarationJournal.Count - 1; index >= 0; index--)
@@ -1942,6 +3138,8 @@ public sealed class Binder
         // installed on a preceding iteration. Bind receiving sites only after
         // this state is available; fresh guards in the body still narrow normally.
         ApplyCallableMutationSummary(summary);
+        foreach (var target in memberReceiverWrites)
+            InvalidateMemberFlowNarrowing(target);
         foreach (var name in byReferenceWrites)
         {
             if (_scope.Lookup(name) is VariableSymbol visible)
@@ -1995,7 +3193,9 @@ public sealed class Binder
             elseBody = BindIsolatedFlowBranch(
                 fallthrough,
                 branches,
-                setup: null,
+                () => DeclareFailedConditionPatterns(
+                    ifStmt.ElseIfClauses.LastOrDefault()?.Condition ?? ifStmt.Condition,
+                    elseIfClauses.LastOrDefault()?.Condition ?? condition),
                 () => BindStatements(ifStmt.ElseBody));
         }
 
@@ -2080,9 +3280,13 @@ public sealed class Binder
 
         if (bind.Initializer != null)
         {
-            initializer = BindExpression(bind.Initializer);
+            initializer = bind.Initializer is LambdaExpressionNode { IsAsync: true } asyncLambda
+                ? BindExpression(asyncLambda, TryBuildFunctionType(bind.TypeName, null, null))
+                : BindExpression(bind.Initializer);
             // Infer type from initializer if not specified
             typeName = bind.TypeName ?? initializer.Type.DisplayString;
+            if (bind.TypeName is not null)
+                CheckMetadataArrayToCollection(initializer, bind.TypeName, bind.Span, $"Binding '{bind.Name}'");
         }
         else if (bind.TypeName != null)
         {
@@ -2090,14 +3294,14 @@ public sealed class Binder
         }
         else
         {
-            // §B{name} with neither :type nor initializer: previously
+            // A binding with neither a type nor initializer previously
             // silently defaulted to INT (latent bug). Per RFC v0.6 bind
             // inference formalization §3.2, this is now Calor0250.
             // Fall back to "INT" so subsequent binding still produces a
             // usable symbol and we don't cascade NREs through the bound tree.
             _diagnostics.ReportError(bind.Span, DiagnosticCode.BindRequiresTypeOrInitializer,
                 $"Binding '{bind.Name}' has no type annotation and no initializer. " +
-                "Add either ':type' (e.g. '§B{" + bind.Name + ":i32}') " +
+                "Add either a type before the name (e.g. 'int:name') " +
                 "or an initializer expression so the binder can infer the type.");
             typeName = "INT";
         }
@@ -2105,7 +3309,8 @@ public sealed class Binder
         var rebindTarget = bind.IsMutable ? FindRebindTarget(bind.Name) : null;
         if (rebindTarget != null)
         {
-            rebindTarget = InvalidateMutableFlowNarrowing(rebindTarget);
+            rebindTarget = InvalidateMutableFlowNarrowing(rebindTarget,
+                mayWriteNull: initializer == null || MayIntroduceNullInObliviousModule(initializer));
             if (rebindTarget.StorageIdentity.IsLoopVariable)
                 ReportWriteToReadOnlyLocal(rebindTarget, bind.IdentifierSpan, "rebind {0}");
             if (!CanRebind(rebindTarget))
@@ -2139,8 +3344,8 @@ public sealed class Binder
                 _diagnostics.ReportError(
                     bind.IdentifierSpan,
                     DiagnosticCode.BindRebindTypeMismatch,
-                    $"Mutable binding '{bind.Name}' has type '{rebindTarget.TypeName}' and cannot be " +
-                    $"rebound with '{annotatedType ?? valueType}'.");
+                    $"Mutable binding '{bind.Name}' has type '{AttributeHelper.ToSurfaceSpelling(rebindTarget.TypeName)}' and cannot be " +
+                    $"rebound with '{AttributeHelper.ToSurfaceSpelling(bind.TypeName ?? valueType!)}'.");
             }
 
             if (initializer != null)
@@ -2198,8 +3403,11 @@ public sealed class Binder
             inferredReferenceType: inferredReferenceType,
             isTypeInferred: bind.TypeName is null,
             methodInputArrayType: GetLocalMethodInputArrayType(bind.TypeName, initializer),
-            genericNullabilityType: bind.TypeName is null ? initializer?.GenericNullabilityType : null);
+            genericNullabilityType: bind.TypeName is null ? initializer?.GenericNullabilityType : null,
+            hasUnknownInferredType: bind.TypeName is null && initializer?.HasUnknownInferredType == true);
         variable.IsImmutableBinding = !bind.IsMutable && !bind.IsCollectionStatementForm; // #1550
+        variable.MetadataArrayResultType = initializer?.MetadataArrayResultType;
+        variable.AnonymousObjectMembers = bind.TypeName is null ? initializer?.AnonymousObjectMembers : null;
 
         if (!_scope.TryDeclare(variable))
         {
@@ -2209,8 +3417,19 @@ public sealed class Binder
         if (initializer is not null)
             SetCallableState(variable, initializer);
 
-        var incompatibleRepresentation = initializer is not null && bind.TypeName is not null
-            && CheckReferenceOptionRepresentation(bind.TypeName, initializer);
+        if (variable.MethodInputArrayType is
+                { NullableAnnotation: BoundTypes.NullableAnnotation.Annotated or BoundTypes.NullableAnnotation.Oblivious } declaredArray
+            && initializer is { HasUnknownInferredType: false }
+            && NullabilityChecker.GetMethodInputArrayType(initializer) is
+                { NullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated } initializedArray
+            && initializedArray.Rank == declaredArray.Rank
+            && (initializer is not BoundCallExpression call
+                || !call.HasUnresolvedArguments && !call.HasOpaqueOverloads && !call.IsInaccessibleCall
+                    && (call.ResolvedMetadataMethod is not null || call.SelectedOverloadMatches.Count == 1)))
+        {
+            // The declaration keeps its annotations; only the current container value is non-null.
+            DeclareNarrowedNonNullVariable(new ReferenceNode(bind.IdentifierSpan, bind.Name), variable);
+        }
 
         // v0.14 §S3 nullability check (issue #875, D2 predicate). Fires when
         // an explicit :string / :str target is initialized with a value whose
@@ -2221,16 +3440,17 @@ public sealed class Binder
         // now carry real annotations on their BoundCallExpression.Type.
         // Current semantics produces binder Errors, kept analysis-only by
         // BindingDiagnosticPolicy. Unsupported majors do not compile in Info mode.
-        if (!incompatibleRepresentation
-            && initializer != null
+        if (initializer != null
             && bind.TypeName != null
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
+            && !IsObliviousFlowInObliviousModule(initializer)
             && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
         {
             var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
             _diagnostics.Report(
                 initializer.Span,
                 DiagnosticCode.NullableToNonNullableBinding,
+                DescribeClosedGenericReceiving(initializer, stringTarget!) ??
                 $"Binding '{bind.Name}' declares non-nullable {targetShapeLabel} but its initializer " +
                 $"may be null (source annotation: '{DescribeAnnotation(initializer)}'). " +
                 $"Change the target to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
@@ -2238,21 +3458,9 @@ public sealed class Binder
                 BindingDiagnosticContext.For(BindingReceivingBoundary.Initializer, stringTarget!));
         }
 
+        if (initializer != null && MayIntroduceNullInObliviousModule(initializer))
+            _obliviousNullTaintedStorage.Add(variable.StorageIdentity);
         return new BoundBindStatement(bind.Span, variable, initializer);
-    }
-
-    private bool CheckReferenceOptionRepresentation(string targetType, BoundExpression source)
-    {
-        if (Parsing.AttributeHelper.IsReferenceOptionMismatch(
-            targetType, source.Type.DisplayString, _declaredReferenceTypes))
-        {
-            _diagnostics.ReportError(source.Span, DiagnosticCode.ReferenceOptionMismatch,
-                $"Cannot assign '{Parsing.AttributeHelper.ToSurfaceSpelling(source.Type.DisplayString)}' " +
-                $"to '{Parsing.AttributeHelper.ToSurfaceSpelling(targetType)}': reference values and " +
-                "runtime Option values are distinct. Use explicit Option construction or consumption.");
-            return true;
-        }
-        return false;
     }
 
     /// <summary>
@@ -2347,23 +3555,35 @@ public sealed class Binder
     private bool TryBuildMethodInputArrayType(
         string declaredType,
         out BoundTypes.ArrayBoundType? array,
-        FunctionSymbol? declaringFunction = null)
+        FunctionSymbol? declaringFunction = null,
+        string? declaringTypeName = null)
     {
         array = null;
-        if (!TrySplitArrayTypeSpelling(declaredType, out var elementName, out var rank, out var annotation))
+        if (!TrySplitArrayTypeSpelling(declaredType, out var elementName, out var rank, out var annotation,
+                _declaredReferenceAnnotation))
             return false;
 
         BoundTypes.BoundType element;
-        if (TryBuildMethodInputArrayType(elementName, out var nested, declaringFunction))
+        if (TryBuildMethodInputArrayType(elementName, out var nested, declaringFunction, declaringTypeName))
             element = nested!;
-        else if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(elementName, out var nullableElement)
-            && TypeIdentity.Canonicalize(nullableElement) == "STRING")
-            element = new BoundTypes.NominalBoundType(
-                "STRING", BoundTypes.NullableAnnotation.Annotated);
-        else if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName)))
-            element = new BoundTypes.PrimitiveBoundType(TypeIdentity.Canonicalize(elementName));
-        else if (TryBuildStringTarget(elementName, out var reference, declaringFunction)
-            && reference is BoundTypes.NominalBoundType)
+        else if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
+            || IsBuiltInValueTypeName(elementName))
+            element = new BoundTypes.PrimitiveBoundType(
+                IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName))
+                    ? TypeIdentity.Canonicalize(elementName) : elementName,
+                bits: null, signed: null, displayOverride: elementName);
+        else if (TryBuildDeclaredMetadataArrayElement(elementName, declaringFunction, declaringTypeName) is { } metadataElement)
+            element = metadataElement;
+        else if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TypeIdentity.TrySplitGeneric(elementName.TrimEnd('?'), out _, out _))
+            element = BuildDeclaredBoundType(elementName);
+        else if ((declaringFunction is not null
+                ? TryBuildCallableReference(elementName, declaringFunction)
+                : TryBuildReferenceType(elementName, declaringTypeName ?? _currentClassName,
+                    declaringTypeName is not null && _classesByQualifiedName.TryGetValue(declaringTypeName, out var owner)
+                        ? owner.NamespaceIdentity : _currentNamespaceIdentity,
+                    _currentMemberTypeParameters?.Select(parameter => parameter.Name)))
+            is { } reference)
             element = reference;
         else
             element = new BoundTypes.UnresolvedBoundType($"Unsupported declared array element '{elementName}'");
@@ -2372,18 +3592,52 @@ public sealed class Binder
         return true;
     }
 
+    private BoundTypes.BoundType? TryBuildDeclaredMetadataArrayElement(
+        string elementName, FunctionSymbol? function, string? declaringTypeName)
+    {
+        if (!TypeIdentity.TrySplitGeneric(elementName.TrimEnd('?'), out _, out _)
+            || GetOrCreateMetadataBinder() is not { } metadata)
+            return null;
+        var containingType = function is not null ? function.ContainingTypeName : declaringTypeName ?? _currentClassName;
+        var scopeId = _currentNamespaceScopeId;
+        var namespaceIdentity = _currentNamespaceIdentity;
+        var parameters = function is null
+            ? (_currentMemberTypeParameters ?? []).Select(parameter => parameter.Name).ToHashSet(StringComparer.Ordinal)
+            : function.TypeParameters.ToHashSet(StringComparer.Ordinal);
+        if (function is not null)
+        {
+            _functionNamespaces.TryGetValue(function.Id, out namespaceIdentity);
+            scopeId = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
+        }
+        if (containingType is not null && _classesByQualifiedName.TryGetValue(containingType, out var owner))
+        {
+            scopeId = owner.NamespaceScopeId;
+            namespaceIdentity = owner.NamespaceIdentity;
+            parameters.UnionWith(ReturnShape.GetCallableTypeParameters(owner, _asyncTypeModule).Select(parameter => parameter.Name));
+        }
+        return ResolveComputedMetadataType(metadata.Context, elementName, scopeId,
+                namespaceIdentity, containingType, parameters)
+            is Microsoft.CodeAnalysis.INamedTypeSymbol { IsReferenceType: true, IsUnboundGenericType: false } selected
+            ? Metadata.MetadataBinderResult.ToBoundType(selected.WithNullableAnnotation(
+                elementName.EndsWith('?') ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                : _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+                    ? Microsoft.CodeAnalysis.NullableAnnotation.None : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated))
+            : null;
+    }
+
     // Lexical decomposition only. Bound shapes are built from declarations, never
     // from a bound display; the legacy resolver also uses the pieces for built-ins.
     private static bool TrySplitArrayTypeSpelling(
         string spelling,
         out string element,
         out int rank,
-        out BoundTypes.NullableAnnotation annotation)
+        out BoundTypes.NullableAnnotation annotation,
+        BoundTypes.NullableAnnotation defaultAnnotation = BoundTypes.NullableAnnotation.NotAnnotated)
     {
         var type = spelling.Trim();
-        annotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        annotation = defaultAnnotation;
         var wholeAnnotation = type.StartsWith('?') || type.EndsWith('?')
-            || type.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase)
+            || type.StartsWith("NULLABLE[inner=", StringComparison.OrdinalIgnoreCase)
                 && IsWholeBracketedType(type, type.IndexOf('['));
         if (wholeAnnotation && Parsing.AttributeHelper.TryUnwrapNullableAnnotation(type, out var referent))
         {
@@ -2393,6 +3647,9 @@ public sealed class Binder
         rank = 1;
         element = string.Empty;
         const string expanded = "ARRAY[element=";
+        if (TypeIdentity.TrySplitNativeArray(type, out element, out rank))
+            return true;
+        rank = 1;
         if (type.EndsWith(']') && type.LastIndexOf('[') is var open && open > 0
             && type[(open + 1)..^1].All(character => character == ','))
         {
@@ -2476,6 +3733,12 @@ public sealed class Binder
         out BoundTypes.BoundType? target,
         FunctionSymbol? declaringFunction = null)
     {
+        if (TryBuildClosedReferenceGeneric(bindTypeName, declaringFunction, allowCoreReference: true)
+            is { } referenceGeneric)
+        {
+            target = referenceGeneric;
+            return true;
+        }
         if (TryBuildMethodInputArrayType(bindTypeName, out var arrayTarget, declaringFunction))
         {
             target = arrayTarget;
@@ -2502,45 +3765,70 @@ public sealed class Binder
         string? namespaceIdentity,
         IEnumerable<string>? typeParameters = null,
         bool allowObject = true)
+        => TryBuildReferenceType(typeName, containingTypeName, namespaceIdentity,
+            typeParameters, allowObject, _currentNamespaceScopeId);
+
+    private BoundTypes.NominalBoundType? TryBuildReferenceType(
+        string typeName,
+        string? containingTypeName,
+        string? namespaceIdentity,
+        IEnumerable<string>? typeParameters,
+        bool allowObject,
+        string? namespaceScopeId)
     {
         var referent = typeName.Trim();
         var annotated = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(referent, out var inner);
         if (annotated)
             referent = inner.Trim();
+        if (referent == "object")
+            return allowObject && GetOrCreateMetadataBinder()?.Context.TryResolveType("System.Object") is { } objectType
+                ? new BoundTypes.NominalBoundType(referent,
+                    annotated ? BoundTypes.NullableAnnotation.Annotated : _declaredReferenceAnnotation,
+                    roslynSymbol: objectType)
+                : null;
+        var lookupReferent = string.Join(".", referent.Split('.').Select(part => part.TrimStart('@')));
         if (referent.Length == 0 || referent.IndexOfAny(['[', ']', '<', '>', '`', '*', '&', '(', ')']) >= 0
-            || typeParameters?.Contains(referent, StringComparer.Ordinal) == true)
+            || typeParameters?.Contains(lookupReferent, StringComparer.Ordinal) == true)
             return null;
         var canonical = TypeIdentity.Canonicalize(referent);
-        if (TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical != "OBJECT"
+        if (TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical is not ("OBJECT" or "STRING")
             || TypeIdentity.IsKnownValueMetadataName(referent))
             return null;
         if (canonical == "OBJECT" && !allowObject)
             return null;
         if (containingTypeName is not null
             && _classesByQualifiedName.TryGetValue(containingTypeName, out var containingClass)
-            && containingClass.TypeParameters.Any(parameter => parameter.Name == referent))
+            && ReturnShape.GetCallableTypeParameters(containingClass, _asyncTypeModule)
+                .Any(parameter => parameter.Name == lookupReferent))
             return null;
 
         var annotation = annotated
             ? BoundTypes.NullableAnnotation.Annotated
-            : BoundTypes.NullableAnnotation.NotAnnotated;
-        var lookupNames = ReferenceLookupNames(referent, containingTypeName ?? namespaceIdentity).ToArray();
-        foreach (var lookupName in lookupNames)
-        {
-            var declarations = _symbolsById.Values.OfType<TypeSymbol>()
-                .Where(symbol => symbol.QualifiedName == lookupName)
-                .Take(2).ToArray();
-            if (declarations.Length != 0)
-                return declarations is [var declaration] && declaration.IsReferenceType
-                    ? new BoundTypes.NominalBoundType(referent, annotation, declaration)
-                    : null;
-        }
+            : _declaredReferenceAnnotation;
+        // Predefined string spellings name the CLR special type, not a lexical type alias.
+        if (referent is "STRING" or "string" or "str")
+            return GetOrCreateMetadataBinder()?.Context.TryResolveType("System.String") is { } stringType
+                ? new BoundTypes.NominalBoundType(referent, annotation, roslynSymbol: stringType)
+                : null;
+        var lexicalScope = containingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(containingTypeName, out var declaringClass)
+                ? declaringClass.NamespaceScopeId : namespaceScopeId;
+        var source = ResolveSourceType(referent, containingTypeName, namespaceIdentity, lexicalScope);
+        if (source.Handled)
+            return source.Type is { IsReferenceType: true } declaration
+                ? new BoundTypes.NominalBoundType(referent, annotation, declaration)
+                : null;
 
+        var lookupNames = ReferenceLookupNames(lookupReferent, containingTypeName ?? namespaceIdentity).ToArray();
         var metadataName = TypeIdentity.MapShortTypeNameToFullName(lookupNames[^1]);
-        if (!metadataName.Contains('.', StringComparison.Ordinal))
-            return null;
-        var symbol = GetOrCreateMetadataBinder()?.Context.TryResolveType(metadataName);
-        return symbol is { IsReferenceType: true, IsGenericType: false }
+        var metadata = GetOrCreateMetadataBinder();
+        var scoped = metadata is not null
+            ? ResolveScopedMetadataType(metadata.Context, referent, 0, lexicalScope, namespaceIdentity)
+            : default;
+        var symbol = scoped.Handled ? scoped.Type
+            : metadataName.Contains('.', StringComparison.Ordinal) ? metadata?.Context.TryResolveType(metadataName) : null;
+        return symbol is { IsReferenceType: true }
+            && (!symbol.IsGenericType || !symbol.IsDefinition)
             ? new BoundTypes.NominalBoundType(referent, annotation, roslynSymbol: symbol)
             : null;
     }
@@ -2595,22 +3883,35 @@ public sealed class Binder
     private BoundTypes.NominalBoundType? TryBuildCallableReference(string typeName, FunctionSymbol function)
     {
         _functionNamespaces.TryGetValue(function.Id, out var namespaceIdentity);
+        var namespaceScopeId = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
         if (function.ContainingTypeName is not null
             && _classesByQualifiedName.TryGetValue(function.ContainingTypeName, out var cls))
             namespaceIdentity = cls.NamespaceIdentity;
         return TryBuildReferenceType(
-            typeName, function.ContainingTypeName, namespaceIdentity, function.TypeParameters);
+            typeName, function.ContainingTypeName, namespaceIdentity, function.TypeParameters,
+            allowObject: true, namespaceScopeId);
     }
 
-    private static bool TryBuildDeclaredNullabilityShape(string bindTypeName, out BoundTypes.BoundType? target)
+    private bool TryBuildDeclaredNullabilityShape(string bindTypeName, out BoundTypes.BoundType? target)
     {
         target = null;
         var trimmed = bindTypeName.Trim();
+        if (TryBuildClosedReferenceGeneric(trimmed) is { } referenceGeneric)
+        {
+            target = referenceGeneric;
+            return true;
+        }
+        if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TypeIdentity.TrySplitGeneric(trimmed.TrimEnd('?'), out _, out _))
+        {
+            target = BuildDeclaredBoundType(trimmed);
+            return true;
+        }
 
         // v0.14 §S6 (task #7 Phase-C) — array-shape targets. Surface forms
         // accepted here mirror what ExpandType and IsLikelyType emit:
         //   :[str] / :[string]                 -> "ARRAY[element=STRING]"    (non-null elements)
-        //   :[?str] / :[?string]               -> "ARRAY[element=OPTION[inner=STRING]]" (nullable elements)
+        //   :[?str] / :[?string]               -> "ARRAY[element=NULLABLE[inner=STRING]]" (nullable elements)
         //   :str[] / :string[]                 -> "STRING[]"                 (postfix; non-null elements)
         //   :?str[] / :?string[]               -> "?STRING[]"                (nullable elements)
         // Recognize both post-expansion and raw surface forms because
@@ -2618,7 +3919,7 @@ public sealed class Binder
         // through ExpandType. Prefix "?" on the ELEMENT indicates nullable
         // elements; the array container itself is orthogonal (S6 diagnoses
         // element mismatch only, per the D6 follow-on scope).
-        if (TryParseArrayStringTarget(trimmed, out var arrayTarget))
+        if (TryParseArrayStringTarget(trimmed, out var arrayTarget, _declaredReferenceAnnotation))
         {
             target = arrayTarget;
             return true;
@@ -2626,14 +3927,14 @@ public sealed class Binder
 
         // v0.14 §S7 (task #7 Phase-C) — whitelisted generic instantiations
         // whose relevant type argument is STRING. Recognizes:
-        //   Option<string> / ?string-in-Option    (T=payload)
+        //   List<string> / ?string-in-List    (T=payload)
         //   List<T>, IList<T>, IEnumerable<T>, IReadOnlyList<T>,
         //   ICollection<T>, IReadOnlyCollection<T>  (T=element)
         // For each, position 0 of TypeArguments is the meaningful slot; the
         // container's own annotation is orthogonal (per D6 same as arrays).
         // Anything outside this whitelist (Dictionary, Task, custom generic)
         // stays out-of-scope and falls through to the scalar path below.
-        if (TryParseGenericStringTarget(trimmed, out var genericTarget))
+        if (TryParseGenericStringTarget(trimmed, out var genericTarget, _declaredReferenceAnnotation))
         {
             target = genericTarget;
             return true;
@@ -2649,7 +3950,7 @@ public sealed class Binder
                 "STRING",
                 annotatedNullable
                     ? BoundTypes.NullableAnnotation.Annotated
-                    : BoundTypes.NullableAnnotation.NotAnnotated);
+                    : _declaredReferenceAnnotation);
             return true;
         }
 
@@ -2663,10 +3964,66 @@ public sealed class Binder
                 trimmed,
                 annotatedNullable
                     ? BoundTypes.NullableAnnotation.Annotated
-                    : BoundTypes.NullableAnnotation.NotAnnotated);
+                    : _declaredReferenceAnnotation);
             return true;
         }
         return false;
+    }
+
+    private BoundTypes.GenericInstantiationBoundType? TryBuildClosedReferenceGeneric(
+        string spelling, FunctionSymbol? function = null, bool allowCoreReference = false)
+    {
+        if (!ResolveSourceCallConversions)
+            return null;
+        var annotation = _declaredReferenceAnnotation;
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(spelling, out var referent))
+        {
+            spelling = referent;
+            annotation = BoundTypes.NullableAnnotation.Annotated;
+        }
+        if (!TypeIdentity.TrySplitGeneric(spelling, out var name, out var arguments)
+            || arguments.Count != 1 || GetOrCreateMetadataBinder() is not { } metadata)
+            return null;
+        var scope = _currentNamespaceScopeId;
+        var ns = _currentNamespaceIdentity;
+        var owner = _currentClassName;
+        if (function is not null)
+        {
+            _functionNamespaces.TryGetValue(function.Id, out ns);
+            scope = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
+            owner = function.ContainingTypeName;
+        }
+        if (owner is not null && _classesByQualifiedName.TryGetValue(owner, out var declaringClass))
+        {
+            ns = declaringClass.NamespaceIdentity;
+            scope = declaringClass.NamespaceScopeId;
+        }
+        if (ResolveSourceType(TypeIdentity.ToLookupName(name, 1), owner, ns, scope).Handled)
+            return null;
+        var resolved = ResolveScopedMetadataType(metadata.Context, name, 1, scope, ns);
+        var definition = resolved.Handled ? resolved.Type
+            : GenericStringContainerWhitelist.Contains(name)
+                ? metadata.Context.TryResolveType($"System.Collections.Generic.{ShortGenericName(name)}`1")
+                : null;
+        if (definition is null)
+            return null;
+        var boundDefinition = Metadata.MetadataBinderResult.ToNominalBoundType(definition);
+        if (!NullabilityChecker.IsReferenceContainerDefinition(boundDefinition))
+            return null;
+        var element = function is null
+            ? TryBuildReferenceType(arguments[0], owner, ns,
+                _currentMemberTypeParameters?.Select(parameter => parameter.Name),
+                allowObject: true, scope)
+            : TryBuildCallableReference(arguments[0], function);
+        if (element is null || !NullabilityChecker.IsClosedSourceReference(element)
+            && !(allowCoreReference && element.RoslynSymbol?.SpecialType
+                is Microsoft.CodeAnalysis.SpecialType.System_Object
+                    or Microsoft.CodeAnalysis.SpecialType.System_String))
+            return null;
+        return new BoundTypes.GenericInstantiationBoundType(
+            new BoundTypes.NominalBoundType(
+                definition.ContainingNamespace + "." + definition.Name, roslynSymbol: definition),
+            [element], annotation);
     }
 
     /// <summary>
@@ -2703,7 +4060,8 @@ public sealed class Binder
     /// non-array or non-STRING-element shapes, keeping the S6 scope
     /// narrow (D6 follow-on).
     /// </summary>
-    private static bool TryParseArrayStringTarget(string trimmed, out BoundTypes.ArrayBoundType? target)
+    private static bool TryParseArrayStringTarget(string trimmed, out BoundTypes.ArrayBoundType? target,
+        BoundTypes.NullableAnnotation defaultAnnotation = BoundTypes.NullableAnnotation.NotAnnotated)
     {
         target = null;
         string? innerType = null;
@@ -2730,14 +4088,14 @@ public sealed class Binder
 
         if (innerType is null) return false;
 
-        var elementAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var elementAnnotation = defaultAnnotation;
         var elementTrimmed = innerType.Trim();
 
-        if (elementTrimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+        if (elementTrimmed.StartsWith("NULLABLE[inner=", StringComparison.Ordinal)
             && elementTrimmed.EndsWith("]", StringComparison.Ordinal))
         {
             elementAnnotation = BoundTypes.NullableAnnotation.Annotated;
-            elementTrimmed = elementTrimmed["OPTION[inner=".Length..^1];
+            elementTrimmed = elementTrimmed["NULLABLE[inner=".Length..^1];
         }
         else if (elementTrimmed.StartsWith("?", StringComparison.Ordinal))
         {
@@ -2756,13 +4114,13 @@ public sealed class Binder
         }
 
         var elementBound = new BoundTypes.NominalBoundType("STRING", elementAnnotation);
-        target = new BoundTypes.ArrayBoundType(elementBound);
+        target = new BoundTypes.ArrayBoundType(elementBound, nullableAnnotation: defaultAnnotation);
         return true;
     }
 
-    // v0.14 §S7 whitelist — the six generic containers that participate in
+    // v0.14 §S7 whitelist — the generic containers that participate in
     // the string-scope nullability gate. Keys cover both the Calor surface
-    // spelling (e.g. "Option", "List") and Roslyn's fully-qualified
+    // spelling (e.g. "List") and Roslyn's fully-qualified
     // display-name (e.g. "System.Collections.Generic.List") so the same
     // whitelist works for both bind-site (surface strings) and metadata-
     // resolved (BCL) call/return-site parameter types. Everything not in
@@ -2771,7 +4129,6 @@ public sealed class Binder
     private static readonly HashSet<string> GenericStringContainerWhitelist =
         new(StringComparer.Ordinal)
         {
-            "Option",           "OPTION",
             "List",             "System.Collections.Generic.List",
             "IList",            "System.Collections.Generic.IList",
             "IEnumerable",      "System.Collections.Generic.IEnumerable",
@@ -2783,10 +4140,10 @@ public sealed class Binder
     /// <summary>
     /// v0.14 §S7 helper — recognizes a whitelisted generic instantiation
     /// whose position-0 type argument is a scalar STRING. Accepts both
-    /// the Calor surface form (<c>Option&lt;string&gt;</c>,
+    /// the Calor surface form (<c>List&lt;string&gt;</c>,
     /// <c>List&lt;?string&gt;</c>) and the post-ExpandType form where the
     /// argument is normalized (<c>List&lt;STRING&gt;</c>,
-    /// <c>Option&lt;OPTION[inner=STRING]&gt;</c>). Returns a
+    /// <c>List&lt;NULLABLE[inner=STRING]&gt;</c>). Returns a
     /// <see cref="BoundTypes.GenericInstantiationBoundType"/> whose
     /// single argument is a STRING <see cref="BoundTypes.NominalBoundType"/>
     /// carrying the declared inner annotation, so
@@ -2794,10 +4151,11 @@ public sealed class Binder
     /// symmetrically against a source generic. Returns false for
     /// non-whitelisted definitions or non-STRING type arguments.
     /// </summary>
-    private static bool TryParseGenericStringTarget(string trimmed, out BoundTypes.GenericInstantiationBoundType? target)
+    private static bool TryParseGenericStringTarget(string trimmed, out BoundTypes.GenericInstantiationBoundType? target,
+        BoundTypes.NullableAnnotation defaultAnnotation = BoundTypes.NullableAnnotation.NotAnnotated)
     {
         target = null;
-        var outerAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var outerAnnotation = defaultAnnotation;
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
         {
             outerAnnotation = BoundTypes.NullableAnnotation.Annotated;
@@ -2815,19 +4173,19 @@ public sealed class Binder
         // out-of-scope per D6 and must not construct a target.
         if (!GenericStringContainerWhitelist.Contains(baseName)) return false;
 
-        // Position-0 argument only: none of the six whitelisted containers
+        // Position-0 argument only: none of the whitelisted containers
         // use multi-arg like Dictionary yet. If the argument list contains
         // a top-level comma, we conservatively reject rather than guess.
         if (ContainsTopLevelComma(argsSection)) return false;
 
         var innerRaw = argsSection.Trim();
-        var innerAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var innerAnnotation = defaultAnnotation;
 
-        if (innerRaw.StartsWith("OPTION[inner=", StringComparison.Ordinal)
+        if (innerRaw.StartsWith("NULLABLE[inner=", StringComparison.Ordinal)
             && innerRaw.EndsWith("]", StringComparison.Ordinal))
         {
             innerAnnotation = BoundTypes.NullableAnnotation.Annotated;
-            innerRaw = innerRaw["OPTION[inner=".Length..^1];
+            innerRaw = innerRaw["NULLABLE[inner=".Length..^1];
         }
         else if (innerRaw.StartsWith("?", StringComparison.Ordinal) && innerRaw.Length > 1)
         {
@@ -2859,7 +4217,7 @@ public sealed class Binder
     /// when the generic argument list contains a comma at the top level
     /// (i.e. a multi-argument generic). Nested angle brackets and square
     /// brackets are respected so <c>Dictionary&lt;string, List&lt;int&gt;&gt;</c>
-    /// is detected as multi-arg while <c>List&lt;OPTION[inner=STRING]&gt;</c>
+    /// is detected as multi-arg while <c>List&lt;NULLABLE[inner=STRING]&gt;</c>
     /// is not.
     /// </summary>
     private static bool ContainsTopLevelComma(string argsSection)
@@ -2913,7 +4271,7 @@ public sealed class Binder
         if (isScalarString)
         {
             // Parameter already declared nullable — accepting null is intended.
-            if (parameterType.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) return null;
+            if (parameterType.NullableAnnotation != BoundTypes.NullableAnnotation.NotAnnotated) return null;
 
             return new BoundTypes.NominalBoundType(
                 "STRING",
@@ -2996,6 +4354,44 @@ public sealed class Binder
             : null;
     }
 
+    /// <summary>
+    /// 0.30: a module declared <c>nullable oblivious</c> mirrors C#'s disabled nullable
+    /// context, where an oblivious value may flow into a non-null parameter, return,
+    /// binding or receiver without a diagnostic. Only a wholly oblivious source is
+    /// exempt: an explicit <c>?T</c> anywhere in its type, a null literal, a
+    /// null-containing conditional, or storage the module may have set to null (see
+    /// <see cref="_obliviousNullTaintedStorage"/>) is still reported. Modules without the policy keep
+    /// the conservative Oblivious-is-possibly-null default (D3).
+    /// </summary>
+    private bool IsObliviousFlowInObliviousModule(BoundExpression source)
+        => _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+           && !MayIntroduceNullInObliviousModule(source)
+           && !(source is BoundVariableExpression variable
+               && (_obliviousNullTaintedStorage.Contains(variable.Variable.StorageIdentity)
+                   || variable.ResolvedSymbols.Any(symbol =>
+                       _obliviousNullTaintedStorage.Contains(symbol.StorageIdentity))));
+
+    private bool MayIntroduceNullInObliviousModule(BoundExpression source)
+        => _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+           && (source is BoundNullLiteral
+               || NullabilityChecker.IsNullContainingScalarStringSource(source)
+               || HasAnnotatedComponent(source.Type)
+               || NullabilityChecker.GetMethodInputArrayType(source) is { } inputArray
+                  && HasAnnotatedComponent(inputArray));
+
+    private static bool HasAnnotatedComponent(BoundTypes.BoundType type) => type switch
+    {
+        BoundTypes.NominalBoundType nominal
+            => nominal.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated,
+        BoundTypes.GenericInstantiationBoundType generic
+            => generic.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated
+               || generic.TypeArguments.Any(HasAnnotatedComponent),
+        BoundTypes.ArrayBoundType array
+            => array.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated
+               || HasAnnotatedComponent(array.ElementType),
+        _ => false
+    };
+
     private static string DescribeAnnotation(BoundExpression source) => source.Type switch
     {
         BoundTypes.NominalBoundType n => n.NullableAnnotation.ToString(),
@@ -3009,30 +4405,50 @@ public sealed class Binder
     /// Returns a pair (declared-shape label, fix-hint label) that mirrors
     /// the target's actual shape so messages read naturally at each of
     /// the three emit sites (S3 bind, S4 return, S4 call). Scalar STRING
-    /// yields <c>'string'</c> / <c>'?string'</c>, array yields
-    /// <c>'string[]'</c> / <c>'[?string]'</c>, generic yields
-    /// <c>'Option&lt;string&gt;'</c> / <c>'Option&lt;?string&gt;'</c>
+    /// yields <c>'string'</c> / <c>'string?'</c>, array yields
+    /// <c>'string[]'</c> / <c>'string?[]'</c>, generic yields
+    /// <c>'List&lt;string&gt;'</c> / <c>'List&lt;string?&gt;'</c>
     /// (spelled with the definition's short name so it matches what the
-    /// user wrote).
+    /// user wrote). Fix hints use the native suffix spelling (0.30); the
+    /// retired prefix form '?T' no longer parses.
     /// </summary>
     private static (string TargetShapeLabel, string FixHintLabel) DescribeStringTargetShape(BoundTypes.BoundType stringTarget)
     {
         return stringTarget switch
         {
-            BoundTypes.ArrayBoundType => ("'string[]'", "'[?string]'"),
+            BoundTypes.ArrayBoundType => ("'string[]'", "'string?[]'"),
             BoundTypes.GenericInstantiationBoundType g =>
                 (
                     $"'{ShortGenericName(g.Definition.QualifiedName)}<string>'",
-                    $"'{ShortGenericName(g.Definition.QualifiedName)}<?string>'"
+                    $"'{ShortGenericName(g.Definition.QualifiedName)}<string?>'"
                 ),
             // v0.14 §S8 — user-declared reference types echo their own name
-            // in the message so users see 'Foo' / '?Foo' rather than the
+            // in the message so users see 'Foo' / 'Foo?' rather than the
             // scalar-STRING boilerplate. Distinguished by QualifiedName not
             // matching the STRING aliases.
             BoundTypes.NominalBoundType n when n.QualifiedName is not ("STRING" or "string" or "str" or "System.String") =>
-                ($"'{n.QualifiedName}'", $"'?{n.QualifiedName}'"),
-            _ => ("'string'", "'?string'"),
+                ($"'{n.QualifiedName}'", $"'{n.QualifiedName}?'"),
+            _ => ("'string'", "'string?'"),
         };
+    }
+
+    private static string? DescribeClosedGenericReceiving(
+        BoundExpression source, BoundTypes.BoundType target)
+    {
+        if (target is not BoundTypes.GenericInstantiationBoundType
+            { TypeArguments: [BoundTypes.NominalBoundType receiving] } generic)
+            return null;
+        var supplied = source.GenericNullabilityType ?? source.Type as BoundTypes.GenericInstantiationBoundType;
+        var value = supplied?.TypeArguments.SingleOrDefault() as BoundTypes.NominalBoundType;
+        if (!NullabilityChecker.IsClosedSourceReference(receiving)
+            && (value is null || !NullabilityChecker.IsClosedSourceReference(value)))
+            return null;
+        return $"Reference-generic receiving contract '{generic.Definition.QualifiedName}<{receiving.QualifiedName}>' " +
+            $"requires container annotation '{generic.NullableAnnotation}' and element annotation '{receiving.NullableAnnotation}', " +
+            $"but the supplied annotations are '{supplied?.NullableAnnotation.ToString() ?? "null"}' " +
+            $"and '{value?.NullableAnnotation.ToString() ?? "unsupported"}'. " +
+            "Prove the affected container/elements non-null or use compatible annotations; " +
+            "invariant containers must also preserve the original element contract against nullable writes.";
     }
 
     /// <summary>Trims a possibly fully-qualified container name to its
@@ -3048,7 +4464,7 @@ public sealed class Binder
     // the source-count of TypeName string-equality sites flat (F-3 ratchet
     // in BoundTypeArchitectureTests). Delegates to TryBuildStringTarget so
     // surface-form parsing (`:string`, `:?string`, `:str`,
-    // `OPTION[inner=STRING]`) stays in one place.
+    // `NULLABLE[inner=STRING]`) stays in one place.
     // v0.14 nullability workstream — fallback for §B{x} STR:"hi" (inferred
     // type). When bind.TypeName is null but the inferred typeName resolves
     // to a scalar STRING, copy the initializer's annotation onto the
@@ -3056,7 +4472,7 @@ public sealed class Binder
     // literal-initialized locals (which are provably non-null) rather
     // than silently degrading to Oblivious and misfiring Calor0272.
     // Non-STRING inferred types keep the safe Oblivious default per §D6.
-    private static BoundTypes.NullableAnnotation InferAnnotationForStringBinding(
+    private BoundTypes.NullableAnnotation InferAnnotationForStringBinding(
         string? bindTypeName,
         string typeName,
         BoundExpression? initializer)
@@ -3073,7 +4489,7 @@ public sealed class Binder
             : BoundTypes.NullableAnnotation.Oblivious;
     }
 
-    private static BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
+    private BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
     {
         if (bindTypeName is null) return BoundTypes.NullableAnnotation.Oblivious;
         if (!TryBuildDeclaredNullabilityShape(bindTypeName, out var target)) return BoundTypes.NullableAnnotation.Oblivious;
@@ -3135,16 +4551,154 @@ public sealed class Binder
         };
     }
 
-    private BoundExpression BindExpression(ExpressionNode expr)
+    private BoundExpression BindExpression(ExpressionNode expr) => BindExpression(expr, targetType: null);
+
+    private BoundExpression BindExpression(
+        ExpressionNode expr, BoundTypes.FunctionBoundType? targetType)
     {
         ArgumentNullException.ThrowIfNull(expr);
         ExpressionsBound++;
-        var bound = ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
+        var bound = expr is LambdaExpressionNode lambda && targetType != null
+            ? BindLambdaExpression(lambda, targetType)
+            : ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
             ? binder(this, expr)
             : BindUnsupportedExpression(expr);
+        if (bound is IBoundStorageExpression storageExpression
+            && TryGetStableMemberStorage(expr, bound, out var memberStorage, out _, requireNonNullFlow: true)
+            && _scope.Lookup(memberStorage.Name) is VariableSymbol narrowedMember
+            && _flowNarrowingSources.ContainsKey(narrowedMember)
+            && bound.Type is BoundTypes.NominalBoundType memberType)
+        {
+            var nonNull = new BoundTypes.NominalBoundType(
+                memberType.QualifiedName, BoundTypes.NullableAnnotation.NotAnnotated,
+                memberType.Declaration, memberType.RoslynSymbol);
+            bound = storageExpression.WithFlowType(nonNull);
+        }
+        if (_bindingContract)
+            _boundContractExpressions[expr] = bound;
+        if (expr is CallExpressionNode or ExpressionCallNode && bound is BoundCallExpression call)
+            _boundVerificationCalls[expr] = call;
         if (MayChangeHeap(bound))
             InvalidateByReferenceParameterNarrowing();
+        if (bound is BoundFieldAccessExpression
+            {
+                ResolvedField.IsEnumMember: true,
+                Target: BoundTypeReferenceExpression { ResolvedType: { IsEnum: true } owner },
+                Type: BoundTypes.NominalBoundType { Declaration: { } resultOwner }
+            } constant && ReferenceEquals(owner, resultOwner))
+            _boundSourceEnumConstants[expr] = constant;
+        if (bound is BoundFieldAccessExpression
+            {
+                ResolvedField: { IsField: true, IsStatic: true, ConditionalAlternative: null } selected,
+                ResolvedFields: [var field],
+                SourceStaticFieldOwner: not null,
+                Target: BoundTypeReferenceExpression
+                {
+                    ResolvedType: { } receiver,
+                    Type: BoundTypes.NominalBoundType { Declaration: { } receiverDeclaration }
+                }
+            } staticField && ReferenceEquals(selected, field)
+                && ReferenceEquals(receiver, receiverDeclaration))
+            _boundSourceStaticFieldReads[expr] = staticField;
+        if (bound is BoundFieldAccessExpression
+            {
+                Target: BoundTypeReferenceExpression,
+                ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
+                    { IsStatic: true, IsConst: true, Type.SpecialType: not Microsoft.CodeAnalysis.SpecialType.None }
+            } metadataConstant)
+            _boundMetadataConstants[expr] = metadataConstant;
+        if (bound is BoundFieldAccessExpression
+            {
+                Target: BoundTypeReferenceExpression,
+                ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol
+                    { IsStatic: true, IsConst: false, Type.TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error },
+                Type: BoundTypes.NominalBoundType { RoslynSymbol: not null }
+            } metadataStaticField)
+            _boundMetadataStaticFieldReads[expr] = metadataStaticField;
         return bound;
+    }
+
+    internal BoundExpression BindVerificationReceiver(
+        ExpressionNode receiver, IEnumerable<(string Name, string Type)> variables)
+    {
+        using var scope = PushVerificationScope(variables, receiver.Span);
+        if (TryBindPredefinedTypeReceiver(receiver) is { } predefined)
+            return predefined;
+        if (receiver is ReferenceNode reference && GetOrCreateMetadataBinder() is { } metadata)
+        {
+            if (_scope.Lookup(reference.Name) is VariableSymbol variable
+                && ResolveVerificationType(metadata.Context, variable.TypeName) is { } variableType)
+                return new BoundVariableExpression(receiver.Span, variable,
+                    typeOverride: Metadata.MetadataBinderResult.ToBoundType(variableType));
+            if (_scope.Lookup(reference.Name) is null
+                && !(reference.IsVerbatim && SyntaxFactory.ParseTypeName(reference.Name) is PredefinedTypeSyntax)
+                && ResolveVerificationType(metadata.Context, reference.Name) is { } staticType)
+                return new BoundTypeReferenceExpression(receiver.Span, reference.Name,
+                    Metadata.MetadataBinderResult.ToNominalBoundType(staticType));
+        }
+        return TryBindMetadataTypeReceiver(receiver) ?? BindExpression(receiver);
+    }
+
+    internal BoundExpression BindVerificationExpression(
+        ExpressionNode expression, IEnumerable<(string Name, string Type)> variables)
+    {
+        using var scope = PushVerificationScope(variables, expression.Span);
+        return BindExpression(expression);
+    }
+
+    private static Microsoft.CodeAnalysis.ITypeSymbol? ResolveVerificationType(
+        Metadata.MetadataContext context, string typeName)
+    {
+        var open = typeName.IndexOf('<');
+        if (open > 0 && typeName.EndsWith('>')
+            && typeName[..open] is "List" or "System.Collections.Generic.List"
+            && ResolveBclArgumentType(context, typeName[(open + 1)..^1]) is { } element
+            && context.TryResolveType("System.Collections.Generic.List`1") is { } list)
+            return list.Construct(element);
+        return ResolveBclArgumentType(context, typeName);
+    }
+
+    private IDisposable PushVerificationScope(
+        IEnumerable<(string Name, string Type)> variables, Parsing.TextSpan span)
+    {
+        var scope = PushScope(_scope.CreateChild());
+        foreach (var (name, type) in variables)
+            _scope.TryDeclare(new VariableSymbol(
+                SymbolId.Create("verification", name), name, type,
+                isMutable: false, isParameter: true, ParameterModifier.None, span)
+            {
+                MethodInputArrayType = TryBuildMethodInputArrayType(type, out var array) ? array : null,
+                GenericNullabilityType = TryParseGenericStringTarget(type, out var generic, _declaredReferenceAnnotation) ? generic : null
+            });
+        return scope;
+    }
+
+    internal Microsoft.CodeAnalysis.IMethodSymbol? ResolveVerificationStringCall(
+        CallExpressionNode call, bool isStatic, bool ordinal,
+        IEnumerable<(string Name, string Type)> variables)
+    {
+        using var scope = PushVerificationScope(variables, call.Span);
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata?.Context.TryResolveType("System.String") is not { } receiver)
+            return null;
+        var args = new List<Metadata.MetadataArgument>();
+        for (var index = 0; index < call.Arguments.Count; index++)
+        {
+            var type = ordinal && index == call.Arguments.Count - 1
+                ? metadata.Context.TryResolveType("System.StringComparison")
+                : ResolveBclArgumentType(metadata.Context, BindExpression(call.Arguments[index]).Type.DisplayString);
+            if (type is null)
+                return null;
+            args.Add(new Metadata.MetadataArgument(type));
+        }
+        var resolution = metadata.ResolveCall(receiver, call.Target[(call.Target.LastIndexOf('.') + 1)..], args);
+        if (!resolution.IsResolved || resolution.Symbol is not { } method
+            || method.IsStatic != isStatic || method.Parameters.Length != args.Count
+            || method.ContainingType.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_String
+            || method.Parameters.Where((parameter, index) =>
+                !Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(parameter.Type, args[index].Type)).Any())
+            return null;
+        return method;
     }
 
     private BoundExpression BindIntLiteral(IntLiteralNode literal)
@@ -3175,7 +4729,8 @@ public sealed class Binder
             literal.Span,
             literal.Value,
             literal.IsMultiline,
-            literal.IsUtf8);
+            literal.IsUtf8,
+            literal.IsUtf8 ? null : GetOrCreateMetadataBinder()?.Context.TryResolveType("System.String"));
 
     private BoundExpression BindThisExpression(ThisExpressionNode expression)
     {
@@ -3207,22 +4762,114 @@ public sealed class Binder
                 : "'base' is unavailable outside an instance member");
     }
 
-    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess, BoundExpression? boundTarget = null)
+    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess, BoundExpression? boundTarget = null,
+        bool isPatternMember = false)
     {
         var target = boundTarget
+            ?? TryBindSourceEnumTypeReceiver(fieldAccess.Target)
+            ?? TryBindSourceStaticFieldReceiver(fieldAccess)
             ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
             ?? BindExpression(fieldAccess.Target);
+        if (target is BoundConditionalAccessExpression conditionalTarget)
+            return ContinueConditionalAccess(fieldAccess.Span, conditionalTarget,
+                BindFieldAccess(fieldAccess, conditionalTarget.WhenNotNull, isPatternMember));
+        if (TryGetEventStorage(fieldAccess, out var eventStorage, out var eventType))
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                eventStorage.TypeName, eventStorage, fieldAccess.FieldNameSpan, resolvedType: eventType);
+        if (target is BoundTypeReferenceExpression { ResolvedType: { IsEnum: true } enumType })
+        {
+            var members = _enumMembers[enumType.Id].Where(member => member.Name == fieldAccess.FieldName).ToArray();
+            if (members is [var member] && IsSourceTypeAccessible(enumType))
+                return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                    enumType.QualifiedName, member, fieldAccess.FieldNameSpan,
+                    resolvedType: new BoundTypes.NominalBoundType(enumType.QualifiedName, declaration: enumType));
+            _diagnostics.ReportError(fieldAccess.FieldNameSpan, DiagnosticCode.UndefinedReference,
+                $"Enum member '{enumType.QualifiedName}.{fieldAccess.FieldName}' is missing, ambiguous or inaccessible.");
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: new BoundTypes.UnresolvedBoundType("Unresolved source enum member", reported: true))
+            {
+                HasUnknownInferredType = true
+            };
+        }
+        if (fieldAccess.FieldName == "Length" && IsArrayReceiver(target))
+            return new BoundArrayLength(fieldAccess.Span, target);
+        if (ResolveMetadataScalarArrayProperty(target, fieldAccess.FieldName) is { } scalarArrayProperty)
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: Metadata.MetadataBinderResult.ToNominalBoundType(scalarArrayProperty.Type))
+            {
+                ResolvedMetadataMember = scalarArrayProperty
+            };
+        if (target.AnonymousObjectMembers is { } anonymousMembers
+            && anonymousMembers.Where(member => member.Name == fieldAccess.FieldName).ToArray() is [var anonymousMember])
+        {
+            var value = anonymousMember.Value;
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                typeName: null, fieldNameSpan: fieldAccess.FieldNameSpan, resolvedType: value.Type)
+            {
+                IsAnonymousPropertyRead = true,
+                AnonymousObjectMembers = value.AnonymousObjectMembers,
+                MethodInputArrayType = value.MethodInputArrayType,
+                MetadataArrayResultType = value.MetadataArrayResultType,
+                GenericNullabilityType = value.GenericNullabilityType,
+                HasUnknownInferredType = value.HasUnknownInferredType
+            };
+        }
+        if (target is BoundVariableExpression { ResolvedSymbols.Count: 1 } tupleVariable
+            && tupleVariable.Variable.TypeName.StartsWith('(')
+            && SyntaxFactory.ParseTypeName(tupleVariable.Variable.TypeName) is TupleTypeSyntax tupleType
+            && !tupleType.ContainsDiagnostics
+            && fieldAccess.FieldName.StartsWith("Item", StringComparison.Ordinal)
+            && int.TryParse(fieldAccess.FieldName.AsSpan(4), out var tupleIndex)
+            && tupleIndex >= 1 && tupleIndex <= tupleType.Elements.Count
+            && fieldAccess.FieldName == $"Item{tupleIndex}")
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName,
+                tupleType.Elements[tupleIndex - 1].Type.ToString(), fieldNameSpan: fieldAccess.FieldNameSpan)
+            {
+                IsTupleElementRead = true
+            };
         var resolvedFields = fieldAccess.Target switch
         {
+            _ when target is BoundTypeReferenceExpression { ResolvedType: { } sourceType }
+                && _classesByQualifiedName.TryGetValue(sourceType.QualifiedName, out var sourceOwner) =>
+                ResolveAccessibleMembers(sourceOwner, fieldAccess.FieldName)
+                    .OfType<VariableSymbol>().Where(member => member.IsField && member.IsStatic).Cast<Symbol>().ToArray(),
             ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
             BaseExpressionNode => ResolveAccessibleMembers(
                 ResolveBaseClass(_currentClass),
                 fieldAccess.FieldName),
             // #943 (D1 RO-COPY-1): a field of an in-module struct value (`(§IDX{pts} 0).X`) is
             // one storage path; resolving it keeps the operand typed instead of OBJECT.
+            _ when isPatternMember => ResolveAccessibleMembers(
+                ResolveClass(target.Type.DisplayString), fieldAccess.FieldName),
+            _ when !target.HasUnknownInferredType
+                && target is BoundArrayAccess or BoundMultiDimArrayAccess or IBoundStorageExpression
+                && target.Type is BoundTypes.NominalBoundType
+                    { Declaration: { } declaration, NullableAnnotation: not BoundTypes.NullableAnnotation.Annotated }
+                && IsSourceTypeAccessible(declaration)
+                && !declaration.QualifiedName.Contains('`')
+                && !TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(declaration.Name))
+                && _classesByQualifiedName.TryGetValue(declaration.QualifiedName, out var declaredOwner)
+                && declaredOwner.TypeParameters.Count == 0 =>
+                ResolveReadableInstanceMembers(declaredOwner, fieldAccess.FieldName),
+            _ when ResolveClass(target.Type.DisplayString) is { IsStruct: false } instanceOwner =>
+                ResolveReadableInstanceProperties(instanceOwner, fieldAccess.FieldName),
             _ => ResolveStructFieldPath(target.Type.DisplayString, fieldAccess.FieldName),
         };
         var fields = resolvedFields.OfType<VariableSymbol>().ToArray();
+        if (fields.Any(field => field.EventDeclaration is not null))
+        {
+            _diagnostics.ReportError(fieldAccess.FieldNameSpan, DiagnosticCode.UndefinedReference,
+                $"Event '{fieldAccess.FieldName}' is not readable as delegate storage in this context");
+            return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: new BoundTypes.UnresolvedBoundType("Unavailable event backing storage", reported: true))
+            {
+                HasUnknownInferredType = true
+            };
+        }
         var fieldTypes = fields
             .Select(field => TypeIdentity.Canonicalize(field.TypeName))
             .Distinct(StringComparer.Ordinal)
@@ -3230,20 +4877,51 @@ public sealed class Binder
         BoundTypes.BoundType? resolvedType = null;
         if (fields is [var field])
         {
+            if (ResolveVariableEnumType(field) is { } fieldEnum)
+                resolvedType = new BoundTypes.NominalBoundType(fieldEnum.QualifiedName, declaration: fieldEnum);
             var identity = TryBuildVariableReference(field);
             var isString = TryBuildDeclaredNullabilityShape(field.TypeName, out var declared)
                 && declared is BoundTypes.NominalBoundType { QualifiedName: "STRING" };
-            if (identity is not null || isString)
+            if (resolvedType is null && (identity is not null || isString))
                 resolvedType = new BoundTypes.NominalBoundType(
                     field.TypeName, field.NullableAnnotation, identity?.Declaration, identity?.RoslynSymbol);
+        }
+
+        if (_asyncTypeModule != null
+            && fields is [var nativeMember]
+            && (isPatternMember || nativeMember.IsProperty)
+            && TypeIdentity.TryResolveNativeInstanceMemberType(
+                _asyncTypeModule, target.Type.DisplayString, fieldAccess.FieldName, out var nativeMemberType))
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, nativeMemberType, nativeMember,
+                fieldAccess.FieldNameSpan, fields,
+                nativeMember.IsProperty && resolvedType is BoundTypes.NominalBoundType nominal
+                    ? new BoundTypes.NominalBoundType(nativeMemberType, nominal.NullableAnnotation,
+                        nominal.Declaration, nominal.RoslynSymbol)
+                    : null);
+
+        if (fields.Length == 0
+            && ResolveMetadataArrayProperty(target, fieldAccess.FieldName) is { } arrayProperty)
+        {
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan)
+            {
+                ResolvedMetadataMember = arrayProperty,
+                MetadataArrayResultType = arrayProperty.Type as Microsoft.CodeAnalysis.IArrayTypeSymbol
+            };
         }
 
         // Native this/base resolution remains authoritative; N2 owns its annotation transfer.
         if (fields.Length == 0
             && target.Type is BoundTypes.NominalBoundType
             {
-                RoslynSymbol: { IsReferenceType: true, IsGenericType: false } receiverType
-            })
+                RoslynSymbol: { IsGenericType: false } receiverType
+            }
+            && (receiverType.IsReferenceType
+                || target is BoundTypeReferenceExpression
+                    && (receiverType.TypeKind == Microsoft.CodeAnalysis.TypeKind.Enum
+                        || receiverType.SpecialType != Microsoft.CodeAnalysis.SpecialType.None)))
         {
             var metadataBinder = GetOrCreateMetadataBinder();
             string? reason = "The metadata context is unavailable.";
@@ -3255,19 +4933,29 @@ public sealed class Binder
                 Microsoft.CodeAnalysis.IFieldSymbol metadataField => metadataField.Type,
                 _ => null
             };
-            if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol
-                { IsReferenceType: true, IsGenericType: false })
+            if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol namedMemberType
+                && (namedMemberType is { IsReferenceType: true, IsGenericType: false }
+                    || TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(namedMemberType.ToDisplayString()))
+                    || member is Microsoft.CodeAnalysis.IFieldSymbol { IsConst: true, Type.TypeKind: Microsoft.CodeAnalysis.TypeKind.Enum }
+                        && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(namedMemberType, receiverType)))
             {
+                if (member is Microsoft.CodeAnalysis.IPropertySymbol property)
+                    ValidateStringInstanceReceiver(target, property.GetMethod);
                 return new BoundFieldAccessExpression(
                     fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
                     fieldNameSpan: fieldAccess.FieldNameSpan,
-                    resolvedType: Metadata.MetadataBinderResult.ToNominalBoundType(memberType))
+                    resolvedType: namedMemberType.IsValueType
+                        ? new BoundTypes.NominalBoundType(
+                            NormalizeTypeName(AttributeHelper.ExpandType(namedMemberType.ToDisplayString())),
+                            Metadata.MetadataBinderResult.MapAnnotation(memberType.NullableAnnotation),
+                            roslynSymbol: namedMemberType)
+                        : Metadata.MetadataBinderResult.ToNominalBoundType(memberType))
                 {
                     ResolvedMetadataMember = member
                 };
             }
 
-            reason ??= "The member result is outside supported scalar reference reads.";
+            reason ??= "The member result is outside supported scalar reads.";
             _diagnostics.ReportInfo(fieldAccess.Span, DiagnosticCode.SignatureUnresolved,
                 $"Metadata member resolution incomplete: {reason}");
             return new BoundFieldAccessExpression(
@@ -3276,7 +4964,8 @@ public sealed class Binder
                 resolvedType: new BoundTypes.UnresolvedBoundType(reason))
             {
                 // #943: the by-reference operand check still needs to know it is a property.
-                UnsupportedMetadataMember = member
+                UnsupportedMetadataMember = member,
+                HasUnknownInferredType = true
             };
         }
 
@@ -3288,7 +4977,15 @@ public sealed class Binder
             fields.FirstOrDefault(),
             fieldAccess.FieldNameSpan,
             fields,
-            resolvedType);
+            resolvedType)
+        {
+            SourceStaticFieldOwner = target is BoundTypeReferenceExpression
+                && fields is [{ IsField: true, IsStatic: true, DeclaringTypeName: { } declaringType }]
+                ? _classesByQualifiedName.GetValueOrDefault(declaringType) : null,
+            MethodInputArrayType = fields is [var arrayField] ? arrayField.MethodInputArrayType : null,
+            HasUnknownInferredType = fieldTypes.Length != 1
+                || fields.Any(field => field.HasUnknownInferredType)
+        };
     }
 
     /// <summary>#943: the instance field a (possibly dotted) path names through in-module struct values.</summary>
@@ -3309,21 +5006,243 @@ public sealed class Binder
 
     private BoundTypeReferenceExpression? TryBindMetadataTypeReceiver(ExpressionNode expression)
     {
+        if (TryBindPredefinedTypeReceiver(expression) is { } predefined)
+            return predefined;
         var name = DottedReferenceName(expression);
         if (name is null)
             return null;
         var head = name.Split('.')[0];
-        if (_scope.LookupAll(head).Count != 0 || ResolveAccessibleMembers(_currentClass, head).Count != 0)
+        if (IsTypeReceiverHeadShadowed(head, allowDeclaredTypes: false))
+            return null;
+        if (ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Handled)
+            return null;
+        if (expression is ReferenceNode { IsVerbatim: true }
+            && SyntaxFactory.ParseTypeName(name) is PredefinedTypeSyntax)
             return null;
         var type = TryBuildReferenceType(
             name, _currentClassName, _currentNamespaceIdentity,
             _currentMemberTypeParameters?.Select(parameter => parameter.Name));
-        return type?.RoslynSymbol is not null
-            ? new BoundTypeReferenceExpression(expression.Span, name, type)
+        if (type?.RoslynSymbol is not null)
+            return new BoundTypeReferenceExpression(expression.Span, name, type);
+        return GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, name) is Microsoft.CodeAnalysis.INamedTypeSymbol symbol
+                ? new BoundTypeReferenceExpression(expression.Span, name,
+                    Metadata.MetadataBinderResult.ToNominalBoundType(symbol))
+                : null;
+    }
+
+    private BoundTypeReferenceExpression? TryBindSourceEnumTypeReceiver(ExpressionNode expression)
+    {
+        var name = DottedReferenceName(expression);
+        if (name is null
+            || !name.StartsWith("global::", StringComparison.Ordinal)
+                && IsTypeReceiverHeadShadowed(name.Split('.')[0], allowDeclaredTypes: true))
+            return null;
+        var resolved = ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId);
+        return resolved.Type is { IsEnum: true } owner
+            ? new BoundTypeReferenceExpression(expression.Span, name,
+                new BoundTypes.NominalBoundType(owner.QualifiedName, declaration: owner), owner)
             : null;
     }
 
-    private static string? DottedReferenceName(ExpressionNode expression) => expression switch
+    private BoundTypeReferenceExpression? TryBindSourceStaticFieldReceiver(FieldAccessNode expression)
+    {
+        var name = DottedReferenceName(expression.Target);
+        if (name is null
+            || !name.StartsWith("global::", StringComparison.Ordinal)
+                && IsTypeReceiverHeadShadowed(name.Split('.')[0], allowDeclaredTypes: true))
+            return null;
+        var type = ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Type;
+        if (type is null || !IsSourceTypeAccessible(type)
+            || !_classesByQualifiedName.TryGetValue(type.QualifiedName, out var owner)
+            || ResolveAccessibleMembers(owner, expression.FieldName).OfType<VariableSymbol>().ToArray()
+                is not [{ IsField: true, IsStatic: true }])
+            return null;
+        return new BoundTypeReferenceExpression(expression.Target.Span, name,
+            new BoundTypes.NominalBoundType(type.QualifiedName, declaration: type), type);
+    }
+
+    private (bool Handled, TypeSymbol? Type) ResolveSourceType(
+        string name, string? containingTypeName, string? namespaceIdentity, string? scopeId)
+    {
+        static string LookupName(string value) =>
+            string.Join(".", value.Split('.').Select(part => part.TrimStart('@')));
+        var global = name.StartsWith("global::", StringComparison.Ordinal);
+        var spelling = global ? name["global::".Length..] : name;
+        spelling = LookupName(spelling);
+        var head = spelling.Split('.')[0];
+        var visibleScopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = scopeId; id is not null;)
+        {
+            if (!visibleScopes.Add(id) || !_metadataNamespaceScopes.TryGetValue(id, out var scope))
+                return (true, null);
+            id = scope.ParentScopeId;
+        }
+        var imports = _metadataUsings.Where(import =>
+            import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId)).ToArray();
+        var aliases = global ? [] : imports.Where(import => import.Alias == head).ToArray();
+        if (aliases.Length > 1)
+            return (true, null);
+        var types = SourceTypeSymbols();
+        foreach (var lookup in ReferenceLookupNames(
+            global ? "global::" + spelling : spelling, containingTypeName ?? namespaceIdentity))
+        {
+            var matches = types.Where(type => LookupName(type.QualifiedName) == LookupName(lookup)).Take(2).ToArray();
+            if (matches.Length > 0)
+                return aliases.Length == 0 && matches is [var match] ? (true, match) : (true, null);
+            var separator = lookup.Length - spelling.Length - 1;
+            if (separator > 0 && _classesByQualifiedName.TryGetValue(lookup[..separator], out var owner)
+                && EnumerateCurrentClassInteropBlocks(owner).Any(block =>
+                    CSharpSyntaxTree.ParseText("class __Host { " + block.CSharpCode + " }").GetCompilationUnitRoot()
+                        .Members.OfType<ClassDeclarationSyntax>().SelectMany(host => host.Members).Any(member => member switch
+                        {
+                            BaseTypeDeclarationSyntax type => type.Identifier.ValueText == head,
+                            DelegateDeclarationSyntax type => type.Identifier.ValueText == head,
+                            _ => false
+                        })))
+                return (true, null);
+        }
+        if (aliases is [var alias])
+        {
+            var target = string.Join(".", alias.Namespace.Replace("global::", "", StringComparison.Ordinal)
+                    .Split('.').Select(part => part.TrimStart('@')))
+                + spelling[head.Length..];
+            var matches = types.Where(type => LookupName(type.QualifiedName) == target).Take(2).ToArray();
+            return matches.Length == 0 ? default : (true, matches is [var match] ? match : null);
+        }
+        if (global)
+            return default;
+        var imported = imports.Where(import => import.Alias is null && !import.IsStatic)
+            .SelectMany(import => types.Where(type => LookupName(type.QualifiedName) == LookupName(import.Namespace) + "." + spelling))
+            .Distinct().Take(2).ToArray();
+        if (imported.Length == 0)
+            return default;
+        // A metadata import can compete with a source import; neither spelling wins by itself.
+        if (GetOrCreateMetadataBinder() is { } metadata
+            && ResolveScopedMetadataType(metadata.Context, spelling, 0, scopeId, namespaceIdentity).Type is not null)
+            return (true, null);
+        return (true, imported is [var importedType] ? importedType : null);
+    }
+
+    private bool IsSourceTypeAccessible(TypeSymbol type)
+    {
+        while (true)
+        {
+            var separator = type.QualifiedName.LastIndexOf('.');
+            if (separator < 0 || !_classesByQualifiedName.TryGetValue(type.QualifiedName[..separator], out var owner))
+                return type.Visibility is Visibility.Public or Visibility.Internal;
+            var accessible = type.Visibility switch
+            {
+                Visibility.Private => IsWithinDeclaringType(type.QualifiedName[..separator]),
+                Visibility.Protected or Visibility.PrivateProtected =>
+                    _currentClass != null && IsSameOrDerivedClass(_currentClass, type.QualifiedName[..separator]),
+                _ => true
+            };
+            if (!accessible)
+                return false;
+            type = _classSymbols[owner];
+        }
+    }
+
+    private TypeSymbol? ResolveCallableEnumType(FunctionSymbol function, string typeName)
+    {
+        if (_enumMembers.Count == 0 || function.TypeParameters.Contains(typeName, StringComparer.Ordinal))
+            return null;
+        _functionNamespaces.TryGetValue(function.Id, out var ns);
+        var scopeId = _functionSymbols.FirstOrDefault(pair => pair.Value == function).Key?.NamespaceScopeId;
+        if (function.ContainingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(function.ContainingTypeName, out var owner))
+        {
+            if (ReturnShape.GetCallableTypeParameters(owner, _asyncTypeModule).Any(parameter => parameter.Name == typeName))
+                return null;
+            ns = owner.NamespaceIdentity;
+            scopeId = owner.NamespaceScopeId;
+        }
+        return ResolveSourceType(typeName, function.ContainingTypeName, ns, scopeId).Type
+            is { IsEnum: true } type ? type : null;
+    }
+
+    private string ResolveCallableParameterType(FunctionSymbol function, string typeName)
+    {
+        if (ResolveCallableEnumType(function, typeName) is { } type)
+            return "global::" + type.QualifiedName;
+        if (!TypeIdentity.IsBuiltinCanonicalName(TypeIdentity.Canonicalize(typeName).TrimEnd('?'))
+            && _functionSymbols.Values.Contains(function)
+            && GetResolvedStringOverloadType(TryBuildCallableReference(typeName, function)) is { } stringType)
+            return stringType;
+        return typeName;
+    }
+
+    private static string? GetResolvedStringOverloadType(BoundTypes.BoundType? type) =>
+        type is BoundTypes.NominalBoundType
+            { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } reference
+                ? reference.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "STRING?" : "STRING"
+                : null;
+
+    private TypeSymbol? ResolveVariableEnumType(VariableSymbol variable)
+    {
+        var owner = variable.DeclaringTypeName is { } ownerName
+            ? _classesByQualifiedName.GetValueOrDefault(ownerName) : null;
+        if (owner is null ? GetTypeParameterConstraints(variable.TypeName) is not null
+            : ReturnShape.GetCallableTypeParameters(owner, _asyncTypeModule).Any(parameter => parameter.Name == variable.TypeName))
+            return null;
+        return ResolveSourceType(variable.TypeName, variable.DeclaringTypeName ?? _currentClassName,
+            owner?.NamespaceIdentity ?? _currentNamespaceIdentity,
+            owner?.NamespaceScopeId ?? _currentNamespaceScopeId).Type is { IsEnum: true } type ? type : null;
+    }
+
+    private BoundTypeReferenceExpression? TryBindPredefinedTypeReceiver(ExpressionNode expression)
+    {
+        if (expression is not ReferenceNode { IsVerbatim: false } reference
+            || SyntaxFactory.ParseTypeName(reference.Name) is not PredefinedTypeSyntax predefined
+            || GetOrCreateMetadataBinder() is not { } metadata)
+            return null;
+        var specialType = predefined.Keyword.Kind() switch
+        {
+            SyntaxKind.BoolKeyword => Microsoft.CodeAnalysis.SpecialType.System_Boolean,
+            SyntaxKind.ByteKeyword => Microsoft.CodeAnalysis.SpecialType.System_Byte,
+            SyntaxKind.SByteKeyword => Microsoft.CodeAnalysis.SpecialType.System_SByte,
+            SyntaxKind.ShortKeyword => Microsoft.CodeAnalysis.SpecialType.System_Int16,
+            SyntaxKind.UShortKeyword => Microsoft.CodeAnalysis.SpecialType.System_UInt16,
+            SyntaxKind.IntKeyword => Microsoft.CodeAnalysis.SpecialType.System_Int32,
+            SyntaxKind.UIntKeyword => Microsoft.CodeAnalysis.SpecialType.System_UInt32,
+            SyntaxKind.LongKeyword => Microsoft.CodeAnalysis.SpecialType.System_Int64,
+            SyntaxKind.ULongKeyword => Microsoft.CodeAnalysis.SpecialType.System_UInt64,
+            SyntaxKind.CharKeyword => Microsoft.CodeAnalysis.SpecialType.System_Char,
+            SyntaxKind.FloatKeyword => Microsoft.CodeAnalysis.SpecialType.System_Single,
+            SyntaxKind.DoubleKeyword => Microsoft.CodeAnalysis.SpecialType.System_Double,
+            SyntaxKind.DecimalKeyword => Microsoft.CodeAnalysis.SpecialType.System_Decimal,
+            SyntaxKind.StringKeyword => Microsoft.CodeAnalysis.SpecialType.System_String,
+            SyntaxKind.ObjectKeyword => Microsoft.CodeAnalysis.SpecialType.System_Object,
+            SyntaxKind.VoidKeyword => Microsoft.CodeAnalysis.SpecialType.System_Void,
+            _ => Microsoft.CodeAnalysis.SpecialType.None
+        };
+        if (specialType == Microsoft.CodeAnalysis.SpecialType.None)
+            return null;
+        var symbol = metadata.Context.HostCompilationForBinder.GetSpecialType(specialType);
+        return symbol.TypeKind != Microsoft.CodeAnalysis.TypeKind.Error
+            ? new BoundTypeReferenceExpression(expression.Span, reference.Name,
+                Metadata.MetadataBinderResult.ToNominalBoundType(symbol))
+            : null;
+    }
+
+    private bool IsTypeReceiverHeadShadowed(string head, bool allowDeclaredTypes) =>
+        _scope.LookupAll(head).Concat(ResolveLexicalMembers(head))
+            .Any(symbol => !allowDeclaredTypes || symbol is not TypeSymbol)
+        || GetTypeParameterConstraints(head) is not null;
+
+    private bool HasVisibleUsingAlias(string head)
+    {
+        var scopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = _currentNamespaceScopeId; id is not null
+            && scopes.Add(id) && _metadataNamespaceScopes.TryGetValue(id, out var scope); id = scope.ParentScopeId)
+        {
+        }
+        return _metadataUsings.Any(import => import.Alias == head.TrimStart('@')
+            && (import.IsGlobal || import.NamespaceScopeId is null || scopes.Contains(import.NamespaceScopeId)));
+    }
+
+    internal static string? DottedReferenceName(ExpressionNode expression) => expression switch
     {
         ReferenceNode reference => reference.Name,
         FieldAccessNode field when DottedReferenceName(field.Target) is { } prefix =>
@@ -3331,11 +5250,65 @@ public sealed class Binder
         _ => null
     };
 
+    private BoundExpression BindOverflowContext(OverflowContextExpressionNode expression)
+    {
+        var operand = BindExpression(expression.Operand);
+        return new BoundStructuralExpression(
+            expression.Span, nameof(OverflowContextExpressionNode), operand.Type.DisplayString,
+            [operand], new Dictionary<string, object?> { ["IsChecked"] = expression.IsChecked },
+            deferredChildren: null, typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
+            resultType: operand.Type)
+        {
+            HasUnknownInferredType = operand.HasUnknownInferredType,
+            MethodInputArrayType = operand.MethodInputArrayType,
+            GenericNullabilityType = operand.GenericNullabilityType
+        };
+    }
+
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
-        var operand = BindExpression(typeOp.Operand);
+        BoundTypes.FunctionBoundType? callable = null;
+        if (typeOp is { Operation: TypeOp.Cast, Operand: LambdaExpressionNode }
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, typeOp.TargetType)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol
+                    { TypeKind: Microsoft.CodeAnalysis.TypeKind.Delegate, DelegateInvokeMethod: { } invoke })
+            callable = new BoundTypes.FunctionBoundType(
+                System.Collections.Immutable.ImmutableArray.CreateRange(
+                    invoke.Parameters.Select(parameter => Metadata.MetadataBinderResult.ToBoundType(parameter.Type))),
+                Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                displayOverride: typeOp.TargetType, row: BoundTypes.EffectRow.Unknown);
+        var operand = BindExpression(typeOp.Operand, callable);
+        // Keep the delegate's return identity and nullable contract; only a bound
+        // non-null body can refine an otherwise oblivious object result.
+        if (callable?.ReturnType is BoundTypes.NominalBoundType
+            {
+                RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Object,
+                NullableAnnotation: BoundTypes.NullableAnnotation.Oblivious
+            } objectResult
+            && operand is BoundLambdaExpression { IsAsync: false, ExpressionBody: { } body }
+            && (IsDefinitelyNonNullScalar(body)
+                || NullabilityChecker.GetMethodInputArrayType(body)?.NullableAnnotation
+                    == BoundTypes.NullableAnnotation.NotAnnotated
+                || NullabilityChecker.GetAnnotation(body.Type) == BoundTypes.NullableAnnotation.NotAnnotated
+                    && (body.Type switch
+                    {
+                        BoundTypes.NominalBoundType nominal =>
+                            nominal.RoslynSymbol?.IsReferenceType == true || nominal.IsKnownReferenceType,
+                        BoundTypes.ArrayBoundType => true,
+                        BoundTypes.GenericInstantiationBoundType generic =>
+                            generic.RoslynSymbol?.IsReferenceType == true
+                            || generic.Definition.Declaration?.IsReferenceType == true,
+                        _ => false
+                    })))
+            callable = new BoundTypes.FunctionBoundType(callable.ParameterTypes,
+                new BoundTypes.NominalBoundType(objectResult.QualifiedName,
+                    BoundTypes.NullableAnnotation.NotAnnotated, objectResult.Declaration, objectResult.RoslynSymbol),
+                callable.DisplayString, callable.Row, callable.ParameterRows);
         var annotation = typeOp.Operation switch
         {
+            TypeOp.Cast when operand is BoundNullLiteral =>
+                BoundTypes.NullableAnnotation.Annotated,
             TypeOp.As when IsScalarStringTypeName(typeOp.TargetType) =>
                 BoundTypes.NullableAnnotation.Annotated,
             TypeOp.Cast when IsScalarStringTypeName(typeOp.TargetType)
@@ -3346,12 +5319,30 @@ public sealed class Binder
                 BoundTypes.NullableAnnotation.NotAnnotated,
             _ => BoundTypes.NullableAnnotation.Oblivious
         };
+        BoundTypes.BoundType? resolvedType = callable;
+        if (typeOp.Operation is TypeOp.Cast or TypeOp.As
+            && TryBuildReferenceType(typeOp.TargetType, _currentClassName, _currentNamespaceIdentity,
+                _currentMemberTypeParameters?.Select(parameter => parameter.Name))
+                is { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } stringType)
+        {
+            if (typeOp.Operation == TypeOp.Cast && !operand.HasUnknownInferredType
+                && operand.Type is BoundTypes.NominalBoundType
+                    { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } stringSource)
+                annotation = stringSource.NullableAnnotation;
+            resolvedType = new BoundTypes.NominalBoundType(
+                typeOp.TargetType, annotation, roslynSymbol: stringType.RoslynSymbol);
+        }
+        if (typeOp.Operation == TypeOp.Cast && GetTypeParameterConstraints(typeOp.TargetType) is null
+            && ResolveSourceType(typeOp.TargetType, _currentClassName, _currentNamespaceIdentity,
+                _currentNamespaceScopeId).Type is { IsEnum: true } enumType)
+            resolvedType = new BoundTypes.NominalBoundType(enumType.QualifiedName, declaration: enumType);
         return new BoundTypeOperationExpression(
             typeOp.Span,
             typeOp.Operation,
             operand,
             typeOp.TargetType,
-            annotation);
+            annotation,
+            resolvedType: resolvedType);
     }
 
     private BoundExpression BindIsPattern(IsPatternNode isPattern)
@@ -3442,7 +5433,7 @@ public sealed class Binder
         if (condition is BinaryOperationNode { Operator: BinaryOperator.NotEqual } comparison
             && boundCondition is BoundBinaryExpression boundComparison)
         {
-            if (comparison.Left is ReferenceNode { Name: "null" }
+            if (comparison.Left is ReferenceNode { IsNullLiteral: true }
                 && comparison.Right is ReferenceNode right
                 && boundComparison.Right is BoundVariableExpression rightVariable)
             {
@@ -3450,7 +5441,7 @@ public sealed class Binder
                     return;
                 DeclareNarrowedNonNullVariable(right, rightVariable.Variable);
             }
-            else if (comparison.Right is ReferenceNode { Name: "null" }
+            else if (comparison.Right is ReferenceNode { IsNullLiteral: true }
                      && comparison.Left is ReferenceNode left
                      && boundComparison.Left is BoundVariableExpression leftVariable)
             {
@@ -3463,6 +5454,28 @@ public sealed class Binder
 
     private void DeclareFailedConditionPatterns(ExpressionNode condition, BoundExpression boundCondition)
     {
+        var arguments = condition switch
+        {
+            CallExpressionNode call => call.Arguments,
+            ExpressionCallNode call => call.Arguments,
+            _ => null
+        };
+        if (arguments is [ReferenceNode referenceArgument]
+            && boundCondition is BoundCallExpression
+            {
+                Arguments: [BoundVariableExpression variableArgument],
+                ResolvedMetadataMethod:
+                {
+                    IsStatic: true,
+                    Name: nameof(string.IsNullOrEmpty) or nameof(string.IsNullOrWhiteSpace),
+                    ContainingType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String,
+                    ReturnType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Boolean,
+                    Parameters: [{ Type.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String }]
+                }
+            })
+        {
+            DeclareNarrowedNonNullVariable(referenceArgument, variableArgument.Variable);
+        }
         if (condition is StringOperationNode
             {
                 Operation: StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace,
@@ -3475,6 +5488,122 @@ public sealed class Binder
         {
             DeclareNarrowedNonNullVariable(reference, variable.Variable);
         }
+    }
+
+    private bool IsSelectedBuiltInNullGuard(BinaryOperationNode condition)
+    {
+        if (condition.Operator is not (BinaryOperator.Equal or BinaryOperator.Or)
+            || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return false;
+        SourceCallBindings();
+        return _sourceCallConversions.BuiltInNullGuardOperations.Contains(condition);
+    }
+
+    private void DeclareFailedNullEqualityConditionPatterns(
+        ExpressionNode condition,
+        BoundExpression boundCondition,
+        IReadOnlySet<string>? excludedNarrowings = null)
+    {
+        if (condition is not BinaryOperationNode comparison
+            || boundCondition is not BoundBinaryExpression binary
+            || !IsSelectedBuiltInNullGuard(comparison))
+            return;
+
+        if (comparison.Operator == BinaryOperator.Or)
+        {
+            var leftExclusions = excludedNarrowings is null
+                ? binary.InvalidatedLeftNarrowingNames
+                : excludedNarrowings.Concat(binary.InvalidatedLeftNarrowingNames)
+                    .ToHashSet(StringComparer.Ordinal);
+            DeclareFailedNullEqualityConditionPatterns(comparison.Left, binary.Left, leftExclusions);
+            DeclareFailedNullEqualityConditionPatterns(comparison.Right, binary.Right, excludedNarrowings);
+            return;
+        }
+
+        if (comparison.Operator != BinaryOperator.Equal)
+            return;
+        var (reference, bound) = comparison.Left is ReferenceNode { IsNullLiteral: true }
+            ? (comparison.Right, binary.Right)
+            : comparison.Right is ReferenceNode { IsNullLiteral: true }
+                ? (comparison.Left, binary.Left)
+                : (null, null);
+        if (reference is ReferenceNode local
+            && bound is BoundVariableExpression { HasUnknownInferredType: false } variable
+            && variable.Variable.StorageIdentity is { IsField: false, IsProperty: false }
+            && excludedNarrowings?.Contains(local.Name) != true)
+            DeclareNarrowedNonNullVariable(local, variable.Variable);
+        else if (reference is not null && bound is not null
+            && TryGetStableMemberStorage(reference, bound, out var storage, out var receiver)
+            && excludedNarrowings?.Contains(storage.Name) != true
+            && (receiver is null || excludedNarrowings?.Contains(receiver.Name) != true))
+            DeclareNarrowedNonNullVariable(new ReferenceNode(reference.Span, storage.Name), storage);
+    }
+
+    private bool TryGetStableMemberStorage(
+        ExpressionNode expression, BoundExpression bound,
+        out VariableSymbol storage, out VariableSymbol? receiver, bool requireNonNullFlow = false)
+    {
+        storage = null!;
+        receiver = null;
+        if (_sourceCallConversions?.StableMemberReads.GetValueOrDefault(expression) is not { } selected
+            || requireNonNullFlow && !selected.HasNonNullFlow)
+            return false;
+        if (bound is not IBoundStorageExpression { ResolvedStorageCandidates: [var candidate] })
+            return false;
+        var member = candidate.StorageIdentity;
+        if (!member.IsProperty || !ReferenceEquals(
+                _classScopes[selected.Owner].LookupLocal(selected.Property.Name), member))
+            return false;
+        if (bound is BoundFieldAccessExpression access)
+        {
+            if (access.Target is BoundVariableExpression { HasUnknownInferredType: false } variable
+                && variable.Variable.StorageIdentity is { IsField: false, IsProperty: false }
+                && variable.Type is BoundTypes.NominalBoundType { Declaration: { } owner }
+                && ReferenceEquals(owner, _classSymbols[selected.Owner]))
+                receiver = variable.Variable.StorageIdentity;
+            else if (access.Target is not BoundThisExpression
+                || !ReferenceEquals(_currentClass, selected.Owner))
+                return false;
+        }
+        else if (!ReferenceEquals(_currentClass, selected.Owner))
+            return false;
+
+        var key = (receiver, member);
+        if (!_memberFlowStorages.TryGetValue(key, out storage!))
+        {
+            // These scoped flow slots retain the real member/receiver pair; they are
+            // not source declarations or dotted-name aliases for user storage.
+            storage = new VariableSymbol(
+                member.Id.Append("member-flow", receiver?.Id.Value ?? "this"),
+                $"\0member-flow:{_memberFlowStorages.Count}", member.TypeName,
+                isMutable: true, nullableAnnotation: member.NullableAnnotation);
+            _memberFlowStorages.Add(key, storage);
+        }
+        return true;
+    }
+
+    private void InvalidateMemberFlowNarrowing(VariableSymbol variable)
+    {
+        foreach (var (key, storage) in _memberFlowStorages)
+        {
+            if ((ReferenceEquals(key.Receiver, variable.StorageIdentity)
+                    || ReferenceEquals(key.Member, variable.StorageIdentity))
+                && _scope.Lookup(storage.Name) is VariableSymbol narrowed
+                && _flowNarrowingSources.ContainsKey(narrowed))
+                InvalidateMutableFlowNarrowing(narrowed, requireRebindable: false);
+        }
+    }
+
+    private void InvalidateMemberFlowNarrowing(BoundExpression target)
+    {
+        if (target is BoundVariableExpression variable)
+            InvalidateMemberFlowNarrowing(variable.Variable);
+        else if (target is BoundFieldAccessExpression field)
+            foreach (var member in field.ResolvedFields)
+                InvalidateMemberFlowNarrowing(member);
+        else if (target is BoundTupleLiteral tuple)
+            foreach (var element in tuple.Elements)
+                InvalidateMemberFlowNarrowing(element);
     }
 
     private void DeclareNarrowedNonNullVariable(
@@ -3529,8 +5658,14 @@ public sealed class Binder
 
     private VariableSymbol InvalidateMutableFlowNarrowing(
         VariableSymbol variable,
-        bool requireRebindable = true)
+        bool requireRebindable = true,
+        bool mayWriteNull = true)
     {
+        if (mayWriteNull && _declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious)
+            _obliviousNullTaintedStorage.Add(variable.StorageIdentity);
+        InvalidateMemberFlowNarrowing(variable);
+        variable.StorageIdentity.MetadataArrayResultType = null;
+        variable.MetadataArrayResultType = null;
         var source = variable;
         var traversed = new List<VariableSymbol>();
         while (_flowNarrowingSources.TryGetValue(source, out var previous))
@@ -3598,7 +5733,7 @@ public sealed class Binder
                 _diagnostics.ReportError(
                     newExpr.TypeNameSpan,
                     DiagnosticCode.ExpectedTypeName,
-                    "§NEW requires a non-empty type name.");
+                    "new requires a non-empty type name.");
             }
 
             return new BoundNewExpression(
@@ -3611,7 +5746,8 @@ public sealed class Binder
                 resolvedType: null,
                 typeNameSpan: newExpr.TypeNameSpan,
                 resolvedConstructors: Array.Empty<FunctionSymbol>(),
-                typeReference: boundTypeReference);
+                typeReference: boundTypeReference,
+                argumentNames: newExpr.ArgumentNames);
         }
 
         var constructorTypeName = TypeIdentity.ToLookupName(
@@ -3621,10 +5757,98 @@ public sealed class Binder
             newExpr.Span,
             $"{constructorTypeName}..ctor",
             boundArgs,
-            argumentNames: null,
+            argumentNames: newExpr.ArgumentNames,
             argumentModifiers: null,
             typeArguments: null);
 
+        var metadata = GetOrCreateMetadataBinder();
+        var fullTypeName = newExpr.TypeArguments.Count == 0 ? newExpr.TypeName
+            : $"{newExpr.TypeName}<{string.Join(",", newExpr.TypeArguments)}>";
+        var metadataType = boundTypeReference.ResolvedType is null && metadata is not null
+            ? ResolveComputedMetadataType(metadata.Context, fullTypeName) as Microsoft.CodeAnalysis.INamedTypeSymbol
+            : null;
+        var collectionDefinition = metadataType?.OriginalDefinition;
+        if (newExpr.CollectionInitializers.Count > 0 && collectionDefinition is null
+            && boundTypeReference.ResolvedType is null && metadata is not null
+            && TypeIdentity.TrySplitGeneric(fullTypeName, out var root, out var typeArguments)
+            && ResolveTypeSymbol(root, typeArguments.Count) is null)
+        {
+            var scoped = ResolveScopedMetadataType(metadata.Context, root, typeArguments.Count,
+                _currentNamespaceScopeId, _currentNamespaceIdentity);
+            collectionDefinition = scoped.Handled ? scoped.Type
+                : metadata.Context.TryResolveType(TypeIdentity.MapShortTypeNameToFullName(fullTypeName));
+        }
+        if (newExpr.CollectionInitializers.Count > 0
+            && boundTypeReference.ResolvedType is not null
+            && (ResolveClass(fullTypeName) is not { } sourceClass
+                || !IsEnumerableCollectionClass(sourceClass, new HashSet<ClassDefinitionNode>())))
+            _diagnostics.ReportError(newExpr.TypeNameSpan, DiagnosticCode.TypeMismatch,
+                $"Collection initializer type '{fullTypeName}' requires a resolved System.Collections.IEnumerable implementation.");
+        var collectionCalls = new List<BoundCallExpression>();
+        foreach (var entry in newExpr.CollectionInitializers)
+        {
+            var arguments = BindExpressions(entry.Arguments);
+            var source = ResolveCall(entry.Span, entry.Target, arguments, null, null, null);
+            // This side-band receiver describes the fresh instance, not the enclosing class.
+            var receiver = new BoundThisExpression(newExpr.TypeNameSpan, fullTypeName,
+                metadataType is null ? null : Metadata.MetadataBinderResult.ToNominalBoundType(metadataType));
+            var selected = source.Functions.Count == 0
+                ? TryResolveBclCall(entry.Target, arguments, null, null, computedReceiver: receiver)
+                : null;
+            var sourceListEntry = false;
+            var sourceAddDefinition = collectionDefinition is not null && metadata is not null
+                && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                    collectionDefinition, metadata.Context.TryResolveType("System.Collections.Generic.List`1"))
+                ? collectionDefinition.GetMembers("Add")
+                .OfType<Microsoft.CodeAnalysis.IMethodSymbol>().SingleOrDefault(method =>
+                    !method.IsStatic && !method.IsGenericMethod && method.ReturnsVoid
+                    && method.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public
+                    && method.Parameters is [{ RefKind: Microsoft.CodeAnalysis.RefKind.None,
+                        Type: Microsoft.CodeAnalysis.ITypeParameterSymbol { Ordinal: 0 } parameter }]
+                    && Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(
+                        parameter.ContainingSymbol, collectionDefinition)) : null;
+            if (selected is null && source.Functions.Count == 0
+                && sourceAddDefinition is not null
+                && TypeIdentity.TrySplitGeneric(fullTypeName, out _, out var listArguments)
+                && listArguments.Count == 1
+                && GetTypeParameterConstraints(listArguments[0]) is null
+                && ResolveTypeSymbol(listArguments[0], 0) is { IsReferenceType: true } elementType)
+            {
+                sourceListEntry = arguments is [var argument]
+                    && GetTypeParameterConstraints(argument.Type.DisplayString) is null
+                    && (argument is BoundNewExpression constructed ? constructed.ResolvedType
+                        : (argument.Type as BoundTypes.NominalBoundType)?.Declaration)?.Id == elementType.Id
+                    && argument.Type is BoundTypes.NominalBoundType
+                        { NullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated };
+            }
+            if (source.Functions.Count == 0 && selected is null && !sourceListEntry)
+                _diagnostics.ReportError(entry.Span, DiagnosticCode.NoMatchingOverload,
+                    $"Collection initializer cannot resolve an instance Add overload for '{fullTypeName}'.");
+            if (metadataType is not null && !metadataType.AllInterfaces.Any(type =>
+                    type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Collections_IEnumerable))
+                _diagnostics.ReportError(newExpr.TypeNameSpan, DiagnosticCode.TypeMismatch,
+                    $"Collection initializer type '{fullTypeName}' must implement System.Collections.IEnumerable.");
+            var call = new BoundCallExpression(entry.Span, entry.Target, arguments,
+                selected?.Symbol?.ReturnType.ToDisplayString() ?? source.Function?.ReturnType ?? "VOID",
+                resolvedTypeName: selected?.Symbol?.ContainingType.ToDisplayString(),
+                resolvedMethodName: selected?.Symbol?.Name,
+                resolvedParameterTypes: selected?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString()).ToArray(),
+                resolvedSymbol: source.Function,
+                receiver: receiver,
+                resolvedSymbols: source.Functions,
+                calleeSpan: TextSpan.Empty)
+            {
+                ResolvedMetadataMethod = selected?.Symbol,
+                CollectionMethodDefinition = sourceListEntry ? sourceAddDefinition : null,
+                MutatesOnlyFreshCollectionReceiver = source.Functions.Count == 0
+                    && resolution.Functions.Count == 0
+                    && newExpr.Arguments.Count == 0
+                    && IsFreshBclCollectionAdd(metadata, metadataType ?? collectionDefinition,
+                        selected?.Symbol ?? (sourceListEntry ? sourceAddDefinition : null))
+            };
+            collectionCalls.Add(call);
+            InvalidateByReferenceParameterNarrowing();
+        }
         return new BoundNewExpression(
             newExpr.Span,
             newExpr.TypeName,
@@ -3635,7 +5859,73 @@ public sealed class Binder
             boundTypeReference.ResolvedType,
             newExpr.TypeNameSpan,
             resolution.Functions,
-            boundTypeReference);
+            boundTypeReference,
+            newExpr.ArgumentNames,
+            metadataType,
+            collectionCalls);
+    }
+
+    private static bool IsFreshBclCollectionAdd(
+        Metadata.MetadataBinder? metadata,
+        Microsoft.CodeAnalysis.INamedTypeSymbol? receiver,
+        Microsoft.CodeAnalysis.IMethodSymbol? method)
+    {
+        if (metadata is null || receiver is null || method is null
+            || method.IsStatic || method.IsGenericMethod
+            || !receiver.InstanceConstructors.Any(constructor =>
+                constructor.Parameters.IsEmpty
+                && constructor.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public))
+            return false;
+        var symbols = Microsoft.CodeAnalysis.SymbolEqualityComparer.Default;
+        var definition = receiver.OriginalDefinition;
+        var list = metadata.Context.TryResolveType("System.Collections.Generic.List`1");
+        var set = metadata.Context.TryResolveType("System.Collections.Generic.HashSet`1");
+        var dictionary = metadata.Context.TryResolveType("System.Collections.Generic.Dictionary`2");
+        var isList = symbols.Equals(definition, list);
+        if (!isList && !symbols.Equals(definition, set) && !symbols.Equals(definition, dictionary))
+            return false;
+        if (!definition.GetMembers("Add").OfType<Microsoft.CodeAnalysis.IMethodSymbol>()
+            .Any(candidate => symbols.Equals(candidate, method.OriginalDefinition)))
+            return false;
+        // Default equality for these sealed CLR primitives cannot dispatch to user callbacks.
+        return isList || receiver.TypeArguments[0].SpecialType is
+            Microsoft.CodeAnalysis.SpecialType.System_Boolean or Microsoft.CodeAnalysis.SpecialType.System_Char
+            or Microsoft.CodeAnalysis.SpecialType.System_SByte or Microsoft.CodeAnalysis.SpecialType.System_Byte
+            or Microsoft.CodeAnalysis.SpecialType.System_Int16 or Microsoft.CodeAnalysis.SpecialType.System_UInt16
+            or Microsoft.CodeAnalysis.SpecialType.System_Int32 or Microsoft.CodeAnalysis.SpecialType.System_UInt32
+            or Microsoft.CodeAnalysis.SpecialType.System_Int64 or Microsoft.CodeAnalysis.SpecialType.System_UInt64
+            or Microsoft.CodeAnalysis.SpecialType.System_Single or Microsoft.CodeAnalysis.SpecialType.System_Double
+            or Microsoft.CodeAnalysis.SpecialType.System_Decimal or Microsoft.CodeAnalysis.SpecialType.System_String;
+    }
+
+    private bool IsEnumerableCollectionClass(ClassDefinitionNode cls, HashSet<ClassDefinitionNode> visited)
+    {
+        if (!visited.Add(cls) || cls.TypeParameters.Count > 0 || GetOrCreateMetadataBinder() is not { } metadata)
+            return false;
+        var oldNamespace = _currentNamespaceIdentity;
+        var oldScope = _currentNamespaceScopeId;
+        _currentNamespaceIdentity = cls.NamespaceIdentity;
+        _currentNamespaceScopeId = cls.NamespaceScopeId;
+        try
+        {
+            foreach (var name in cls.ImplementedInterfaces.Concat(
+                         cls.BaseClass is { } baseClass ? [baseClass] : Array.Empty<string>()))
+            {
+                if (ResolveComputedMetadataType(metadata.Context, name) is Microsoft.CodeAnalysis.INamedTypeSymbol type
+                    && (type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Collections_IEnumerable
+                        || type.AllInterfaces.Any(parent =>
+                            parent.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Collections_IEnumerable)))
+                    return true;
+                if (ResolveClass(name) is { } parent && IsEnumerableCollectionClass(parent, visited))
+                    return true;
+            }
+            return false;
+        }
+        finally
+        {
+            _currentNamespaceIdentity = oldNamespace;
+            _currentNamespaceScopeId = oldScope;
+        }
     }
 
     private BoundTypeReference BindTypeReference(TypeReferenceNode typeReference)
@@ -3658,7 +5948,121 @@ public sealed class Binder
     {
         var array = BindExpression(arrayAccess.Array);
         var index = BindExpression(arrayAccess.Index);
-        return new BoundArrayAccess(arrayAccess.Span, array, index);
+        if (index is BoundRangeExpression && GetOrCreateMetadataBinder() is { } sliceMetadata
+            && ResolveComputedMetadataType(sliceMetadata.Context, array.Type.DisplayString) is { } slicedType
+            && (slicedType is Microsoft.CodeAnalysis.IArrayTypeSymbol { Rank: 1 }
+                || slicedType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String))
+        {
+            var inputArray = NullabilityChecker.GetMethodInputArrayType(array) is { } originalArray
+                ? new BoundTypes.ArrayBoundType(originalArray.ElementType, originalArray.Rank,
+                    BoundTypes.NullableAnnotation.NotAnnotated) : null;
+            return new BoundArrayAccess(arrayAccess.Span, array, index, resolvedType:
+                inputArray ?? Metadata.MetadataBinderResult.ToBoundType(slicedType.WithNullableAnnotation(
+                    Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated)))
+            {
+                MethodInputArrayType = inputArray,
+                MetadataArrayResultType = slicedType as Microsoft.CodeAnalysis.IArrayTypeSymbol
+            };
+        }
+        var metadataArray = array is BoundVariableExpression { Variable.IsTypeInferred: false }
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveBclArgumentType(metadata.Context, array.Type.DisplayString)
+                is Microsoft.CodeAnalysis.IArrayTypeSymbol { ElementType: Microsoft.CodeAnalysis.IArrayTypeSymbol element }
+                ? element : null;
+        var elementType = GetArrayAccessElementType(array);
+        if (elementType is null && GetOrCreateMetadataBinder() is { } indexerMetadata
+            && ResolveComputedMetadataType(indexerMetadata.Context, array.Type.DisplayString)
+                is { SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } receiverType
+            && ResolveComputedMetadataType(indexerMetadata.Context, index.Type.DisplayString) is { } indexType
+            && indexerMetadata.ResolveIndexer(receiverType, [new Metadata.MetadataArgument(indexType)])
+                is { GetMethod: not null } property)
+        {
+            elementType = Metadata.MetadataBinderResult.ToBoundType(property.Type);
+            metadataArray = property.Type as Microsoft.CodeAnalysis.IArrayTypeSymbol;
+        }
+        // 0.30: the indexer of a non-array metadata receiver, for the effect pass. It does
+        // not change the access's type; only which accessor contract is charged.
+        Microsoft.CodeAnalysis.IPropertySymbol? indexer = null;
+        Microsoft.CodeAnalysis.ITypeSymbol? indexerReceiver = null;
+        if (NullabilityChecker.GetMethodInputArrayType(array) is null
+            && !array.HasUnknownInferredType && !index.HasUnknownInferredType
+            && array.Type is not BoundTypes.NominalBoundType { Declaration: not null }
+            && GetOrCreateMetadataBinder() is { } elementMetadata
+            && ResolveComputedMetadataType(elementMetadata.Context, array.Type.DisplayString)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol { TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error } receiver
+            && ResolveComputedMetadataType(elementMetadata.Context, index.Type.DisplayString) is { } elementIndexType)
+        {
+            indexer = elementMetadata.ResolveElementAccess(receiver, elementIndexType);
+            indexerReceiver = indexer is null ? null : receiver;
+        }
+        return new BoundArrayAccess(arrayAccess.Span, array, index, resolvedType: elementType)
+        {
+            MetadataArrayResultType = metadataArray,
+            ResolvedIndexer = indexer,
+            ResolvedIndexerReceiver = indexerReceiver
+        };
+    }
+
+    private BoundTypes.BoundType? GetArrayAccessElementType(BoundExpression array)
+    {
+        if (array.HasUnknownInferredType)
+            return null;
+        if (NullabilityChecker.GetMethodInputArrayType(array) is { } establishedArray)
+            return establishedArray.Rank == 1 ? establishedArray.ElementType : null;
+        var typeName = array.Type.DisplayString;
+        if (GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, typeName)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol { SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String } text)
+        {
+            var stringIndexer = text.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>()
+                .FirstOrDefault(property => property.IsIndexer && property.GetMethod is not null
+                    && property.Parameters.Length == 1
+                    && property.Parameters[0].Type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Int32
+                    && property.Type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_Char);
+            if (stringIndexer?.Type is Microsoft.CodeAnalysis.INamedTypeSymbol character)
+                // Preserve CLR identity instead of the C# display alias for effect resolution.
+                return new BoundTypes.NominalBoundType("System.Char", roslynSymbol: character);
+        }
+        if (!TypeIdentity.TrySplitGeneric(typeName, out var name, out var arguments))
+            return null;
+        if (array.Type is BoundTypes.NominalBoundType { Declaration: not null }
+            || ResolveTypeSymbol(name, arguments.Count) is not null)
+            return null;
+
+        var metadataName = name switch
+        {
+            "List" or "System.Collections.Generic.List" => "System.Collections.Generic.List`1",
+            "IList" or "System.Collections.Generic.IList" => "System.Collections.Generic.IList`1",
+            "IReadOnlyList" or "System.Collections.Generic.IReadOnlyList" => "System.Collections.Generic.IReadOnlyList`1",
+            "Dictionary" or "Dict" or "System.Collections.Generic.Dictionary" => "System.Collections.Generic.Dictionary`2",
+            "IDictionary" or "System.Collections.Generic.IDictionary" => "System.Collections.Generic.IDictionary`2",
+            "IReadOnlyDictionary" or "System.Collections.Generic.IReadOnlyDictionary" => "System.Collections.Generic.IReadOnlyDictionary`2",
+            _ => null
+        };
+        if (metadataName is null
+            || GetOrCreateMetadataBinder()?.Context.TryResolveType(metadataName) is not { } definition
+            || definition.Arity != arguments.Count
+            || array.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } actual }
+                && !Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(actual.OriginalDefinition, definition))
+            return null;
+
+        var indexer = definition.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>()
+            .FirstOrDefault(property => property.IsIndexer && property.GetMethod is not null);
+        if (indexer?.Type is not Microsoft.CodeAnalysis.ITypeParameterSymbol parameter
+            || parameter.Ordinal >= arguments.Count)
+            return null;
+
+        var generic = array.GenericNullabilityType ?? array.Type as BoundTypes.GenericInstantiationBoundType
+            ?? (array as BoundFieldAccessExpression)?.ResolvedField?.GenericNullabilityType;
+        if (generic?.TypeArguments.Length == arguments.Count)
+            return generic.TypeArguments[parameter.Ordinal];
+        if (array.Type is BoundTypes.NominalBoundType { RoslynSymbol: { } constructed })
+            return Metadata.MetadataBinderResult.ToBoundType(constructed.TypeArguments[parameter.Ordinal]);
+
+        var argument = arguments[parameter.Ordinal];
+        return TryBuildReferenceType(argument, _currentClassName, _currentNamespaceIdentity,
+                _currentMemberTypeParameters?.Select(typeParameter => typeParameter.Name))
+            ?? BuildDeclaredBoundType(argument);
     }
 
     private BoundExpression BindMultiDimArrayAccess(MultiDimArrayAccessNode arrayAccess)
@@ -3685,7 +6089,30 @@ public sealed class Binder
 
     private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
     {
-        var dimensions = BindExpressions(array.DimensionSizes);
+        IReadOnlyList<BoundExpression> dimensions = BindExpressions(array.DimensionSizes);
+        if (dimensions.Count == 0 && array.InitializerNesting is { } nesting)
+        {
+            var lengths = Enumerable.Repeat(-1, array.Rank).ToArray();
+            var position = 0;
+            if (ReadLevel(0) && position == nesting.Count)
+                dimensions = lengths.Select(length => (BoundExpression)new BoundIntLiteral(
+                    array.Span, Math.Max(length, 0))).ToArray();
+
+            bool ReadLevel(int level)
+            {
+                if (position >= nesting.Count)
+                    return false;
+                var count = nesting[position++];
+                if (count < 0 || lengths[level] >= 0 && lengths[level] != count)
+                    return false;
+                lengths[level] = count;
+                if (level < array.Rank - 1)
+                    for (var index = 0; index < count; index++)
+                        if (!ReadLevel(level + 1))
+                            return false;
+                return true;
+            }
+        }
         var rows = array.Initializer
             .Select(row => (IReadOnlyList<BoundExpression>)BindExpressions(row))
             .ToArray();
@@ -3774,7 +6201,7 @@ public sealed class Binder
 
     private BoundExpression BindCollectionContains(CollectionContainsNode contains)
     {
-        var collection = BindReferenceExpression(new ReferenceNode(contains.Span, contains.CollectionName));
+        var collection = BindReferenceExpression(new ReferenceNode(contains.Span, contains.CollectionName, isVerbatim: true));
         var value = BindExpression(contains.KeyOrValue);
         return new BoundCollectionContains(
             contains.Span,
@@ -3829,61 +6256,57 @@ public sealed class Binder
                 .ToArray());
     }
 
-    private BoundExpression BindSomeExpression(SomeExpressionNode some)
-    {
-        var value = BindExpression(some.Value);
-        return new BoundSomeExpression(some.Span, value);
-    }
-
-    private BoundExpression BindNoneExpression(NoneExpressionNode none)
-    {
-        var innerType = string.IsNullOrWhiteSpace(none.TypeName) ? "OBJECT" : none.TypeName!;
-        return new BoundNoneLiteral(none.Span, MakeOptionType(innerType));
-    }
-
-    private BoundExpression BindOkExpression(OkExpressionNode ok)
-    {
-        var value = BindExpression(ok.Value);
-        return new BoundOkExpression(ok.Span, value);
-    }
-
-    private BoundExpression BindErrExpression(ErrExpressionNode err)
-    {
-        var error = BindExpression(err.Error);
-        return new BoundErrExpression(err.Span, error);
-    }
-
     private BoundExpression BindAwaitExpression(AwaitExpressionNode awaitExpression)
     {
         var awaited = BindExpression(awaitExpression.Awaited);
-        var resultType = GetAwaitedResultType(awaited.Type);
-        return new BoundStructuralExpression(
+        var metadataType = awaited.Type switch
+        {
+            BoundTypes.NominalBoundType nominal => nominal.RoslynSymbol,
+            BoundTypes.GenericInstantiationBoundType generic => generic.RoslynSymbol,
+            _ => null
+        };
+        var awaiter = metadataType is not null ? GetOrCreateMetadataBinder()?.ResolveAwait(metadataType) : null;
+        var resultType = awaiter?.GetResultMethod is { } getResult
+            ? Metadata.MetadataBinderResult.ToBoundType(getResult.ReturnType)
+            : metadataType is null ? GetAwaitedResultType(awaited.Type) : null;
+        var bound = new BoundStructuralExpression(
             awaitExpression.Span,
             nameof(AwaitExpressionNode),
-            resultType.DisplayString,
+            resultType?.DisplayString ?? "OBJECT",
             [awaited],
             new Dictionary<string, object?>
             {
                 ["ConfigureAwait"] = awaitExpression.ConfigureAwait,
+                ["GetAwaiter"] = awaiter?.GetAwaiterMethod,
+                ["IsCompleted"] = awaiter?.IsCompletedProperty,
+                ["GetResult"] = awaiter?.GetResultMethod,
             },
             deferredChildren: null,
             typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
-            resultType: resultType);
+            resultType: resultType)
+        {
+            HasUnknownInferredType = resultType is null || awaited.HasUnknownInferredType
+        };
+        _boundAwaits[awaitExpression] = bound;
+        return bound;
     }
 
-    private static BoundTypes.BoundType GetAwaitedResultType(BoundTypes.BoundType awaitedType)
+    private BoundTypes.BoundType? GetAwaitedResultType(BoundTypes.BoundType awaitedType)
     {
         if (awaitedType is BoundTypes.GenericInstantiationBoundType
             {
                 Definition.QualifiedName: var definition,
                 TypeArguments.Length: 1
             } generic
-            && ShortGenericName(definition) is "Task" or "ValueTask")
+            && Parsing.AttributeHelper.ResolveAsyncCarrierName(definition, _asyncTypeModule)
+                is "System.Threading.Tasks.Task" or "System.Threading.Tasks.ValueTask")
         {
             return generic.TypeArguments[0];
         }
 
-        return BuildDeclaredBoundType(UnwrapAwaitedType(awaitedType.DisplayString));
+        return Parsing.AttributeHelper.TryGetAsyncResultType(awaitedType.DisplayString, _asyncTypeModule, out var result)
+            ? BuildDeclaredBoundType(result)
+            : null;
     }
 
     private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
@@ -3895,8 +6318,8 @@ public sealed class Binder
         var rightValueType = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(right.Type.DisplayString, out var rightReferent)
             ? NormalizeTypeName(rightReferent) : right.Type.DisplayString;
         var resultName = ExpressionResultTypes.IsNever(left.Type) ? "NEVER"
-            : coalesce.Left is ReferenceNode { Name: "null" } ? right.Type.DisplayString
-            : coalesce.Right is ReferenceNode { Name: "null" } ? leftValueType
+            : coalesce.Left is ReferenceNode { IsNullLiteral: true } ? right.Type.DisplayString
+            : coalesce.Right is ReferenceNode { IsNullLiteral: true } ? leftValueType
             : GetCommonType(leftValueType, rightValueType);
         var shape = NullabilityResultTypes.Coalesce(left, right);
         return new BoundStructuralExpression(
@@ -3907,26 +6330,106 @@ public sealed class Binder
             metadata: null,
             deferredChildren: [right],
             typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
-            resultType: shape ?? ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type))
+            resultType: shape ?? ExpressionResultTypes.Coalesce(resultName, left, right))
         {
             MethodInputArrayType = shape as BoundTypes.ArrayBoundType,
-            GenericNullabilityType = shape as BoundTypes.GenericInstantiationBoundType
+            GenericNullabilityType = shape as BoundTypes.GenericInstantiationBoundType,
+            HasUnknownInferredType = !ExpressionResultTypes.IsNever(left.Type)
+                && (left.HasUnknownInferredType || right.HasUnknownInferredType)
         };
     }
 
     private BoundExpression BindNullConditional(NullConditionalNode conditional)
     {
         var target = BindExpression(conditional.Target);
-        return Structural(
-            conditional,
-            "OBJECT",
-            [target],
-            new Dictionary<string, object?>
-            {
-                ["MemberName"] = conditional.MemberName,
-                ["TargetType"] = target.Type.DisplayString,
-            });
+        return BindConditionalAccess(conditional.Span, target, receiver =>
+            BindFieldAccess(new FieldAccessNode(conditional.Span,
+                conditional.Target, conditional.MemberName), receiver));
     }
+
+    private BoundExpression BindConditionalAccess(
+        TextSpan span, BoundExpression target, Func<BoundExpression, BoundExpression> bindContinuation)
+    {
+        if (target is BoundConditionalAccessExpression outer)
+            return ContinueConditionalAccess(span, outer,
+                BindConditionalAccess(span, outer.WhenNotNull, bindContinuation));
+
+        var type = GetConditionalReceiverType(ConditionalValueType(target));
+        if (type is BoundTypes.GenericInstantiationBoundType
+            { RoslynSymbol.OriginalDefinition.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Nullable_T,
+                TypeArguments: [var underlying] })
+            type = underlying;
+        else
+            type = ConditionalReferenceType(type, BoundTypes.NullableAnnotation.NotAnnotated);
+        // A placeholder is not another evaluation of the receiver. Only the outer node owns it.
+        var receiver = new BoundStructuralExpression(span, "ConditionalReceiver", type.DisplayString,
+            children: null, metadata: null, deferredChildren: null,
+            BoundTypes.NullableAnnotation.Oblivious, type)
+        {
+            HasUnknownInferredType = target.HasUnknownInferredType,
+            MethodInputArrayType = type as BoundTypes.ArrayBoundType,
+            GenericNullabilityType = type as BoundTypes.GenericInstantiationBoundType
+        };
+        var continuation = bindContinuation(receiver);
+        return new BoundConditionalAccessExpression(span, target, continuation,
+            LiftConditionalResult(ConditionalValueType(continuation)));
+    }
+
+    private BoundConditionalAccessExpression ContinueConditionalAccess(
+        TextSpan span, BoundConditionalAccessExpression conditional, BoundExpression continuation) =>
+        new(span, conditional.Receiver, continuation, LiftConditionalResult(ConditionalValueType(continuation)));
+
+    private static BoundTypes.BoundType ConditionalValueType(BoundExpression expression) =>
+        (BoundTypes.BoundType?)NullabilityChecker.GetMethodInputArrayType(expression)
+        ?? expression.GenericNullabilityType ?? expression.Type;
+
+    private BoundTypes.BoundType LiftConditionalResult(BoundTypes.BoundType type)
+    {
+        type = GetConditionalReceiverType(type);
+        var symbol = type switch
+        {
+            BoundTypes.NominalBoundType nominal => nominal.RoslynSymbol,
+            BoundTypes.GenericInstantiationBoundType generic => generic.RoslynSymbol,
+            _ => null
+        };
+        if (symbol is { IsValueType: true }
+            && symbol.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Void
+            && symbol.OriginalDefinition.SpecialType != Microsoft.CodeAnalysis.SpecialType.System_Nullable_T
+            && GetOrCreateMetadataBinder()?.Context.TryResolveType("System.Nullable`1") is { } nullable)
+            return Metadata.MetadataBinderResult.ToBoundType(nullable.Construct(symbol));
+        return ConditionalReferenceType(type, BoundTypes.NullableAnnotation.Annotated);
+    }
+
+    private BoundTypes.BoundType GetConditionalReceiverType(BoundTypes.BoundType type)
+    {
+        if (type is BoundTypes.NominalBoundType { RoslynSymbol: null, Declaration: null } nominal
+            && GetOrCreateMetadataBinder() is { } metadata
+            && ResolveComputedMetadataType(metadata.Context, nominal.QualifiedName)
+                is Microsoft.CodeAnalysis.INamedTypeSymbol symbol)
+            return symbol.IsValueType || symbol.IsGenericType
+                ? Metadata.MetadataBinderResult.ToBoundType(symbol)
+                : new BoundTypes.NominalBoundType(nominal.QualifiedName, nominal.NullableAnnotation,
+                    roslynSymbol: symbol);
+        return type;
+    }
+
+    private static BoundTypes.BoundType ConditionalReferenceType(
+        BoundTypes.BoundType type, BoundTypes.NullableAnnotation annotation) => type switch
+    {
+        BoundTypes.NominalBoundType nominal when nominal.IsKnownReferenceType
+            || nominal.RoslynSymbol?.IsReferenceType == true =>
+            new BoundTypes.NominalBoundType(nominal.QualifiedName, annotation,
+                nominal.Declaration, nominal.RoslynSymbol),
+        BoundTypes.ArrayBoundType array =>
+            new BoundTypes.ArrayBoundType(array.ElementType, array.Rank, annotation)
+            {
+                RoslynSymbol = array.RoslynSymbol
+            },
+        BoundTypes.GenericInstantiationBoundType generic when generic.RoslynSymbol?.IsValueType != true =>
+            new BoundTypes.GenericInstantiationBoundType(generic.Definition, generic.TypeArguments, annotation,
+                generic.RoslynSymbol),
+        _ => type
+    };
 
     private BoundExpression BindRangeExpression(RangeExpressionNode range)
     {
@@ -3956,13 +6459,31 @@ public sealed class Binder
 
     private BoundExpression BindTypeOf(TypeOfExpressionNode typeOf)
     {
-        return Structural(
-            typeOf,
-            "TYPE",
+        var symbol = GetOrCreateMetadataBinder()?.Context.TryResolveType("System.Type");
+        BoundTypes.BoundType resultType;
+        if (symbol is not null)
+            resultType = new BoundTypes.NominalBoundType("System.Type",
+                BoundTypes.NullableAnnotation.NotAnnotated, roslynSymbol: symbol);
+        else
+        {
+            ReportAnalysisIncomplete(typeOf, "The runtime System.Type metadata could not be resolved.");
+            resultType = new BoundTypes.UnresolvedBoundType("System.Type metadata unavailable", reported: true);
+        }
+        return new BoundStructuralExpression(
+            typeOf.Span,
+            nameof(TypeOfExpressionNode),
+            "System.Type",
+            children: null,
             metadata: new Dictionary<string, object?>
             {
                 ["OperandType"] = typeOf.TypeName,
-            });
+            },
+            deferredChildren: null,
+            typeAnnotation: BoundTypes.NullableAnnotation.NotAnnotated,
+            resultType: resultType)
+        {
+            HasUnknownInferredType = symbol is null
+        };
     }
 
     private BoundExpression BindGenericType(GenericTypeNode genericType)
@@ -4009,10 +6530,40 @@ public sealed class Binder
         return new BoundInterpolatedStringExpression(interpolated.Span, parts);
     }
 
-    private BoundExpression BindLambdaExpression(LambdaExpressionNode lambda)
+    private BoundExpression BindLambdaExpression(
+        LambdaExpressionNode lambda, BoundTypes.FunctionBoundType? targetType = null)
     {
+        if (targetType is null && ResolveSourceCallConversions && _asyncTypeModule is not null)
+        {
+            SourceCallBindings();
+            if (_sourceCallConversions.LambdaTargets.TryGetValue(lambda, out var target)
+                && target.DelegateInvokeMethod is { } invoke)
+                targetType = new BoundTypes.FunctionBoundType(
+                    System.Collections.Immutable.ImmutableArray.CreateRange(
+                        invoke.Parameters.Select(parameter => Metadata.MetadataBinderResult.ToBoundType(parameter.Type))),
+                    Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                    row: BoundTypes.EffectRow.Unknown);
+        }
         var outerBindings = _scope.CaptureVisibleVariableBindings();
+        var mutableArrayResults = outerBindings.Select(binding => binding.Symbol.StorageIdentity)
+            .Distinct()
+            .Where(variable => variable.IsMutable && variable.MetadataArrayResultType is not null)
+            .Select(variable => (Variable: variable, Type: variable.MetadataArrayResultType))
+            .ToArray();
+        foreach (var (variable, _) in mutableArrayResults)
+            variable.MetadataArrayResultType = null;
         var outerFlowNarrowings = _flowNarrowingSources.ToArray();
+        // A rebindable captured array may change before the deferred body runs.
+        foreach (var (narrowed, _) in outerFlowNarrowings)
+        {
+            if (narrowed.MethodInputArrayType is not null
+                && narrowed.StorageIdentity is { IsField: false, IsProperty: false } storage
+                && CanRebind(storage)
+                && ReferenceEquals(_scope.Lookup(narrowed.Name), narrowed))
+            {
+                InvalidateMutableFlowNarrowing(narrowed, requireRebindable: false);
+            }
+        }
         var outerCallableState = CaptureCallableState();
         var outerCallableWrites = _deferredCallableWrites;
         _deferredCallableWrites = [];
@@ -4021,18 +6572,20 @@ public sealed class Binder
             parentContext,
             "lambda",
             lambda.Id,
-            "lambda");
+            $"snapshot:{_transientBindingId}:lambda:{lambda.Span.Start}");
         using var _scopeGuard = PushScope(_scope.CreateChild());
         using var _staticGuard = PushStaticContext(lambda.IsStatic);
         using var _identityGuard = PushDeclarationContext(lambdaIdentity);
         using var _returnGuard = PushReturnTypeContext(null);
 
         var parameters = new List<VariableSymbol>(lambda.Parameters.Count);
-        foreach (var parameter in lambda.Parameters)
+        foreach (var (parameter, index) in lambda.Parameters.Select((parameter, index) => (parameter, index)))
         {
+            var contextual = parameter.TypeName is null && targetType is not null
+                && index < targetType.ParameterTypes.Length ? targetType.ParameterTypes[index] : null;
             var symbol = CreateLocalVariable(
                 parameter.Name,
-                parameter.TypeName ?? "OBJECT",
+                parameter.TypeName ?? contextual?.DisplayString ?? "OBJECT",
                 isMutable: false,
                 isParameter: true,
                 ParameterModifier.None,
@@ -4041,7 +6594,14 @@ public sealed class Binder
                 // v0.14 nullability workstream (task #3) — inherit
                 // declared STRING nullability on lambda parameters.
                 // Scoped to STRING per §D6; non-STRING keeps Oblivious.
-                nullableAnnotation: TryReadDeclaredStringAnnotation(parameter.TypeName));
+                // An untyped parameter takes the selected delegate's STRING
+                // annotation (0.30: String instance receivers must be proven).
+                nullableAnnotation: contextual is BoundTypes.NominalBoundType
+                    {
+                        QualifiedName: "STRING" or "string" or "str" or "System.String"
+                    } contextualString
+                    ? contextualString.NullableAnnotation
+                    : TryReadDeclaredStringAnnotation(parameter.TypeName));
             if (!_scope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -4061,6 +6621,11 @@ public sealed class Binder
         var returnType = expressionBody?.Type.DisplayString
             ?? GetCommonType(CollectReturnTypes(statementBody))
             ?? "VOID";
+        if (lambda.IsAsync)
+            returnType = targetType?.ReturnType.DisplayString
+                ?? (ReturnShape.IsVoidType(returnType)
+                    ? "global::System.Threading.Tasks.Task"
+                    : $"global::System.Threading.Tasks.Task<{returnType}>");
         var effects = lambda.Effects?.Effects
             .Select(effect => $"{effect.Key}:{effect.Value}")
             .ToArray()
@@ -4102,6 +6667,8 @@ public sealed class Binder
         foreach (var (narrowed, source) in outerFlowNarrowings)
             _flowNarrowingSources[narrowed] = source;
         RestoreCallableState(outerCallableState);
+        foreach (var (variable, type) in mutableArrayResults)
+            variable.MetadataArrayResultType = type;
         _deferredCallableWrites = outerCallableWrites;
 
         return new BoundLambdaExpression(
@@ -4119,7 +6686,7 @@ public sealed class Binder
             // E1 slice 2b: hand the expression body's real BoundType to the
             // lambda's FunctionBoundType. A statement body has no single bound
             // expression, so the node falls back to the string it just computed.
-            expressionBody?.Type,
+            lambda.IsAsync ? BuildDeclaredBoundType(returnType) : expressionBody?.Type,
             declaredRow,
             deferredMutations)
         {
@@ -4130,7 +6697,7 @@ public sealed class Binder
     private BoundExpression BindMatchExpression(MatchExpressionNode match)
     {
         var target = BindExpression(match.Target);
-        var cases = BindMatchCases(match.Cases);
+        var cases = BindMatchCases(match.Cases, target);
         var resultType = GetCommonType(
                 cases.Where(matchCase => matchCase.Result != null)
                     .Select(matchCase => matchCase.Result!.Type.DisplayString))
@@ -4144,7 +6711,8 @@ public sealed class Binder
             resultType);
     }
 
-    private IReadOnlyList<BoundMatchCase> BindMatchCases(IReadOnlyList<MatchCaseNode> cases)
+    private IReadOnlyList<BoundMatchCase> BindMatchCases(
+        IReadOnlyList<MatchCaseNode> cases, BoundExpression target)
     {
         var baseline = CaptureFlowNarrowingState();
         var fallthrough = baseline;
@@ -4157,7 +6725,7 @@ public sealed class Binder
             FlowNarrowingState afterGuard;
             using (PushScope(_scope.CreateChild()))
             {
-                var pattern = BindPattern(matchCase.Pattern);
+                var pattern = BindPattern(matchCase.Pattern, matchedValue: target);
                 var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
                 afterGuard = CaptureFlowNarrowingState();
                 if (matchCase.Guard != null && guard != null)
@@ -4197,7 +6765,8 @@ public sealed class Binder
         return boundCases;
     }
 
-    private BoundPattern BindPattern(PatternNode pattern, bool allowBindings = true)
+    private BoundPattern BindPattern(
+        PatternNode pattern, bool allowBindings = true, BoundExpression? matchedValue = null)
     {
         switch (pattern)
         {
@@ -4205,7 +6774,10 @@ public sealed class Binder
                 return Pattern(pattern);
             case VariablePatternNode variable:
                 if (allowBindings && !variable.Name.Contains('.', StringComparison.Ordinal))
-                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name,
+                        matchedValue?.Type is BoundTypes.UnresolvedBoundType
+                            ? "OBJECT" : matchedValue?.Type.DisplayString ?? "OBJECT",
+                        isTypeInferred: true, inferredValue: matchedValue);
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?>
@@ -4214,8 +6786,11 @@ public sealed class Binder
                         ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
                     });
             case VarPatternNode variable:
-                if (allowBindings)
-                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                if (allowBindings && variable.Name != "_")
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name,
+                        matchedValue?.Type is BoundTypes.UnresolvedBoundType
+                            ? "OBJECT" : matchedValue?.Type.DisplayString ?? "OBJECT",
+                        isTypeInferred: true, inferredValue: matchedValue);
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
@@ -4242,20 +6817,19 @@ public sealed class Binder
                     relational,
                     metadata: new Dictionary<string, object?> { ["Operator"] = relational.Operator },
                     expressions: [BindExpression(relational.Value)]);
-            case SomePatternNode some:
-                return Pattern(some, patterns: [BindPattern(some.InnerPattern, allowBindings)]);
-            case NonePatternNode:
-                return Pattern(pattern);
-            case OkPatternNode ok:
-                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern, allowBindings)]);
-            case ErrPatternNode err:
-                return Pattern(err, patterns: [BindPattern(err.InnerPattern, allowBindings)]);
             case PositionalPatternNode positional:
                 return Pattern(
                     positional,
                     metadata: new Dictionary<string, object?> { ["TypeName"] = positional.TypeName },
                     patterns: positional.Patterns.Select(child => BindPattern(child, allowBindings)).ToArray());
             case PropertyPatternNode property:
+                var propertyTarget = property.TypeName is { } typeName
+                    ? new BoundStructuralExpression(property.Span, nameof(PropertyPatternNode), typeName,
+                        children: matchedValue == null ? [] : [matchedValue])
+                    : matchedValue;
+                var memberValues = property.Matches.Select(match => propertyTarget == null ? null : BindFieldAccess(
+                    new FieldAccessNode(match.Span, new ReferenceNode(match.Span, ""),
+                        match.PropertyName), propertyTarget, isPatternMember: true)).ToArray();
                 return Pattern(
                     property,
                     metadata: new Dictionary<string, object?>
@@ -4263,11 +6837,27 @@ public sealed class Binder
                         ["TypeName"] = property.TypeName,
                         ["PropertyNames"] = property.Matches.Select(match => match.PropertyName).ToArray(),
                     },
-                    patterns: property.Matches.Select(match => BindPattern(match.Pattern, allowBindings)).ToArray());
+                    expressions: memberValues.OfType<BoundExpression>().ToArray(),
+                    patterns: property.Matches.Select((match, index) =>
+                        BindPattern(match.Pattern, allowBindings, memberValues[index])).ToArray());
             case ListPatternNode list:
-                var listPatterns = list.Patterns.Select(child => BindPattern(child, allowBindings)).ToList();
+                var matchedArray = matchedValue?.MethodInputArrayType
+                    ?? matchedValue?.Type as BoundTypes.ArrayBoundType;
+                var elementValue = matchedArray is { Rank: 1 }
+                    ? PatternValue(list.Span, matchedArray.ElementType)
+                    : null;
+                var listPatterns = list.Patterns.Select(child => BindPattern(child, allowBindings, elementValue)).ToList();
                 if (list.SlicePattern != null)
-                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern, allowBindings));
+                {
+                    var sliceValue = matchedArray is { Rank: 1 }
+                        ? PatternValue(list.SlicePattern.Span,
+                            new BoundTypes.ArrayBoundType(matchedArray.ElementType,
+                                nullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated)
+                            { RoslynSymbol = matchedArray.RoslynSymbol })
+                        : null;
+                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count),
+                        BindPattern(list.SlicePattern, allowBindings, sliceValue));
+                }
                 return Pattern(
                     list,
                     metadata: new Dictionary<string, object?>
@@ -4281,7 +6871,10 @@ public sealed class Binder
             case OrPatternNode orPattern:
                 return Pattern(orPattern, patterns: [BindPattern(orPattern.Left, allowBindings: false), BindPattern(orPattern.Right, allowBindings: false)]);
             case AndPatternNode andPattern:
-                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left, allowBindings), BindPattern(andPattern.Right, allowBindings)]);
+                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left, allowBindings, matchedValue),
+                    BindPattern(andPattern.Right, allowBindings, andPattern.Left is TypePatternNode typed
+                        ? new BoundStructuralExpression(typed.Span, nameof(TypePatternNode), typed.TypeName,
+                            children: matchedValue == null ? [] : [matchedValue]) : matchedValue)]);
             default:
                 return Pattern(
                     pattern,
@@ -4290,16 +6883,24 @@ public sealed class Binder
                         ["AnalysisIncomplete"] = true,
                     });
         }
+
+        static BoundExpression PatternValue(Parsing.TextSpan span, BoundTypes.BoundType type) =>
+            new BoundStructuralExpression(span, nameof(ListPatternNode), type.DisplayString,
+                children: null, metadata: null, deferredChildren: null,
+                typeAnnotation: BoundTypes.NullableAnnotation.Oblivious, resultType: type);
     }
 
     private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName,
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
-        VariableSymbol? binding = null)
+        VariableSymbol? binding = null,
+        bool isTypeInferred = false,
+        BoundExpression? inferredValue = null)
     {
         if (_scope.LookupLocal(name) is VariableSymbol existing
             && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
             return;
 
+        var inferredReferenceType = isTypeInferred ? GetInferredReferenceType(inferredValue) : null;
         var symbol = binding ?? CreateLocalVariable(
             name,
             typeName,
@@ -4308,7 +6909,19 @@ public sealed class Binder
             ParameterModifier.None,
             span,
             "pattern",
-            nullableAnnotation: nullableAnnotation);
+            nullableAnnotation: isTypeInferred
+                ? inferredReferenceType?.NullableAnnotation
+                    ?? InferAnnotationForStringBinding(null, typeName, inferredValue)
+                : nullableAnnotation,
+            isTypeInferred: isTypeInferred,
+            inferredReferenceType: inferredReferenceType,
+            functionType: isTypeInferred ? inferredValue?.Type as BoundTypes.FunctionBoundType : null,
+            methodInputArrayType: isTypeInferred ? inferredValue?.Type as BoundTypes.ArrayBoundType : null,
+            genericNullabilityType: isTypeInferred ? inferredValue?.Type as BoundTypes.GenericInstantiationBoundType : null,
+            hasUnknownInferredType: isTypeInferred && (inferredValue is null
+                || inferredValue.HasUnknownInferredType
+                || inferredValue.Type is BoundTypes.UnresolvedBoundType
+                || inferredValue is BoundVariableExpression { Variable.Id.IsNone: true }));
         if (!_scope.TryDeclare(symbol))
         {
             _diagnostics.ReportError(
@@ -4398,9 +7011,9 @@ public sealed class Binder
         //   * StringOp.ToString maps to object.ToString(), which the
         //     modern BCL annotates as string? because overrides may
         //     return null. Stamp Annotated so downstream flow requires
-        //     an explicit null-check / .unwrap before non-null uses.
+        //     an explicit null-check before non-null uses.
         var stringAnnotation = operation.Operation == StringOp.ToString
-            && (arguments.Count == 0 || !IsDefinitelyNonNullToStringInput(arguments[0]))
+            && (arguments.Count == 0 || !IsDefinitelyNonNullScalar(arguments[0]))
                 ? BoundTypes.NullableAnnotation.Annotated
                 : BoundTypes.NullableAnnotation.NotAnnotated;
         return Structural(
@@ -4417,7 +7030,7 @@ public sealed class Binder
                 : BoundTypes.NullableAnnotation.Oblivious);
     }
 
-    private static bool IsDefinitelyNonNullToStringInput(BoundExpression argument)
+    private static bool IsDefinitelyNonNullScalar(BoundExpression argument)
     {
         if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(argument.Type.DisplayString)))
             return true;
@@ -4507,12 +7120,170 @@ public sealed class Binder
 
     private BoundExpression BindExpressionCall(ExpressionCallNode call)
     {
-        var target = BindExpression(call.TargetExpression);
-        var arguments = BindExpressions(call.Arguments);
+        if (call.TargetExpression is NullConditionalNode conditional)
+            return BindConditionalAccess(call.Span, BindExpression(conditional.Target), receiver =>
+                BindCallExpression(new CallExpressionNode(call.Span,
+                    "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
+                    call.TypeArguments, conditional.Span, conditional.Target.Span),
+                    receiver, conditional.MemberName));
+        if (call.TargetExpression is FieldAccessNode member)
+        {
+            if (TryBindConstructedSourceCall(call, member) is { } constructedCall)
+                return constructedCall;
+            if (TryBindExternalSourceCall(call, member) is { } sourceCall)
+                return sourceCall;
+            var sourceReceiver = DottedReferenceName(member.Target);
+            var sourceTarget = sourceReceiver is null ? null : $"{sourceReceiver}.{member.FieldName}";
+            BoundExpression? receiver = TryBindPredefinedTypeReceiver(member.Target);
+            if (receiver is null && DottedReferenceName(member.Target) is { } receiverName
+                && !IsTypeReceiverHeadShadowed(receiverName.Split('.')[0], allowDeclaredTypes: true)
+                && ResolveSourceType(receiverName, _currentClassName,
+                    _currentNamespaceIdentity, _currentNamespaceScopeId).Type is { } typeSymbol)
+                receiver = new BoundTypeReferenceExpression(member.Target.Span,
+                    receiverName,
+                    new BoundTypes.NominalBoundType(typeSymbol.QualifiedName, declaration: typeSymbol), typeSymbol);
+            receiver ??= TryBindMetadataTypeReceiver(member.Target);
+            if (receiver is null && sourceReceiver is not null && sourceTarget is not null
+                && !IsTypeReceiverHeadShadowed(sourceReceiver.Split('.')[0], allowDeclaredTypes: false)
+                && !HasVisibleUsingAlias(sourceReceiver.Split('.')[0])
+                && CrossModuleFunctionModules?.TryGetValue(sourceTarget, out var moduleTarget) == true)
+            {
+                receiver = new BoundTypeReferenceExpression(member.Target.Span, sourceReceiver,
+                    new BoundTypes.NominalBoundType(moduleTarget.QualifiedClassName));
+                CrossModuleCallTargets[call.Span] = sourceTarget;
+                return BindCallExpression(new CallExpressionNode(call.Span,
+                    sourceTarget, call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
+                    call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName);
+            }
+
+            receiver ??= BindExpression(member.Target);
+            if (TryGetEventStorage(member, out _, out _))
+                return BindFunctionValueCall(call, BindFieldAccess(member, receiver));
+            if (receiver is BoundVariableExpression { Variable.Id.IsNone: true } unresolved)
+                receiver = new BoundVariableExpression(unresolved.Span, unresolved.Variable,
+                    typeOverride: new BoundTypes.UnresolvedBoundType(
+                        $"Undefined receiver '{sourceReceiver}'", reported: true));
+            else if (receiver is BoundVariableExpression { HasUnknownInferredType: true } inferred
+                && sourceTarget is not null)
+                receiver = BuildCallReceiver(sourceTarget, member.Target.Span, inferred.Variable, null, null);
+            if (receiver is BoundConditionalAccessExpression conditionalReceiver)
+                return ContinueConditionalAccess(call.Span, conditionalReceiver,
+                    BindCallExpression(new CallExpressionNode(call.Span,
+                        "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
+                        call.TypeArguments, member.FieldNameSpan, member.Target.Span),
+                        conditionalReceiver.WhenNotNull, member.FieldName));
+            return BindCallExpression(new CallExpressionNode(call.Span,
+                "<expression-call>", call.Arguments, call.ArgumentNames, call.ArgumentModifiers,
+                call.TypeArguments, member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call);
+        }
+        return BindFunctionValueCall(call, BindExpression(call.TargetExpression));
+    }
+
+    /// <summary>
+    /// The source-call bindings this binder already computed for <paramref name="module"/>, or
+    /// null. The call graph reuses them instead of compiling the same projection again.
+    /// </summary>
+    internal CallGraphAnalysis.OperatorBindings? ComputedSourceCallBindings(ModuleNode module) =>
+        ReferenceEquals(_asyncTypeModule, module) ? _sourceCallConversions : null;
+
+    [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(_sourceCallConversions))]
+    private CallGraphAnalysis.OperatorBindings SourceCallBindings() =>
+        _sourceCallConversions ??= CallGraphAnalysis.ResolveOperatorCalls(
+            _asyncTypeModule!, _diagnostics, ProjectionContractMode,
+            crossModuleTypes: CrossModuleTypes, sourcePath: _sourcePath);
+
+    private BoundCallExpression? TryBindConstructedSourceCall(ExpressionCallNode call, FieldAccessNode member)
+    {
+        if (!ResolveSourceCallConversions || _asyncTypeModule is null
+            || DottedReferenceName(member.Target) is not { } receiverName
+            || !receiverName.Contains('<') && !HasVisibleUsingAlias(receiverName.Split('.')[0]))
+            return null;
+        var bindings = SourceCallBindings();
+        if (!bindings.SelectedCalls.TryGetValue(call.Span, out var selected)
+            || !selected.HasCompleteProofContext
+            || selected.Method is not
+                { IsStatic: true, MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary,
+                    ContainingType.IsGenericType: true } method
+            || selected.IncludesExtensionReceiver
+            || selected.Arguments.Count != call.Arguments.Count
+            || !selected.Arguments.Select(mapping => mapping.ArgumentIndex).SequenceEqual(
+                Enumerable.Range(0, call.Arguments.Count))
+            || !_functionSymbols.TryGetValue(selected.Declaration, out var function)
+            || !_staticMethodSymbols.Contains(function) || !IsFunctionAccessible(function)
+            || function.ContainingTypeName is not { } ownerName
+            || !_classesByQualifiedName.TryGetValue(ownerName, out var owner))
+            return null;
+
+        // The image selects the declaration and its construction together; a
+        // stripped receiver spelling cannot establish either identity.
+        var receiver = new BoundTypeReferenceExpression(member.Target.Span,
+            receiverName,
+            new BoundTypes.NominalBoundType(method.ContainingType.ToDisplayString(),
+                Metadata.MetadataBinderResult.MapAnnotation(method.ContainingType.NullableAnnotation),
+                _classSymbols[owner], method.ContainingType), _classSymbols[owner]);
+        return BindCallExpression(new CallExpressionNode(call.Span, "<expression-call>",
+            call.Arguments, call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments,
+            member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call,
+            (selected, function));
+    }
+
+    private BoundCallExpression? TryBindExternalSourceCall(ExpressionCallNode call, FieldAccessNode member)
+    {
+        if (CrossModuleTypes is null || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return null;
+        var bindings = SourceCallBindings();
+        bindings.SelectedCalls.TryGetValue(call.Span, out var selected);
+        if (selected is not null && _functionSymbols.ContainsKey(selected.Declaration))
+            return null;
+        if (selected is null
+            || selected.Method is not { IsStatic: true, MethodKind: Microsoft.CodeAnalysis.MethodKind.Ordinary } method
+            || method.ContainingType.StaticConstructors.Length != 0
+            || selected.IncludesExtensionReceiver
+            || CrossModuleTypes.FindCallable(selected.Declaration) is not { } callable)
+        {
+            if (!bindings.ForeignSourceCallSites.Contains(call.Span))
+                return null;
+            var evaluatedReceiver = BindExpression(member.Target);
+            var arguments = BindCallArguments(call.Arguments, call.ArgumentModifiers);
+            InvalidateMutatingCallArguments(arguments, call.ArgumentModifiers, OverloadResolutionResult.NotFound(), null);
+            return new BoundCallExpression(call.Span, "<expression-call>", arguments, "OBJECT",
+                argumentNames: call.ArgumentNames, argumentModifiers: call.ArgumentModifiers,
+                typeArguments: call.TypeArguments, calleeSpan: member.FieldNameSpan,
+                receiverSpan: member.Target.Span, receiver: evaluatedReceiver)
+            {
+                EvaluatedReceiver = evaluatedReceiver,
+                HasOpaqueOverloads = true,
+                HasUnknownInferredType = true
+            };
+        }
+        var receiver = new BoundTypeReferenceExpression(member.Target.Span,
+            DottedReferenceName(member.Target) ?? method.ContainingType.ToDisplayString(),
+            Metadata.MetadataBinderResult.ToNominalBoundType(method.ContainingType), callable.OwnerSymbol);
+        var bound = BindCallExpression(new CallExpressionNode(call.Span, "<expression-call>",
+            call.Arguments, call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments,
+            member.FieldNameSpan, member.Target.Span), receiver, member.FieldName, call,
+            (selected, callable.Symbol));
+        if (bound.ResolvedSymbol == callable.Symbol)
+            ExternalSourceCalls[callable.Symbol.Id] = callable;
+        return bound;
+    }
+
+    private BoundExpression BindFunctionValueCall(ExpressionCallNode call, BoundExpression target)
+    {
+        var arguments = BindCallArguments(call.Arguments, call.ArgumentModifiers);
         var resultType = target.Type is BoundTypes.FunctionBoundType function
             ? function.ReturnType
-            : (target as BoundVariableExpression)?.Variable.FunctionType?.ReturnType;
-        return new BoundExpressionCall(call.Span, target, arguments, resultType);
+            : target is BoundCallExpression { ResolvedSymbol.ReturnFunctionType: { } returnedFunction }
+                ? returnedFunction.ReturnType
+                : (target as BoundVariableExpression)?.Variable.FunctionType?.ReturnType;
+        var observed = InvalidateDeferredCallTarget(target);
+        InvalidateMutatingCallArguments(arguments, call.ArgumentModifiers, OverloadResolutionResult.NotFound(), null);
+        return new BoundExpressionCall(call.Span, target, arguments, resultType,
+            call.ArgumentNames, call.ArgumentModifiers, call.TypeArguments)
+        {
+            ObservedCallableEffects = observed,
+            HasUnknownInferredType = resultType is null
+        };
     }
 
     private BoundExpression BindFallbackInterop(FallbackExpressionNode fallback)
@@ -4527,7 +7298,10 @@ public sealed class Binder
             {
                 ["FeatureName"] = fallback.FeatureName,
                 ["Suggestion"] = fallback.Suggestion,
-            });
+            })
+        {
+            HasUnknownInferredType = true
+        };
     }
 
     private BoundExpression BindRawCSharpInterop(RawCSharpExpressionNode raw)
@@ -4541,21 +7315,43 @@ public sealed class Binder
             metadata: new Dictionary<string, object?>
             {
                 ["CSharpCode"] = raw.CSharpCode,
-            });
+            })
+        {
+            HasUnknownInferredType = true
+        };
     }
 
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)
     {
-        if (refNode.Name == "null")
+        if (refNode.IsNullLiteral)
             return new BoundNullLiteral(refNode.Span);
 
+        if (TryGetEventStorage(refNode, out var eventStorage, out var eventType))
+            return new BoundVariableExpression(refNode.Span, eventStorage, typeOverride: eventType);
+
+        if (TryBindSourceStaticFieldReference(refNode) is { } sourceField)
+            return sourceField;
+
         var symbols = _scope.LookupAll(refNode.Name);
-        if (symbols.Count == 0)
-            symbols = ResolveAccessibleMembers(_currentClass, refNode.Name);
+        if (symbols.Count == 0 || symbols.All(symbol => symbol is TypeSymbol))
+        {
+            var lexicalMembers = ResolveLexicalMembers(refNode.Name);
+            if (lexicalMembers.Count != 0)
+                symbols = lexicalMembers;
+        }
+        // Module functions in a namespaced module are declared under their qualified
+        // name. A bare reference to one is still a function used as a value: report it
+        // as such (with the call fix), not as an undefined variable.
+        if (symbols.Count == 0 && !refNode.Name.Contains('.')
+            && !string.IsNullOrEmpty(_currentNamespaceIdentity)
+            && _scope.LookupAll($"{_currentNamespaceIdentity}.{refNode.Name}") is { Count: > 0 } namespaced
+            && namespaced.All(symbol => symbol is FunctionSymbol))
+            symbols = namespaced;
 
         if (symbols.Count == 0)
         {
             BoundExpression? unresolvedMember = null;
+            var receiverReportedError = false;
             // The lexer also accepts a dotted reference as one token. Route the
             // resolved external form through the same member binder as explicit dots.
             var lastDot = refNode.Name.LastIndexOf('.');
@@ -4564,11 +7360,78 @@ public sealed class Binder
                 var receiverName = refNode.Name[..lastDot];
                 var receiverSpan = new Parsing.TextSpan(
                     refNode.Span.Start, lastDot, refNode.Span.Line, refNode.Span.Column);
-                var receiverNode = new ReferenceNode(receiverSpan, receiverName);
-                BoundExpression? receiver = TryBindMetadataTypeReceiver(receiverNode);
-                if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
+                var receiverNode = new ReferenceNode(receiverSpan, receiverName, refNode.IsVerbatim);
+                BoundExpression? receiver = TryBindSourceEnumTypeReceiver(receiverNode)
+                    ?? TryBindMetadataTypeReceiver(receiverNode)
+                    ?? TryBindSourceStaticFieldReference(receiverNode);
+                // As in C#, a variable in scope wins simple-name lookup over a namespace or
+                // type, so `x.F` and `x.F.G` read members of x exactly like `x . F . G`.
+                var variableRoot = false;
+                if (receiver is null && (_scope.Lookup(receiverName) is VariableSymbol
+                    || _scope.Lookup(receiverName.Split('.')[0]) is VariableSymbol))
+                {
+                    var errorsBefore = _diagnostics.Errors.Count;
                     receiver = BindReferenceExpression(receiverNode);
-                if (receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null })
+                    variableRoot = true;
+                    // A dotted receiver already reported its own undefined prefix.
+                    receiverReportedError = receiverName.Contains('.') && _diagnostics.Errors.Count != errorsBefore;
+                }
+                // 0.30: a receiver that is itself a member read on a type (`DateTime.Now` in
+                // `DateTime.Now.Year`, `Outer.Holder.Instance` in `Outer.Holder.Instance.Size`)
+                // binds as that member read, so the chain reads members exactly like the
+                // spaced `DateTime . Now . Year`.
+                var typeRootedChain = false;
+                if (receiver is null && IsTypeRootedMemberRead(receiverNode))
+                {
+                    var errorsBefore = _diagnostics.Errors.Count;
+                    receiver = BindReferenceExpression(receiverNode);
+                    typeRootedChain = true;
+                    // A selected metadata member whose result type the binder cannot carry
+                    // (`DateTime.Now`) reports itself unresolved, but it is not undefined.
+                    receiverReportedError = _diagnostics.Errors.Count != errorsBefore
+                        && receiver is not BoundFieldAccessExpression { UnsupportedMetadataMember: not null };
+                }
+                else if (receiver is BoundFieldAccessExpression { SourceStaticFieldOwner: not null })
+                    typeRootedChain = true;
+                // The member read binds exactly as the spaced form does. On a user type the
+                // member must exist (a declared field or property), or the undefined-name
+                // report below still applies; past an unknown-typed member read in the
+                // chain, the spaced form's binding is all there is to know.
+                var memberName = refNode.Name[(lastDot + 1)..];
+                ClassDefinitionNode? receiverClass = null;
+                if ((variableRoot || typeRootedChain) && !receiverReportedError
+                    && (receiver is BoundVariableExpression or BoundFieldAccessExpression
+                            && receiver.Type is BoundTypes.NominalBoundType { Declaration: { } receiverType, RoslynSymbol: null }
+                            && _classesByQualifiedName.TryGetValue(receiverType.QualifiedName, out receiverClass)
+                        || receiver is BoundFieldAccessExpression
+                            {
+                                HasUnknownInferredType: true, ResolvedField: null, IsAnonymousPropertyRead: false
+                            } and not { Type: BoundTypes.UnresolvedBoundType }))
+                {
+                    var memberSpan = new Parsing.TextSpan(
+                        refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
+                        refNode.Span.Line, refNode.Span.Column + lastDot + 1);
+                    var member = BindFieldAccess(new FieldAccessNode(
+                        refNode.Span, receiverNode, memberName, memberSpan), receiver);
+                    if (receiverClass is null
+                            ? member.Type is not BoundTypes.UnresolvedBoundType
+                            : ResolveAccessibleMembers(receiverClass, memberName).Any(symbol => symbol is VariableSymbol))
+                        return member;
+                    unresolvedMember = member;
+                }
+                else if (!receiverReportedError && (receiver is BoundTypeReferenceExpression { ResolvedType.IsEnum: true }
+                    || receiver is BoundVariableExpression tupleVariable
+                        && tupleVariable.Variable.TypeName.StartsWith('(')
+                        && SyntaxFactory.ParseTypeName(tupleVariable.Variable.TypeName)
+                            is TupleTypeSyntax { ContainsDiagnostics: false }
+                    || receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null }
+                    || receiver?.AnonymousObjectMembers is not null
+                    || receiver is BoundFieldAccessExpression { IsAnonymousPropertyRead: true }
+                    || receiver is not null && ResolveMetadataArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
+                    || receiver is not null && ResolveMetadataScalarArrayProperty(receiver, refNode.Name[(lastDot + 1)..]) is not null
+                    || refNode.Name[(lastDot + 1)..] == "Length"
+                        && receiver is not null && (IsArrayReceiver(receiver)
+                            || receiver is BoundVariableExpression { Variable.MetadataArrayResultType: not null })))
                 {
                     var memberSpan = new Parsing.TextSpan(
                         refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
@@ -4579,10 +7442,25 @@ public sealed class Binder
                         return member;
                     unresolvedMember = member;
                 }
+                else if (typeRootedChain && !receiverReportedError
+                    && receiver is BoundFieldAccessExpression { Type: BoundTypes.UnresolvedBoundType })
+                {
+                    // As the spaced `(DateTime.Now) . Year`: a member of a value whose type the
+                    // binder cannot carry stays unresolved, but the qualifier's own read (and
+                    // its selected metadata member) stays in the tree for later passes.
+                    var memberSpan = new Parsing.TextSpan(
+                        refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
+                        refNode.Span.Line, refNode.Span.Column + lastDot + 1);
+                    return BindFieldAccess(new FieldAccessNode(refNode.Span, receiverNode, memberName, memberSpan), receiver);
+                }
             }
 
             var similarName = _scope.FindSimilarName(refNode.Name);
-            if (similarName != null)
+            if (receiverReportedError)
+            {
+                // The receiver prefix already carries the undefined-name report.
+            }
+            else if (similarName != null)
             {
                 // Create a fix to replace the undefined reference with the similar name
                 var fix = new SuggestedFix(
@@ -4614,6 +7492,12 @@ public sealed class Binder
         if (symbols.All(symbol => symbol is VariableSymbol))
         {
             var variables = symbols.Cast<VariableSymbol>().ToArray();
+            if (variables.Any(variable => variable.StorageIdentity.EventDeclaration is not null))
+            {
+                _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
+                    $"Event '{refNode.Name}' is not readable as delegate storage in this context");
+                return new BoundVariableExpression(refNode.Span, CreateUnresolvedVariable(refNode));
+            }
             if (variables.Any(variable =>
                     variable.DeclaringTypeName != null
                     && !IsMemberAccessible(variable)))
@@ -4644,6 +7528,9 @@ public sealed class Binder
             var identity = variables.Length == 1
                 ? TryBuildVariableReference(variables[0])
                 : null;
+            if (variables is [var variable] && ResolveVariableEnumType(variable) is { } enumType)
+                return new BoundVariableExpression(refNode.Span, variable, variables,
+                    typeOverride: new BoundTypes.NominalBoundType(enumType.QualifiedName, declaration: enumType));
             return new BoundVariableExpression(refNode.Span, variables[0], variables,
                 typeOverride: null, referenceIdentity: identity);
         }
@@ -4658,16 +7545,61 @@ public sealed class Binder
             CreateUnresolvedVariable(refNode));
     }
 
+    /// <summary>
+    /// Whether a dotted name is a member read on a type (<c>DateTime.Now</c>,
+    /// <c>System.DateTime.Now</c>, <c>Outer.Holder.Instance</c>): a proper prefix names a
+    /// source or metadata type, the name itself is not a type, and no value in scope
+    /// shadows its first segment (that is a member read on the value instead).
+    /// </summary>
+    private bool IsTypeRootedMemberRead(ReferenceNode reference)
+    {
+        var segments = reference.Name.Split('.');
+        if (segments.Length < 2 || segments.Any(segment => segment.Length == 0)
+            || IsTypeReceiverHeadShadowed(segments[0], allowDeclaredTypes: true)
+            || IsTypeName(reference.Name))
+            return false;
+        for (var count = segments.Length - 1; count >= 1; count--)
+            if (IsTypeName(string.Join('.', segments[..count])))
+                return true;
+        return false;
+
+        bool IsTypeName(string name) =>
+            ResolveSourceType(name, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Type is not null
+            || TryBindMetadataTypeReceiver(new ReferenceNode(reference.Span, name, reference.IsVerbatim)) is not null;
+    }
+
+    private BoundExpression? TryBindSourceStaticFieldReference(ReferenceNode refNode)
+    {
+        var sourceFieldDot = refNode.Name.LastIndexOf('.');
+        if (sourceFieldDot > 0)
+        {
+            var receiver = new ReferenceNode(new Parsing.TextSpan(
+                refNode.Span.Start, sourceFieldDot, refNode.Span.Line, refNode.Span.Column),
+                refNode.Name[..sourceFieldDot], refNode.IsVerbatim);
+            var member = new FieldAccessNode(refNode.Span, receiver, refNode.Name[(sourceFieldDot + 1)..],
+                new Parsing.TextSpan(refNode.Span.Start + sourceFieldDot + 1,
+                    refNode.Name.Length - sourceFieldDot - 1, refNode.Span.Line, refNode.Span.Column + sourceFieldDot + 1));
+            if (TryBindSourceStaticFieldReceiver(member) is { } sourceReceiver)
+                return BindFieldAccess(member, sourceReceiver);
+        }
+
+        return null;
+    }
+
     private BoundBinaryExpression BindBinaryOperation(BinaryOperationNode binOp)
     {
         BoundExpression left;
         BoundExpression right;
-        if (binOp.Operator == BinaryOperator.And)
+        if (binOp.Operator == BinaryOperator.And
+            || binOp.Operator == BinaryOperator.Or && IsSelectedBuiltInNullGuard(binOp))
         {
             using var _ = PushScope(_scope.CreateChild());
             var existingNarrowings = _flowNarrowingSources.Keys.ToHashSet();
             left = BindExpression(binOp.Left);
-            DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            if (binOp.Operator == BinaryOperator.And)
+                DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            else
+                DeclareFailedNullEqualityConditionPatterns(binOp.Left, left);
             var introducedNarrowings = _flowNarrowingSources.Keys
                 .Where(variable => !existingNarrowings.Contains(variable))
                 .ToArray();
@@ -4678,11 +7610,11 @@ public sealed class Binder
                 .ToHashSet(StringComparer.Ordinal);
             invalidatedNames.UnionWith(GetExplicitlyMutatedVariableNames(right));
 
-            var conjunctionResultType = GetBinaryOperationResultType(
+            var shortCircuitResultType = GetBinaryOperationResultType(
                 binOp.Operator,
                 left.Type.DisplayString,
                 right.Type.DisplayString);
-            return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, conjunctionResultType)
+            return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, shortCircuitResultType)
             {
                 InvalidatedLeftNarrowingNames = invalidatedNames
             };
@@ -4797,6 +7729,17 @@ public sealed class Binder
             foreach (var captured in call.ObservedCallableEffects.Mutations)
                 yield return captured;
         }
+        else if (node is BoundExpressionCall expressionCall)
+        {
+            for (var index = 0; index < expressionCall.Arguments.Count; index++)
+            {
+                if (expressionCall.ArgumentModifiers?.ElementAtOrDefault(index) is "ref" or "out"
+                    && expressionCall.Arguments[index] is BoundVariableExpression variable)
+                    yield return variable.Variable;
+            }
+            foreach (var captured in expressionCall.ObservedCallableEffects.Mutations)
+                yield return captured;
+        }
         foreach (var child in node.ChildNodes)
         {
             foreach (var variable in GetExplicitlyMutatedVariables(child))
@@ -4807,7 +7750,19 @@ public sealed class Binder
     private VariableSymbol? ResolveCallableStorage(string target, VariableSymbol? receiverSymbol) =>
         (target.EndsWith(".Invoke", StringComparison.Ordinal)
             ? receiverSymbol
-            : _scope.Lookup(target) as VariableSymbol)?.StorageIdentity;
+            : _scope.Lookup(target) is VariableSymbol { StorageIdentity.EventDeclaration: null } variable
+                ? variable : null)?.StorageIdentity;
+
+    private CallableMutationSummary InvalidateDeferredCallTarget(BoundExpression target)
+    {
+        var observed = GetCallableEffects(target);
+        return new CallableMutationSummary
+        {
+            Mutations = ApplyCallableMutationSummary(observed),
+            Dependencies = GetCallableValueSources(target).Distinct<VariableSymbol>(ReferenceEqualityComparer.Instance).ToArray(),
+            Alternatives = [observed]
+        };
+    }
 
     private CallableMutationSummary InvalidateDeferredCallTarget(VariableSymbol? callable)
     {
@@ -4908,9 +7863,70 @@ public sealed class Binder
     private void SetCallableState(VariableSymbol variable, BoundExpression value)
     {
         var effects = GetCallableEffects(value);
+        if (variable.StorageIdentity.EventDeclaration is not null)
+            effects = UnionCallableEffects(GetCallableState(variable), effects);
         StoreCallableState(variable.StorageIdentity, effects);
         _deferredCallableWrites?.Add(new(
             variable.StorageIdentity, effects, GetCallableValueSources(value).ToArray()));
+    }
+
+    private BoundStatement? BindEventSubscription(
+        StatementNode statement, ExpressionNode eventExpression, ExpressionNode handler, bool adding)
+    {
+        if (!TryGetEventStorage(eventExpression, out var storage, out var type, subscription: true)
+            || storage.DeclaringTypeName is not { } owner || !IsWithinDeclaringType(owner))
+            return ScanUnboundWrites(statement);
+
+        BoundExpression target = eventExpression is FieldAccessNode field
+            ? new BoundFieldAccessExpression(field.Span, BindExpression(field.Target), field.FieldName,
+                storage.TypeName, storage, field.FieldNameSpan, resolvedType: type)
+            : new BoundVariableExpression(eventExpression.Span, storage, typeOverride: type);
+        var value = BindExpression(handler);
+        InvalidateMutableFlowNarrowing(storage, requireRebindable: false);
+        // Removal need not remove the last occurrence, and unknown subscribers
+        // can still be present. Retain the conservative union for both writes.
+        var effects = UnionCallableEffects(GetCallableState(storage), GetCallableEffects(value));
+        StoreCallableState(storage, effects);
+        _deferredCallableWrites?.Add(new(storage, effects, GetCallableValueSources(value).ToArray()));
+        return new BoundCompoundAssignment(statement.Span, target,
+            adding ? CompoundAssignmentOperator.Add : CompoundAssignmentOperator.Subtract, value);
+    }
+
+    private BoundTypes.FunctionBoundType? TryBuildEventFunctionType(EventDefinitionNode declaration)
+    {
+        if (declaration.HasAccessors || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return null;
+        SourceCallBindings();
+        return _sourceCallConversions.EventTypes.TryGetValue(declaration, out var type)
+            ? BuildEventFunctionType(type, declaration.DelegateType) : null;
+    }
+
+    private static BoundTypes.FunctionBoundType BuildEventFunctionType(
+        Microsoft.CodeAnalysis.INamedTypeSymbol type, string display)
+    {
+        var invoke = type.DelegateInvokeMethod!;
+        return new BoundTypes.FunctionBoundType(
+            System.Collections.Immutable.ImmutableArray.CreateRange(
+                invoke.Parameters.Select(parameter => Metadata.MetadataBinderResult.ToBoundType(parameter.Type))),
+            Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+            displayOverride: display, row: BoundTypes.EffectRow.Unknown);
+    }
+
+    private bool TryGetEventStorage(AstNode expression, out VariableSymbol storage,
+        out BoundTypes.FunctionBoundType type, bool subscription = false)
+    {
+        storage = null!;
+        type = null!;
+        if (_eventSymbols.Count == 0 || !ResolveSourceCallConversions || _asyncTypeModule is null)
+            return false;
+        SourceCallBindings();
+        if (!_sourceCallConversions.EventStorageUses.TryGetValue(expression, out var selected)
+            || selected.IsSubscription != subscription
+            || !_sourceCallConversions.EventTypes.ContainsKey(selected.Declaration)
+            || !_eventSymbols.TryGetValue(selected.Declaration, out storage!))
+            return false;
+        type = BuildEventFunctionType(selected.DelegateType, storage.TypeName);
+        return true;
     }
 
     private static IEnumerable<VariableSymbol> GetCallableValueSources(BoundExpression expression)
@@ -4919,6 +7935,9 @@ public sealed class Binder
             yield break;
         if (expression is BoundVariableExpression variable)
             yield return variable.Variable.StorageIdentity;
+        if (expression is BoundFieldAccessExpression { ResolvedFields: [var field] }
+            && field.EventDeclaration is not null)
+            yield return field.StorageIdentity;
         foreach (var child in expression.Children)
         {
             foreach (var source in GetCallableValueSources(child))
@@ -4932,6 +7951,9 @@ public sealed class Binder
             return lambda.CallableEffects;
         if (expression is BoundVariableExpression variable)
             return GetCallableState(variable.Variable);
+        if (expression is BoundFieldAccessExpression { ResolvedFields: [var field] }
+            && field.EventDeclaration is not null)
+            return GetCallableState(field);
         var effects = CallableMutationSummary.Empty;
         foreach (var child in expression.Children)
             effects = UnionCallableEffects(effects, GetCallableEffects(child));
@@ -5006,6 +8028,8 @@ public sealed class Binder
             yield return expression.ObservedCallableEffects;
         else if (node is BoundCallStatement statement)
             yield return statement.ObservedCallableEffects;
+        else if (node is BoundExpressionCall expressionCall)
+            yield return expressionCall.ObservedCallableEffects;
         foreach (var child in node.ChildNodes)
         {
             foreach (var effects in GetObservedCallEffects(child))
@@ -5038,6 +8062,9 @@ public sealed class Binder
             ReportWriteToReadOnlyLocal(operand, unaryOp.Operand.Span, "increment {0}");
         else if (unaryOp.Operator is UnaryOperator.PreDecrement or UnaryOperator.PostDecrement)
             ReportWriteToReadOnlyLocal(operand, unaryOp.Operand.Span, "decrement {0}");
+        if (unaryOp.Operator is UnaryOperator.PreIncrement or UnaryOperator.PostIncrement
+            or UnaryOperator.PreDecrement or UnaryOperator.PostDecrement)
+            InvalidateMemberFlowNarrowing(operand);
         var resultType = unaryOp.Operator switch
         {
             UnaryOperator.Not => "BOOL",
@@ -5048,30 +8075,77 @@ public sealed class Binder
         return new BoundUnaryExpression(unaryOp.Span, unaryOp.Operator, operand, resultType);
     }
 
-    private BoundCallExpression BindCallExpression(CallExpressionNode callExpr)
+    private BoundCallExpression BindCallExpression(CallExpressionNode callExpr,
+        BoundExpression? computedReceiver = null, string? computedMethodName = null,
+        ExpressionCallNode? contextualCall = null,
+        (CallGraphAnalysis.SourceCallSelection Selection, FunctionSymbol Symbol)? sourceSelection = null)
     {
         var args = BindCallArguments(callExpr.Arguments, callExpr.ArgumentModifiers);
-        var receiverSymbol = ResolveCallReceiver(
+        var argumentNames = callExpr.ArgumentNames;
+        var argumentModifiers = callExpr.ArgumentModifiers;
+        var isEventCall = TryGetEventStorage(callExpr, out var eventStorage, out var eventType)
+            && computedReceiver is null;
+        var receiverSymbol = isEventCall ? eventStorage : computedReceiver is null ? ResolveCallReceiver(
             callExpr.Target,
-            callExpr.ReceiverSpan ?? callExpr.CalleeSpan);
-        var receiverTypeSymbol = receiverSymbol == null
-            ? ResolveCallReceiverType(callExpr.Target)
-            : null;
-        var resolution = ResolveCall(
+            callExpr.ReceiverSpan ?? callExpr.CalleeSpan) : (computedReceiver as BoundVariableExpression)?.Variable;
+        var receiverTypeSymbol = computedReceiver is BoundTypeReferenceExpression computedTypeReceiver
+            ? computedTypeReceiver.ResolvedType
+            : computedReceiver is null && receiverSymbol == null
+                ? ResolveCallReceiverType(callExpr.Target)
+                : null;
+        var resolution = sourceSelection is { } source
+            ? args.Any(argument => argument.HasUnknownInferredType)
+                ? OverloadResolutionResult.UnresolvedArguments()
+                : OverloadResolutionResult.Resolved(source.Symbol, source.Selection.ReturnType, source.Selection.Arguments)
+            : isEventCall ? OverloadResolutionResult.NotFound() : ResolveCall(
             callExpr.Span,
             callExpr.Target,
             args,
             callExpr.ArgumentNames,
             callExpr.ArgumentModifiers,
             callExpr.TypeArguments,
-            allowNullableStringCompatibility: true);
+            allowNullableStringCompatibility: true,
+            computedReceiver: computedReceiver,
+            computedMethodName: computedMethodName);
+        var isSourceExtensionCall = false;
+        if (resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
+            && computedReceiver is not null and not BoundTypeReferenceExpression)
+        {
+            IReadOnlyList<BoundExpression> extensionArguments = [computedReceiver, .. args];
+            IReadOnlyList<string?>? extensionNames = argumentNames is null ? null : [null, .. argumentNames];
+            IReadOnlyList<string?>? extensionModifiers = argumentModifiers is null ? null : [null, .. argumentModifiers];
+            var extensionResolution = computedReceiver.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true }
+                ? ResolveSourceEnumExtension(
+                    callExpr, computedMethodName!, extensionArguments, extensionNames, extensionModifiers)
+                : ResolveSelectedSourceExtension(callExpr, extensionArguments);
+            if (extensionResolution.Kind != OverloadResolutionKind.NotFound || extensionResolution.HasOpaqueOverloads)
+            {
+                resolution = extensionResolution;
+                args = extensionArguments;
+                argumentNames = extensionNames;
+                argumentModifiers = extensionModifiers;
+                isSourceExtensionCall = true;
+                // Image-selected calls must retain receiver syntax: a static
+                // spelling can select a competing non-extension overload.
+                if (resolution.Function is { } selected
+                    && computedReceiver.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true })
+                    SourceExtensionCallTargets[callExpr.Span] = selected;
+            }
+        }
         var returnType = resolution.ResolvedReturnType ?? "OBJECT";
 
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
             callExpr.Target,
             receiverSymbol,
             receiverTypeSymbol);
-        var receiver = BuildCallReceiver(
+        if (computedReceiver is not null)
+        {
+            resolvedTypeName = computedReceiver.Type.FullyQualifiedName;
+            resolvedMethodName = computedMethodName;
+        }
+        var receiver = isEventCall
+            ? new BoundVariableExpression(callExpr.CalleeSpan, eventStorage, typeOverride: eventType)
+            : computedReceiver ?? BuildCallReceiver(
             callExpr.Target,
             callExpr.ReceiverSpan ?? callExpr.CalleeSpan,
             receiverSymbol,
@@ -5084,10 +8158,43 @@ public sealed class Binder
         // additionally consumes the parameter-side annotations from the same
         // resolution to fire Calor0274 for possibly-null strings passed into
         // non-nullable :string parameters.
-        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
-            ? TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers)
+        var metadataReceiver = computedReceiver
+            ?? (receiverSymbol is { FunctionType: null } && receiver is BoundVariableExpression ? receiver : null);
+        if (metadataReceiver is null && receiver is BoundTypeReferenceExpression { ResolvedType: null } typeReceiver
+            && !callExpr.Target.StartsWith("System.", StringComparison.Ordinal)
+            && !callExpr.Target.StartsWith("Microsoft.", StringComparison.Ordinal))
+            metadataReceiver = TryBindMetadataTypeReceiver(new ReferenceNode(typeReceiver.Span, typeReceiver.Name));
+        var bclResolution = !isEventCall && resolution.Kind == OverloadResolutionKind.NotFound && !resolution.HasOpaqueOverloads
+            ? metadataReceiver is not null
+                ? TryResolveBclCall($"{metadataReceiver.Type.FullyQualifiedName}.{resolvedMethodName}", args,
+                    callExpr.ArgumentNames, callExpr.ArgumentModifiers, metadataReceiver, callExpr.TypeArguments, contextualCall)
+                : TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers,
+                    contextualCall: contextualCall)
             : null;
-        var annotatedReturn = bclResolution?.GetReturnBoundTypeEx();
+        var metadataScalarReturn = bclResolution?.Symbol?.ReturnType.SpecialType
+            is Microsoft.CodeAnalysis.SpecialType.System_String
+                or Microsoft.CodeAnalysis.SpecialType.System_Boolean or Microsoft.CodeAnalysis.SpecialType.System_Char
+                or Microsoft.CodeAnalysis.SpecialType.System_SByte or Microsoft.CodeAnalysis.SpecialType.System_Byte
+                or Microsoft.CodeAnalysis.SpecialType.System_Int16 or Microsoft.CodeAnalysis.SpecialType.System_UInt16
+                or Microsoft.CodeAnalysis.SpecialType.System_Int32 or Microsoft.CodeAnalysis.SpecialType.System_UInt32
+                or Microsoft.CodeAnalysis.SpecialType.System_Int64 or Microsoft.CodeAnalysis.SpecialType.System_UInt64
+                or Microsoft.CodeAnalysis.SpecialType.System_Single or Microsoft.CodeAnalysis.SpecialType.System_Double
+                or Microsoft.CodeAnalysis.SpecialType.System_Decimal or Microsoft.CodeAnalysis.SpecialType.System_IntPtr
+                or Microsoft.CodeAnalysis.SpecialType.System_UIntPtr;
+        // Array enrichment shares the scalar-result boundary of named calls.
+        // In particular it must not admit previously unresolved mutating void calls.
+        if (metadataReceiver is not null && !metadataScalarReturn
+            && (computedReceiver is null || NullabilityChecker.GetMethodInputArrayType(metadataReceiver) is not null))
+            bclResolution = null;
+        var instanceArrayResolution = computedReceiver is null && resolution.Kind == OverloadResolutionKind.NotFound
+            && !resolution.HasOpaqueOverloads
+            ? TryResolveInstanceArrayCall(callExpr, receiver)
+            : null;
+        var selectedSourceMethod = sourceSelection is { } selectedCall && resolution.Function == selectedCall.Symbol
+            ? selectedCall.Selection.Method : null;
+        var annotatedReturn = selectedSourceMethod is { } selectedSource
+            ? Metadata.MetadataBinderResult.ToBoundType(selectedSource.ReturnType)
+            : isEventCall ? eventType.ReturnType : bclResolution?.GetReturnBoundTypeEx();
         var methodInputArrayReturn = annotatedReturn as BoundTypes.ArrayBoundType;
         var genericNullabilityReturn = annotatedReturn as BoundTypes.GenericInstantiationBoundType;
         if (bclResolution?.LegacyReturnType is { } legacyReturn)
@@ -5103,7 +8210,7 @@ public sealed class Binder
         // shapes — the same set §S3/S7/S8 target-side gates handle) to
         // extract the annotation, then wraps the ALREADY-COMPUTED
         // `returnType` string so BoundCallExpression.Type.DisplayString
-        // stays byte-identical to today (e.g. "str", "OPTION[inner=STRING]",
+        // stays byte-identical to today (e.g. "str", "NULLABLE[inner=STRING]",
         // "Foo"). We deliberately do NOT swap in TryBuildStringTarget's
         // canonicalized target ("STRING") — that would break every
         // downstream consumer (BinderOverloadSetTests, etc.) that reads
@@ -5113,8 +8220,10 @@ public sealed class Binder
         if (annotatedReturn is null
             && resolution.Function is { } calorReturnee)
         {
+            if (ResolveCallableEnumType(calorReturnee, returnType) is { } returnEnum)
+                annotatedReturn = new BoundTypes.NominalBoundType(returnEnum.QualifiedName, declaration: returnEnum);
             var declaredAnnotation = TryReadDeclaredStringAnnotation(calorReturnee.ReturnType);
-            if (declaredAnnotation != BoundTypes.NullableAnnotation.Oblivious)
+            if (annotatedReturn is null && declaredAnnotation != BoundTypes.NullableAnnotation.Oblivious)
             {
                 var identity = TryBuildCallableReference(calorReturnee.ReturnType, calorReturnee);
                 annotatedReturn = new BoundTypes.NominalBoundType(
@@ -5139,23 +8248,40 @@ public sealed class Binder
             methodInputArrayReturn ??= callableShape as BoundTypes.ArrayBoundType;
             genericNullabilityReturn ??= callableShape as BoundTypes.GenericInstantiationBoundType;
         }
-        if (annotatedReturn is null
-            && resolvedMethodName == "Unwrap"
-            && receiverSymbol is not null
-            && TryParseGenericStringTarget(receiverSymbol.TypeName, out var receiverGeneric)
-            && receiverGeneric!.Definition.QualifiedName is "Option" or "OPTION"
-            && receiverGeneric.TypeArguments[0] is BoundTypes.NominalBoundType optionPayload)
+        if (sourceSelection?.Selection.Method is { } sourceArgumentMethod
+            && resolution.Function == sourceSelection.Value.Symbol)
         {
-            // Unwrap preserves T. Option<str> returns a non-null string or
-            // throws; Option<?str> may successfully return null.
-            annotatedReturn = optionPayload;
+            var reported = new HashSet<(TextSpan Span, string ParameterName, string TargetShape)>();
+            foreach (var mapping in sourceSelection.Value.Selection.Arguments)
+            {
+                var parameter = sourceArgumentMethod.Parameters[mapping.ParameterIndex];
+                var parameterType = mapping.IsExpandedParams && parameter.Type is Microsoft.CodeAnalysis.IArrayTypeSymbol array
+                    ? array.ElementType : parameter.Type;
+                if (parameter.RefKind != Microsoft.CodeAnalysis.RefKind.Out
+                    && TryBuildBclArgumentTarget(parameterType) is { } target)
+                    ValidateCallArgument(args[mapping.ArgumentIndex], parameter.Name, target,
+                        mapping.IsExpandedParams, reported);
+            }
         }
-
-        ValidateCallArguments(args, resolution, bclResolution);
+        else
+            ValidateCallArguments(args, resolution, bclResolution);
+        if (receiver is not null)
+            ValidateStringInstanceReceiver(receiver, bclResolution?.Symbol);
+        if (bclResolution?.Symbol is { ReducedFrom: not null, ReceiverType: { } reducedReceiver } reduced
+            && (computedReceiver ?? receiver) is { } extensionReceiver
+            && TryBuildBclArgumentTarget(reducedReceiver) is BoundTypes.GenericInstantiationBoundType
+                { TypeArguments: [BoundTypes.NominalBoundType receiverElement] } receiverTarget
+            && NullabilityChecker.IsClosedSourceReference(receiverElement))
+            ValidateCallArgument(extensionReceiver, reduced.ReducedFrom.Parameters[0].Name,
+                receiverTarget, false, []);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
-        InvalidateMutatingCallArguments(args, callExpr.ArgumentModifiers, resolution, bclResolution);
-        var callable = ResolveCallableStorage(callExpr.Target, receiverSymbol);
-        var callableEffects = InvalidateDeferredCallTarget(callable);
+        InvalidateMutatingCallArguments(args, argumentModifiers, resolution, bclResolution);
+        var callable = isEventCall ? eventStorage.StorageIdentity : computedMethodName == "Invoke"
+            ? receiverSymbol?.StorageIdentity
+            : ResolveCallableStorage(callExpr.Target, receiverSymbol);
+        var callableEffects = computedMethodName == "Invoke" && computedReceiver is not null
+            ? InvalidateDeferredCallTarget(computedReceiver)
+            : InvalidateDeferredCallTarget(callable);
 
         var boundCall = new BoundCallExpression(
             callExpr.Span,
@@ -5164,17 +8290,21 @@ public sealed class Binder
             returnType,
             resolvedTypeName,
             resolvedMethodName,
-            resolvedParameterTypes: (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+            resolvedParameterTypes: (selectedSourceMethod is { } sourceMethod
+                ? sourceMethod.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+                : isEventCall ? eventType.ParameterTypes.Select(type => type.DisplayString)
+                : bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
                 ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
                 .ToArray(),
-            argumentNames: callExpr.ArgumentNames,
-            argumentModifiers: callExpr.ArgumentModifiers,
+            argumentNames: argumentNames,
+            argumentModifiers: argumentModifiers,
             typeArguments: callExpr.TypeArguments,
             resolvedSymbol: resolution.Function,
             receiverSymbol: receiverSymbol,
-            resolvedSymbols: WithLocalFunctionCandidates(callExpr.Target, resolution.Functions),
+            resolvedSymbols: resolution.Kind == OverloadResolutionKind.UnresolvedArguments ? []
+                : WithLocalFunctionCandidates(callExpr.Target, resolution.Functions),
             calleeSpan: callExpr.CalleeSpan,
             receiverSpan: callExpr.ReceiverSpan,
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
@@ -5182,18 +8312,119 @@ public sealed class Binder
             annotatedReturnType: annotatedReturn,
             receiver: receiver)
         {
+            EvaluatedReceiver = isEventCall ? receiver : computedReceiver,
+            SelectedSourceMethod = selectedSourceMethod,
+            SourceStaticMethodOwner = selectedSourceMethod is { IsStatic: true, ContainingType.IsGenericType: true }
+                && receiverTypeSymbol is { } sourceOwnerSymbol
+                    ? _classesByQualifiedName.GetValueOrDefault(sourceOwnerSymbol.QualifiedName) : null,
+            IsSourceExtensionCall = isSourceExtensionCall,
+            ResolvedMetadataMethod = instanceArrayResolution?.Symbol
+                ?? (metadataReceiver is not null || metadataScalarReturn ? bclResolution?.Symbol : null),
+            ResolvedMetadataReceiverType = bclResolution?.ReceiverType,
+            MetadataArrayResultType = (instanceArrayResolution?.Symbol
+                ?? (metadataReceiver is not null ? bclResolution?.Symbol : null))?.ReturnType as Microsoft.CodeAnalysis.IArrayTypeSymbol,
             CallableStorageIdentity = callable,
             ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
             SelectedOverloadMatches = resolution.Matches,
+            HasOpaqueOverloads = resolution.HasOpaqueOverloads,
+            HasUnresolvedArguments = resolution.Kind == OverloadResolutionKind.UnresolvedArguments,
+            HasUnknownInferredType = resolution.ResolvedReturnType is null
+                && annotatedReturn is null && instanceArrayResolution is null,
             MethodInputArrayType = methodInputArrayReturn ?? (resolution.Matches.Count == 1
                 && TryBuildMethodInputArrayType(resolution.Matches[0].ReturnType, out var nativeArray,
                     resolution.Matches[0].Function) ? nativeArray : null),
             GenericNullabilityType = genericNullabilityReturn ?? (resolution.Matches.Count == 1
-                && TryParseGenericStringTarget(resolution.Matches[0].ReturnType, out var genericReturn)
-                    ? genericReturn : null)
+                ? TryBuildClosedReferenceGeneric(
+                    resolution.Matches[0].ReturnType, resolution.Matches[0].Function)
+                    ?? (TryBuildDeclaredNullabilityShape(resolution.Matches[0].ReturnType, out var genericReturn)
+                        ? genericReturn as BoundTypes.GenericInstantiationBoundType : null)
+                : null)
         };
         return boundCall;
+    }
+
+    private OverloadResolutionResult ResolveSelectedSourceExtension(
+        CallExpressionNode call, IReadOnlyList<BoundExpression> arguments)
+    {
+        if (!ResolveSourceCallConversions || _asyncTypeModule is null)
+            return OverloadResolutionResult.NotFound();
+        SourceCallBindings();
+        if (_sourceCallConversions.SelectedCalls.TryGetValue(call.Span, out var selected)
+            && selected.IncludesExtensionReceiver
+            && selected.Arguments.Count == arguments.Count
+            && selected.Arguments.Select(mapping => mapping.ArgumentIndex).SequenceEqual(
+                Enumerable.Range(0, arguments.Count))
+            && selected.Declaration is MethodNode { IsStatic: true, Parameters.Count: > 0 } method
+            && method.Parameters[0].Modifier.HasFlag(ParameterModifier.This)
+            && _functionSymbols.TryGetValue(method, out var function)
+            && _staticMethodSymbols.Contains(function) && IsFunctionAccessible(function))
+            return OverloadResolutionResult.Resolved(function, selected.ReturnType, selected.Arguments);
+        // A selected or competing source extension cannot fall back to a
+        // same-named metadata contract when its native identity is unavailable.
+        return _sourceCallConversions.SourceExtensionCalls.Contains(call.Span)
+            ? OverloadResolutionResult.Opaque() : OverloadResolutionResult.NotFound();
+    }
+
+    private OverloadResolutionResult ResolveSourceEnumExtension(
+        CallExpressionNode call, string methodName, IReadOnlyList<BoundExpression> arguments,
+        IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers)
+    {
+        var metadata = GetOrCreateMetadataBinder();
+        if (metadata?.Context.TryResolveType("System.Enum") is not { } enumBase)
+            return OverloadResolutionResult.Opaque();
+        // Instance members precede extension lookup. Until their applicability
+        // is established for source enums, do not replace them with a pure row.
+        if (Metadata.MetadataMemberLookup.MethodGroup(
+                metadata.Context.HostCompilationForBinder, enumBase, methodName)
+            .Any(method => !method.IsStatic))
+            return OverloadResolutionResult.Opaque();
+        var visibleScopes = new HashSet<string>(StringComparer.Ordinal);
+        for (var id = _currentNamespaceScopeId; id is not null
+            && visibleScopes.Add(id) && _metadataNamespaceScopes.TryGetValue(id, out var scope);)
+            id = scope.ParentScopeId;
+        var namespaces = _metadataUsings.Where(import => import.Alias is null && !import.IsStatic
+                && (import.NamespaceScopeId is null || visibleScopes.Contains(import.NamespaceScopeId)))
+            .Select(import => import.Namespace).ToHashSet(StringComparer.Ordinal);
+        for (var ns = _currentNamespaceIdentity ?? ""; ; )
+        {
+            namespaces.Add(ns);
+            var dot = ns.LastIndexOf('.');
+            if (ns.Length == 0) break;
+            ns = dot < 0 ? "" : ns[..dot];
+        }
+        var providers = _classesByQualifiedName.Where(pair => pair.Value.IsStatic
+                && pair.Value.TypeParameters.Count == 0
+                && pair.Key == GetQualifiedTypeName(pair.Value)
+                && namespaces.Contains(pair.Value.NamespaceIdentity ?? ""))
+            .ToArray();
+        // Preserved declarations may compete with a native winner. Their bodies
+        // and signatures cannot authorize a source effect row.
+        if (providers.Any(provider => HasOpaqueMethodDeclaration(
+                provider.Value, methodName, call.TypeArguments?.Count)))
+            return OverloadResolutionResult.Opaque();
+        var owners = providers.Select(provider => provider.Key).ToHashSet(StringComparer.Ordinal);
+        var candidates = _functionSymbols.Where(pair => pair.Key is MethodNode method
+                && method.Name == methodName && method.IsStatic
+                && method.Parameters.Count > 0
+                && method.Parameters[0].Modifier.HasFlag(ParameterModifier.This)
+                && method.Parameters.Skip(1).All(parameter => !parameter.Modifier.HasFlag(ParameterModifier.This))
+                && ResolveCallableEnumType(pair.Value, pair.Value.Parameters[0].TypeName) is not null
+                && pair.Value.ContainingTypeName is { } owner && owners.Contains(owner))
+            .Select(pair => pair.Value).ToArray();
+        var argumentTypes = arguments.Select((argument, index) =>
+            GetOverloadArgumentType(argument, argumentModifiers?.ElementAtOrDefault(index))).ToArray();
+        var resolution = ResolveAccessibleOverload(methodName, argumentTypes,
+            argumentNames, argumentModifiers, GetOverloadTypeArguments(call.TypeArguments),
+            allowNullableStringCompatibility: true, requireStatic: true, candidateOverrides: candidates,
+            arguments: arguments, callSpan: call.Span, includesExtensionReceiver: true);
+        if (resolution.Kind == OverloadResolutionKind.NoMatch)
+            _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
+                $"No source extension overload '{methodName}' matches {FormatCallSignature(argumentTypes, argumentModifiers, call.TypeArguments)}.");
+        else if (resolution.Kind == OverloadResolutionKind.Ambiguous)
+            _diagnostics.ReportError(call.Span, DiagnosticCode.AmbiguousOverload,
+                $"Source extension call '{methodName}' is ambiguous between: {FormatCandidates(resolution.Candidates)}");
+        return resolution;
     }
 
     private BoundTypes.BoundType? GetCallableReturnNullabilityShape(BoundTypes.BoundType returnType)
@@ -5208,7 +8439,7 @@ public sealed class Binder
             : nominal.QualifiedName;
         if (TryBuildMethodInputArrayType(spelling, out var array))
             return array;
-        return TryParseGenericStringTarget(spelling, out var generic) ? generic : null;
+        return TryParseGenericStringTarget(spelling, out var generic, nominal.NullableAnnotation) ? generic : null;
     }
 
     /// <summary>
@@ -5310,15 +8541,7 @@ public sealed class Binder
                         report: ShouldReportUnresolvedReceiver(receiverPath)));
             }
 
-            // The binder's OBJECT fallback on an inferred local it could not type
-            // (unknown callee return, disagreeing conditional resolutions). A
-            // parameter, field or property always carries a declared type, so its
-            // OBJECT is a real `object` and is honoured. A local explicitly
-            // declared `§B{o:OBJECT}` (uppercase; the surface `object` keyword
-            // stays lowercase and is unaffected) is conflated with the fallback —
-            // documented, not distinguished, exactly as slice 1 had it.
-            if (typedHead.Type is BoundTypes.NominalBoundType { QualifiedName: "OBJECT" }
-                && !(receiverSymbol.IsParameter || receiverSymbol.IsField || receiverSymbol.IsProperty))
+            if (typedHead.HasUnknownInferredType)
             {
                 return new BoundVariableExpression(
                     receiverSpan,
@@ -5477,6 +8700,13 @@ public sealed class Binder
         if (variables.Length == 0)
             return null;
 
+        if (variables.Any(variable => variable.StorageIdentity.EventDeclaration is not null))
+        {
+            _diagnostics.ReportError(referenceSpan, DiagnosticCode.UndefinedReference,
+                $"Event '{receiverName}' is not readable as delegate storage in this context");
+            return null;
+        }
+
         if (_isStaticContext
             && variables.Any(variable =>
                 variable.DeclaringTypeName != null
@@ -5522,8 +8752,13 @@ public sealed class Binder
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
         IReadOnlyList<string>? typeArguments,
-        bool allowNullableStringCompatibility = false)
+        bool allowNullableStringCompatibility = false,
+        BoundExpression? computedReceiver = null,
+        string? computedMethodName = null)
     {
+        if (arguments.Any(argument => argument.HasUnknownInferredType)
+            || computedReceiver?.HasUnknownInferredType == true)
+            return OverloadResolutionResult.UnresolvedArguments();
         // Synthetic constructor targets can also occur in ordinary call nodes.
         allowNullableStringCompatibility &= !target.EndsWith("..ctor", StringComparison.Ordinal);
         var argumentTypes = arguments
@@ -5546,22 +8781,51 @@ public sealed class Binder
                             ? argumentModifiers[index]
                             : null))
             .ToArray();
-        foreach (var lookupName in GetCallLookupNames(target).Distinct(StringComparer.Ordinal))
+        var interfaceCandidates = GetInterfaceCallCandidates(computedReceiver, computedMethodName, out var opaqueInterface);
+        if (opaqueInterface)
+            return OverloadResolutionResult.Opaque();
+        if (interfaceCandidates is { Count: 0 })
         {
+            _diagnostics.ReportError(span, DiagnosticCode.NoMatchingOverload,
+                $"Interface receiver has no method '{computedMethodName}'.");
+            return OverloadResolutionResult.NoMatch(interfaceCandidates);
+        }
+        var lookupNames = interfaceCandidates is not null ? ["<interface-call>"]
+            : computedReceiver is null ? GetCallLookupNames(target)
+            : EnumerateHierarchyLookupNames(ResolveClass(computedReceiver.Type.DisplayString), computedMethodName!);
+        var overloadTypeArguments = GetOverloadTypeArguments(typeArguments);
+        var opaqueOwner = computedReceiver is null ? _currentClass : ResolveClass(computedReceiver.Type.FullyQualifiedName);
+        var opaqueTarget = computedReceiver is null ? target : computedMethodName;
+        foreach (var lookupName in lookupNames.Distinct(StringComparer.Ordinal))
+        {
+            var requireStatic = computedReceiver is BoundTypeReferenceExpression
+                || computedReceiver is null && IsEnclosingLexicalCall(target, lookupName);
             var resolution = ResolveAccessibleOverload(
                 lookupName,
                 argumentTypes,
                 argumentNames,
                 argumentModifiers,
-                typeArguments,
-                allowNullableStringCompatibility);
+                overloadTypeArguments,
+                allowNullableStringCompatibility,
+                requireStatic,
+                requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
+                candidateOverrides: interfaceCandidates,
+                arguments: arguments,
+                callSpan: span);
+            if (resolution.HasOpaqueOverloads)
+                return resolution;
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
-            if (resolution.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous
-                && CurrentClassHasOpaqueMethodDeclaration(target))
+            if ((resolution.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous
+                    || resolution.Kind == OverloadResolutionKind.Resolved
+                        && !resolution.Functions.Any(_localFunctionSymbols.Contains))
+                && opaqueTarget != null
+                && HasOpaqueMethodDeclaration(opaqueOwner, opaqueTarget, typeArguments?.Count))
             {
-                return OverloadResolutionResult.NotFound();
+                // A native winner is not authoritative when a preserved overload
+                // can compete; leave the call unresolved for downstream analysis.
+                return OverloadResolutionResult.Opaque();
             }
 
             // v0.17 R2 — an argument whose type this module CANNOT SEE is in the
@@ -5574,10 +8838,11 @@ public sealed class Binder
             // meet in one module. Extending the existing `<unresolved>`
             // suppression is the honest reading; the alternative is emitting an
             // error whose premise the compiler has not established.
-            var hasUnresolvedArguments = argumentTypes.Any(type =>
+            var hasUnresolvedArguments = argumentTypes.Where((type, index) =>
                 string.Equals(type, "<unresolved>", StringComparison.Ordinal)
                 || !string.Equals(type, "NULL", StringComparison.Ordinal)
-                    && IsNominalTypeInvisibleToThisModule(type));
+                    && arguments[index] is not BoundLambdaExpression
+                    && IsNominalTypeInvisibleToThisModule(type)).Any();
             if (allowNullableStringCompatibility && !hasUnresolvedArguments
                 && resolution.Kind == OverloadResolutionKind.Resolved
                 && resolution.Matches.Any(match => match.Arguments.Any(mapping =>
@@ -5587,7 +8852,11 @@ public sealed class Binder
                 // Preserve actual prior rejection, not a guess based on the new
                 // winner: an OBJECT overload may already have accepted this call.
                 var previous = ResolveAccessibleOverload(
-                    lookupName, argumentTypes, argumentNames, argumentModifiers, typeArguments);
+                    lookupName, argumentTypes, argumentNames, argumentModifiers, overloadTypeArguments,
+                    requireStatic: requireStatic,
+                    requireInstance: computedReceiver is not null and not BoundTypeReferenceExpression,
+                    candidateOverrides: interfaceCandidates,
+                    arguments: arguments);
                 if (previous.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous)
                     resolution = resolution.WithReplacedNativeOverloadError();
             }
@@ -5617,9 +8886,16 @@ public sealed class Binder
         return OverloadResolutionResult.NotFound();
     }
 
-    private bool CurrentClassHasOpaqueMethodDeclaration(string target)
+    private string[]? GetOverloadTypeArguments(IReadOnlyList<string>? typeArguments) =>
+        typeArguments?.Select(typeArgument =>
+            GetTypeParameterConstraints(typeArgument) is null
+                && ResolveSourceType(typeArgument, _currentClassName, _currentNamespaceIdentity,
+                    _currentNamespaceScopeId).Type is { IsEnum: true } enumType
+                    ? "global::" + enumType.QualifiedName : typeArgument).ToArray();
+
+    private bool HasOpaqueMethodDeclaration(ClassDefinitionNode? owner, string target, int? typeArgumentCount)
     {
-        if (_currentClass == null)
+        if (owner == null)
             return false;
 
         var methodName = target.StartsWith("this.", StringComparison.Ordinal)
@@ -5628,8 +8904,16 @@ public sealed class Binder
         if (methodName.Contains('.', StringComparison.Ordinal))
             return false;
 
-        return EnumerateCurrentClassInteropBlocks(_currentClass)
-            .Any(block => GetInteropMethodNames(block).Contains(methodName));
+        var visited = new HashSet<ClassDefinitionNode>();
+        for (var current = owner; current != null && visited.Add(current); current = ResolveBaseClass(current))
+        {
+            if (EnumerateCurrentClassInteropBlocks(current)
+                .Any(block => GetInteropMethodArities(block).Any(method =>
+                    string.Equals(method.Name, methodName, StringComparison.Ordinal)
+                    && (typeArgumentCount == null || method.Arity == typeArgumentCount))))
+                return true;
+        }
+        return false;
     }
 
     private static IEnumerable<CSharpInteropBlockNode> EnumerateCurrentClassInteropBlocks(
@@ -5644,36 +8928,40 @@ public sealed class Binder
         }
     }
 
-    private IReadOnlySet<string> GetInteropMethodNames(CSharpInteropBlockNode block)
+    private IReadOnlySet<(string Name, int Arity)> GetInteropMethodArities(CSharpInteropBlockNode block)
     {
-        if (_interopMethodNames.TryGetValue(block, out var names))
-            return names;
+        if (_interopMethodArities.TryGetValue(block, out var methods))
+            return methods;
 
         var wrapper = $"class __CalorInteropHost\n{{\n{block.CSharpCode}\n}}";
         var root = CSharpSyntaxTree.ParseText(wrapper).GetCompilationUnitRoot();
-        names = root.Members
+        methods = root.Members
             .OfType<ClassDeclarationSyntax>()
             .SelectMany(declaration => declaration.Members.OfType<MethodDeclarationSyntax>())
             .Where(method => method.ExplicitInterfaceSpecifier == null)
-            .Select(method => method.Identifier.ValueText)
-            .Where(name => !string.IsNullOrEmpty(name))
-            .ToHashSet(StringComparer.Ordinal);
-        _interopMethodNames.Add(block, names);
-        return names;
+            .Select(method => (
+                Name: method.Identifier.ValueText,
+                Arity: method.TypeParameterList?.Parameters.Count ?? 0))
+            .Where(method => !string.IsNullOrEmpty(method.Name))
+            .ToHashSet();
+        _interopMethodArities.Add(block, methods);
+        return methods;
     }
 
     private string GetOverloadArgumentType(BoundExpression argument, string? argumentModifier)
     {
+        if (argument.Type is BoundTypes.NominalBoundType { Declaration.IsEnum: true } enumType)
+            return "global::" + enumType.Declaration.QualifiedName;
         if (argument is not BoundVariableExpression variable
             || argumentModifier is not ("ref" or "out"))
         {
-            return argument.Type.DisplayString;
+            return GetResolvedStringOverloadType(argument.Type) ?? argument.Type.DisplayString;
         }
 
         var storage = variable.Variable;
         while (_flowNarrowingSources.TryGetValue(storage, out var declared))
             storage = declared;
-        return storage.TypeName;
+        return GetResolvedStringOverloadType(TryBuildVariableReference(storage)) ?? storage.TypeName;
     }
 
     private OverloadResolutionResult ResolveAccessibleOverload(
@@ -5682,24 +8970,75 @@ public sealed class Binder
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
         IReadOnlyList<string>? typeArguments,
-        bool allowNullableStringCompatibility = false)
+        bool allowNullableStringCompatibility = false,
+        bool requireStatic = false,
+        bool requireInstance = false,
+        IReadOnlyList<FunctionSymbol>? candidateOverrides = null,
+        IReadOnlyList<BoundExpression>? arguments = null,
+        TextSpan? callSpan = null,
+        bool includesExtensionReceiver = false)
     {
-        var candidates = _scope.GetOverloads(lookupName)
+        var candidates = (candidateOverrides ?? _scope.GetOverloads(lookupName))
             .ToArray();
         if (candidates.Length == 0)
             return OverloadResolutionResult.NotFound();
 
         var accessibleCandidates = candidates
-            .Where(IsFunctionAccessible)
+            .Where(candidate => IsFunctionAccessible(candidate)
+                && (!requireStatic || _staticMethodSymbols.Contains(candidate))
+                && (!requireInstance || !_staticMethodSymbols.Contains(candidate)))
             .ToArray();
         if (accessibleCandidates.Length == 0)
             return OverloadResolutionResult.Inaccessible(candidates);
 
-        var accessibleScope = new Scope();
-        foreach (var candidate in accessibleCandidates)
-            accessibleScope.TryDeclareOverload(lookupName, candidate, out _);
+        if (ResolveSourceCallConversions && _asyncTypeModule is not null && callSpan is { } site)
+        {
+            SourceCallBindings();
+            if (_sourceCallConversions.AmbiguousCalls.Contains(site))
+                return OverloadResolutionResult.Ambiguous(accessibleCandidates);
+            if (_sourceCallConversions.SelectedCalls.TryGetValue(site, out var selected)
+                && (selected.UsesUserDefinedConversion || selected.UsesAnonymousFunctionConversion)
+                && selected.IncludesExtensionReceiver == includesExtensionReceiver
+                && selected.Arguments.Count == argumentTypes.Count
+                && _functionSymbols.TryGetValue(selected.Declaration, out var selectedFunction)
+                && accessibleCandidates.Contains(selectedFunction))
+                return OverloadResolutionResult.Resolved(
+                    selectedFunction, selected.ReturnType, selected.Arguments);
+        }
 
-        return accessibleScope.ResolveOverload(
+        var accessibleScope = new Scope();
+        var duplicates = new Dictionary<FunctionSymbol, List<FunctionSymbol>>();
+        foreach (var candidate in accessibleCandidates)
+        {
+            if (!accessibleScope.TryDeclareOverload(lookupName, candidate, out var duplicate)
+                && candidateOverrides is not null && duplicate is not null)
+            {
+                if (!duplicates.TryGetValue(duplicate, out var alternatives))
+                    duplicates[duplicate] = alternatives = [duplicate];
+                alternatives.Add(candidate);
+            }
+        }
+
+        // 0.30 overloads: C# decides a constant's conversions by its value. When an argument is
+        // (or may be) a constant this binder cannot evaluate, and some candidate could accept it
+        // only through a constant conversion, the applicable set is unknown: stay opaque.
+        if (arguments is not null && accessibleCandidates.Length > 0)
+        {
+            for (var index = 0; index < arguments.Count && index < argumentTypes.Count; index++)
+            {
+                var type = TypeIdentity.Canonicalize(argumentTypes[index]);
+                if (type is "INT" or "LONG"
+                    && ClassifyIntegralConstant(arguments[index], out _) == IntegralConstant.Unknown
+                    && accessibleCandidates.Any(candidate => candidate.Parameters.Any(parameter =>
+                        !string.IsNullOrWhiteSpace(parameter.TypeName)
+                        && IsConstantConversionTarget(type, TypeIdentity.Canonicalize(parameter.TypeName)))))
+                    return OverloadResolutionResult.Opaque();
+            }
+        }
+
+        // An extension call's receiver converts by identity, reference or boxing only.
+        bool IsValueConversionPosition(int index) => !(includesExtensionReceiver && index == 0);
+        var resolved = accessibleScope.ResolveOverload(
             lookupName,
             argumentTypes,
             argumentNames,
@@ -5707,7 +9046,409 @@ public sealed class Binder
             typeArguments,
             GetImplicitConversionCost,
             allowNullableStringCompatibility,
-            IsBetterNullConversionTarget);
+            IsBetterNullConversionTarget,
+            (function, type) => arguments is not null
+                && TryBuildClosedReferenceGeneric(type, function) is { } generic
+                && generic.TypeArguments is [BoundTypes.NominalBoundType { Declaration: { } element } payload]
+                    ? $"global::{generic.Definition.QualifiedName}<global::{element.QualifiedName}" +
+                        $"{(payload.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "?" : "")}>" +
+                        $"{(generic.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated ? "?" : "")}"
+                    : ResolveCallableParameterType(function, type),
+            arguments is null ? null : (index, parameterType, argumentType) => IsValueConversionPosition(index)
+                ? GetImplicitArgumentConversionCost(parameterType, argumentType, arguments[index])
+                : GetImplicitConversionCost(parameterType, argumentType),
+            arguments is null ? null : (index, candidateType, otherType) =>
+                IsBetterIntegerLiteralConversionTarget(
+                    arguments[index], argumentTypes[index], candidateType, otherType),
+            arguments is null ? null : (index, first, second) =>
+                CompareArgumentConversions(arguments[index], argumentTypes[index], first, second,
+                    InterpolationIsString(accessibleCandidates, index, argumentNames)),
+            arguments is null ? null : (index, parameterType) =>
+                RequiresExactBetterness(parameterType, argumentTypes[index]),
+            arguments is null ? null : IsConversionModeled);
+        if (resolved.Function is { } winner && duplicates.TryGetValue(winner, out var ambiguous))
+            return OverloadResolutionResult.Ambiguous(ambiguous);
+
+        // Roslyn's own selection for this call in the module's C# projection, when it has one.
+        var roslynChoice = callSpan is { } choiceSite ? RoslynSelectedFunction(choiceSite, includesExtensionReceiver,
+            argumentTypes.Count, includeDispatches: true) : null;
+
+        // A choice this binder's rules cannot certify (a comparison or a rejection outside what
+        // they model) stands only when the projection shows Roslyn selected the same
+        // declaration, or when no C# candidate can beat it. Otherwise Roslyn's selection is
+        // used when its argument map is plain, and the call is left opaque when it is not.
+        if (resolved.NeedsConfirmation)
+        {
+            var confirmed = roslynChoice is not null && resolved.Functions is [var only]
+                && ReferenceEquals(only, roslynChoice);
+            var exact = !confirmed && arguments is not null
+                && IsUnbeatableExactMatch(resolved, arguments, argumentTypes, accessibleCandidates, argumentNames);
+            var adopted = confirmed || exact || roslynChoice is null || !accessibleCandidates.Contains(roslynChoice) ? null
+                : TryAdoptRoslynChoice(roslynChoice, argumentTypes, argumentNames, argumentModifiers);
+            if (!confirmed && !exact)
+                return adopted ?? OverloadResolutionResult.Opaque();
+        }
+
+        // Soundness backstop: when Roslyn selected a different source declaration, this
+        // binder's choice is wrong (an unmodeled conversion, a typing difference): leave the
+        // call opaque, never charge the other overload's row.
+        // (Only a recorded argument map: an ordinary dispatch names the least-derived
+        // declaration of a virtual member, which an override this binder chose is not.)
+        if (resolved.Kind == OverloadResolutionKind.Resolved && resolved.Function is { } chosen
+            && callSpan is { } selectedSite
+            && RoslynSelectedFunction(selectedSite, includesExtensionReceiver, argumentTypes.Count,
+                includeDispatches: false) is { } recorded
+            && accessibleCandidates.Contains(recorded) && !ReferenceEquals(recorded, chosen))
+            return TryAdoptRoslynChoice(recorded, argumentTypes, argumentNames, argumentModifiers)
+                ?? OverloadResolutionResult.Opaque();
+        return resolved;
+    }
+
+    /// <summary>
+    /// Roslyn's selection as this binder's result, when the call maps argument i to parameter i
+    /// (no names, no defaults, no params, not generic): it is C#'s choice, so it is exact.
+    /// Otherwise null, and the caller leaves the call opaque.
+    /// </summary>
+    private static OverloadResolutionResult? TryAdoptRoslynChoice(FunctionSymbol function,
+        IReadOnlyList<string> argumentTypes, IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers)
+    {
+        if (function.GenericArity != 0 || function.Parameters.Count != argumentTypes.Count
+            || argumentNames?.Any(name => name != null) == true
+            || function.Parameters.Any(parameter => parameter.Modifier.HasFlag(ParameterModifier.Params)))
+            return null;
+        for (var index = 0; index < function.Parameters.Count; index++)
+        {
+            var modifier = function.Parameters[index].Modifier
+                & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
+            var supplied = argumentModifiers?.ElementAtOrDefault(index);
+            if (modifier != ParameterModifier.None ? string.IsNullOrEmpty(supplied) : !string.IsNullOrEmpty(supplied))
+                return null;
+        }
+        return OverloadResolutionResult.Resolved(function, function.ReturnType,
+            function.Parameters.Select((parameter, index) =>
+                new ResolvedArgumentMapping(index, index, parameter.TypeName, false)).ToArray());
+    }
+
+    /// <summary>
+    /// The source declaration Roslyn bound this call to in the module's C# projection: a call
+    /// with a recorded argument map (an implicit or extension conversion), or any ordinary
+    /// source invocation's dispatch. Null when the projection has no entry or its
+    /// configurations disagree.
+    /// </summary>
+    private FunctionSymbol? RoslynSelectedFunction(TextSpan site, bool includesExtensionReceiver, int argumentCount,
+        bool includeDispatches)
+    {
+        if (!ResolveSourceCallConversions || _asyncTypeModule is null || _sourceCallConversions is not { } projection)
+            return null;
+        if (projection.SelectedCalls.TryGetValue(site, out var selection)
+            && selection.IncludesExtensionReceiver == includesExtensionReceiver
+            && selection.Arguments.Count == argumentCount
+            && _functionSymbols.TryGetValue(selection.Declaration, out var selected))
+            return selected;
+        if (includeDispatches && !includesExtensionReceiver
+            && projection.SourceDispatches.TryGetValue(site, out var dispatch)
+            && dispatch?.Declaration is { } declaration
+            && dispatch.Method.Parameters.Length >= argumentCount
+            && _functionSymbols.TryGetValue(declaration, out var dispatched))
+            return dispatched;
+        // A constructor call or `base(...)`/`this(...)` initializer (including a record's
+        // synthesized one), as Roslyn bound it in every configuration.
+        if (includeDispatches && !includesExtensionReceiver)
+        {
+            var constructor = projection.SourceConstructors.FirstOrDefault(pair => pair.Key.Span == site).Value
+                ?? projection.ConstructorInitializers.FirstOrDefault(pair => pair.Key.Initializer?.Span == site).Value;
+            if (constructor is not null
+                && projection.SourceDeclarations.TryGetValue(constructor.OriginalDefinition, out var constructorDeclaration)
+                && _functionSymbols.TryGetValue(constructorDeclaration, out var selectedConstructor))
+                return selectedConstructor;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A winner no other candidate can beat in C#: every argument's C# type is exactly its
+    /// parameter type (an exact match is never worse than another conversion, and is better than
+    /// any non-identity one), and it carries every tie-breaker advantage C# gives an
+    /// equivalent candidate (non-generic, normal form, no default supplied, by-value
+    /// parameters). Any C#-applicable competitor, modeled here or not, loses to it.
+    /// </summary>
+    private bool IsUnbeatableExactMatch(
+        OverloadResolutionResult resolved, IReadOnlyList<BoundExpression> arguments, IReadOnlyList<string> argumentTypes,
+        IReadOnlyList<FunctionSymbol> candidates, IReadOnlyList<string?>? argumentNames)
+    {
+        if (resolved.Functions is not [var winner] || resolved.Matches is not [var match]
+            || winner.GenericArity != 0 || winner.Parameters.Count != match.Arguments.Count
+            || winner.Parameters.Any(parameter => (parameter.Modifier & ~ParameterModifier.This) != ParameterModifier.None)
+            || match.Arguments.Count != arguments.Count)
+            return false;
+        return match.Arguments.All(mapping => !mapping.IsExpandedParams
+            && mapping.ArgumentIndex < arguments.Count
+            && TryGetCSharpArgumentType(arguments[mapping.ArgumentIndex], argumentTypes[mapping.ArgumentIndex],
+                InterpolationIsString(candidates, mapping.ArgumentIndex, argumentNames)) is { } type
+            && ConversionIdentity(type) == ConversionIdentity(mapping.ParameterType));
+    }
+
+    /// <summary>
+    /// Whether this binder models every C# conversion between the two types: the built-in value
+    /// types, their nullables, string, object and the null literal, and arrays against those.
+    /// Anything else (a user type, an interface, a type parameter) may convert through boxing, a
+    /// reference or a user-defined conversion this binder does not see.
+    /// </summary>
+    private static bool IsConversionModeled(string parameterType, string argumentType)
+    {
+        static bool Modeled(string type)
+        {
+            var canonical = ConversionIdentity(type.TrimStart('?'));
+            return canonical is "STRING" or "OBJECT" or "NULL" || IsBuiltinValueType(canonical)
+                || TryGetValueNullableUnderlying(canonical, out _);
+        }
+        // An array and a built-in scalar never convert either way except through object:
+        // a user-defined conversion needs a user type on one side.
+        static bool IsArray(string type)
+        {
+            var trimmed = type.Trim().TrimEnd('?');
+            return trimmed.StartsWith('[') || trimmed.EndsWith(']');
+        }
+        if (string.IsNullOrWhiteSpace(parameterType) || string.IsNullOrWhiteSpace(argumentType))
+            return false;
+        if (Modeled(parameterType) && Modeled(argumentType))
+            return true;
+        return IsArray(parameterType) && Modeled(argumentType) && ConversionIdentity(argumentType) is not ("OBJECT" or "NULL")
+            || IsArray(argumentType) && Modeled(parameterType) && ConversionIdentity(parameterType) != "OBJECT";
+    }
+
+    /// <summary>
+    /// True when a call that converts this argument to <paramref name="parameterType"/> must be
+    /// resolved by C#'s better-function-member rule: a nullable value parameter the argument
+    /// does not match exactly, or a constant conversion target.
+    /// </summary>
+    private bool RequiresExactBetterness(string parameterType, string argumentType)
+    {
+        var parameter = TypeIdentity.Canonicalize(parameterType);
+        var source = TypeIdentity.Canonicalize(argumentType);
+        return parameter != source
+            && (TryGetValueNullableUnderlying(parameter, out _) || IsConstantConversionTarget(source, parameter));
+    }
+
+    /// <summary>
+    /// C#'s better conversion from expression (§12.6.4.5) for one argument: +1 when converting
+    /// it to <paramref name="first"/> is better than to <paramref name="second"/>, -1 when worse,
+    /// 0 when neither, null when this binder cannot tell (a type outside the built-in value,
+    /// string and object types, or an argument whose C# type it does not know exactly).
+    /// </summary>
+    private int? CompareArgumentConversions(BoundExpression argument, string argumentType, string first, string second,
+        bool interpolationIsString = false)
+    {
+        var target1 = ConversionIdentity(first);
+        var target2 = ConversionIdentity(second);
+        if (target1 == target2)
+            return 0;
+        // The null literal has no type: it exactly matches neither target.
+        var source = argument is BoundNullLiteral ? "NULL"
+            : TryGetCSharpArgumentType(argument, argumentType, interpolationIsString);
+        if (source is null)
+            return null;
+        source = source == "NULL" ? source : ConversionIdentity(source);
+        // E exactly matches T when E's type is T.
+        var exact1 = source == target1;
+        var exact2 = source == target2;
+        if (exact1 != exact2)
+            return exact1 ? 1 : -1;
+        // Better conversion target: an implicit conversion one way and not the other.
+        var forward = ImplicitTypeConversionExists(target1, target2);
+        var backward = ImplicitTypeConversionExists(target2, target1);
+        if (forward is null || backward is null)
+            return null;
+        if (forward != backward)
+            return forward.Value ? 1 : -1;
+        // A signed integral target (or its nullable) is better than an unsigned one.
+        if (IsSignedBetterTarget(target1, target2))
+            return 1;
+        if (IsSignedBetterTarget(target2, target1))
+            return -1;
+        return 0;
+    }
+
+    /// <summary>
+    /// A type's identity for conversions: a nullable annotation on string or object is not a
+    /// different type (`string?` converts exactly as `string` does).
+    /// </summary>
+    private static string ConversionIdentity(string type)
+    {
+        var canonical = TypeIdentity.Canonicalize(type);
+        return canonical is "STRING?" or "OBJECT?" ? canonical[..^1] : canonical;
+    }
+
+    private static string StripValueNullable(string canonical) =>
+        TryGetValueNullableUnderlying(canonical, out var underlying) ? underlying : canonical;
+
+    private static bool IsSignedBetterTarget(string first, string second) =>
+        (StripValueNullable(first), StripValueNullable(second)) switch
+        {
+            ("INT[bits=8][signed=true]", "INT[bits=8][signed=false]" or "INT[bits=16][signed=false]"
+                or "UINT" or "ULONG") => true,
+            ("INT[bits=16][signed=true]", "INT[bits=16][signed=false]" or "UINT" or "ULONG") => true,
+            ("INT", "UINT" or "ULONG") => true,
+            ("LONG", "ULONG") => true,
+            _ => false
+        };
+
+    /// <summary>
+    /// Whether C# has an implicit conversion between two TYPES (no constant conversions), for
+    /// the built-in value types, their nullables, string and object; null for anything else.
+    /// </summary>
+    private static bool? ImplicitTypeConversionExists(string from, string to)
+    {
+        if (from == to)
+            return true;
+        if (to == "OBJECT")
+            return from != "VOID";
+        if (from == "OBJECT")
+            return false;
+        static bool Known(string type) => type == "STRING" || IsBuiltinValueType(type)
+            || TryGetValueNullableUnderlying(type, out _);
+        if (!Known(from) || !Known(to))
+            return null;
+        if (from == "STRING" || to == "STRING")
+            return false;
+        var toNullable = TryGetValueNullableUnderlying(to, out var toUnderlying);
+        var fromNullable = TryGetValueNullableUnderlying(from, out var fromUnderlying);
+        if (fromNullable && !toNullable)
+            return false;
+        var source = fromNullable ? fromUnderlying : from;
+        var target = toNullable ? toUnderlying : to;
+        return source == target || IsImplicitNumericConversion(source, target);
+    }
+
+    /// <summary>
+    /// The argument's C# type (in the generated C#) when this binder knows it exactly; null
+    /// otherwise (a promoted arithmetic result, a flow-narrowed variable).
+    /// </summary>
+    private string? TryGetCSharpArgumentType(BoundExpression argument, string argumentType,
+        bool interpolationIsString = false)
+    {
+        var type = TypeIdentity.Canonicalize(argumentType);
+        if (type is "<unresolved>" or "NULL")
+            return null;
+        return argument switch
+        {
+            // The emitter writes a literal with its Calor type's suffix (`3000000000L`, `5U`).
+            BoundIntLiteral => type,
+            BoundFloatLiteral or BoundDecimalLiteral or BoundBoolLiteral or BoundStringLiteral => type,
+            BoundUnaryExpression { Operator: UnaryOperator.Negate, Operand: var operand }
+                when type is "INT" or "LONG" or "FLOAT" or "FLOAT[bits=32]" or "DECIMAL"
+                && TryGetCSharpArgumentType(operand, operand.Type.DisplayString) == type => type,
+            // A storage's bound type is its declared type, resolved (`Color` binds as
+            // `Demo.Storage.Color`). Flow narrowing changes only a reference's nullable state,
+            // which C# overload resolution ignores; a value type narrowed from `T?` to `T` is not
+            // its C# type.
+            BoundVariableExpression { Variable: { Id.IsNone: false } variable } => TrustStorageType(variable, type),
+            BoundFieldAccessExpression { ResolvedField: { } field } => TrustStorageType(field, type),
+            // An interpolated string is a `string` unless a candidate takes an interpolated
+            // string handler there, which C# prefers; the caller decides.
+            BoundInterpolatedStringExpression when interpolationIsString => "STRING",
+            BoundFieldAccessExpression { ResolvedField: null, ResolvedMetadataMember: not null } => type,
+            BoundTypeOperationExpression { Operation: TypeOp.Cast } => type,
+            BoundNewExpression => type,
+            BoundIncompleteExpression => null,
+            BoundCallExpression { HasUnresolvedArguments: false, HasOpaqueOverloads: false } call
+                when call.ResolvedSymbol is not null || call.ResolvedMetadataMethod is not null => type,
+            _ => null
+        };
+    }
+
+    private string? TrustStorageType(VariableSymbol storage, string type)
+    {
+        if (TypeIdentity.Canonicalize(storage.TypeName) == type)
+            return type;
+        if (!_flowNarrowingSources.ContainsKey(storage))
+            return type;
+        return IsBuiltinValueType(type) || TryGetValueNullableUnderlying(type, out _) ? null : type;
+    }
+
+    /// <summary>
+    /// True when no candidate can take an interpolated string handler at argument
+    /// <paramref name="index"/>: every parameter there is string, FormattableString,
+    /// IFormattable or object, so the interpolated string is a plain `string` argument.
+    /// </summary>
+    private static bool InterpolationIsString(IReadOnlyList<FunctionSymbol> candidates, int index,
+        IReadOnlyList<string?>? argumentNames)
+    {
+        if (argumentNames?.Any(name => name != null) == true)
+            return false;
+        foreach (var candidate in candidates)
+        {
+            if (index >= candidate.Parameters.Count)
+            {
+                if (candidate.Parameters.Count > 0
+                    && candidate.Parameters[^1].Modifier.HasFlag(ParameterModifier.Params))
+                    return false;
+                continue;
+            }
+            var parameter = candidate.Parameters[index];
+            if (parameter.Modifier.HasFlag(ParameterModifier.Params) || string.IsNullOrWhiteSpace(parameter.TypeName))
+                return false;
+            var canonical = ConversionIdentity(parameter.TypeName);
+            var simple = canonical.TrimEnd('?');
+            simple = simple.StartsWith("global::", StringComparison.Ordinal) ? simple[8..] : simple;
+            simple = simple.StartsWith("System.", StringComparison.Ordinal) ? simple[7..] : simple;
+            if (canonical is not ("STRING" or "OBJECT") && simple is not ("FormattableString" or "IFormattable"))
+                return false;
+        }
+        return true;
+    }
+
+    private IReadOnlyList<FunctionSymbol>? GetInterfaceCallCandidates(
+        BoundExpression? receiver, string? methodName, out bool opaque)
+    {
+        opaque = false;
+        if (receiver?.Type is not BoundTypes.NominalBoundType { Declaration: { } identity }
+            || !_interfacesBySymbolId.TryGetValue(identity.Id, out var root))
+            return null;
+        var candidates = new List<FunctionSymbol>();
+        var pending = new Queue<(TypeSymbol Symbol, InterfaceDefinitionNode Declaration)>();
+        var visited = new HashSet<SymbolId>();
+        pending.Enqueue(root);
+        while (pending.TryDequeue(out var current))
+        {
+            if (!visited.Add(current.Symbol.Id))
+                continue;
+            if (current.Declaration.InteropBlocks.Count > 0 || current.Declaration.PreprocessorBlocks.Count > 0)
+            {
+                opaque = true;
+                return [];
+            }
+            var declared = current.Declaration.Methods.Where(method =>
+                GetCallableLookupName(method.Name) == methodName).ToArray();
+            if (declared.Length > 0)
+            {
+                candidates.AddRange(declared.Select(method => _functionSymbols[method]));
+                continue;
+            }
+            foreach (var parent in current.Declaration.BaseInterfaces)
+            {
+                var type = TryBuildReferenceType(parent, current.Symbol.QualifiedName,
+                    current.Declaration.NamespaceIdentity);
+                if (type?.Declaration is not { } parentIdentity
+                    || !_interfacesBySymbolId.TryGetValue(parentIdentity.Id, out var inherited))
+                {
+                    opaque = true;
+                    return [];
+                }
+                pending.Enqueue(inherited);
+            }
+        }
+        // Every interface-typed value is an object, so C# also binds System.Object's
+        // public instance members on it. They are not interface members, and their
+        // implementation is whatever the runtime type overrides: opaque, never NoMatch.
+        if (candidates.Count == 0
+            && methodName is nameof(ToString) or nameof(Equals) or nameof(GetHashCode) or nameof(GetType))
+        {
+            opaque = true;
+            return [];
+        }
+        return candidates.DistinctBy(candidate => candidate.Id).ToArray();
     }
 
     private bool IsBetterNullConversionTarget(string candidateType, string otherType)
@@ -5734,6 +9475,240 @@ public sealed class Binder
 
         return GetImplicitConversionCost(other, candidate) is not null
             && GetImplicitConversionCost(candidate, other) is null;
+    }
+
+    private int? GetImplicitArgumentConversionCost(
+        string parameterType, string argumentType, BoundExpression argument)
+    {
+        var ordinaryCost = GetImplicitConversionCost(parameterType, argumentType);
+        if (ordinaryCost is not null)
+            return ordinaryCost;
+        if (TryBuildClosedReferenceGeneric(parameterType) is { } receiving
+            && (argument.GenericNullabilityType ?? argument.Type as BoundTypes.GenericInstantiationBoundType)
+                is { } supplied
+            && NullabilityChecker.IsReferenceContainerDefinition(supplied.Definition)
+            && NullabilityChecker.SameGenericDefinition(
+                receiving.Definition.QualifiedName, supplied.Definition.QualifiedName)
+            && receiving.TypeArguments is [BoundTypes.NominalBoundType targetElement]
+            && supplied.TypeArguments is [BoundTypes.NominalBoundType sourceElement]
+            && targetElement.HasSameUnderlyingReferenceType(sourceElement))
+            return 0;
+
+        var parameter = TypeIdentity.Canonicalize(parameterType);
+        var source = TypeIdentity.Canonicalize(argumentType);
+        // 0.30 overloads: C#'s implicit nullable conversions. `S` → `T?` when `S` → `T` is an
+        // identity or implicit numeric conversion (or, for a constant, a constant conversion),
+        // and `S?` → `T?` when `S` → `T` is implicit numeric. These are value conversions
+        // (outside GetImplicitConversionCost), so a call that uses one is resolved by C#'s
+        // better-function-member rule (ResolveExactOverload), never by summed cost.
+        if (TryGetValueNullableUnderlying(parameter, out var underlying))
+        {
+            // The null literal converts to every nullable value type.
+            if (source == "NULL")
+                return 40;
+            if (TryGetValueNullableUnderlying(source, out var sourceUnderlying))
+                return IsImplicitNumericConversion(sourceUnderlying, underlying) ? 11 : null;
+            if (!IsBuiltinValueType(source))
+                return null;
+            if (source == underlying)
+                return 1;
+            return IsImplicitNumericConversion(source, underlying)
+                || IsImplicitConstantConversion(argument, source, underlying) ? 11 : null;
+        }
+
+        return IsImplicitConstantConversion(argument, source, parameter) ? 10 : null;
+    }
+
+    private static readonly HashSet<string> BuiltinNumericTypes = new(StringComparer.Ordinal)
+    {
+        "INT[bits=8][signed=true]", "INT[bits=8][signed=false]",
+        "INT[bits=16][signed=true]", "INT[bits=16][signed=false]",
+        "INT", "UINT", "LONG", "ULONG", "CHAR", "FLOAT[bits=32]", "FLOAT", "DECIMAL"
+    };
+
+    private static bool IsBuiltinValueType(string canonical) =>
+        BuiltinNumericTypes.Contains(canonical) || canonical == "BOOL";
+
+    /// <summary>`T?` for a built-in value type T (not a nullable reference type).</summary>
+    private static bool TryGetValueNullableUnderlying(string canonical, out string underlying)
+    {
+        underlying = canonical.EndsWith('?') ? canonical[..^1] : "";
+        return underlying.Length > 0 && IsBuiltinValueType(underlying);
+    }
+
+    /// <summary>
+    /// C#'s implicit constant expression conversion: a constant of type int converts to
+    /// sbyte, byte, short, ushort, uint or ulong when its value fits; a constant of type long
+    /// converts to ulong when it is not negative.
+    /// </summary>
+    private bool IsImplicitConstantConversion(BoundExpression argument, string source, string target)
+    {
+        if (source is not ("INT" or "LONG")
+            || ClassifyIntegralConstant(argument, out var value) != IntegralConstant.Known)
+            return false;
+        return (source, target) switch
+        {
+            ("INT", "INT[bits=8][signed=true]") => value is >= sbyte.MinValue and <= sbyte.MaxValue,
+            ("INT", "INT[bits=8][signed=false]") => value is >= byte.MinValue and <= byte.MaxValue,
+            ("INT", "INT[bits=16][signed=true]") => value is >= short.MinValue and <= short.MaxValue,
+            ("INT", "INT[bits=16][signed=false]") => value is >= ushort.MinValue and <= ushort.MaxValue,
+            ("INT", "UINT") => value is >= uint.MinValue and <= uint.MaxValue,
+            ("INT" or "LONG", "ULONG") => value >= 0,
+            _ => false
+        };
+    }
+
+    /// <summary>The targets a constant of <paramref name="source"/> type may convert to by value.</summary>
+    private static bool IsConstantConversionTarget(string source, string target)
+    {
+        if (TryGetValueNullableUnderlying(target, out var underlying))
+            target = underlying;
+        return source switch
+        {
+            "INT" => target is "INT[bits=8][signed=true]" or "INT[bits=8][signed=false]"
+                or "INT[bits=16][signed=true]" or "INT[bits=16][signed=false]" or "UINT" or "ULONG",
+            "LONG" => target == "ULONG",
+            _ => false
+        };
+    }
+
+    private enum IntegralConstant { NotConstant, Known, Unknown }
+
+    /// <summary>
+    /// Whether C# reads <paramref name="expression"/> as a constant expression, and its value
+    /// when this binder can compute it. <c>Unknown</c> is a constant (or possibly one) whose
+    /// value is not computed here: overload resolution must not guess which constant
+    /// conversions apply to it.
+    /// </summary>
+    private IntegralConstant ClassifyIntegralConstant(BoundExpression expression, out long value)
+    {
+        value = 0;
+        switch (expression)
+        {
+            case BoundIntLiteral { IsUnsigned: false } literal:
+                value = literal.Value;
+                return IntegralConstant.Known;
+            case BoundIntLiteral or BoundFloatLiteral or BoundDecimalLiteral or BoundBoolLiteral
+                or BoundStringLiteral or BoundNullLiteral:
+                return IntegralConstant.Unknown;
+            case BoundUnaryExpression unary:
+            {
+                var operand = ClassifyIntegralConstant(unary.Operand, out var operandValue);
+                if (operand == IntegralConstant.NotConstant)
+                    return IntegralConstant.NotConstant;
+                if (operand == IntegralConstant.Known && unary.Operator == UnaryOperator.Negate
+                    && operandValue != long.MinValue)
+                {
+                    value = -operandValue;
+                    return IntegralConstant.Known;
+                }
+                return IntegralConstant.Unknown;
+            }
+            case BoundBinaryExpression binary:
+                return ClassifyIntegralConstant(binary.Left, out _) == IntegralConstant.NotConstant
+                    || ClassifyIntegralConstant(binary.Right, out _) == IntegralConstant.NotConstant
+                        ? IntegralConstant.NotConstant : IntegralConstant.Unknown;
+            case BoundConditionalExpression conditional:
+                return ClassifyIntegralConstant(conditional.Condition, out _) == IntegralConstant.NotConstant
+                    || ClassifyIntegralConstant(conditional.WhenTrue, out _) == IntegralConstant.NotConstant
+                    || ClassifyIntegralConstant(conditional.WhenFalse, out _) == IntegralConstant.NotConstant
+                        ? IntegralConstant.NotConstant : IntegralConstant.Unknown;
+            case BoundTypeOperationExpression operation:
+                return ClassifyIntegralConstant(operation.Operand, out _) == IntegralConstant.NotConstant
+                    ? IntegralConstant.NotConstant : IntegralConstant.Unknown;
+            case BoundVariableExpression { Variable: var variable }:
+                return ClassifyFieldConstant(variable, out value);
+            case BoundFieldAccessExpression { ResolvedField: { } field }:
+                return ClassifyFieldConstant(field, out value);
+            case BoundFieldAccessExpression { ResolvedMetadataMember: Microsoft.CodeAnalysis.IFieldSymbol metadataField }:
+                if (!metadataField.IsConst)
+                    return IntegralConstant.NotConstant;
+                if (metadataField.HasConstantValue && metadataField.ConstantValue is
+                    sbyte or byte or short or ushort or int or uint or long)
+                {
+                    value = Convert.ToInt64(metadataField.ConstantValue, System.Globalization.CultureInfo.InvariantCulture);
+                    return IntegralConstant.Known;
+                }
+                return IntegralConstant.Unknown;
+            case BoundFieldAccessExpression { ResolvedMetadataMember: Microsoft.CodeAnalysis.IPropertySymbol }:
+                return IntegralConstant.NotConstant;
+            case BoundFieldAccessExpression or BoundInteropExpression or BoundIncompleteExpression:
+                return IntegralConstant.Unknown;
+            default:
+                return IntegralConstant.NotConstant;
+        }
+    }
+
+    private IntegralConstant ClassifyFieldConstant(VariableSymbol variable, out long value)
+    {
+        value = 0;
+        if (variable.Id.IsNone)
+            return IntegralConstant.Unknown;
+        if (variable.IsParameter || variable.IsProperty || !variable.IsField)
+            return IntegralConstant.NotConstant; // Calor has no constant locals.
+        if (!_sourceFieldConstants.TryGetValue(variable, out var declaration))
+            return variable.IsStatic ? IntegralConstant.Unknown : IntegralConstant.NotConstant;
+        if (!declaration.IsConst)
+            return IntegralConstant.NotConstant;
+        switch (declaration.Initializer)
+        {
+            case IntLiteralNode { IsUnsigned: false } literal:
+                value = literal.Value;
+                return IntegralConstant.Known;
+            case UnaryOperationNode
+            {
+                Operator: UnaryOperator.Negate,
+                Operand: IntLiteralNode { IsUnsigned: false } negated
+            } when negated.Value != long.MinValue:
+                value = -negated.Value;
+                return IntegralConstant.Known;
+            default:
+                return IntegralConstant.Unknown;
+        }
+    }
+
+    private static bool TryGetSignedIntegerLiteral(BoundExpression expression, out long value)
+    {
+        switch (expression)
+        {
+            case BoundIntLiteral { IsUnsigned: false } literal:
+                value = literal.Value;
+                return true;
+            case BoundUnaryExpression { Operator: UnaryOperator.Negate } unary
+                when TryGetSignedIntegerLiteral(unary.Operand, out var operand) && operand != long.MinValue:
+                value = -operand;
+                return true;
+            default:
+                value = 0;
+                return false;
+        }
+    }
+
+    private static bool IsBetterIntegerLiteralConversionTarget(
+        BoundExpression argument, string argumentType, string candidateType, string otherType)
+    {
+        if (!TryGetSignedIntegerLiteral(argument, out _))
+            return false;
+        var candidate = TypeIdentity.Canonicalize(candidateType);
+        var other = TypeIdentity.Canonicalize(otherType);
+        var source = TypeIdentity.Canonicalize(argumentType);
+        if (candidate == source)
+            return true;
+        if (other == source)
+            return false;
+        if (IsImplicitNumericConversion(candidate, other)
+            && !IsImplicitNumericConversion(other, candidate))
+            return true;
+        // C# also prefers these signed targets when neither target converts to the other.
+        return (candidate, other) switch
+        {
+            ("INT[bits=8][signed=true]", "INT[bits=8][signed=false]"
+                or "INT[bits=16][signed=false]" or "UINT" or "ULONG") => true,
+            ("INT[bits=16][signed=true]", "INT[bits=16][signed=false]" or "UINT" or "ULONG") => true,
+            ("INT", "UINT" or "ULONG") => true,
+            ("LONG", "ULONG") => true,
+            _ => false
+        };
     }
 
     /// <summary>
@@ -5869,7 +9844,7 @@ public sealed class Binder
                 return !declaredClass.IsStruct;
 
             var lookupName = TypeIdentity.ToLookupName(type);
-            var declaredTypes = _symbolsById.Values.OfType<TypeSymbol>()
+            var declaredTypes = SourceTypeSymbols()
                 .Where(symbol => symbol.QualifiedName == lookupName)
                 .Take(2)
                 .ToArray();
@@ -5934,7 +9909,7 @@ public sealed class Binder
                      _currentMemberTypeParameters ?? Array.Empty<TypeParameterNode>(),
                      _currentClass?.TypeParameters ?? Array.Empty<TypeParameterNode>()))
         {
-            if (!string.Equals(parameter.Name, name, StringComparison.Ordinal))
+            if (!string.Equals(parameter.Name, name.TrimStart('@'), StringComparison.Ordinal))
                 continue;
             return parameter.Constraints
                 .Where(constraint => constraint.Kind is TypeConstraintKind.Interface
@@ -5962,13 +9937,13 @@ public sealed class Binder
     private bool IsNominalTypeInvisibleToThisModule(string type)
     {
         var canonical = TypeIdentity.Canonicalize(type);
-        // These spellings previously had the built-in OPTION head and therefore did not
-        // suppress a failed overload. Keep that rejection until #1382/#1383/#1385 hand it off.
+        // Nullable spellings must not suppress a failed overload.
+        // Keep that rejection until #1382/#1383/#1385 hand it off.
         // This compatibility condition is not a claim that the referent was resolved.
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(canonical, out _))
             return false;
 
-        // Head of a generic/array/option form: `Seq<Assembly>` -> `Seq`.
+        // Head of a generic/array form: `Seq<Assembly>` -> `Seq`.
         var head = canonical;
         var generic = head.IndexOf('<');
         if (generic > 0)
@@ -5990,7 +9965,14 @@ public sealed class Binder
         if (GetTypeParameterConstraints(head) != null)
             return false;
 
-        return ResolveClass(head) == null;
+        if (TryBuildReferenceType(head, _currentClassName, _currentNamespaceIdentity,
+                _currentMemberTypeParameters?.Select(parameter => parameter.Name))
+            is { RoslynSymbol.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_Object })
+            return false;
+
+        return ResolveClass(head) == null
+            && ResolveSourceType(head, _currentClassName, _currentNamespaceIdentity, _currentNamespaceScopeId).Type
+                is not { IsEnum: true };
     }
 
     /// <summary>
@@ -6072,6 +10054,16 @@ public sealed class Binder
             ("LONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
             ("ULONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
             ("FLOAT[bits=32]", "FLOAT") => true,
+            // 0.30: C#'s char row. Without it a char argument could reach only an `object`
+            // overload while C# picks the `int` one.
+            ("CHAR", "INT[bits=16][signed=false]"
+                or "INT"
+                or "UINT"
+                or "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
             _ => false,
         };
 
@@ -6087,10 +10079,7 @@ public sealed class Binder
         return function.Visibility switch
         {
             Visibility.Private =>
-                string.Equals(
-                    function.ContainingTypeName,
-                    _currentClassName,
-                    StringComparison.Ordinal),
+                IsWithinDeclaringType(function.ContainingTypeName),
             Visibility.Protected or Visibility.PrivateProtected =>
                 _currentClass != null
                 && IsSameOrDerivedClass(_currentClass, function.ContainingTypeName),
@@ -6127,25 +10116,98 @@ public sealed class Binder
         return Array.Empty<Symbol>();
     }
 
-    private bool IsMemberAccessible(VariableSymbol member)
+    private IReadOnlyList<Symbol> ResolveLexicalMembers(string memberName)
     {
-        if (member.DeclaringTypeName == null)
-            return true;
+        var declaredHere = ResolveAccessibleMembers(_currentClass, memberName);
+        if (declaredHere.Count > 0 || memberName.Contains('.', StringComparison.Ordinal))
+            return declaredHere;
 
-        return member.Visibility switch
+        var enclosing = _currentClass;
+        while (enclosing != null && _containingClasses.TryGetValue(enclosing, out enclosing))
+        {
+            var declared = _classScopes[enclosing].LookupAllLocal(memberName);
+            if (declared.Count > 0)
+            {
+                return declared.All(symbol => symbol is VariableSymbol { IsStatic: true } variable
+                        && IsMemberAccessible(variable))
+                    ? declared
+                    : Array.Empty<Symbol>();
+            }
+        }
+        return Array.Empty<Symbol>();
+    }
+
+    private IReadOnlyList<Symbol> ResolveReadableInstanceProperties(ClassDefinitionNode receiverClass, string memberName)
+    {
+        var members = ResolveAccessibleMembers(receiverClass, memberName);
+        return members.All(member => member is VariableSymbol { IsProperty: true, IsStatic: false } property
+                && HasAccessiblePropertyGetter(property, receiverClass))
+            ? members : Array.Empty<Symbol>();
+    }
+
+    private IReadOnlyList<Symbol> ResolveReadableInstanceMembers(ClassDefinitionNode receiverClass, string memberName)
+    {
+        var members = ResolveAccessibleMembers(receiverClass, memberName);
+        if (members is [VariableSymbol { IsField: true, IsStatic: false } field]
+            && field.DeclaringTypeName is { } declaringType
+            && _classesByQualifiedName.TryGetValue(declaringType, out var owner)
+            && !owner.IsPartial && owner.PreprocessorBlocks.Count == 0 && owner.InteropBlocks.Count == 0
+            && EnumerateFields(owner).Count(declaration => declaration.Name == memberName) == 1
+            && (field.Visibility is not (Visibility.Protected or Visibility.PrivateProtected)
+                || _currentClass != null
+                    && IsSameOrDerivedClass(receiverClass, _qualifiedClassNames[_currentClass])))
+            return members;
+        return ResolveReadableInstanceProperties(receiverClass, memberName);
+    }
+
+    private bool HasAccessiblePropertyGetter(VariableSymbol member, ClassDefinitionNode receiverClass)
+    {
+        if (member.DeclaringTypeName == null
+            || !_classesByQualifiedName.TryGetValue(member.DeclaringTypeName, out var declaringClass))
+            return false;
+
+        var declarations = EnumerateProperties(declaringClass)
+            .Where(property => property.Name == member.Name && property.IdentifierSpan == member.DeclarationSpan)
+            .ToArray();
+        if (declarations is not [{ Getter: { } getter } property])
+            return false;
+
+        var visibility = getter.Visibility ?? property.Visibility;
+        return IsMemberAccessible(visibility, member.DeclaringTypeName)
+            && (visibility is not (Visibility.Protected or Visibility.PrivateProtected)
+                || _currentClass != null
+                    && IsSameOrDerivedClass(receiverClass, _qualifiedClassNames[_currentClass]));
+    }
+
+    private bool IsMemberAccessible(VariableSymbol member) =>
+        member.DeclaringTypeName == null || IsMemberAccessible(member.Visibility, member.DeclaringTypeName);
+
+    private bool IsMemberAccessible(Visibility visibility, string declaringTypeName)
+    {
+        return visibility switch
         {
             Visibility.Private =>
-                string.Equals(
-                    member.DeclaringTypeName,
-                    _currentClassName,
-                    StringComparison.Ordinal),
+                IsWithinDeclaringType(declaringTypeName),
             Visibility.Protected or Visibility.PrivateProtected =>
                 _currentClass != null
-                && IsSameOrDerivedClass(_currentClass, member.DeclaringTypeName),
+                && IsSameOrDerivedClass(_currentClass, declaringTypeName),
             Visibility.Internal or Visibility.ProtectedInternal => true,
             Visibility.Public => true,
             _ => false,
         };
+    }
+
+    private bool IsWithinDeclaringType(string declaringTypeName)
+    {
+        var current = _currentClass;
+        while (current != null)
+        {
+            if (string.Equals(_qualifiedClassNames[current], declaringTypeName, StringComparison.Ordinal))
+                return true;
+            if (!_containingClasses.TryGetValue(current, out current))
+                break;
+        }
+        return false;
     }
 
     private bool IsSameOrDerivedClass(
@@ -6170,6 +10232,21 @@ public sealed class Binder
             current = baseClass;
         }
 
+        return false;
+    }
+
+    private bool IsEnclosingLexicalCall(string target, string lookupName)
+    {
+        if (target.Contains('.', StringComparison.Ordinal) || _currentClass is null
+            || EnumerateHierarchyLookupNames(_currentClass, target).Contains(lookupName, StringComparer.Ordinal))
+            return false;
+
+        var enclosing = _currentClass;
+        while (_containingClasses.TryGetValue(enclosing, out enclosing))
+        {
+            if (EnumerateHierarchyLookupNames(enclosing, target).Contains(lookupName, StringComparer.Ordinal))
+                return true;
+        }
         return false;
     }
 
@@ -6210,7 +10287,10 @@ public sealed class Binder
         {
             // 0.25 F3 (#847): C# simple-name lookup: a local/parameter is invoked as a
             // value; a visible local function wins over members and module functions.
-            if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null })
+            if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null }
+                || _scope.Lookup(target) is VariableSymbol { StorageIdentity.EventDeclaration: not null }
+                || ResolveLexicalMembers(target).OfType<VariableSymbol>()
+                    .Any(variable => variable.EventDeclaration is not null))
                 yield break;
             if (_scope.GetOverloads(target).Any(_localFunctionSymbols.Contains))
             {
@@ -6225,6 +10305,12 @@ public sealed class Binder
                              target))
                 {
                     yield return lookupName;
+                }
+                var enclosing = _currentClass;
+                while (_containingClasses.TryGetValue(enclosing, out enclosing))
+                {
+                    foreach (var lookupName in EnumerateHierarchyLookupNames(enclosing, target))
+                        yield return lookupName;
                 }
             }
 
@@ -6489,9 +10575,9 @@ public sealed class Binder
                 continue;
             }
             string? reason;
-            if (arguments[index] is ReferenceNode { Name: "_" } discard)
+            if (arguments[index] is ReferenceNode { Name: "_", IsVerbatim: false } discard)
             {
-                var declared = _scope.LookupAll("_").Count > 0 || ResolveAccessibleMembers(_currentClass, "_").Count > 0;
+                var declared = _scope.LookupAll("_").Count > 0 || ResolveLexicalMembers("_").Count > 0;
                 reason = modifier != "out" ? $"'{modifier} _' is not a discard; only 'out _' is"
                     : declared ? "'out _' would bind to the declared symbol '_', not discard" : null;
                 bound[index] = declared ? BindExpression(discard) : new BoundVariableExpression(discard.Span, CreateUnresolvedVariable(discard));
@@ -6656,7 +10742,20 @@ public sealed class Binder
             // Only these kinds run no code and read no shared storage of their own; every other
             // kind (calls of any form, construction, element/field/property reads) may.
             BoundIntLiteral or BoundStringLiteral or BoundBoolLiteral or BoundFloatLiteral or BoundDecimalLiteral
-                or BoundNoneLiteral or BoundNullLiteral or BoundLambdaExpression => false,
+                or BoundNullLiteral or BoundLambdaExpression => false,
+            BoundThrowExpression { Exception: BoundNullLiteral } => false,
+            BoundStructuralExpression
+                { NodeTypeName: nameof(NullCoalesceNode), Children: [var receiver, BoundThrowExpression { Exception: BoundNullLiteral }] } =>
+                MayChangeHeap(receiver),
+            BoundFieldAccessExpression
+                {
+                    ResolvedMetadataMember: Microsoft.CodeAnalysis.IPropertySymbol
+                    {
+                        Name: "Length", IsStatic: false, Parameters.Length: 0,
+                        ContainingType.SpecialType: Microsoft.CodeAnalysis.SpecialType.System_String
+                    },
+                    Target: var receiver
+                } => MayChangeHeap(receiver),
             // An operator on a user type may be an overloaded operator method.
             BoundBinaryExpression binary => !IsBuiltInOperand(binary.Left) || !IsBuiltInOperand(binary.Right),
             // A built-in string or character operation (`len`, `upper`) over built-in operands runs no user code.
@@ -6677,13 +10776,7 @@ public sealed class Binder
     {
         if (_byReferenceParameters.Count == 0)
             return false;
-        var target = bound switch
-        {
-            BoundAssignmentStatement assignment => assignment.Target,
-            BoundCompoundAssignment compound => compound.Target,
-            _ => null,
-        };
-        if (target != null)
+        if (bound?.DirectWriteTarget is { } target)
             return AssignsAliasedStorage(target);
         return statement is not (IfStatementNode or WhileStatementNode or ForStatementNode or DoWhileStatementNode
             or TryStatementNode or MatchStatementNode or BindStatementNode or ReturnStatementNode or BreakStatementNode
@@ -6720,6 +10813,7 @@ public sealed class Binder
         _aliasInvalidations++;
         foreach (var parameter in _byReferenceParameters)
         {
+            InvalidateMemberFlowNarrowing(parameter);
             if (_scope.Lookup(parameter.Name) is VariableSymbol visible
                 && !ReferenceEquals(visible, parameter) && ReferenceEquals(RootOf(visible), parameter))
             {
@@ -6731,28 +10825,7 @@ public sealed class Binder
     private static string MakeArrayType(string elementType, int rank) =>
         $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
 
-    private static string MakeOptionType(string innerType) =>
-        $"Option<{innerType}>";
-
-    private static string MakeResultType(string okType, string errorType) =>
-        $"RESULT[ok={okType}][err={errorType}]";
-
-    private static string UnwrapAwaitedType(string typeName)
-    {
-        foreach (var prefix in new[] { "Task<", "ValueTask<", "TASK<", "VALUETASK<" })
-        {
-            if (typeName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                && typeName.EndsWith('>'))
-                return typeName[prefix.Length..^1];
-        }
-
-        return typeName.Equals("Task", StringComparison.OrdinalIgnoreCase)
-            || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
-            ? "VOID"
-            : "OBJECT";
-    }
-
-    private static string GetIndexedElementType(string typeName)
+    private static string? GetIndexedElementType(string typeName)
     {
         const string arrayPrefix = "ARRAY[element=";
         if (typeName.StartsWith(arrayPrefix, StringComparison.OrdinalIgnoreCase)
@@ -6773,11 +10846,11 @@ public sealed class Binder
             var arguments = SplitTopLevelTypeArguments(typeName[(genericStart + 1)..^1]);
             if (genericName.Contains("Dictionary", StringComparison.OrdinalIgnoreCase)
                 || genericName.Equals("Dict", StringComparison.OrdinalIgnoreCase))
-                return arguments.Count > 1 ? arguments[1] : "OBJECT";
-            return arguments.Count > 0 ? arguments[0] : "OBJECT";
+                return arguments.Count > 1 ? arguments[1] : null;
+            return arguments.Count > 0 ? arguments[0] : null;
         }
 
-        return "OBJECT";
+        return null;
     }
 
     private static IReadOnlyList<string> SplitTopLevelTypeArguments(string text)
@@ -6884,6 +10957,9 @@ public sealed class Binder
             "int[bits=64][signed=false]" => "ULONG",
             "f32" or "single" => "FLOAT[bits=32]",
             "float[bits=32]" => "FLOAT[bits=32]",
+            // Only the lowercase C# keyword is single precision; `FLOAT` is the canonical double
+            // (see TypeIdentity.Canonicalize).
+            "float" when trimmed == "float" => "FLOAT[bits=32]",
             "f64" or "float" or "double" => "FLOAT",
             "dec" or "decimal" => "DECIMAL",
             "str" or "string" => "STRING",
@@ -7059,7 +11135,7 @@ public sealed class Binder
     private BoundMatchStatement BindMatchStatement(MatchStatementNode matchStmt)
     {
         var target = BindExpression(matchStmt.Target);
-        return new BoundMatchStatement(matchStmt.Span, target, BindMatchCases(matchStmt.Cases));
+        return new BoundMatchStatement(matchStmt.Span, target, BindMatchCases(matchStmt.Cases, target));
     }
 
     // ===== New statement binders for class member bodies =====
@@ -7095,32 +11171,73 @@ public sealed class Binder
     {
         var what = form.Replace("{0}", $"'{name}'", StringComparison.Ordinal);
         _diagnostics.ReportError(span, DiagnosticCode.WriteToReadOnlyLocal, isLoopVariable
-            ? $"Cannot {what}: it is a §L loop variable, which only the loop may update. " +
-              $"Copy it into a mutable binding (§B{{~name}} {name}) or use a §WH loop."
+            ? $"Cannot {what}: it is a 'for' loop variable, which only the loop may update. " +
+              $"Copy it into a mutable binding (var copy = {name}) or use a 'while' loop."
             : $"Cannot {what}: it is an immutable binding. " +
-              $"Declare it mutable with a leading '~' (§B{{~{name}}} or §B{{~{name}:type}}).");
+              $"Declare it mutable with 'var' instead of 'let' (var {name} = ... or var type:{name} = ...).");
     }
 
     private BoundAssignmentStatement BindAssignmentStatement(AssignmentStatementNode assign)
     {
         var target = BindExpression(assign.Target);
         var value = BindExpression(assign.Value);
+        CheckMetadataArrayToCollection(value, target.Type.DisplayString, assign.Span, "Assignment");
         ReportWriteToReadOnlyLocal(target, assign.Target.Span, "assign to {0}");
+        InvalidateMemberFlowNarrowing(target);
         if (target is BoundVariableExpression variable)
         {
-            var restored = InvalidateMutableFlowNarrowing(variable.Variable);
+            var restored = InvalidateMutableFlowNarrowing(variable.Variable,
+                mayWriteNull: MayIntroduceNullInObliviousModule(value));
             if (!ReferenceEquals(restored, variable.Variable))
                 target = new BoundVariableExpression(assign.Target.Span, restored);
             SetCallableState(restored, value);
         }
+        else if (target is BoundFieldAccessExpression { ResolvedFields: [var member] }
+            && member.EventDeclaration is not null)
+        {
+            InvalidateMutableFlowNarrowing(member, requireRebindable: false);
+            SetCallableState(member, value);
+        }
         return new BoundAssignmentStatement(assign.Span, target, value);
+    }
+
+    private void CheckMetadataArrayToCollection(
+        BoundExpression value, string targetTypeName, Parsing.TextSpan span, string subject)
+    {
+        if (value.MetadataArrayResultType is not { } array
+            || GetOrCreateMetadataBinder() is not { } metadata
+            || ResolveComputedMetadataType(metadata.Context, targetTypeName)
+                is not Microsoft.CodeAnalysis.INamedTypeSymbol { IsGenericType: true } target)
+            return;
+        var identity = $"{target.ContainingNamespace.ToDisplayString()}.{target.OriginalDefinition.MetadataName}";
+        if (identity is not ("System.Collections.Generic.List`1" or "System.Collections.Generic.HashSet`1"
+            or "System.Collections.Generic.SortedSet`1" or "System.Collections.Generic.Queue`1"
+            or "System.Collections.Generic.Stack`1" or "System.Collections.Generic.LinkedList`1"
+            or "System.Collections.ObjectModel.Collection`1" or "System.Collections.ObjectModel.ObservableCollection`1"
+            or "System.Collections.Generic.SortedList`2"))
+            return;
+        _diagnostics.ReportError(span, DiagnosticCode.BindArrayToConcreteCollection,
+            $"{subject} is a concrete collection ('{target.Name}<…>'), but the selected metadata member returns an array. "
+            + $"An array is not implicitly convertible to '{target.Name}<…>' in C# (CS0029). "
+            + $"Use '{array.ToDisplayString()}', or construct a new {target.Name} from the array.");
     }
 
     private BoundCompoundAssignment BindCompoundAssignment(CompoundAssignmentStatementNode compound)
     {
+        if (compound.Operator is CompoundAssignmentOperator.Add or CompoundAssignmentOperator.Subtract
+            && TryGetEventStorage(compound.Target, out _, out _, subscription: true)
+            && BindEventSubscription(compound, compound.Target, compound.Value,
+                compound.Operator == CompoundAssignmentOperator.Add) is BoundCompoundAssignment subscription)
+            return subscription;
         var target = BindExpression(compound.Target);
         var value = BindExpression(compound.Value);
         ReportWriteToReadOnlyLocal(target, compound.Target.Span, "assign to {0}");
+        InvalidateMemberFlowNarrowing(target);
+        if (target is IBoundStorageExpression { ReferencedStorage: { EventDeclaration: not null } storage })
+        {
+            InvalidateMutableFlowNarrowing(storage, requireRebindable: false);
+            SetCallableState(storage, value);
+        }
         return new BoundCompoundAssignment(compound.Span, target, compound.Operator, value);
     }
 
@@ -7129,10 +11246,14 @@ public sealed class Binder
         using var _ = PushScope(_scope.CreateChild());
 
         var collection = BindExpression(forEach.Collection);
-        var variableType = string.IsNullOrWhiteSpace(forEach.VariableType)
-                           || forEach.VariableType.Equals("var", StringComparison.OrdinalIgnoreCase)
-            ? GetIndexedElementType(collection.Type.DisplayString)
-            : forEach.VariableType;
+        var isTypeInferred = string.IsNullOrWhiteSpace(forEach.VariableType)
+            || forEach.VariableType.Equals("var", StringComparison.OrdinalIgnoreCase);
+        var inferredElementType = isTypeInferred
+            ? GetIndexedElementType(collection.Type.DisplayString) : null;
+        var variableType = isTypeInferred
+            ? inferredElementType ?? "OBJECT" : forEach.VariableType;
+        var hasUnknownInferredType = isTypeInferred
+            && (inferredElementType is null || collection.HasUnknownInferredType);
         var loopVar = CreateLocalVariable(
             forEach.VariableName,
             variableType,
@@ -7144,7 +11265,13 @@ public sealed class Binder
             // v0.14 nullability workstream (task #3) — inherit declared
             // STRING nullability on foreach loop variables. Scoped to
             // STRING per §D6; INT/other keep Oblivious.
-            nullableAnnotation: TryReadDeclaredStringAnnotation(variableType));
+            nullableAnnotation: TryReadDeclaredStringAnnotation(variableType),
+            isTypeInferred: isTypeInferred,
+            inferredReferenceType: isTypeInferred && !hasUnknownInferredType
+                ? TryBuildReferenceType(variableType, _currentClassName, _currentNamespaceIdentity,
+                    _currentMemberTypeParameters?.Select(parameter => parameter.Name))
+                : null,
+            hasUnknownInferredType: hasUnknownInferredType);
         _scope.TryDeclare(loopVar);
 
         if (forEach.IndexVariableName != null)
@@ -7167,6 +11294,38 @@ public sealed class Binder
         return new BoundForeachStatement(forEach.Span, loopVar, collection, body);
     }
 
+    private BoundForeachStatement BindDeconstructionForeach(DictionaryForeachNode each)
+    {
+        using var _ = PushScope(_scope.CreateChild());
+        var collection = BindExpression(each.Dictionary);
+        string? keyType = null;
+        string? valueType = null;
+        if (TypeIdentity.TrySplitGeneric(collection.Type.DisplayString, out var typeName, out var arguments)
+            && typeName is "Dictionary" or "System.Collections.Generic.Dictionary"
+            && arguments.Count == 2)
+        {
+            keyType = arguments[0];
+            valueType = arguments[1];
+        }
+        VariableSymbol Declare(string name, string? type, TextSpan span)
+        {
+            var symbol = CreateLocalVariable(name, type ?? "OBJECT", false, false,
+                ParameterModifier.None, span, "foreach-deconstruction",
+                isTypeInferred: true, hasUnknownInferredType: type == null);
+            if (!_scope.TryDeclare(symbol))
+                _diagnostics.ReportError(span, DiagnosticCode.DuplicateDefinition,
+                    $"Variable '{name}' is already defined");
+            return symbol;
+        }
+        var key = Declare(each.KeyName, keyType, each.KeySpan);
+        var value = Declare(each.ValueName, valueType, each.ValueSpan);
+        PrepareLoopCallableState(each.Body);
+        var headerCallables = CaptureCallableState();
+        var body = BindStatements(each.Body);
+        JoinCallableState(headerCallables);
+        return new BoundForeachStatement(each.Span, key, collection, body, value);
+    }
+
     private BoundUsingStatement BindUsingStatement(UsingStatementNode usingStmt)
     {
         using var _ = PushScope(_scope.CreateChild());
@@ -7177,12 +11336,14 @@ public sealed class Binder
         {
             if (usingStmt.VariableType is not null
                 && TryBuildStringTarget(usingStmt.VariableType, out var target)
+                && !IsObliviousFlowInObliviousModule(resourceExpr)
                 && NullabilityChecker.IsPossiblyNullAssignedTo(resourceExpr, target!))
             {
                 var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target!);
                 _diagnostics.Report(
                     resourceExpr.Span,
                     DiagnosticCode.NullableToNonNullableBinding,
+                    DescribeClosedGenericReceiving(resourceExpr, target!) ??
                     $"Using resource '{usingStmt.VariableName}' declares non-nullable {targetShapeLabel} but its initializer " +
                     $"may be null (source annotation: '{DescribeAnnotation(resourceExpr)}'). " +
                     $"Change the target to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
@@ -7210,7 +11371,8 @@ public sealed class Binder
                 "using",
                 nullableAnnotation: annotation,
                 inferredReferenceType: inferredReferenceType,
-                isTypeInferred: usingStmt.VariableType is null);
+                isTypeInferred: usingStmt.VariableType is null,
+                hasUnknownInferredType: usingStmt.VariableType is null && resourceExpr.HasUnknownInferredType);
             _scope.TryDeclare(resource);
         }
 
@@ -7302,7 +11464,7 @@ public sealed class Binder
                 // field, parameter or local, so after the block it would mean different variables
                 // depending on the active branch. The binding still hoists, so writes to it are
                 // checked too.
-                conflict = $"Variable '{visible.Name}' declared in a §PP branch hides a variable or member of the " +
+                conflict = $"Variable '{visible.Name}' declared in a pp branch hides a variable or member of the " +
                     "same name, but not every branch declares it, so after the block the name would refer to " +
                     "different variables depending on the active branch. Declare it in every branch, or rename it";
                 hoistDespiteConflict = true;
@@ -7313,7 +11475,7 @@ public sealed class Binder
                 // The code after the block has one variable, so its type (and any refinement
                 // the emitter guards writes with) must not depend on which branch is active.
                 conflict = $"Variable '{visible.Name}' is declared with different types in the branches " +
-                    $"of a §PP block ({string.Join(", ", alternatives.Select(variable => $"'{variable.TypeName}'").Distinct())}); " +
+                    $"of a pp block ({string.Join(", ", alternatives.Select(variable => $"'{AttributeHelper.ToSurfaceSpelling(variable.TypeName)}'").Distinct())}); " +
                     "declare it with the same type in every branch";
             }
             if (conflict != null)
@@ -7331,6 +11493,7 @@ public sealed class Binder
             {
                 StoreCallableState(visible, UnionCallableEffects(GetCallableState(visible), GetCallableState(other)));
                 _callableState.Remove(other);
+                visible.HasUnknownInferredType |= other.HasUnknownInferredType;
                 other.StorageIdentity = visible;
             }
             // A flow fact (such as "not null") a branch established for its binding survives the
@@ -7476,7 +11639,10 @@ public sealed class Binder
                 Check(dec.Operand, "decrement {0}"); break;
             case CallStatementNode call: CheckArguments(call.Arguments, call.ArgumentModifiers); break;
             case CallExpressionNode call: CheckArguments(call.Arguments, call.ArgumentModifiers); break;
-            case ForStatementNode loop: childScope[loop.VariableName] = UnboundLocal.Loop; break;
+            case ForStatementNode loop:
+                childScope[loop.VariableName] = loop.ReevaluatesCondition
+                    ? UnboundLocal.Writable : UnboundLocal.Loop;
+                break;
             case ForeachStatementNode each: childScope[each.VariableName] = UnboundLocal.Writable; break;
             case DictionaryForeachNode each:
                 childScope[each.KeyName] = UnboundLocal.Writable;
@@ -7576,18 +11742,22 @@ public sealed class Binder
         var previousClassScope = _currentClassScope;
         var previousClassIdentity = _currentClassIdentity;
         var previousNamespaceIdentity = _currentNamespaceIdentity;
+        var previousNamespaceScopeId = _currentNamespaceScopeId;
         _currentClassName = className;
         _currentClass = cls;
         _currentClassScope = classScope;
         _currentClassIdentity = _classSymbolIds[cls];
         _currentNamespaceIdentity = cls.NamespaceIdentity;
+        _currentNamespaceScopeId = cls.NamespaceScopeId;
 
         try
         {
             // Methods
             foreach (var method in EnumerateMethods(cls))
             {
-                if (method.IsAbstract || method.IsExtern || method.Body.Count == 0)
+                if (method.Body.Count == 0 && !method.HasContracts
+                    && _contractInheritance?.RuntimeContracts.ContainsKey(method) != true
+                    && !method.Parameters.Any(parameter => parameter.InlineRefinement != null))
                     continue;
                 var bound = TryBindMember(() => BindMethod(method, className), method.Span, className, method.Name);
                 if (bound != null) functions.Add(bound);
@@ -7596,7 +11766,8 @@ public sealed class Binder
             // Constructors
             foreach (var ctor in EnumerateConstructors(cls))
             {
-                if (ctor.Body.Count == 0 && ctor.Initializer == null)
+                if (ctor.Body.Count == 0 && ctor.Initializer == null && !cls.IsRecord
+                    && ctor.Preconditions.Count == 0)
                     continue;
                 var memberName = ctor.IsStatic ? ".cctor" : ".ctor";
                 var bound = TryBindMember(
@@ -7658,15 +11829,20 @@ public sealed class Binder
 
             // Operator overloads
             var operators = EnumerateOperators(cls).ToArray();
+            var ambiguousOperatorKeys = operators.GroupBy(op => CallableIdentityKey($"op_{op.Kind}", op.Parameters, []))
+                .Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
             for (var operatorIndex = 0; operatorIndex < operators.Length; operatorIndex++)
             {
                 var op = operators[operatorIndex];
                 if (op.Body.Count == 0) continue;
+                var fallbackKey = CallableIdentityKey($"op_{op.Kind}", op.Parameters, []);
+                if (ambiguousOperatorKeys.Contains(fallbackKey))
+                    fallbackKey += ":ambiguous-snapshot:" + _transientBindingId;
                 var bound = TryBindMember(
-                    () => BindOperator(op, className, operatorIndex),
+                    () => BindOperator(op, className, fallbackKey),
                     op.Span,
                     className,
-                    $"op_{op.Kind}");
+                    fallbackKey);
                 if (bound != null) functions.Add(bound);
             }
 
@@ -7753,6 +11929,7 @@ public sealed class Binder
             _currentClassScope = previousClassScope;
             _currentClassIdentity = previousClassIdentity;
             _currentNamespaceIdentity = previousNamespaceIdentity;
+            _currentNamespaceScopeId = previousNamespaceScopeId;
         }
     }
 
@@ -7798,14 +11975,18 @@ public sealed class Binder
         var functionSymbol = _functionSymbols[method];
         using var _identity = PushDeclarationContext(functionSymbol.Id);
         // v0.14 §S4 — expose the declared return type to BindReturnStatement.
-        using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
+        using var _returnCtx = PushReturnTypeContext(functionSymbol.BodyReturnType);
 
         DeclareParameters(functionSymbol.Parameters, method.Parameters);
+        var inherited = !method.HasContracts
+            ? _contractInheritance?.RuntimeContracts.GetValueOrDefault(method) : null;
+        var contracts = BindContracts(inherited?.Preconditions ?? method.Preconditions,
+            inherited?.Postconditions ?? method.Postconditions, functionSymbol.BodyReturnType);
         var boundBody = BindStatements(method.Body);
         BindLocalFunctions(localFunctions, localFunctionScope, functionSymbol.Id);
         var declaredEffects = ExtractMethodEffects(method.Effects);
         return new BoundFunction(method.Span, functionSymbol, boundBody, functionScope,
-            declaredEffects, BoundMemberKind.Method, className);
+            declaredEffects, BoundMemberKind.Method, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindConstructor(ConstructorNode ctor, string className)
@@ -7821,6 +12002,7 @@ public sealed class Binder
         using var _returnCtx = PushReturnTypeContext(functionSymbol.ReturnType);
 
         DeclareParameters(functionSymbol.Parameters, ctor.Parameters);
+        var contracts = BindContracts(ctor.Preconditions, [], "VOID");
 
         // Bind constructor initializer (: base(...) / : this(...)) as a call prepended to body.
         // This makes initializer arguments visible to bug pattern checkers (e.g., div-by-zero in base(x / y)).
@@ -7853,7 +12035,7 @@ public sealed class Binder
         return new BoundFunction(ctor.Span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(),
             ctor.IsStatic ? BoundMemberKind.StaticConstructor : BoundMemberKind.Constructor,
-            className);
+            className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindPropertyAccessor(
@@ -7911,15 +12093,16 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — property getters that return :string flow through here.
         using var _returnCtx = PushReturnTypeContext(returnType);
+        var contracts = BindContracts(accessor.Preconditions, [], returnType);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
-            Array.Empty<string>(), memberKind, className);
+            Array.Empty<string>(), memberKind, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindOperator(
         OperatorOverloadNode op,
         string className,
-        int operatorIndex)
+        string fallbackKey)
     {
         var functionScope = _scope.CreateChild();
         using var _s = PushScope(functionScope);
@@ -7928,7 +12111,7 @@ public sealed class Binder
             _currentClassIdentity,
             "operator",
             op.Id,
-            $"op_{op.Kind}");
+            fallbackKey);
         using var _identity = PushDeclarationContext(functionId);
 
         var parameters = BindParameters(op.Parameters);
@@ -7946,11 +12129,13 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — operator overloads with a declared return type.
         using var _returnCtx = PushReturnTypeContext(returnType);
+        var contracts = BindContracts(op.Preconditions, op.Postconditions, returnType);
         var boundBody = BindStatements(op.Body);
-        // OperatorOverloadNode has no Effects field — mark as unknown
-        var declaredEffects = new List<string> { "*:*" };
+        var declaredEffects = op.Effects is null
+            ? new[] { "*:*" }
+            : ExtractMethodEffects(op.Effects);
         return new BoundFunction(op.Span, functionSymbol, boundBody, functionScope,
-            declaredEffects, BoundMemberKind.OperatorOverload, className);
+            declaredEffects, BoundMemberKind.OperatorOverload, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindIndexerAccessor(
@@ -8003,9 +12188,10 @@ public sealed class Binder
         TrackSymbol(functionSymbol);
         // v0.14 §S4 — indexer getters that return :string flow through here.
         using var _returnCtx = PushReturnTypeContext(returnType);
+        var contracts = BindContracts(accessor.Preconditions, [], returnType);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
-            Array.Empty<string>(), memberKind, className);
+            Array.Empty<string>(), memberKind, className) { ContractConditions = contracts };
     }
 
     private BoundFunction BindEventAccessor(
@@ -8252,6 +12438,104 @@ public sealed class Binder
             lexicalTypeContext ?? _currentClassName ?? _currentNamespaceIdentity);
     }
 
+    private BoundTypes.FunctionBoundType? TryBuildParameterFunctionType(
+        ParameterNode parameter, IReadOnlyList<EffectParameterInfo>? binders, string? lexicalTypeContext)
+    {
+        if (ResolveSourceCallConversions && _asyncTypeModule is not null)
+        {
+            // The projection's answer for a position whose emitted type can never be a
+            // delegate is always null (it stores the non-delegate type), so do not build
+            // the whole C# image just to learn that.
+            if (EmitsAsNonDelegateType(parameter.TypeName))
+                return null;
+            SourceCallBindings();
+            if (_sourceCallConversions.ParameterTypes.TryGetValue(parameter, out var type))
+                return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
+                    ? new BoundTypes.FunctionBoundType(
+                        System.Collections.Immutable.ImmutableArray.CreateRange(
+                            invoke.Parameters.Select(item => Metadata.MetadataBinderResult.ToBoundType(item.Type))),
+                        Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                        displayOverride: parameter.TypeName,
+                        row: BindRow(parameter.Row, binders))
+                    : null;
+        }
+        return TryBuildFunctionType(parameter.TypeName, parameter.Row, binders, lexicalTypeContext);
+    }
+
+    private BoundTypes.FunctionBoundType? TryBuildReturnFunctionType(
+        OutputNode? output, IReadOnlyList<EffectParameterInfo>? binders, string? lexicalTypeContext)
+    {
+        if (output == null)
+            return null;
+        if (ResolveSourceCallConversions && _asyncTypeModule is not null)
+        {
+            if (EmitsAsNonDelegateType(output.TypeName))
+                return null;
+            SourceCallBindings();
+            if (_sourceCallConversions.OutputTypes.TryGetValue(output, out var type))
+                return type is Microsoft.CodeAnalysis.INamedTypeSymbol { DelegateInvokeMethod: { } invoke }
+                    ? new BoundTypes.FunctionBoundType(
+                        System.Collections.Immutable.ImmutableArray.CreateRange(
+                            invoke.Parameters.Select(item => Metadata.MetadataBinderResult.ToBoundType(item.Type))),
+                        Metadata.MetadataBinderResult.ToBoundType(invoke.ReturnType),
+                        displayOverride: output.TypeName,
+                        row: BindRow(output.Row, binders))
+                    : null;
+        }
+        return TryBuildFunctionType(output.TypeName, output.Row, binders, lexicalTypeContext);
+    }
+
+    /// <summary>
+    /// Whether the C# type the emitter writes for this declared spelling can never
+    /// denote a delegate, whatever the module declares: a C# keyword type
+    /// (<c>int</c>, <c>string</c>, <c>void</c>, ...), or a nullable, array or pointer
+    /// built only from one. Keywords cannot be redeclared or aliased in C#, so Roslyn
+    /// binds such a type to the same non-delegate symbol in every image.
+    /// <para>The source projection (<see cref="SourceCallBindings"/>) types a parameter or
+    /// return as a callback only when that emitted type is a delegate. For these
+    /// spellings it records the non-delegate type and the caller returns null, so
+    /// skipping the projection gives the same answer. That keeps a module whose
+    /// parameters are all scalars from paying for a full C# compilation at binding.
+    /// Anything else (a named type, a generic, a tuple) still asks the projection.</para>
+    /// <para>The spelling is mapped exactly as <c>CSharpEmitter.MapTypeName</c> maps it.
+    /// A head that names a module refinement or indexed type is erased to its base
+    /// type there, so it is never classified here. The check reads the emitted text
+    /// rather than parsing it: it runs for every parameter and return of the module.</para>
+    /// </summary>
+    private bool EmitsAsNonDelegateType(string? typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName) || _asyncTypeModule is null)
+            return false;
+        var spelling = typeName.Trim();
+        var generic = spelling.IndexOf('<');
+        var head = generic > 0 ? spelling[..generic] : spelling;
+        if (_asyncTypeModule.RefinementTypes.Any(type => type.Name == head)
+            || _asyncTypeModule.IndexedTypes.Any(type => type.Name == head))
+            return false;
+        var emitted = Migration.TypeMapper.CalorToCSharp(spelling);
+        if (string.IsNullOrWhiteSpace(emitted))
+            return false;
+        var core = emitted.AsSpan().Trim();
+        while (true)
+        {
+            if (core.EndsWith("?") || core.EndsWith("*"))
+                core = core[..^1].TrimEnd();
+            else if (core.EndsWith("]"))
+            {
+                var open = core.LastIndexOf('[');
+                if (open <= 0)
+                    return false;
+                foreach (var rank in core[(open + 1)..^1])
+                    if (rank != ',' && !char.IsWhiteSpace(rank))
+                        return false;
+                core = core[..open].TrimEnd();
+            }
+            else
+                break;
+        }
+        return SyntaxFacts.IsPredefinedType(SyntaxFacts.GetKeywordKind(core.ToString()));
+    }
+
     /// <summary>
     /// The structural shape of a declared function-type spelling.
     /// <c>Func&lt;A,B&gt;</c> is <c>(A) -&gt; B</c>, <c>Action&lt;A&gt;</c> is
@@ -8322,10 +12606,13 @@ public sealed class Binder
         return null;
     }
 
-    private static BoundTypes.BoundType BuildDeclaredBoundType(string typeName)
+    private BoundTypes.BoundType BuildDeclaredBoundType(string typeName)
     {
         var name = typeName.Trim();
-        var annotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TryBuildMethodInputArrayType(name, out var array))
+            return array!;
+        var annotation = _declaredReferenceAnnotation;
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(name, out var referent))
         {
             name = referent;
@@ -8335,6 +12622,13 @@ public sealed class Binder
         {
             annotation = BoundTypes.NullableAnnotation.Oblivious;
         }
+
+        if (_declaredReferenceAnnotation == BoundTypes.NullableAnnotation.Oblivious
+            && TypeIdentity.TrySplitGeneric(name, out var definition, out var arguments))
+            return new BoundTypes.GenericInstantiationBoundType(
+                new BoundTypes.NominalBoundType(definition),
+                System.Collections.Immutable.ImmutableArray.CreateRange(arguments.Select(BuildDeclaredBoundType)),
+                annotation);
 
         return new BoundTypes.NominalBoundType(name, annotation);
     }
@@ -8446,7 +12740,7 @@ public sealed class Binder
         // corpus, which is a change with a blast radius and nothing to do with
         // rows.
         // Canonicalize throws on an empty/whitespace name (Binding/Scope.cs:323) --
-        // a `§FLD{:c:pri}` parses with an empty type, so guard on whitespace, not null
+        // a `§FLD{:c:priv}` parses with an empty type, so guard on whitespace, not null
         // (review round 2 of PR #1102, R2-A).
         var displayed = string.IsNullOrWhiteSpace(typeName)
             ? "?"
@@ -8461,7 +12755,7 @@ public sealed class Binder
         _diagnostics.ReportError(
             row.Span,
             DiagnosticCode.EffectRowMisplaced,
-            $"{described}, so it cannot carry an effect row. Remove the §E{{…}}, or — if this is "
+            $"{described}, so it cannot carry an effect row. Remove the '!' row, or — if this is "
             + "the function's own effect declaration — move it onto its own line.");
     }
 
@@ -8508,7 +12802,7 @@ public sealed class Binder
         EffectsNode? row,
         IReadOnlyList<EffectParameterInfo>? binders)
     {
-        if (row == null) return BoundTypes.EffectRow.Unknown;
+        if (row == null || row.IsUnknown) return BoundTypes.EffectRow.Unknown;
 
         var mentionsVariable = false;
         foreach (var variable in row.EffectVariables)
@@ -8519,7 +12813,7 @@ public sealed class Binder
                     row.Span,
                     DiagnosticCode.EffectVariableScope,
                     $"Effect variable '{variable}' is not bound by this declaration. "
-                    + "Declare it in the type-parameter list — §F{f:Name:pub}<eff "
+                    + "Declare it in the type-parameter list — func Name<! "
                     + $"{variable}> — or use an effect code from the taxonomy.");
             }
             mentionsVariable = true;

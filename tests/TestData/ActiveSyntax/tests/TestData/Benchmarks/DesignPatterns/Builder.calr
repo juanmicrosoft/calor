@@ -1,0 +1,13 @@
+module Builder Builder
+  module BuilderModule
+    func IsComplete public (bool:hasName, bool:hasAge) → bool
+      !
+      return hasName && hasAge
+
+    func SetStep public (int:currentStep) → int
+      !
+      return currentStep + 1
+
+    func CanBuild public (int:requiredSteps, int:completedSteps) → bool
+      !
+      return completedSteps >= requiredSteps

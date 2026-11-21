@@ -102,6 +102,11 @@ import importlib.util
 import json
 import os
 import re
+import shutil
+import shlex
+import signal
+import subprocess
+import tempfile
 from pathlib import Path
 import xml.etree.ElementTree as ET
 import sys
@@ -445,6 +450,246 @@ def isolate_workspace(workspace):
         "<RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>"
         "<RestoreLockedMode>false</RestoreLockedMode>"
         "</PropertyGroup></Project>\n", encoding="utf-8")
+
+
+def initialized_arm_admission(pair_json, key, arm, output=None):
+    """Initialization is a new, unregistered strict/raw arm, never a frozen slot."""
+    pair = json.loads(Path(pair_json).read_text(encoding="utf-8"))
+    entry = pair.get("arms", {}).get(key, {})
+    if arm != "calor" or key != "calor" or entry.get("config") != STRICT_CONFIG:
+        raise ValueError("initialized workspace requires the ordinary strict calor arm")
+    unregistered_input_admission(pair, output, "initialized workspace")
+
+
+def unregistered_input_admission(pair, output, context):
+    def frozen(value):
+        if isinstance(value, dict):
+            return any("frozen" in k.lower() or "registration" in k.lower() or frozen(v)
+                       for k, v in value.items())
+        if isinstance(value, list):
+            return any(frozen(v) for v in value)
+        return False
+    if "sourceAssembly" in pair or "seeded" in pair or frozen(pair):
+        raise ValueError(context + " cannot use registered/frozen pair inputs")
+    if output:
+        path = Path(output).resolve()
+        if "registrations" in path.parts or any(
+                (parent / name).exists() for parent in (path, *path.parents)
+                for name in ("pins.json", "registration.json")):
+            raise ValueError(context + " cannot write inside a pinned/registered epoch")
+
+
+def arm_compiler_digest(root, dll):
+    allowed = [root / "src/Calor.Compiler/bin" / cfg / "net10.0/calor.dll"
+               for cfg in ("Release", "Debug")]
+    if dll not in allowed or not dll.is_file():
+        raise ValueError("compiler must be a build in the selected arm repo root")
+    task_compiler = root / "src/Calor.Tasks/bin/Release/net10.0/calor.dll"
+    digest = hashlib.sha256(dll.read_bytes()).hexdigest()
+    if not task_compiler.is_file() or hashlib.sha256(task_compiler.read_bytes()).hexdigest() != digest:
+        raise ValueError("selected compiler does not match the arm's Calor.Tasks compiler")
+    return digest
+
+
+def select_canary(source, expected_hash, output, repo_root, compiler, timeout):
+    """Snapshot explicit bytes once; never normalize or auto-select an input."""
+    source, out = Path(source).absolute(), Path(output)
+    root, dll = Path(repo_root).resolve(), Path(compiler).resolve()
+    unregistered_input_admission({}, out, "selected canary")
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
+        raise ValueError("arm canary SHA-256 must be 64 lowercase hex digits")
+    if source.is_symlink() or not source.is_file():
+        raise ValueError("arm canary must be an existing regular, non-symlink file")
+    content = source.read_bytes()
+    if not content or hashlib.sha256(content).hexdigest() != expected_hash:
+        raise ValueError("arm canary bytes do not match the explicit SHA-256 pin")
+    digest = arm_compiler_digest(root, dll)
+    if timeout <= 0:
+        raise ValueError("canary command timeout must be positive")
+    with tempfile.TemporaryDirectory(prefix="p0-canary-home-") as home:
+        env = dict(os.environ, HOME=home, USERPROFILE=home, DOTNET_CLI_HOME=home,
+                   CALOR_TELEMETRY_OPTOUT="1", DOTNET_CLI_TELEMETRY_OPTOUT="1",
+                   DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1")
+        version, _ = _initialized_command(["dotnet", str(dll), "--version"], root, env, timeout)
+        if version.strip() != ET.parse(root / "Directory.Build.props").findtext(".//Version"):
+            raise ValueError("selected compiler version does not match the arm repo root")
+    commit, _ = _initialized_command(["git", "-C", str(root), "rev-parse", "HEAD"],
+                                    root, os.environ, timeout)
+    out.mkdir()  # An existing archive must never be overwritten.
+    (out / "source.calr").write_bytes(content)
+    identity = {"source": str(source), "sha256": expected_hash,
+                "file": "arm-canary/source.calr", "repoRoot": str(root),
+                "repoCommit": commit.strip(), "compiler": str(dll),
+                "compilerSha256": digest, "version": version.strip()}
+    (out / "input.json").write_text(
+        json.dumps(identity, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return identity
+
+
+def _initialized_command(command, cwd, env, timeout, input_text=None):
+    """Bound root exit and pipe EOF; terminate only this subprocess group."""
+    process = subprocess.Popen(command, cwd=cwd, env=env, text=True,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, start_new_session=True)
+    try:
+        stdout, stderr = process.communicate(input_text, timeout=timeout)
+    except BaseException:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except PermissionError as exc:
+            sys.stderr.write("initialized command cleanup could not signal group %s: %s\n" %
+                             (process.pid, exc))
+        try:
+            process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            # An escaped descendant can retain the pipes after the group dies.
+            # Abandon EOF rather than turn timeout/cancellation into another wait.
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if stream is not None:
+                    stream.close()
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                sys.stderr.write("initialized command cleanup could not reap pid %s\n" % process.pid)
+        raise
+    if process.returncode:
+        raise ValueError("selected compiler command failed (%s): %s\n%s" %
+                         (process.returncode, " ".join(command), stderr + stdout))
+    return stdout, stderr
+
+
+def initialize_workspace(workspace, output, repo_root, compiler, template, timeout, exemplar=None):
+    """Run real init in a disposable home, then bind the existing harness SDK pin.
+
+    The raw initializer output is archived before the local-build adapter. No
+    generated instruction, hook, or MCP argument is reconstructed from templates.
+    """
+    ws, out, root, dll = map(lambda p: Path(p).resolve(),
+                            (workspace, output, repo_root, compiler))
+    if timeout <= 0:
+        raise ValueError("initialization timeout must be positive")
+    digest = arm_compiler_digest(root, dll)
+    if not (ws / ".git").is_dir():
+        raise ValueError("initialized workspace requires its own disposable git root")
+    for relative in ("CLAUDE.md", ".claude", ".calor", ".mcp.json"):
+        if (ws / relative).exists():
+            raise ValueError("refusing to overwrite existing initialized input: " + relative)
+    for path in ws.rglob("*"):
+        relative = path.relative_to(ws)
+        if relative.parts[0] == ".git":
+            continue
+        if path.is_symlink() or path.name in (".git", "CLAUDE.md", ".claude", ".mcp.json"):
+            raise ValueError("conflicting initialized workspace input: " + str(relative))
+    archive = out / "initialized-inputs"
+    if archive.exists():
+        raise ValueError("initialized input archive already exists")
+    project = ws / "src/Src.csproj"
+    if not project.is_file() or project.is_symlink():
+        raise ValueError("missing regular initializer project")
+    archive.mkdir()
+    with tempfile.TemporaryDirectory(prefix="p0-init-home-") as home:
+        bin_dir = Path(home) / "bin"
+        bin_dir.mkdir()
+        wrapper = bin_dir / "calor"
+        dotnet = shutil.which("dotnet")
+        if not dotnet:
+            raise ValueError("dotnet is required for selected-arm initialization")
+        wrapper.write_text("#!/bin/sh\nexec %s %s \"$@\"\n" %
+                           (shlex.quote(dotnet), shlex.quote(str(dll))), encoding="utf-8")
+        wrapper.chmod(0o755)
+        env = dict(os.environ, HOME=home, USERPROFILE=home, DOTNET_CLI_HOME=home,
+                   PATH=str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
+                   CALOR_TELEMETRY_OPTOUT="1", DOTNET_CLI_TELEMETRY_OPTOUT="1",
+                   DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1")
+        version, _ = _initialized_command(["dotnet", str(dll), "--version"], ws, env, timeout)
+        declared_version = ET.parse(root / "Directory.Build.props").findtext(".//Version")
+        if not declared_version or version.strip() != declared_version:
+            raise ValueError("selected compiler version does not match the arm repo root")
+        command = ["dotnet", str(dll), "init", "--ai", "claude",
+                   "--project", "src/Src.csproj"]
+        stdout, stderr = _initialized_command(command, ws, env, timeout)
+        (archive / "init.stdout.txt").write_text(stdout, encoding="utf-8")
+        (archive / "init.stderr.txt").write_text(stderr, encoding="utf-8")
+        for relative in ("CLAUDE.md", ".claude/settings.json", ".calor/config.json",
+                         ".gitattributes", ".gitignore", "src/Src.csproj"):
+            source = ws / relative
+            if not source.is_file() or source.is_symlink() or not source.stat().st_size:
+                raise ValueError("init did not generate required input: " + relative)
+        for source in sorted(ws.rglob("*")):
+            relative = source.relative_to(ws)
+            if ".git" in relative.parts:
+                continue
+            if source.is_symlink():
+                raise ValueError("symlinked initialized input: " + str(relative))
+            if not source.is_file():
+                continue
+            dest = archive / relative
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, dest)
+        shutil.copyfile(template, archive / "arm-template.csproj")
+        if exemplar:
+            shutil.copyfile(exemplar, archive / "exemplar.txt")
+        registration = Path(home) / ".claude.json"
+        config = json.loads(registration.read_text(encoding="utf-8"))
+        server = config["projects"][str(ws)]["mcpServers"]["calor"]
+        if server.get("command") != "calor" or server.get("args") != ["mcp", "--stdio"]:
+            raise ValueError("unsupported generated MCP registration; refusing to guess invocation")
+        shutil.copyfile(registration, archive / "claude-home.json")
+        requests = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+             "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+                        "clientInfo": {"name": "initialized-arm-control", "version": "1"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "resources/read",
+             "params": {"uri": "calor://primer"}},
+        ]
+        text, err = _initialized_command(
+            ["dotnet", str(dll)] + server["args"], ws / "src", env, timeout,
+            "".join(json.dumps(r) + "\n" for r in requests))
+        responses = [json.loads(line) for line in text.splitlines() if line.strip()]
+        primer = [r for r in responses if r.get("id") == 2]
+        if (len(primer) != 1 or "error" in primer[0]
+                or not primer[0].get("result", {}).get("contents")
+                or not any(c.get("uri") == "calor://primer" and c.get("text")
+                           for c in primer[0]["result"]["contents"])):
+            raise ValueError("selected compiler did not provide calor://primer")
+        (archive / "primer.jsonl").write_text(text, encoding="utf-8")
+        (archive / "primer.stderr.txt").write_text(err, encoding="utf-8")
+
+    # Keep real init's project and agent inputs. Rebind compilation to the same
+    # SDK/Tasks pin used by the canary instead of init's globally installed tool.
+    document = ET.parse(project)
+    harness = ET.parse(template).getroot()
+    for element in harness:
+        if element.tag == "PropertyGroup" or (
+                element.tag == "ItemGroup" and element.find("ProjectReference") is not None):
+            document.getroot().insert(0, element)
+        elif element.tag == "Import":
+            document.getroot().append(element)
+    # SDK AddCalorGeneratedFilesToCompile owns inclusion after this import.
+    ET.SubElement(document.getroot(), "Target", Name="IncludeCalorGeneratedFiles")
+    document.write(project, encoding="utf-8", xml_declaration=True)
+    shutil.copyfile(project, archive / "bound-Src.csproj")
+    # Translate only the executable binding, retaining generated MCP arguments.
+    server = dict(server, command="dotnet", args=[str(dll)] + server["args"])
+    (out / "mcp-config.json").write_text(
+        json.dumps({"mcpServers": {"calor": server}}, indent=2) + "\n", encoding="utf-8")
+    hashes = {str(p.relative_to(archive)): hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in sorted(archive.rglob("*")) if p.is_file()}
+    commit, _ = _initialized_command(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], ws, os.environ, timeout)
+    identity = {"mode": "calor-init", "ai": "claude", "repoRoot": str(root),
+                "repoCommit": commit.strip(),
+                "compiler": str(dll), "compilerSha256": digest, "version": version.strip(),
+                "command": command, "inputs": hashes,
+                "inputIdentitySha256": hashlib.sha256(json.dumps(
+                    hashes, sort_keys=True).encode("utf-8")).hexdigest(),
+                "archive": "initialized-inputs"}
+    (out / "initialization.json").write_text(
+        json.dumps(identity, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return identity
 
 
 def honest_reference_cells(pair):
@@ -812,8 +1057,45 @@ def main(argv=None):
     p = sub.add_parser("heldout-final"); p.add_argument("path")
     p = sub.add_parser("policy-snapshot"); p.add_argument("workspace")
     p = sub.add_parser("isolate-workspace"); p.add_argument("workspace")
+    p = sub.add_parser("initialized-arm-admission")
+    p.add_argument("pair_json"); p.add_argument("key"); p.add_argument("arm")
+    p.add_argument("--output")
+    p = sub.add_parser("initialize-workspace")
+    for name in ("workspace", "output", "repo_root", "compiler", "template"):
+        p.add_argument(name)
+    p.add_argument("--timeout", type=float, default=120)
+    p.add_argument("--exemplar")
+    p = sub.add_parser("canary-admission")
+    p.add_argument("pair_json"); p.add_argument("output")
+    p = sub.add_parser("select-canary")
+    for name in ("source", "sha256", "output", "repo_root", "compiler"):
+        p.add_argument(name)
+    p.add_argument("--timeout", type=float, default=120)
     sub.add_parser("self-test")
     args = parser.parse_args(argv)
+    if args.cmd in ("canary-admission", "select-canary"):
+        try:
+            if args.cmd == "canary-admission":
+                pair = json.loads(Path(args.pair_json).read_text(encoding="utf-8"))
+                unregistered_input_admission(pair, args.output, "selected canary")
+            else:
+                select_canary(args.source, args.sha256, args.output, args.repo_root,
+                              args.compiler, args.timeout)
+            return 0
+        except (OSError, ValueError, ET.ParseError, subprocess.TimeoutExpired) as exc:
+            sys.stderr.write("invalid selected canary: %s\n" % exc)
+            return 3
+    if args.cmd in ("initialize-workspace", "initialized-arm-admission"):
+        try:
+            if args.cmd == "initialized-arm-admission":
+                initialized_arm_admission(args.pair_json, args.key, args.arm, args.output)
+            else:
+                initialize_workspace(args.workspace, args.output, args.repo_root,
+                                     args.compiler, args.template, args.timeout, args.exemplar)
+            return 0
+        except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as exc:
+            sys.stderr.write("invalid initialized workspace: %s\n" % exc)
+            return 3
     if args.cmd == "turns":
         json.dump(count_turns(args.transcript), sys.stdout, sort_keys=True)
         sys.stdout.write("\n")

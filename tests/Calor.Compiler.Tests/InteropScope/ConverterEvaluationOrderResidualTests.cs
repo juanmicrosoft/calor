@@ -24,7 +24,7 @@ public class ConverterEvaluationOrderResidualTests
             DefinedSymbols = Array.Empty<string>(),
             GracefulFallback = true
         }).Convert(source);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.DoesNotMatch(@"(?m)^\s*raw ", result.CalorSource);
         Assert.Contains("MissingCache<object>.Use", result.CalorSource);
         Assert.Empty(result.Losses);
     }
@@ -185,8 +185,8 @@ public class ConverterEvaluationOrderResidualTests
         var (_, source, allowed) = Rows().Single(row => row.Id == id);
         var original = RefOutImplementationTests.Run(source);
         var (calor, losses) = await RefOutImplementationTests.ConvertAsync(source, surface);
-        var interop = calor.Contains("§CSHARP{", StringComparison.Ordinal) || calor.Contains("§CS{", StringComparison.Ordinal)
-            || calor.Contains("§RAW", StringComparison.Ordinal) || losses.Count > 0;
+        var interop = System.Text.RegularExpressions.Regex.IsMatch(calor, @"^\s*raw ", System.Text.RegularExpressions.RegexOptions.Multiline)
+            || losses.Count > 0;
         var strict = Program.Compile(calor, id + ".calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         // As in ConverterCompoundAssignmentTests: an effects-only refusal is compiled without
         // enforcement, since the comparison is about values.
@@ -213,8 +213,10 @@ public class ConverterEvaluationOrderResidualTests
     [InlineData("D-postfix-in-own-index-simple", null)]
     [InlineData("D-postfix-in-own-index-control", null)]
     [InlineData("E-put-collection-initializer", "initializer-interop")]
-    [InlineData("E-put-list-capacity", "compound-assignment-order")]
-    [InlineData("E-put-dictionary-capacity", "compound-assignment-order")]
+    // 0.30: `a[k] = new T(F())` is written in place (`set a[k] new T(F())`); the index
+    // conversion still runs before F, exactly as in C#, so nothing is preserved.
+    [InlineData("E-put-list-capacity", null)]
+    [InlineData("E-put-dictionary-capacity", null)]
     [InlineData("E-put-dictionary-initializer", "dictionary-initializer")]
     [InlineData("E-put-collection-initializer-control", null)]
     [InlineData("F-struct-path-null-receiver", "compound-assignment-order")]
@@ -242,7 +244,7 @@ public class ConverterEvaluationOrderResidualTests
     public void IndexWithANestedConversion_IsBoundOnce()
     {
         var calor = Convert(Rows().Single(r => r.Id == "C-index-arithmetic-conversion").Source);
-        Assert.Matches(@"§B\{(_asg\d+)\} \(\+ k 0\)\s+§ASSIGN §IDX\{[^}]+\} \1 \(\+ §IDX\{[^}]+\} \1 5\)", calor);
+        Assert.Matches(@"let (_asg\d+) = \(k \+ 0\)\s+set \w+\[\1\] \(\w+\[\1\] \+ 5\)", calor);
     }
 
     // #1677: `Point.Log += "x"` in an expression lambda keeps its operator and its target.
@@ -250,7 +252,7 @@ public class ConverterEvaluationOrderResidualTests
     public void ExpressionLambda_StaticMemberCompound_KeepsTheOperator()
     {
         var calor = Convert(Rows().Single(r => r.Id == "X-lambda-static-field").Source);
-        Assert.Contains("§ASSIGN Point.Log (+ Point.Log \"x\")", calor);
+        Assert.Contains("set Point.Log (Point.Log + \"x\")", calor);
     }
 
     private static string Convert(string source)

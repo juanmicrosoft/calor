@@ -1,0 +1,73 @@
+// Current nullable/exception semantics, not a replay of the frozen benchmark.
+// Seeded dereferences use a user-defined nullable reference type (BenchmarkText?).
+// Since 0.30 a possibly-null receiver of a .NET member (string?.Length) is a hard
+// Calor0274 error before bug-pattern analysis runs, so a string? seed would no
+// longer measure null-dereference detection. Each vulnerable case keeps its safe
+// control on the same type and access shape. Dereferences are field reads (`x.Size`),
+// so the subject keeps exactly eight functions.
+module NullDerefBenchmark NullDerefBenchmark
+  func VulnerableNullDeref public (BenchmarkText?:maybeNull) → int
+    !
+    // BUG: Potential null dereference without check
+    // EXPECTED: Calor0922 Null Dereference
+    return maybeNull.Size
+
+  func SafeNullCheck public (BenchmarkText?:maybeNull) → int
+    !
+    // SAFE: Null check before use
+    // EXPECTED: No warnings
+    if maybeNull != null
+      return maybeNull.Size
+    else
+      return 0
+
+  func VulnerableChainedAccess public (BenchmarkNode?:obj) → string?
+    !
+    // BUG: Chained access without null checks
+    // EXPECTED: Calor0922 Null Dereference
+    let BenchmarkNode?:inner = obj.Inner
+    let string?:value = inner.Value
+    return value
+
+  func SafeCoalesce public (string?:maybeNull) → string
+    !
+    // SAFE: Coalesce provides default
+    // EXPECTED: No warnings
+    let string:safe = maybeNull ?? "default"
+    return safe
+
+  func RequiredNullableValue public (int?:maybeValue) → int
+    // SAFE: Absence deliberately throws; it is not an implicit unwrap.
+    // EXPECTED: No warnings
+    ! alloc,throw
+    return maybeValue ?? throw new InvalidOperationException("Missing value")
+
+  func SafeNullableCheck public (int?:maybeValue) → int
+    !
+    // SAFE: Guarded nullable value with a fallback
+    // EXPECTED: No warnings
+    if maybeValue != null
+      return maybeValue ?? 0
+    else
+      return 0
+
+  func VulnerableFunctionReturn public (int:key, System.Collections.Generic.Dictionary<int,BenchmarkText?>:dict) → int
+    !
+    // BUG: Function return may be null
+    // EXPECTED: Calor0922 Null Dereference
+    let BenchmarkText?:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key)
+    return result.Size
+
+  func SafeOrDefault public (int:key, System.Collections.Generic.Dictionary<int,BenchmarkText?>:dict, BenchmarkText:fallback) → int
+    !
+    // SAFE: Using get_or_default
+    // EXPECTED: No warnings
+    let BenchmarkText:result = System.Collections.Generic.CollectionExtensions.GetValueOrDefault(dict, key) ?? fallback
+    return result.Size
+
+  class BenchmarkNode public
+    field BenchmarkNode?:Inner public
+    field string?:Value public
+
+  class BenchmarkText public
+    field int:Size public

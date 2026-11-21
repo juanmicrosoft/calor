@@ -1,0 +1,20 @@
+module TimerService TimerService
+  module TimerServiceModule
+    func ElapsedMs public (int:startMs, int:endMs) → int
+      !
+      requires endMs >= startMs
+      => result >= 0
+      return endMs - startMs
+
+    func ShouldTimeout public (int:elapsedMs, int:timeoutMs) → bool
+      !
+      return elapsedMs >= timeoutMs
+
+    func RemainingMs public (int:timeoutMs, int:elapsedMs) → int
+      !
+      requires timeoutMs >= 0
+      let remaining = timeoutMs - elapsedMs
+      if remaining < 0
+        return 0
+      else
+        return remaining

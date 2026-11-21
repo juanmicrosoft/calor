@@ -1,0 +1,5 @@
+module UnsafeOption UnsafeOption
+  module UnsafeOptionModule
+    func GetValue public (Option<int>:maybeVal) → int
+      !
+      return maybeVal.unwrap()

@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -133,6 +134,102 @@ public class MigrationLearningFixTests
         var result = EmitBindStatement("myVariable");
         Assert.Contains("myVariable", result);
         Assert.DoesNotContain("@myVariable", result);
+    }
+
+    [Theory]
+    [InlineData("base")]
+    [InlineData("this")]
+    [InlineData("byte")]
+    [InlineData("char")]
+    [InlineData("decimal")]
+    [InlineData("long")]
+    [InlineData("object")]
+    [InlineData("sbyte")]
+    [InlineData("short")]
+    [InlineData("uint")]
+    [InlineData("ulong")]
+    [InlineData("ushort")]
+    public void ReservedIdentifier_LocalRebindAndParameter_Compile(string keyword)
+    {
+        // `this` and `base` are native keywords, so source escapes them with '@'
+        // (backtick identifiers are retired); the C# type keywords stay bare.
+        var name = keyword is "this" or "base" ? "@" + keyword : keyword;
+        var result = Program.Compile(
+            $$"""
+            module Keywords Keywords block
+              func Local (int:input) → int
+                !
+                var int:{{name}} = input
+                var int:{{name}} = ({{name}} + 1)
+                return {{name}}
+
+              func Parameter (int:{{name}}) → int
+                !
+                return {{name}}
+            """);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Contains($"int @{keyword} = input;", result.GeneratedCode);
+        Assert.Contains($"int Parameter(int @{keyword})", result.GeneratedCode);
+        Assert.Contains($"return @{keyword};", result.GeneratedCode);
+        Assert.DoesNotContain($"int {keyword} =", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void PlainThisReference_InClassMethod_PreservesInstanceReceiver()
+    {
+        var result = Program.Compile(
+            """
+            module Receivers Receivers block
+              class Holder
+                func Self () → Holder
+                  !
+                  return this
+            """);
+
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Errors));
+        Assert.Contains("return this;", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void ReceiverKeywords_RemainDistinctFromEscapedIdentifierSegments()
+    {
+        var emitter = new CSharpEmitter();
+        Assert.Equal("base", new BaseExpressionNode(Span).Accept(emitter));
+        Assert.Equal("this", new ThisExpressionNode(Span).Accept(emitter));
+        Assert.Equal("@base", new ReferenceNode(Span, "base").Accept(emitter));
+        Assert.Equal("@this", new ReferenceNode(Span, "this").Accept(emitter));
+        Assert.Equal("base.@event", new ReferenceNode(Span, "base.event").Accept(emitter));
+        Assert.Equal("this.@base", new ReferenceNode(Span, "this.base").Accept(emitter));
+        Assert.Equal("value.@base", new ReferenceNode(Span, "value.base").Accept(emitter));
+        Assert.Equal("@base.Value", new ReferenceNode(Span, "@base.Value").Accept(emitter));
+        Assert.Equal("global::System.Int32", new ReferenceNode(Span, "global::System.Int32").Accept(emitter));
+    }
+
+    [Theory]
+    [InlineData("ImmutableDictionary<str, i32>.Empty", "ImmutableDictionary<string, int>.Empty")]
+    [InlineData("global::System.Collections.Immutable.ImmutableDictionary<str, List<i32[]>>.Empty",
+        "global::System.Collections.Immutable.ImmutableDictionary<string, List<int[]>>.Empty")]
+    [InlineData("Outer<str>.Inner<i32>.event", "Outer<string>.Inner<int>.@event")]
+    [InlineData("Holder<?i32, ?str>.Empty", "Holder<int?, string?>.Empty")]
+    [InlineData("Holder<Namespace.str>.Empty", "Holder<Namespace.str>.Empty")]
+    [InlineData("holder.Create<str>", "holder.Create<string>")]
+    [InlineData("str<i32>", "str<int>")]
+    [InlineData("holder.str<i32>", "holder.str<int>")]
+    public void QualifiedGenericReferences_MapTypesWithoutRenamingValueIdentifiers(
+        string reference, string expected)
+    {
+        var emitter = new CSharpEmitter();
+        Assert.Equal(expected, new ReferenceNode(Span, reference).Accept(emitter));
+    }
+
+    [Fact]
+    public void QualifiedGenericCallTargets_MapTypeArguments()
+    {
+        var call = new CallExpressionNode(Span, "Comparer<str>.Default.Compare",
+            [new StringLiteralNode(Span, "a"), new StringLiteralNode(Span, "b")]);
+        Assert.Equal("Comparer<string>.Default.Compare(\"a\", \"b\")",
+            call.Accept(new CSharpEmitter()));
     }
 
     #endregion
@@ -331,8 +428,8 @@ public class MigrationLearningFixTests
             """;
 
         var result = _converter.Convert(csharpSource);
-        Assert.False(result.Success);
-        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
+        // 0.30 converts this natively; generated-Calor validation no longer rejects it.
+        Assert.True(result.Success, GetErrorMessage(result));
 
         var emitted = Emit(result.Ast!);
         // Keywords should be sanitized with @ prefix in emitted C#
@@ -841,14 +938,12 @@ public class MigrationLearningFixTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
 
-        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
-        // while the registry marks them NotSupported (the native conversion
-        // emitted a class with no constructor). The property-dedup logic in
-        // ConvertRecord stays dormant until records go native again.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("record Person(string Name, int Age)", interop.CSharpCode);
-        Assert.Contains("public string Name { get; init; } = Name;", interop.CSharpCode);
+        var record = Assert.Single(result.Ast!.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Equal(2, record.Properties.Count);
+        Assert.Single(record.Properties.Where(property => property.Name == "Name"));
+        Assert.Equal("Age", Assert.Single(record.RecordPositionalProperties).Name);
+        Assert.Empty(result.Ast.InteropBlocks);
     }
 
     [Fact]
@@ -868,14 +963,11 @@ public class MigrationLearningFixTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
 
-        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
-        // while the registry marks them NotSupported — nothing is dropped and
-        // no broken class shape is emitted.
-        Assert.Empty(result.Ast!.Classes);
-        var interop = Assert.Single(result.Ast.InteropBlocks);
-        Assert.Contains("record Config(string Key, string Value)", interop.CSharpCode);
-        Assert.Contains("public string Key { get; init; } = Key;", interop.CSharpCode);
-        Assert.Contains("public string Value { get; init; } = Value;", interop.CSharpCode);
+        var record = Assert.Single(result.Ast!.Classes);
+        Assert.True(record.IsRecord);
+        Assert.Equal(2, record.Properties.Count);
+        Assert.Empty(record.RecordPositionalProperties);
+        Assert.Empty(result.Ast.InteropBlocks);
     }
 
     #endregion

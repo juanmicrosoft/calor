@@ -24,6 +24,14 @@ the process.
 
 ## The Tool Surface
 
+Compilation-backed tools default to a System-only import. For standalone
+validation, pass `options.implicitSystem=false` to `calor_compile`, or top-level
+`implicitSystem=false` to convert, check, verify, analyze, refine, fix, batch and
+migrate. Original and emitted C# use the same context without rewriting raw
+payloads. Ambiguous names report `CS0104`; use aliases or fully qualified names.
+Saved output needs that context in its actual C# project. Parse-only tools do
+not perform downstream C# validation.
+
 The server registers 19 tools. Several older one-purpose names were folded
 into action-based tools; clients should discover the live tool list rather than
 assuming names from pre-consolidation documentation.
@@ -31,7 +39,7 @@ assuming names from pre-consolidation documentation.
 | Tool | Purpose |
 |:-----|:--------|
 | `calor_compile` | Compile source to C# and return auto-fix suggestions without writing |
-| `calor_check` | Diagnostics, lint, type checking, or snippet validation |
+| `calor_check` | Diagnostics, lint, type checking, snippet validation, or a build/test/contract loop |
 | `calor_verify` | Seven-status Z3 contract verification with counterexamples |
 | `calor_analyze` | Bug/security analysis, migration assessment, or interop minimization |
 | `calor_convert` | Convert C# to Calor with issues and validation diagnostics |
@@ -41,18 +49,127 @@ assuming names from pre-consolidation documentation.
 | `calor_structure` | Outline, call graph, and change-impact analysis |
 | `calor_query` | Ask the project index who calls a declaration, what it calls, what a change to it (or to its effects) could break, and what it declares versus what it really does — the same answer [`calor query`](/docs/cli/query/) gives, from the same index |
 | `calor_edit_preview` | Classify a proposed edit as safe, warning-bearing, or breaking |
-| `calor_format` | Format source or check/assign declaration IDs |
+| `calor_format` | Format source; `ids` returns project-aware identity guidance, not assignment |
 | `calor_session_open` | Parse a project and return a session for cross-file checks |
 | `calor_session_close` | Release an open project session |
 | `calor_file_write` | Heal, check, and atomically apply a confined `.calr` write |
 | `calor_refine` | Refinement obligations, bounds, guards, fixes, and type suggestions |
-| `calor_fix` | Return non-destructive fixes for common compiler errors |
+| `calor_fix` | Return compiler-authorized safe diagnostic patches and freshly checked source without writing |
 | `calor_migrate` | Run the project migration pipeline; this tool can write files |
 | `calor_self_test` | Check the compiler against embedded golden files |
 
 Diagnostic-producing tools use the shared [schema 2.0 envelope](/docs/cli/envelope-schema/)
 inside their result DTOs. In particular, verification uses `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`.
+
+## Examples-First Syntax Help
+
+```json
+{"name":"calor_help","arguments":{"query":"dictionary"}}
+```
+
+The default `syntax` action returns at most two complete programs closest to the
+topic. `feature` is an alias for `query`. Each example has `programId`, the exact
+canonical `calor` source, and C# context. Syntax metadata and capability caveats
+remain in `construct`, `calorSyntax`, and `description`.
+
+The examples come from the single teaching reference and are compiler-checked
+by the resource and help tests. Help lookup does not compile or run code. A
+precise match is not padded with an unrelated second example. Tied construct
+scores use ordinal IDs; tied examples retain their canonical order.
+
+Unknown topics return `found: false` and an empty `examples` array. Known topics
+without a canonical executable example do the same, preserving their caveats
+and directing conversion questions to `action=features`. Preserved C# is not
+presented as native authoring syntax.
+
+Ordinary `feature` responses now use `examples`, not prose `sections`.
+`query: "overview"` still returns a concise overview in `sections`.
+`query: "reference"` returns the full reference, also available at
+`calor://reference`. `CALOR_REFERENCE_FILE` overrides only this explicit full
+reference request; it cannot inject unchecked examples into topic results.
+The `features`, `error`, and `example` actions are unchanged.
+
+The two-example limit is not a measured model-token budget.
+
+## Action selectors
+
+| Tool | Selector | Values |
+|:-----|:---------|:-------|
+| `calor_check` | `action` | `diagnose`, `lint`, `typecheck`, `validate`, `loop` |
+| `calor_analyze` | `action` | `security`, `assess`, `minimize` |
+| `calor_navigate` | `action` | `definition`, `references`, `find`, `info`, `scope` |
+| `calor_structure` | `action` | `outline`, `callgraph`, `impact` |
+| `calor_format` | `action` | `format`, `ids` |
+| `calor_refine` | `action` | `obligations`, `bounds`, `diagnose`, `guards`, `fixes`, `types` |
+| `calor_convert` | `mode` | `convert`, `validate`, `roundtrip`, `assess` |
+| `calor_batch` | `action` | `convert`, `analyze`, `compile` |
+| `calor_batch` | `mode` | `standard`, `interop` (conversion only) |
+| `calor_help` | `action` | `syntax`, `features`, `error`, `example` |
+| `calor_migrate` | `phase` | `assess`, `convert`, `compile`, `fix`, `full` |
+| `calor_query` | `facet` | `callers`, `callees`, `impact`, `effects` |
+| `calor_file_write` | `action` | `write`, `rename`, `move` |
+
+`calor_analyze action=minimize` reports possible native constructs using syntax
+templates from the current teaching reference. `calorEquivalent` is not a
+replacement patch or a proof of convertibility. Preserve modifiers, constructor
+selection, effects and metadata; convert the original C# and check the result.
+Unsupported shapes may still need converter-owned C# preservation.
+
+## Safe diagnostic repair
+
+```json
+{"name":"calor_fix","arguments":{"source":"module Calc\n    func Add (int:x, int:y) → int\n        !\n        return x + y\n","errors":["safe_diagnostics"]}}
+```
+
+`calor_fix` uses the same deterministic safe-patch machinery as
+`calor_check action=diagnose` with `apply: true` and
+`calor_compile options.autoFix`. It returns `fixedSource`, `wasModified`,
+`fixCount` (individual edits), final `diagnostics` and optional `fixes`
+(diagnostic-description strings). `success` and `isError` describe the freshly
+checked source, including unresolved errors when no safe patch exists.
+`filePath` supplies source context or reads a file when `source` is absent.
+The tool never writes the result.
+
+Only compiler-authorized safe patches are applied, in at most three batches
+with a fresh compilation after each. Strings, comments and counted raw C#
+payloads are not searched and rewritten as syntax. Guessed constructor types,
+fuzzy names, effect changes and ambiguous indentation are not automatic repairs.
+Valid `new object()` constructors remain unchanged. The `new_object` rule is
+retired and rejected.
+
+`calor_fix` never renames declarations or call targets, or changes sidecar IDs.
+The former `id_conflicts` rule is rejected: durable identities live in
+`.calor/ids.json`. `calor_format action=ids` returns an error directing callers
+to `calor ids sync PROJECT --register FILE` and `calor ids check FILE`.
+
+Both migration fix paths use the shared safe patches under their existing
+migration compilation policy. They write only a successfully compiled candidate.
+Unresolved errors remain failures even when no patch exists; failed candidates
+leave files unchanged and report zero persisted fixes. A per-file fix does not
+prove project-wide compilation or contracts.
+
+`calor_refine action=bounds` covers only supported indexed sites. Its
+`safe: true` is not proof of complete coverage: empty sites or failed compilation
+can still produce that value. Check compilation, site coverage and per-site
+outcomes separately; unknown and unsupported results remain unproven.
+
+## Build, Test, and Verify in One Call
+
+```json
+{"name":"calor_check","arguments":{"action":"loop","path":"/absolute/source/directory","timeoutSeconds":600,"verificationTimeoutMs":5000}}
+```
+
+`loop` uses the same snapshot and failure-only result as
+[`calor check`](/docs/cli/test/#single-call-validation). It requires `path`,
+not `source`; existing actions still require `source`. It returns safe-fix
+metadata but never applies fixes. Missing tests and non-proven contracts are
+not success.
+
+**Use trusted inputs.** This action executes arbitrary tests with your
+permissions and may restore NuGet packages. `calor_check` therefore advertises
+neither read-only nor idempotent behavior. `--root` does not sandbox test
+execution. Listing tools or inspecting their schemas does not execute code.
 
 ## Conversion Paths in calor_convert, calor_migrate, and calor_batch
 
@@ -74,7 +191,7 @@ The defaults differ from the command line, on purpose:
   of members that fail the C# round trip. `calor_convert` does not; it returns
   `isError: true` with `lossSummary.paths.outcome: "refused"` and
   `rescueUnusableMembers: false`. Pass `passthroughOnError: true` to have those
-  members kept as `§CSHARP`. The report then says `passthrough`, because you
+  members kept in converter-owned raw C# frames. The report then says `passthrough`, because you
   asked for it. In the default lossless mode, members whose Calor does not parse are rescued
   on every surface. Constructs the converter already knows it cannot represent,
   such as iterator accessors, are preserved as converter interop instead.
@@ -102,7 +219,7 @@ Before 0.25, a custom `moduleName` (or an `inputPath`, from which the module
 name is derived) stopped the rescue from finding a global-namespace type's
 original C#, so these calls failed. They now rescue like the others.
 
-### Defaults, Counts, and Partial Failures
+### Defaults, Counts, and Per-File Outcomes
 
 Every conversion result reports the two options that applied, so you can check
 the defaults below in `paths` or `conversionPaths`:
@@ -126,19 +243,23 @@ Partial results look like this:
 
 - **`calor_convert`:** `isError: false` with `outcome: "preserved"` means usable
   output with some C# kept. `isError: true` with `outcome: "refused"` means no
-  usable output. With `fidelity: "lossy"`, `isError: true` with
+  usable output. `isError: true` with
   `outcome: "unverified"` and `paths.roundTrip: "failed"` means `calorSource` is
   returned (and written to `outputPath`), but its C# does not compile. `issues[]`
-  lists the compiler errors. Before 0.26 lossy mode skipped this check and could
-  return such output with `isError: false`.
-- **`calor_batch` and `calor_migrate`:** in the default lossless mode, one failed
-  file means no file is written. Every file then reports `outcome: "refused"` with
-  its counts, and the result has `isError: true`. In the `W1-F6-project` fixture, a
-  two-file project with one file that needs a rescue, `calor_batch` reports
-  `failedFiles: 2`. With `skipOnError: false`, the response also carries `error`,
+  lists the compiler errors. The destructive lossy fidelity and branch-selection
+  parameters are no longer supported.
+- **`calor_batch` and `calor_migrate`:** default conversion preserves unconverted
+  C# at member, type, or whole-file boundaries and writes every buildable discovered
+  input. One malformed or unwritable input does not discard unrelated outputs.
+  Failed inputs report `outcome: "refused"` and the result has `isError: true`.
+  With `skipOnError: false`,
+  the response also carries `error`,
   naming the first failed file, and a `preservationPaths` line. Their
-  `conversionPaths.roundTrip` is `deferred`: the project-wide compile does the
-  round-trip check, and a failure there refuses the file.
+  `conversionPaths.roundTrip` records the project-wide compile result. Exact
+  preserved loose-directory sources can remain `unverified` when references are
+  missing; writing is not a passed build. The current two-file
+  `W1-F6-project` fixture succeeds after the private-property accessor fix:
+  both files report `native`, and `calor_batch` reports `failedFiles: 0`.
 
 The [C# interoperability guide](/docs/guides/csharp-interoperability/) shows, per
 C# feature, what `calor_convert` returns with and without `passthroughOnError`.

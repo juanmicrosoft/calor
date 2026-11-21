@@ -1,0 +1,112 @@
+{
+  "cli-convert": {
+    "command": "calor convert Inventory.cs -o Inventory.calr",
+    "exit": 0,
+    "stdout": [
+      "✓ Conversion successful",
+      "Warnings (1):",
+      "  ⚠ Feature 'out-var' is partially supported. Declare the variable before the statement and pass it with out",
+      "Output: <dir>/Inventory.calr"
+    ],
+    "stderr": [],
+    "calor": "module Inventory overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      !\n      var int:n = default(int)\n      if int.TryParse(text, out @n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      !\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      !\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      ! mut\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      !\n      return (x * 2)\n\n    func Run () → int\n      ! mut\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
+  },
+  "cli-convert-json": {
+    "command": "calor convert Inventory.cs -o Inventory.calr --format json",
+    "exit": 0,
+    "success": true,
+    "nativeConversionCount": 17,
+    "interopPreservationCount": 0,
+    "lossCount": 0,
+    "losses": [],
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": true,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "diagnosticCodes": [
+      "Calor1343 x1"
+    ]
+  },
+  "cli-compile": {
+    "command": "calor --input Inventory.calr --output Inventory.g.cs",
+    "exit": 0,
+    "errorCodes": [],
+    "warningCodes": []
+  },
+  "cli-migrate": {
+    "command": "calor migrate <dir> --skip-verify --skip-analyze --report <report.json>",
+    "exit": 0,
+    "conversionPaths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    }
+  },
+  "mcp-convert": {
+    "arguments": "{ source }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 17,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": false,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      !\n      var int:n = default(int)\n      if int.TryParse(text, out @n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      !\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      !\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      ! mut\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      !\n      return (x * 2)\n\n    func Run () → int\n      ! mut\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
+  },
+  "mcp-convert-passthroughOnError": {
+    "arguments": "{ source, passthroughOnError: true }",
+    "isError": false,
+    "success": true,
+    "nativeConversions": 17,
+    "interopPreservations": 0,
+    "locations": [],
+    "paths": {
+      "schemaVersion": 2,
+      "outcome": "native",
+      "interop": 0,
+      "rescue": 0,
+      "passthrough": 0,
+      "lossy": 0,
+      "dropped": 0,
+      "triggers": {},
+      "rescueUnusableMembers": false,
+      "passthroughOnError": true,
+      "roundTrip": "verified"
+    },
+    "issueCodes": [
+      "warning:Calor1343:out-var"
+    ],
+    "calorSource": "module ConvertedModule overflow unchecked nullable oblivious\n  using System.Collections.Generic\n\n  module Inventory\n    func ParseOr (string:text, int:fallback) → int\n      !\n      var int:n = default(int)\n      if int.TryParse(text, out @n)\n        return n\n      return fallback\n\n    func CountOf (Dictionary<string, int>:stock, string:item) → int\n      !\n      var int:count = default(int)\n      stock.TryGetValue(item, out count)\n      return count\n\n    func IsNumber (string:text) → bool\n      !\n      return int.TryParse(text, out _)\n\n    func Bump (ref int:x)\n      ! mut\n      set x (x + 1)\n\n    func Twice (in int:x) → int\n      !\n      return (x * 2)\n\n    func Run () → int\n      ! mut\n      var int:total = 1\n      Bump(ref total)\n      return (Twice(in total) + ParseOr(\"40\", 0))\n\n\n"
+  }
+}

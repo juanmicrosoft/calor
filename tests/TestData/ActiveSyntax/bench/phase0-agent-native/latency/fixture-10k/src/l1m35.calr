@@ -1,0 +1,92 @@
+module L1M35 L1M35 block
+  module L1M35Module public
+
+    func l1m35_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M13.L2M13Module.l2m13_fn02(x, 26)
+      let int:v2 = L2M16.L2M16Module.l2m16_fn02(x, 26)
+      return ((v1 + v2) + y)
+
+    func l1m35_fn02 public (int:x, int:y) → int
+      !
+      requires (x > 7)
+      => (x >= 8)
+      let int:acc = ((x * 2) + y)
+      if (acc > 21834)
+        return (acc + 21834)
+      else
+        return ((acc * 2) + 21834)
+
+    func l1m35_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M19.L2M19Module.l2m19_fn13(x, 37)
+      let int:v2 = L2M17.L2M17Module.l2m17_fn03(x, 86)
+      return ((v1 + v2) + y)
+
+    func l1m35_fn04 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M17.L2M17Module.l2m17_fn05(x, 19)
+      return (v1 + y)
+
+    func l1m35_fn05 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M10.L2M10Module.l2m10_fn12(x, 59)
+      return (v1 + y)
+
+    func l1m35_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M20.L2M20Module.l2m20_fn04(x, 10)
+      return (v1 + y)
+
+    func l1m35_fn07 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M30.L2M30Module.l2m30_fn02(x, 56)
+      return (v1 + y)
+
+    func l1m35_fn08 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M10.L2M10Module.l2m10_fn07(x, 26)
+      return (v1 + y)
+
+    func l1m35_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M31.L2M31Module.l2m31_fn09(x, 54)
+      let int:v2 = L2M15.L2M15Module.l2m15_fn12(x, 23)
+      return ((v1 + v2) + y)
+
+    func l1m35_fn10 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21841)
+      if (x >= 21841)
+        return x
+      else
+        return 21841
+
+    func l1m35_fn11 public (int:x, int:y) → int
+      !
+      let int:v1 = L2M29.L2M29Module.l2m29_fn01(x, 2)
+      let int:v2 = L2M23.L2M23Module.l2m23_fn11(x, 59)
+      return ((v1 + v2) + y)
+
+    func l1m35_fn12 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 21848)
+      let int:total = ((x * 5) + y)
+      if (total < 21848)
+        return 21848
+      else
+        return total
+
+    func l1m35_fn13 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 21855)
+      if (x >= 21855)
+        return x
+      else
+        return 21855

@@ -1,0 +1,4 @@
+module Bystander
+  func Answer () → int
+    !
+    return 42

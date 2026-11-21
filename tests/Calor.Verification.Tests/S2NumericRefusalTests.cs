@@ -1,4 +1,5 @@
 using Calor.Compiler;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
@@ -15,6 +16,34 @@ namespace Calor.Verification.Tests;
 /// </summary>
 public sealed class S2NumericRefusalTests
 {
+    private static string NativeArithmeticInput(string expression) => expression switch
+    {
+        "(< (- x INT:1) x)" => "x - 1 < x",
+        "(== (- (+ x INT:1) INT:1) x)" => "x + 1 - 1 == x",
+        "(> (+ x LONG:1) x)" => "x + 1L > x",
+        "(>= (- x INT:-1) x)" => "x - (-1) >= x",
+        "(* x y)" => "x * y",
+        "(- x y)" => "x - y",
+        _ => throw new ArgumentException("No native spelling registered for this arithmetic input.", nameof(expression))
+    };
+
+    private static string NativeIntegralInput(string literal)
+    {
+        var parts = literal.Split(':', 2);
+        if (parts.Length == 2)
+        {
+            var style = System.Globalization.NumberStyles.Integer;
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            if (parts[0] == "INT" && int.TryParse(parts[1], style, culture, out _))
+                return parts[1];
+            if (parts[0] == "LONG" && long.TryParse(parts[1], style, culture, out _))
+                return parts[1] + "L";
+            if (parts[0] == "UINT" && uint.TryParse(parts[1], style, culture, out _))
+                return parts[1] + "U";
+        }
+        throw new ArgumentException("This input has no equivalent width-preserving native literal.", nameof(literal));
+    }
+
     private static Calor.Compiler.Verification.Z3.ContractVerificationResult VerifySinglePostcondition(string source)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
@@ -36,11 +65,11 @@ public sealed class S2NumericRefusalTests
     public void NarrowArithmetic_IsRefused(string t1, string t2, string op, string relation, string bound)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{t1}}:x, {{t2}}:y) -> i32
-                §E{}
-                §S ({{relation}} ({{op}} x y) {{bound}})
-                §R INT:0
+            module R1Case
+              func Probe public ({{TypeMapper.ToSurfaceType(t1)}}:x, {{TypeMapper.ToSurfaceType(t2)}}:y) → int
+                !
+                => x {{op}} y {{relation}} {{NativeIntegralInput(bound)}}
+                return 0
             """;
         Assert.Equal(ContractVerificationStatus.Unsupported, VerifySinglePostcondition(source).Status);
     }
@@ -49,40 +78,24 @@ public sealed class S2NumericRefusalTests
     public void Control_NarrowComparison_StaysProven()
     {
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i8:x) -> i32
-                §E{}
-                §S (<= x INT:127)
-                §R INT:0
+            module R1Case
+              func Probe public (sbyte:x) → int
+                !
+                => x <= 127
+                return 0
             """;
         Assert.Equal(ContractVerificationStatus.Proven, VerifySinglePostcondition(source).Status);
-    }
-
-    [Theory]
-    [InlineData("<=", "9223372036854775807")]   // T-LIT-OVERSIZE (R1-NUM-LITERAL-OVERSIZE-003 shape)
-    [InlineData("!=", "-2147483649")]
-    public void OversizeIntLiteral_IsRefused(string relation, string big)
-    {
-        Assert.True(long.Parse(big) is > int.MaxValue or < int.MinValue);
-        var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i64:x) -> i32
-                §E{}
-                §S ({{relation}} x INT:{{big}})
-                §R INT:0
-            """;
-        Assert.Equal(ContractVerificationStatus.Unsupported, VerifySinglePostcondition(source).Status);
     }
 
     [Fact]
     public void Control_SameValueSpelledLong_StaysProven()
     {
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i64:x) -> i32
-                §E{}
-                §S (<= x LONG:9223372036854775807)
-                §R INT:0
+            module R1Case
+              func Probe public (long:x) → int
+                !
+                => x <= 9223372036854775807L
+                return 0
             """;
         Assert.Equal(ContractVerificationStatus.Proven, VerifySinglePostcondition(source).Status);
     }
@@ -94,12 +107,12 @@ public sealed class S2NumericRefusalTests
     public void OverflowSensitiveCheckedArithmetic_IsAssumed(string type, string lower, string claim)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{type}}:x) -> i32
-                §E{}
-                §Q (>= x {{lower}})
-                §S {{claim}}
-                §R INT:0
+            module R1Case
+              func Probe public ({{TypeMapper.ToSurfaceType(type)}}:x) → int
+                !
+                requires x >= {{NativeIntegralInput(lower)}}
+                => {{NativeArithmeticInput(claim)}}
+                return 0
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.Equal(ProofStatus.Assumed, outcome.Status);
@@ -112,11 +125,11 @@ public sealed class S2NumericRefusalTests
     public void Control_ArithmeticThatCannotOverflow_StaysProven(string type, string claim)
     {
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{type}}:x) -> i32
-                §E{}
-                §S {{claim}}
-                §R INT:0
+            module R1Case
+              func Probe public ({{TypeMapper.ToSurfaceType(type)}}:x) → int
+                !
+                => {{NativeArithmeticInput(claim)}}
+                return 0
             """;
         Assert.Equal(ContractVerificationStatus.Proven, VerifySinglePostcondition(source).Status);
     }
@@ -148,11 +161,11 @@ public sealed class S2NumericRefusalTests
         // #1413 (S2 R-NUM, amendment 1.3.1): when the promoted result type always holds the
         // result, no solver query decides it, so the verdict cannot depend on solver time.
         var source = $$"""
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} ({{leftType}}:x, {{rightType}}:y) -> i32
-                §E{}
-                §S (== {{arithmetic}} {{arithmetic}})
-                §R INT:0
+            module R1Case
+              func Probe public ({{TypeMapper.ToSurfaceType(leftType)}}:x, {{TypeMapper.ToSurfaceType(rightType)}}:y) → int
+                !
+                => ({{NativeArithmeticInput(arithmetic)}}) == ({{NativeArithmeticInput(arithmetic)}})
+                return 0
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         if (staticallySafe)
@@ -164,16 +177,25 @@ public sealed class S2NumericRefusalTests
     [Fact]
     public void OversizeLiteralRemovedBySimplification_IsStillRefused()
     {
-        // Review round 2: the simplifier folded the conditional to LONG:0 == LONG:0 before the
-        // translator saw the refused INT: literal.
-        const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} () -> i32
-                §E{}
-                §S (== (? BOOL:true LONG:0 INT:3000000000) LONG:0)
-                §R INT:0
-            """;
-        Assert.Equal(ContractVerificationStatus.Unsupported, VerifySinglePostcondition(source).Status);
+        // Review round 2: the simplifier folded the conditional to 0 == 0 before the translator
+        // saw the refused int-typed literal. Native source can no longer spell an int-typed
+        // literal outside int32, so the D2 form is built at AST level (as an SDK caller can, see
+        // OversizeLiteralBuiltWithoutTheLexer_IsRefused) and run through the pipeline's simplifier.
+        Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
+        var span = Calor.Compiler.Parsing.TextSpan.Empty;
+        var conditional = new Calor.Compiler.Ast.ConditionalExpressionNode(span,
+            new Calor.Compiler.Ast.BoolLiteralNode(span, true),
+            new Calor.Compiler.Ast.IntLiteralNode(span, 0),
+            new Calor.Compiler.Ast.IntLiteralNode(span, 3000000000L) { IsLong = false });
+        var condition = new Calor.Compiler.Ast.BinaryOperationNode(span, Calor.Compiler.Ast.BinaryOperator.Equal,
+            conditional, new Calor.Compiler.Ast.IntLiteralNode(span, 0));
+        var simplified = new ExpressionSimplifier().Simplify(condition);
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        var result = verifier.VerifyPostcondition(
+            [], "i32", [],
+            new Calor.Compiler.Ast.EnsuresNode(span, simplified, null, new Calor.Compiler.Ast.AttributeCollection()));
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [Fact]
@@ -199,52 +221,6 @@ public sealed class S2NumericRefusalTests
         Assert.NotEqual(ContractVerificationStatus.Proven, result.Status);
     }
 
-    [Fact]
-    public void WarmCache_DoesNotCarryAVerdictBetweenIntAndLongSpellings()
-    {
-        // Review round 2: warming one spelling must not change the other's verdict, in either order.
-        const string intSource = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (i64:x) -> i32
-                §E{}
-                §S (<= x INT:9223372036854775807)
-                §R INT:0
-            """;
-        var longSource = intSource.Replace("INT:9223372036854775807", "LONG:9223372036854775807");
-        foreach (var (first, second, expected) in new[]
-                 {
-                     (longSource, intSource, ContractVerificationStatus.Unsupported),
-                     (intSource, longSource, ContractVerificationStatus.Proven),
-                 })
-        {
-            var directory = Path.Combine(Path.GetTempPath(), "calor-s2-num-cache-" + Guid.NewGuid().ToString("N")[..8]);
-            try
-            {
-                Calor.Compiler.Verification.Z3.ContractVerificationResult Compile(string source)
-                {
-                    var options = new CompilationOptions
-                    {
-                        VerifyContracts = true,
-                        VerificationCacheOptions = new VerificationCacheOptions { Enabled = true, CacheDirectory = directory },
-                    };
-                    var compiled = Program.Compile(source, "case.calr", options);
-                    Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Select(d => d.Message)));
-                    return Assert.Single(Assert.Single(options.VerificationResults!.Functions).PostconditionResults);
-                }
-                var primed = Compile(first);
-                // The LONG text is cacheable (Proven) and writes an entry; the refused INT text writes none.
-                Assert.Equal(first == longSource ? ContractVerificationStatus.Proven : ContractVerificationStatus.Unsupported, primed.Status);
-                var written = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories).Length : 0;
-                Assert.Equal(first == longSource, written > 0);
-                Assert.Equal(expected, Compile(second).Status);
-            }
-            finally
-            {
-                try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
-            }
-        }
-    }
-
     [Theory]
     [InlineData(null)]      // control: the current format is served
     [InlineData("1.20")]
@@ -254,12 +230,12 @@ public sealed class S2NumericRefusalTests
         // Review round 3: an entry written before R-NUM (format 1.20 or 1.21) may hold Proven for an
         // overflow-sensitive shape that is now Assumed.
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (u32:x) -> i32
-                §E{}
-                §Q (>= x UINT:1702287129)
-                §S (< (- x INT:1) x)
-                §R INT:0
+            module R1Case
+              func Probe public (uint:x) → int
+                !
+                requires x >= 1702287129U
+                => x - 1 < x
+                return 0
             """;
         var directory = Path.Combine(Path.GetTempPath(), "calor-s2-num-forge-" + Guid.NewGuid().ToString("N")[..8]);
         try
@@ -335,12 +311,12 @@ public sealed class S2NumericRefusalTests
     public void EntailedCheckedArithmetic_IsAssumedWithTheCheckedArithmeticAssumption()
     {
         const string source = """
-            §M{m1:R1Case}
-              §F{f1:Probe:pub} (u32:x) -> i32
-                §E{}
-                §Q (>= x UINT:1702287129)
-                §S (< (- x INT:1) x)
-                §R INT:0
+            module R1Case
+              func Probe public (uint:x) → int
+                !
+                requires x >= 1702287129U
+                => x - 1 < x
+                return 0
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.Equal(ProofStatus.Assumed, outcome.Status);

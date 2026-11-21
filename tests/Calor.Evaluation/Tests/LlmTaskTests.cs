@@ -12,6 +12,177 @@ namespace Calor.Evaluation.Tests;
 /// </summary>
 public class LlmTaskTests
 {
+    [Fact]
+    public void CalorPrompt_UsesPackagedCurrentReferenceWithoutLegacyFallback()
+    {
+        var reference = Calor.Compiler.Init.EmbeddedResourceHelper.ReadResource(
+            "Calor.Compiler.Resources.current-language-reference.md");
+        var prompt = LlmTaskRunner.GetSystemPromptForLanguage("calor");
+        Assert.Contains(reference, prompt);
+        Assert.DoesNotContain("§/M", prompt);
+        Assert.DoesNotContain("§CSHARP", prompt);
+        Assert.Contains("Include a complete module with indented bodies", prompt);
+        Assert.Contains("For boolean logic use a && b, a || b, !a. For numeric negation use -n.", prompt);
+        Assert.DoesNotContain("For boolean logic use (&&", prompt);
+        Assert.DoesNotContain("For numeric negation use (-", prompt);
+    }
+
+    [Theory]
+    [InlineData("""{"compilation":0.4,"testCases":0.6}""", 0.4, 0.6, 0)]
+    [InlineData("""{"compilation":0.4,"testCases":0.6,"contracts":0}""", 0.4, 0.6, 0)]
+    [InlineData("""{"compilation":0.3,"testCases":0.5,"contracts":0.2}""", 0.3, 0.5, 0.2)]
+    public void TaskScoring_JsonDoesNotInventAnUnspecifiedContractBonus(
+        string json, double compilation, double testCases, double contracts)
+    {
+        var scoring = Assert.IsType<TaskScoring>(JsonSerializer.Deserialize<TaskScoring>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+        Assert.Equal(compilation, scoring.Compilation, 10);
+        Assert.Equal(testCases, scoring.TestCases, 10);
+        Assert.Equal(contracts, scoring.Contracts, 10);
+        Assert.True(scoring.IsValid);
+        var roundTrip = JsonSerializer.Deserialize<TaskScoring>(JsonSerializer.Serialize(scoring));
+        Assert.Equal(scoring, roundTrip);
+        Assert.Equal(0.2, new TaskScoring().Contracts, 10);
+    }
+
+    [Theory]
+    [InlineData(0.4, 0.6, 0.2)]
+    [InlineData(-0.1, 0.6, 0.5)]
+    [InlineData(1.1, 0, -0.1)]
+    public async Task TaskScoring_InvalidWeightsAreRejectedBeforeAnyProviderCall(
+        double compilation, double testCases, double contracts)
+    {
+        var provider = new MockProvider();
+        using var runner = new LlmTaskRunner(provider);
+        var task = new LlmTaskDefinition
+        {
+            Id = "invalid-scoring",
+            Name = "Invalid scoring control",
+            Prompt = "ProbeValue",
+            Scoring = new TaskScoring { Compilation = compilation, TestCases = testCases, Contracts = contracts }
+        };
+        Assert.False(task.Scoring.IsValid);
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => runner.RunTaskAsync(task));
+        Assert.Contains(task.Id, error.Message);
+        Assert.Equal(0, provider.CallCount);
+    }
+
+    [Fact]
+    public async Task TaskScoring_NeutralWeightsGiveIdenticalPartiallyCorrectProgramsIdenticalScores()
+    {
+        var task = Assert.IsType<LlmTaskDefinition>(JsonSerializer.Deserialize<LlmTaskDefinition>("""
+            {
+              "id": "offline-scoring",
+              "name": "Offline neutral scoring control",
+              "prompt": "ProbeValue",
+              "scoring": { "compilation": 0.4, "testCases": 0.6 },
+              "testCases": [
+                { "input": [0], "expected": 0 },
+                { "input": [1], "expected": 1 }
+              ],
+              "expectedSignature": {
+                "functionName": "ProbeValue",
+                "parameterTypes": ["int"],
+                "returnType": "int"
+              }
+            }
+            """, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+        var provider = new MockProvider((_, language) => language == "calor"
+            ? "module OfflineScore\n  func ProbeValue public (int:value) → int\n    !\n    return 1\n"
+            : "public static class Functions { public static int ProbeValue(int value) => 1; }");
+        using var runner = new LlmTaskRunner(provider);
+        var result = await runner.RunTaskAsync(task, new LlmTaskRunnerOptions { UseCache = false });
+        Assert.Equal(2, provider.CallCount);
+        Assert.Equal(task.GetPrompt("calor"), task.GetPrompt("csharp"));
+        foreach (var language in new[] { result.CalorResult, result.CSharpResult })
+        {
+            Assert.True(language.CompilationSuccess, string.Join("\n", language.CompilationErrors));
+            Assert.Equal(2, language.TotalTests);
+            Assert.Equal(1, language.PassedTests);
+            Assert.Equal(0.7, language.Score, 10);
+        }
+    }
+
+    [Theory]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 0, 0, 4500)]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 20000, 0, 10500)]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 0, 20000, 79500)]
+    [InlineData(ClaudeProvider.ModelSonnet, 1000, 100, 2000, 3000, 16350)]
+    [InlineData(ClaudeProvider.ModelOpus, 1000, 100, 2000, 3000, 27250)]
+    [InlineData(ClaudeProvider.ModelHaiku, 1000, 100, 2000, 3000, 4360)]
+    public async Task ClaudeProvider_AccountsForSeparateCacheUsage(
+        string model, int inputTokens, int outputTokens,
+        int cacheReadTokens, int cacheCreationTokens, int expectedMicrodollars)
+    {
+        using var client = new HttpClient(new ClaudeUsageHandler(
+            inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens));
+        using var provider = new ClaudeProvider("offline-test-key", client);
+
+        var result = await provider.GenerateCodeAsync("test", "csharp",
+            new LlmGenerationOptions { Model = model });
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(expectedMicrodollars / 1_000_000m, result.Cost);
+        Assert.Equal(inputTokens + cacheReadTokens + cacheCreationTokens, result.InputTokens);
+        Assert.Equal(outputTokens, result.OutputTokens);
+        Assert.False(result.FromCache);
+    }
+
+    [Theory]
+    [InlineData("unpriced-model")]
+    [InlineData("CLAUDE-SONNET-4-20250514")]
+    public async Task ClaudeProvider_RejectsUnpricedModelBeforeSendingRequest(string model)
+    {
+        var handler = new ClaudeUsageHandler(1000, 100, 0, 0);
+        using var client = new HttpClient(handler);
+        using var provider = new ClaudeProvider("offline-test-key", client);
+
+        var result = await provider.GenerateCodeAsync("test", "csharp",
+            new LlmGenerationOptions { Model = model });
+
+        Assert.False(result.Success);
+        Assert.Contains("pricing", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public void ClaudeProvider_EstimateCost_RejectsUnpricedModel()
+    {
+        using var provider = new ClaudeProvider("offline-test-key");
+        var error = Assert.Throws<ArgumentException>(() =>
+            provider.EstimateCost(1000, 100, "unpriced-model"));
+        Assert.Contains("pricing", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class ClaudeUsageHandler(
+        int inputTokens, int outputTokens, int cacheReadTokens, int cacheCreationTokens)
+        : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("https://api.anthropic.com/v1/messages", request.RequestUri?.AbsoluteUri);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    content = new[] { new { type = "text", text = "return 1;" } },
+                    usage = new
+                    {
+                        input_tokens = inputTokens,
+                        output_tokens = outputTokens,
+                        cache_read_input_tokens = cacheReadTokens,
+                        cache_creation_input_tokens = cacheCreationTokens
+                    }
+                }))
+            });
+        }
+    }
+
     #region MockProvider Tests
 
     [Fact]
@@ -37,8 +208,8 @@ public class LlmTaskTests
             "Write a factorial function", "calor");
 
         Assert.True(result.Success);
-        Assert.Contains("§M{", result.GeneratedCode);
-        Assert.Contains("§F{", result.GeneratedCode);
+        Assert.Contains("module ", result.GeneratedCode);
+        Assert.Contains("func ", result.GeneratedCode);
         Assert.Contains("Factorial", result.GeneratedCode);
     }
 
@@ -208,12 +379,10 @@ public static class Test
     public void CodeExecutor_CompileCalor_SimpleFunction_Succeeds()
     {
         using var executor = new CodeExecutor();
-        var result = executor.CompileCalor(@"§M{m001:Math}
-  §F{f001:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)");
+        var result = executor.CompileCalor(@"module Math Math block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)");
 
         Assert.True(result.Success);
         Assert.NotNull(result.GeneratedCSharp);
@@ -234,12 +403,10 @@ public static class Test
     public void CodeExecutor_CompileAndExecuteCalor_Works()
     {
         using var executor = new CodeExecutor();
-        var result = executor.CompileAndExecuteCalor(@"§M{m001:Math}
-  §F{f001:Multiply:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (* a b)",
+        var result = executor.CompileAndExecuteCalor(@"module Math Math block
+  func Multiply (int:a, int:b) → int
+    !
+    return (a * b)",
             "Multiply",
             new object[] { 6, 7 });
 
@@ -544,6 +711,121 @@ public static class Math
         Assert.Equal(0m, estimate.EstimatedCost);
     }
 
+    [Theory]
+    [InlineData(ClaudeProvider.ModelSonnet)]
+    [InlineData(ClaudeProvider.ModelOpus)]
+    [InlineData(ClaudeProvider.ModelHaiku)]
+    public void LlmTaskRunner_EstimateCost_UsesSelectedModel(string model)
+    {
+        var handler = new ClaudeUsageHandler(0, 0, 0, 0);
+        using var client = new HttpClient(handler);
+        using var provider = new ClaudeProvider("offline-test-key", client);
+        using var runner = new LlmTaskRunner(provider);
+        var manifest = CreateCostEstimateManifest();
+        var expectedInput = new[] { "calor", "csharp" }.Sum(language =>
+            provider.EstimateTokenCount(manifest.Tasks[0].GetPrompt(language))
+            + provider.EstimateTokenCount(LlmTaskRunner.GetSystemPromptForLanguage(language)));
+        var expectedCost = provider.EstimateCost(expectedInput, 1000, model);
+
+        var estimate = runner.EstimateCost(manifest, new LlmTaskRunnerOptions
+        {
+            Model = model,
+            UseCache = false,
+            BudgetLimit = expectedCost / 2
+        });
+
+        Assert.Equal(expectedInput, estimate.EstimatedInputTokens);
+        Assert.Equal(1000, estimate.EstimatedOutputTokens);
+        Assert.Equal(expectedCost, estimate.EstimatedCost);
+        Assert.Equal(expectedCost, estimate.ByCategory["test"]);
+        Assert.True(estimate.ExceedsBudget);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public void LlmTaskRunner_EstimateCost_RejectsUnpricedSelectedModel()
+    {
+        var handler = new ClaudeUsageHandler(0, 0, 0, 0);
+        using var client = new HttpClient(handler);
+        using var provider = new ClaudeProvider("offline-test-key", client);
+        using var runner = new LlmTaskRunner(provider);
+
+        Assert.Throws<ArgumentException>(() => runner.EstimateCost(
+            CreateCostEstimateManifest(),
+            new LlmTaskRunnerOptions { Model = "unpriced-model", UseCache = false }));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Theory]
+    [InlineData("calor")]
+    [InlineData("csharp")]
+    [InlineData("both")]
+    public async Task LlmTaskRunner_EstimateCost_MatchesGenerationCacheKeys(string cachedLanguage)
+    {
+        var cacheDir = Path.Combine(Path.GetTempPath(), $"test-cost-cache-{Guid.NewGuid():N}");
+        try
+        {
+            var handler = new ClaudeUsageHandler(0, 0, 0, 0);
+            using var client = new HttpClient(handler);
+            using var provider = new ClaudeProvider("offline-test-key", client);
+            var cache = new LlmResponseCache(cacheDir);
+            using var runner = new LlmTaskRunner(provider, cache);
+            var manifest = CreateCostEstimateManifest();
+            var expectedInput = 0;
+            var expectedOutput = 0;
+            foreach (var language in new[] { "calor", "csharp" })
+            {
+                var prompt = manifest.Tasks[0].GetPrompt(language);
+                var systemPrompt = LlmTaskRunner.GetSystemPromptForLanguage(language);
+                if (cachedLanguage == "both" || cachedLanguage == language)
+                {
+                    await cache.SetAsync(provider.Name, prompt, LlmGenerationOptions.Default with
+                    {
+                        Model = ClaudeProvider.ModelOpus,
+                        SystemPrompt = systemPrompt
+                    }, new LlmGenerationResult { Success = true, Provider = provider.Name, Cost = 1m });
+                }
+                else
+                {
+                    expectedInput += provider.EstimateTokenCount(prompt)
+                        + provider.EstimateTokenCount(systemPrompt);
+                    expectedOutput += 500;
+                }
+            }
+
+            var estimate = runner.EstimateCost(manifest,
+                new LlmTaskRunnerOptions { Model = ClaudeProvider.ModelOpus });
+            var expectedCost = provider.EstimateCost(
+                expectedInput, expectedOutput, ClaudeProvider.ModelOpus);
+
+            Assert.Equal(cachedLanguage == "both" ? 2 : 1, estimate.CachedResponses);
+            Assert.Equal(expectedInput, estimate.EstimatedInputTokens);
+            Assert.Equal(expectedOutput, estimate.EstimatedOutputTokens);
+            Assert.Equal(expectedCost, estimate.EstimatedCost);
+            Assert.Equal(expectedCost, estimate.ByCategory["test"]);
+            Assert.Equal(0, handler.RequestCount);
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDir))
+                Directory.Delete(cacheDir, recursive: true);
+        }
+    }
+
+    private static LlmTaskManifest CreateCostEstimateManifest() => new()
+    {
+        Tasks =
+        [
+            new()
+            {
+                Id = "cost-estimate",
+                Name = "Cost estimate",
+                Category = "test",
+                Prompts = new TaskPrompts { Calor = "Return 1", CSharp = "Return 1" }
+            }
+        ]
+    };
+
     #endregion
 
     #region LlmResponseCache Tests
@@ -573,6 +855,10 @@ public static class Math
             Assert.NotNull(retrieved);
             Assert.Equal("test code", retrieved.GeneratedCode);
             Assert.True(retrieved.FromCache);
+            Assert.Equal(0m, retrieved.Cost);
+            Assert.Equal(100, retrieved.InputTokens);
+            Assert.Equal(50, retrieved.OutputTokens);
+            Assert.Equal(0.01m, result.Cost);
         }
         finally
         {

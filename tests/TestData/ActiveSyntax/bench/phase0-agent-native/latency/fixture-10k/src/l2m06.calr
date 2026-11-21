@@ -1,0 +1,102 @@
+module L2M06 L2M06 block
+  module L2M06Module public
+
+    func l2m06_fn01 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M21.L3M21Module.l3m21_fn08(x, 61)
+      let int:v2 = L3M03.L3M03Module.l3m03_fn11(x, 20)
+      return ((v1 + v2) + y)
+
+    func l2m06_fn02 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M17.L3M17Module.l3m17_fn12(x, 64)
+      return (v1 + y)
+
+    func l2m06_fn03 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M33.L3M33Module.l3m33_fn11(x, 14)
+      let int:v2 = L3M12.L3M12Module.l3m12_fn02(x, 49)
+      return ((v1 + v2) + y)
+
+    func l2m06_fn04 public (int:x, int:y) → int
+      !
+      requires (x >= 6)
+      requires (y >= 0)
+      => (result >= 22121)
+      let int:total = ((x * 3) + y)
+      if (total < 22121)
+        return 22121
+      else
+        return total
+
+    func l2m06_fn05 public (int:x, int:y) → int
+      !
+      requires (x > 2)
+      => (x >= 3)
+      let int:acc = ((x * 5) + y)
+      if (acc > 22128)
+        return (acc + 22128)
+      else
+        return ((acc * 2) + 22128)
+
+    func l2m06_fn06 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M32.L3M32Module.l3m32_fn08(x, 24)
+      return (v1 + y)
+
+    func l2m06_fn07 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 22135)
+      if (x >= 22135)
+        return x
+      else
+        return 22135
+
+    func l2m06_fn08 public (int:x, int:y) → int
+      !
+      requires (x >= 4)
+      requires (y >= 0)
+      => (result >= 22142)
+      let int:total = ((x * 5) + y)
+      if (total < 22142)
+        return 22142
+      else
+        return total
+
+    func l2m06_fn09 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M30.L3M30Module.l3m30_fn06(x, 68)
+      return (v1 + y)
+
+    func l2m06_fn10 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 22149)
+      let int:total = ((x * 2) + y)
+      if (total < 22149)
+        return 22149
+      else
+        return total
+
+    func l2m06_fn11 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 22156)
+      let int:total = ((x * 5) + y)
+      if (total > 22156)
+        return 22156
+      return total
+
+    func l2m06_fn12 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M21.L3M21Module.l3m21_fn11(x, 26)
+      return (v1 + y)
+
+    func l2m06_fn13 public (int:x, int:y) → int
+      !
+      let int:v1 = L3M04.L3M04Module.l3m04_fn09(x, 78)
+      let int:v2 = L3M28.L3M28Module.l3m28_fn11(x, 86)
+      return ((v1 + v2) + y)

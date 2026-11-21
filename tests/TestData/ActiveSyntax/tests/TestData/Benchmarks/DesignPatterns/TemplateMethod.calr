@@ -1,0 +1,79 @@
+module DesignPatterns
+  class DataProcessor internal abstract
+    func Process public () → string
+      !
+      let string:data = this.ReadData()
+      if data == ""
+        return "Validation failed"
+      let string:processed = this.ProcessData(data)
+      return this.SaveResults(processed)
+
+    func ReadData private abstract () → string
+      !
+
+    func ProcessData private abstract (string:data) → string
+      !
+
+    func SaveResults private abstract (string:data) → string
+      !
+
+    func ValidateData private virtual (string:data) → bool
+      return data != ""
+
+
+  class CsvProcessor public
+    extends DataProcessor
+
+    field string:_inputPath private
+    field string:_outputPath private
+
+    ctor (string:inputPath, string:outputPath)
+      set this._inputPath inputPath
+      set this._outputPath outputPath
+
+    func ReadData private override () → string
+      return "CSV data from input"
+
+    func ProcessData private override (string:data) → string
+      return data.Replace(",", "|")
+
+    func SaveResults private override (string:data) → string
+      return "Saved CSV"
+
+    func ValidateData private override (string:data) → bool
+      var _hoist000 = base.ValidateData(data)
+      var _hoist001 = data.Contains("CSV")
+      return _hoist000 && _hoist001
+
+
+  class JsonProcessor public
+    extends DataProcessor
+
+    field string:_endpoint private
+    field string:_outputPath private
+
+    ctor (string:endpoint, string:outputPath)
+      set this._endpoint endpoint
+      set this._outputPath outputPath
+
+    func ReadData private override () → string
+      return "JSON content"
+
+    func ProcessData private override (string:data) → string
+      return data.Replace("JSON", "PROCESSED_JSON")
+
+    func SaveResults private override (string:data) → string
+      return "Saved JSON"
+
+
+  module TemplateMethodDemo internal
+    func ProcessCsv public (string:input, string:output) → string
+      !
+      let CsvProcessor:processor = new CsvProcessor(input, output)
+      return processor.Process()
+
+    func ProcessJson public (string:endpoint, string:output) → string
+      !
+      let JsonProcessor:processor = new JsonProcessor(endpoint, output)
+      return processor.Process()
+

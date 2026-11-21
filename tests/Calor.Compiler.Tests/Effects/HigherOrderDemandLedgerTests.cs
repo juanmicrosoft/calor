@@ -2,7 +2,11 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Effects.Manifests;
 using Microsoft.CodeAnalysis;
@@ -42,16 +46,19 @@ namespace Calor.Compiler.Tests;
 /// declared names. Independent of Calor's rejection.</item>
 /// </list>
 ///
+/// <para>After syntax retirement, D-A retains its original raw-source census,
+/// but current semantic checks use explicitly registered <see cref="ActiveSyntaxInputs"/>
+/// where needed. Mirrors are not extra subjects. The original D-A test replays
+/// the original producer and source tree against the immutable ledger. The
+/// separate current test pins exact counts and named causes in an ordinary
+/// current-expectation fixture, without a historical identity.</para>
+///
 /// <para><b>Anti-tautology pin</b> (the <c>MetadataBinderCorpusMeasurementTests</c>
 /// / <c>BinderIncompleteRatchetTests</c> pattern): each leg re-executes the
 /// measurement live and asserts EXACT per-file / per-subject and aggregate
-/// equality against the committed ledger. A number cannot be hand-edited into
-/// the ledger without the measurement moving with it, and a measurement
-/// cannot move without the ledger being regenerated in the same PR.
-/// Regenerate: <c>CALOR_REGENERATE_HIGHER_ORDER_DEMAND_LEDGER=1 dotnet test
-/// --filter HigherOrderDemandLedger</c> with submodules initialized — each leg
-/// stamps its own <c>measuredCommit</c>, and the shape test requires both legs
-/// (and the top-level SHA) to agree, so a one-legged regeneration fails loud.</para>
+/// equality. Historical shape/gate checks keep reading the original ledger;
+/// current D-A expectations cannot rewrite its measurements or identities.
+/// Regeneration is rejected.</para>
 ///
 /// <para>D-A and the shape test run wherever <c>Calor.Compiler.Tests</c> runs;
 /// D-B skips only where the corpus submodules are absent. In CI the project runs
@@ -100,6 +107,19 @@ public class HigherOrderDemandLedgerTests
         + "older syntax (30 of 33 die on Calor0830 legacy closing tags, two on Calor0006, one on "
         + "Calor0403), and tests/TestData/LintScenarios/10_error_cases/* are error fixtures. "
         + "All seven #901 benchmark subjects now reach the effect pass.";
+
+    private const string CurrentNotReachingEffectPassNote =
+        "Current compiler over 961 logical subjects (the original 952, the six D-S1.5 "
+        + "checked/unchecked/record fixtures and the three ES-04 bystander steps), resolving explicitly registered active copies. "
+        + "82 files fail before the effect pass; the w5-parity-002 treatment run-3 "
+        + "CSV subject now reaches it with authoritative List<str> indexed element typing. Intentionally obsolete "
+        + "MCP inputs retain their original bytes and, like the 14 inputs still written in the retired "
+        + "section-marker syntax with no native mirror, first fail on that marker (Calor0006). "
+        + "benchmarks/null-safety/null-deref.calr reaches it again: its seeds moved from string? to a user T? "
+        + "(29c8755c1). Sixteen benchmark subjects now stop at Calor0202, and HashMap first fails there instead "
+        + "of Calor0213: the type checker rejects their "
+        + "implicit double-to-float narrowing (i1); Visitor joins them once its unspaced `expr.Value` is a "
+        + "typed member read (i7). Every named first error remains exact.";
 
     /// <summary>
     /// The D-B classification, pinned as data: identifiers a declared type syntax
@@ -155,55 +175,129 @@ public class HigherOrderDemandLedgerTests
     private static string LedgerPath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "higher-order-demand-ledger.json");
 
-    private static bool Regenerate() =>
-        Environment.GetEnvironmentVariable(RegenerateEnvVar) == "1";
+    private static void RejectRegeneration() =>
+        Assert.True(string.IsNullOrEmpty(Environment.GetEnvironmentVariable(RegenerateEnvVar)),
+            $"Historical demand ledger is immutable; {RegenerateEnvVar} is forbidden.");
+
+    private static string CurrentExpectationsPath() => Path.Combine(RepoRoot(),
+        "tests", "TestData", "Effects", "higher-order-demand-current-expectations.json");
 
     // ---------------------------------------------------------------- D-A
 
     [Fact]
-    public void DA_CalorNative_MatchesLedgerExactly()
+    [Trait("Category", "HistoricalReplay")]
+    public async Task DA_CalorNative_MatchesLedgerExactly()
     {
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "registered_ledger_historical_replay.py"), "demand"],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical demand replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
+    [Fact]
+    public void CurrentCompiler_DA_CalorNative_MatchesExpectationsExactly()
+    {
+        RejectRegeneration();
         var measured = MeasureDA();
         Assert.True(measured.FileCount > 0, "D-A found no .calr files — corpus discovery broke.");
+        using var stream = File.OpenRead(CurrentExpectationsPath());
+        AssertCurrentExpectations(JsonSerializer.Deserialize<JsonElement>(stream), measured);
+    }
 
-        if (Regenerate())
-        {
-            WriteLedger(existing => existing with { DA = measured with { MeasuredCommit = HeadSha() } });
-            return;
-        }
+    [Fact]
+    public void CurrentCsvSubject_UsesKnownIndexedStringAndReachesEffectEnforcement()
+    {
+        const string relative =
+            "bench/phase0-agent-native/epochs/w5-parity-002/N1-003-csv-row/calor+treatment/run-3/final-src/CsvRow.calr";
+        var root = RepoRoot();
+        var active = ActiveSyntaxInputs.ForCurrentCompiler(root, Path.Combine(root, relative));
+        var source = File.ReadAllText(active);
+        var diagnostics = new DiagnosticBag();
+        var module = new Parsing.Parser(new Parsing.Lexer(source, diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        var bound = new Binding.Binder(diagnostics).Bind(module);
+        var compilationDiagnostics = new DiagnosticBag();
+        BindingDiagnosticPolicy.PropagateCompilationErrors(diagnostics, compilationDiagnostics);
+        Assert.False(compilationDiagnostics.HasErrors, string.Join("\n", compilationDiagnostics));
+        var index = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundArrayAccess>());
+        Assert.False(index.HasUnknownInferredType);
+        var call = Assert.Single(BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>()
+            .Where(call => call.Target == "EscapeField"));
+        Assert.False(call.HasUnresolvedArguments);
+        // Functions in a nested module bind with their namespace-qualified name.
+        Assert.Same(bound.Functions.Single(function => function.Symbol.Name == "CsvRow.CsvRowModule.EscapeField").Symbol,
+            call.ResolvedSymbol);
 
-        var ledger = ReadLedger();
-        Assert.NotNull(ledger.DA);
-        var recorded = ledger.DA!;
+        var status = new StringWriter();
+        var compiled = Program.Compile(source, active,
+            new CompilationOptions { Verbose = true, StatusWriter = status });
+        Assert.False(compiled.Diagnostics.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Contains(Program.EffectEnforcementCompletedStatus, status.ToString());
+        var generated = GeneratedCSharpCompiler.Validate(new CSharpEmitter().Emit(module));
+        Assert.Empty(generated.SyntaxErrors);
+        Assert.Empty(generated.CompilationErrors);
+    }
 
-        Assert.True(recorded.FileCount == measured.FileCount,
-            $"D-A corpus size moved: {measured.FileCount} .calr files vs ledger {recorded.FileCount}. " +
-            $"Corpus additions/removals regenerate the ledger IN THIS PR ({RegenerateEnvVar}=1) " +
-            "with the change named — never silently. This is a filesystem walk: if the count is " +
-            "higher than `git ls-files '*.calr'` (minus docs/design/spikes/), untracked or " +
-            "gitignored .calr are being counted — harness scratch, or epoch run-internals " +
-            "outside a dot-directory — and the tree must be cleaned before regenerating.");
-        // Files that never reach the pass are pinned BY NAME and by first error code: a
-        // parser/binder regression that silently removes files from the effective
-        // denominator (or changes why they fail) fails here, naming them.
+    private static void AssertCurrentExpectations(JsonElement committed, DALedger measured)
+    {
+        Assert.Equal(1, committed.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(Floor, committed.GetProperty("floor").GetInt32());
+        Assert.Equal(FloorRule, committed.GetProperty("floorRule").GetString());
+        Assert.Equal(ScopeText, committed.GetProperty("scope").GetString());
+        Assert.False(committed.TryGetProperty("measuredCommit", out _));
+        var recorded = committed.Deserialize<DALedger>(JsonOptions)!;
+        Assert.Null(recorded.MeasuredCommit);
+        Assert.Null(measured.MeasuredCommit);
+        Assert.Equal(CurrentNotReachingEffectPassNote, recorded.NotReachingEffectPassNote);
+        Assert.Equal(recorded.NotReachingEffectPassNote, measured.NotReachingEffectPassNote);
+        Assert.Equal(recorded.FileCount, measured.FileCount);
         var recordedFailing = recorded.NotReachingEffectPass.Select(e => e.File).ToList();
         var measuredFailing = measured.NotReachingEffectPass.Select(e => e.File).ToList();
         Assert.True(recordedFailing.SequenceEqual(measuredFailing),
-            "D-A files failing before the effect pass moved — a parser/binder change shrank or " +
-            "grew the effective denominator; regenerate with the change named.\n  newly failing: " +
+            "Current D-A effective denominator moved.\n  newly failing: " +
             string.Join(", ", measuredFailing.Except(recordedFailing)) +
             "\n  newly reaching: " + string.Join(", ", recordedFailing.Except(measuredFailing)));
         Assert.Equal(recorded.NotReachingEffectPass, measured.NotReachingEffectPass);
         Assert.Equal(recorded.FilesNotReachingEffectPass, measured.FilesNotReachingEffectPass);
         Assert.Equal(recorded.CompileExceptions, measured.CompileExceptions);
         Assert.Equal(recorded.PerFile, measured.PerFile);
-        Assert.True(recorded.Calor0418 == measured.Calor0418
-                && recorded.Calor0419FunctionTyped == measured.Calor0419FunctionTyped
-                && recorded.Total == measured.Total,
-            $"D-A totals moved: 0418 {measured.Calor0418} / 0419(function-typed) " +
-            $"{measured.Calor0419FunctionTyped} vs ledger {recorded.Calor0418} / " +
-            $"{recorded.Calor0419FunctionTyped}. The ledger is the frozen denominator — " +
-            "regenerate in this PR and name the cause (§4.4 gate 2 discriminating pin).");
+        Assert.Equal(recorded.Calor0418, measured.Calor0418);
+        Assert.Equal(recorded.Calor0419FunctionTyped, measured.Calor0419FunctionTyped);
+        Assert.Equal(recorded.Total, measured.Total);
+        Assert.Equal(measured.Calor0418 + measured.Calor0419FunctionTyped, measured.Total);
+        Assert.True(measured.Total + ReadLedger().DB!.Aggregate.Total >= Floor);
+    }
+
+    [Theory]
+    [InlineData("fileCount")]
+    [InlineData("firstError")]
+    [InlineData("file")]
+    [InlineData("total")]
+    [InlineData("perFile")]
+    public void CurrentExpectations_RejectCountCauseOrNamedSubjectTampering(string field)
+    {
+        var text = File.ReadAllText(CurrentExpectationsPath());
+        var measured = JsonSerializer.Deserialize<DALedger>(text, JsonOptions)!;
+        AssertCurrentExpectations(JsonSerializer.Deserialize<JsonElement>(text), measured);
+        var changed = System.Text.Json.Nodes.JsonNode.Parse(text)!;
+        switch (field)
+        {
+            case "firstError":
+                changed["notReachingEffectPass"]![0]!["firstError"] = "Calor9999";
+                break;
+            case "file":
+                changed["notReachingEffectPass"]![0]!["file"] = "renamed-subject.calr";
+                break;
+            case "perFile":
+                changed["perFile"]![0]!["calor0419FunctionTyped"] = 99;
+                break;
+            default:
+                changed[field] = changed[field]!.GetValue<int>() + 1;
+                break;
+        }
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertCurrentExpectations(JsonSerializer.Deserialize<JsonElement>(changed.ToJsonString()), measured));
     }
 
     private static DALedger MeasureDA()
@@ -241,7 +335,10 @@ public class HigherOrderDemandLedgerTests
                 Assert.True(options.EnforceEffects, "default CompilationOptions must enforce effects");
                 Assert.Equal(UnknownCallPolicy.Strict, options.UnknownCallPolicy);
                 Assert.False(options.StrictEffects);
-                result = Program.Compile(File.ReadAllText(file).Replace("\r\n", "\n"), file, options);
+                // Preserve the frozen census identity, but check explicitly migrated source
+                // with today's compiler. This is not a replay of the archived raw program.
+                var active = ActiveSyntaxInputs.ForCurrentCompiler(root, file);
+                result = Program.Compile(File.ReadAllText(active).Replace("\r\n", "\n"), active, options);
             }
             catch (Exception ex)
             {
@@ -273,7 +370,7 @@ public class HigherOrderDemandLedgerTests
             MeasuredCommit: null,
             FileCount: files.Count,
             FilesNotReachingEffectPass: notReachingEffectPass.Count,
-            NotReachingEffectPassNote: NotReachingEffectPassNote,
+            NotReachingEffectPassNote: CurrentNotReachingEffectPassNote,
             NotReachingEffectPass: notReachingEffectPass,
             CompileExceptions: exceptions,
             Calor0418: perFile.Sum(f => f.Calor0418),
@@ -321,7 +418,8 @@ public class HigherOrderDemandLedgerTests
                     //     dispositioned when the pairs landed; PpwFixture records that disposition and why
                     //     the other two options it listed are unavailable. Counts are unchanged either way.
                     && !rel.StartsWith("bench/phase0-agent-native/templates/", StringComparison.Ordinal)
-                    && !PpwFixture.IsMatch(rel);
+                    && !PpwFixture.IsMatch(rel)
+                    && !ActiveSyntaxInputs.IsActiveCopy(rel);
             })
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(f => Path.Combine(root, f))
@@ -333,6 +431,7 @@ public class HigherOrderDemandLedgerTests
     [SkippableFact]
     public void DB_CSharpBackstop_MatchesLedgerExactly()
     {
+        RejectRegeneration();
         var root = RepoRoot();
         var srcRoots = Subjects
             .Select(s => Path.Combine(root, s.SubmodulePath, "src"))
@@ -342,12 +441,6 @@ public class HigherOrderDemandLedgerTests
         var measured = MeasureDB(root);
         Assert.True(measured.Aggregate.Total > 0,
             "D-B produced zero sites across all three subjects — corpus detection broke.");
-
-        if (Regenerate())
-        {
-            WriteLedger(existing => existing with { DB = measured with { MeasuredCommit = HeadSha() } });
-            return;
-        }
 
         var ledger = ReadLedger();
         Assert.NotNull(ledger.DB);
@@ -557,44 +650,11 @@ public class HigherOrderDemandLedgerTests
 
     private static Ledger ReadLedger()
     {
+        RejectRegeneration();
         Assert.True(File.Exists(LedgerPath()),
-            $"Ledger missing at {LedgerPath()} — run once with {RegenerateEnvVar}=1 (submodules initialized).");
+            $"Immutable demand ledger missing at {LedgerPath()}.");
         return JsonSerializer.Deserialize<Ledger>(File.ReadAllText(LedgerPath()), JsonOptions)!;
     }
-
-    /// <summary>
-    /// Rewrites one leg, preserving the other — the two legs run in nondeterministic
-    /// order under one invocation (BinderIncompleteRatchetTests review minor 5). Each
-    /// leg carries the HEAD it was measured at; the top-level <c>measuredCommit</c> is
-    /// advanced only when both legs agree, so a one-legged regeneration cannot
-    /// re-stamp the ledger as freshly measured. <c>registeredAt</c> never moves.
-    /// </summary>
-    private static void WriteLedger(Func<Ledger, Ledger> update)
-    {
-        var existing = File.Exists(LedgerPath())
-            ? JsonSerializer.Deserialize<Ledger>(File.ReadAllText(LedgerPath()), JsonOptions)!
-            : new Ledger(1, RegisteredAt, null, Floor, FloorRule, ScopeText,
-                new Dictionary<string, string>(Classes), 0, null, null);
-        var updated = update(existing) with
-        {
-            SchemaVersion = 1,
-            RegisteredAt = existing.RegisteredAt ?? RegisteredAt,
-            Floor = Floor,
-            FloorRule = FloorRule,
-            Scope = ScopeText,
-            Classes = new Dictionary<string, string>(Classes),
-        };
-        var legsAgree = updated.DA?.MeasuredCommit != null
-            && updated.DA.MeasuredCommit == updated.DB?.MeasuredCommit;
-        updated = updated with
-        {
-            MeasuredCommit = legsAgree ? updated.DA!.MeasuredCommit : existing.MeasuredCommit,
-            DemandTotal = (updated.DA?.Total ?? 0) + (updated.DB?.Aggregate.Total ?? 0),
-        };
-        File.WriteAllText(LedgerPath(), JsonSerializer.Serialize(updated, JsonOptions) + "\n");
-    }
-
-    private static string HeadSha() => Git(RepoRoot(), "rev-parse HEAD", "HEAD");
 
     private static string Git(string root, string arguments, string what)
     {

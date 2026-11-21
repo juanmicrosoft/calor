@@ -1,0 +1,8 @@
+module Combinators
+  func Map (int[]:xs, Func<int,int>:f ! unknown) → int[]
+    ! alloc, mut
+    let int:n = xs.Length
+    var int[]:@out = new int[n]
+    for i from 0 to n step 1
+      set @out[i]    f(xs[i])
+    return @out

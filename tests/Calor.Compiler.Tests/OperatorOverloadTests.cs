@@ -12,27 +12,176 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class OperatorOverloadTests
 {
+    [Theory]
+    [InlineData("byte", "255", "Int32:255")]
+    [InlineData("sbyte", "-128", "Int32:-128")]
+    [InlineData("short", "-32768", "Int32:-32768")]
+    [InlineData("ushort", "65535", "Int32:65535")]
+    [InlineData("char", "'A'", "Int32:65")]
+    [InlineData("int", "System.Int32.MinValue", "Int32:-2147483648")]
+    [InlineData("uint", "4294967295U", "UInt32:4294967295")]
+    [InlineData("long", "System.Int64.MinValue", "Int64:-9223372036854775808")]
+    [InlineData("ulong", "18446744073709551615UL", "UInt64:18446744073709551615")]
+    [InlineData("float", "1.5F", "Single:1.5")]
+    [InlineData("double", "1.5D", "Double:1.5")]
+    [InlineData("decimal", "1.5M", "Decimal:1.5")]
+    public void Migration_BuiltInUnaryPlus_PreservesPromotionAndSingleEvaluation(
+        string type, string value, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                static int calls;
+                static {{type}} Next() { calls++; return {{value}}; }
+                static string Pick<T>(T value) { return typeof(T).Name + ":" + value; }
+                public static string Run() { return Pick(+Next()) + ":" + calls; }
+            }
+            """;
+        AssertNativeUnaryPlusRoundTrip(source, expected + ":1");
+    }
+
+    [Theory]
+    [InlineData("byte?", "null", "<null>")]
+    [InlineData("byte?", "255", "Int32:255")]
+    [InlineData("int?", "null", "<null>")]
+    [InlineData("int?", "-1", "Int32:-1")]
+    public void Migration_LiftedUnaryPlus_PreservesNullablePromotion(string type, string value, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                static string Pick<T>(T? value) where T : struct
+                {
+                    if (value == null) return "<null>";
+                    return typeof(T).Name + ":" + value;
+                }
+                public static string Run() { {{type}} x = {{value}}; return Pick(+x); }
+            }
+            """;
+        AssertNativeUnaryPlusRoundTrip(source, expected);
+    }
+
+    [Theory]
+    [InlineData("0.0", "0")]
+    [InlineData("-0.0", "-9223372036854775808")]
+    [InlineData("System.Double.NaN", "-2251799813685248")]
+    [InlineData("System.Double.PositiveInfinity", "9218868437227405312")]
+    public void Migration_UnaryPlus_PreservesFloatingPointBits(string value, string expected)
+    {
+        var source = $$"""
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    double x = {{value}};
+                    return System.BitConverter.DoubleToInt64Bits(+x).ToString();
+                }
+            }
+            """;
+        AssertNativeUnaryPlusRoundTrip(source, expected);
+    }
+
+    [Theory]
+    [InlineData("public class Value { public static int Calls; public static Value operator +(Value x) { Calls++; return new Value(); } }",
+        "Value x = new Value(); var y = +x; return Value.Calls.ToString();", "1")]
+    [InlineData("public class Value { public static implicit operator short(Value x) { return 7; } public static explicit operator int(Value x) { return 9; } }",
+        "Value x = new Value(); return (+x).ToString();", "7")]
+    [InlineData("", "dynamic x = 7; return (+x).ToString();", "7")]
+    public void Migration_UnprovenUnaryPlus_IsPreserved(string declaration, string body, string expected)
+    {
+        var source = declaration + " public static class Probe { public static string Run() { " + body + " } }";
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.Contains(conversion.Losses, loss => loss.Feature == "unsupported-prefix-operator");
+        Assert.Contains("+x", conversion.CalorSource);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(source));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(ParseAndEmit(conversion.CalorSource!)));
+    }
+
+    private static void AssertNativeUnaryPlusRoundTrip(string source, string expected)
+    {
+        var conversion = new CSharpToCalorConverter().Convert(source);
+        Assert.True(conversion.Success, string.Join("; ", conversion.Issues));
+        Assert.Empty(conversion.Losses);
+        Assert.DoesNotContain("§CS", conversion.CalorSource);
+        Assert.DoesNotContain("raw ", conversion.CalorSource);
+        Assert.DoesNotContain('§', conversion.CalorSource!);
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(source));
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(ParseAndEmit(conversion.CalorSource!)));
+    }
+
     #region Parsing Tests
+
+    [Theory]
+    [InlineData(3, 4, "7", false)]
+    [InlineData(3, 4, "7", true)]
+    [InlineData(-1, 4, "Requires", false)]
+    [InlineData(-1, 4, "Requires", true)]
+    [InlineData(1, -2, "Ensures", false)]
+    [InlineData(1, -2, "Ensures", true)]
+    public void CanonicalOperatorContracts_ExecuteOnTheClr(int left, int right, string expected, bool roundtrip)
+    {
+        const string source = """
+            module Operators
+              class Number struct
+                field int:Value public
+                op + (Number:left, int:right) → int
+                  !
+                  requires left.Value >= 0
+                  => result >= 0
+                  return left.Value + right
+            """;
+        var input = roundtrip ? new CalorEmitter().Emit(ParseModule(source)) : source;
+        var compiled = Program.Compile(input);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        var probe = $$"""
+
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    try { return (new Number { Value = {{left}} } + ({{right}})).ToString(); }
+                    catch (Calor.Runtime.ContractViolationException error) { return error.Kind.ToString(); }
+                }
+            }
+            """;
+        Assert.Equal(expected, InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + probe));
+    }
+
+    [Fact]
+    public void CanonicalOperatorContracts_PostconditionCannotFollowABodyStatement()
+    {
+        const string source = """
+            module Operators
+              class Number struct
+                op + (Number:left, int:right) → int
+                  !
+                  return right
+                  => result >= 0
+            """;
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken
+            && diagnostic.Message.Contains("Postcondition clauses must precede", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0006");
+    }
 
     [Fact]
     public void Parse_BinaryOperator_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP{op001}
+module Test
+  class MyType
+    op + (MyType:left, MyType:right) → MyType
+      !
+      return left
 ";
 
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         var op = Assert.Single(cls.OperatorOverloads);
 
-        Assert.Equal("op001", op.Id);
+        Assert.StartsWith("op_auto", op.LocalId);
+        Assert.Null(op.ToolingId);
         Assert.Equal("+", op.OperatorToken);
         Assert.Equal(OperatorOverloadKind.Add, op.Kind);
         Assert.True(op.IsBinary);
@@ -47,13 +196,11 @@ public class OperatorOverloadTests
     public void Parse_UnaryOperator_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:-:pub}
-        §I{MyType:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op - (MyType:value) → MyType
+      !
+      return value
 ";
 
         var module = ParseModule(source);
@@ -71,13 +218,11 @@ public class OperatorOverloadTests
     public void Parse_ImplicitConversion_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:implicit:pub}
-        §I{MyType:value}
-        §O{i32}
-        §R 0
-      §/OP{op001}
+module Test
+  class MyType
+    op implicit (MyType:value) → int
+      !
+      return 0
 ";
 
         var module = ParseModule(source);
@@ -95,13 +240,11 @@ public class OperatorOverloadTests
     public void Parse_ExplicitConversion_CreatesCorrectAstNode()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:explicit:pub}
-        §I{i32:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op explicit (int:value) → MyType
+      !
+      return value
 ";
 
         var module = ParseModule(source);
@@ -117,16 +260,13 @@ public class OperatorOverloadTests
     public void Parse_OperatorWithContracts_PreservesContracts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §Q (>= left 0)
-        §S (>= result 0)
-        §R left
-      §/OP{op001}
+module Test
+  class MyType
+    op + (MyType:left, MyType:right) → MyType
+      !
+      requires left >= 0
+      => result >= 0
+      return left
 ";
 
         var module = ParseModule(source);
@@ -137,29 +277,34 @@ public class OperatorOverloadTests
         Assert.Single(op.Postconditions);
     }
 
-    [Fact]
-    public void Parse_MismatchedId_ReportsDiagnostic()
+    [Theory]
+    [InlineData("op001:+:pub")]
+    [InlineData("op_3hj8x2bw9pkq:+:pub")]
+    [InlineData("invalid:pub")]
+    public void Parse_InvalidOperatorHeader_ReportsDiagnosticAndKeepsLaterMember(string header)
     {
-        var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP{op002}
-";
+        var source = $$"""
+            module Test
+              class MyType
+                op {{header}} (MyType:left, MyType:right) → MyType
+                  return left
+                func Later public () → int
+                  return 1
+            """;
 
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("test.calr");
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
-        parser.Parse();
+        var module = parser.Parse();
 
-        // Should have a mismatched ID diagnostic
-        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnexpectedToken
+            && diagnostic.Message.Contains("Expected operator token in §OP", StringComparison.Ordinal));
+        var type = Assert.Single(module.Classes);
+        Assert.Empty(type.OperatorOverloads);
+        Assert.Equal("Later", Assert.Single(type.Methods).Name);
     }
 
     [Theory]
@@ -180,13 +325,11 @@ public class OperatorOverloadTests
     public void Parse_AllBinaryOperators(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
-      §I{{MyType:left}}
-      §I{{MyType:right}}
-      §O{{MyType}}
-      §R left
+module Test
+  class MyType
+    op {operatorSymbol} (MyType:left, MyType:right) → MyType
+      !
+      return left
 ";
 
         var module = ParseModule(source);
@@ -204,12 +347,11 @@ public class OperatorOverloadTests
     public void Parse_UnaryOperators_LogicalNotAndBitwiseNot(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
-      §I{{MyType:value}}
-      §O{{MyType}}
-      §R value
+module Test
+  class MyType
+    op {operatorSymbol} (MyType:value) → MyType
+      !
+      return value
 ";
 
         var module = ParseModule(source);
@@ -228,12 +370,11 @@ public class OperatorOverloadTests
     public void Parse_TrueFalseOperators(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
-      §I{{MyType:value}}
-      §O{{bool}}
-      §R {operatorSymbol}
+module Test
+  class MyType
+    op {operatorSymbol} (MyType:value) → bool
+      !
+      return {operatorSymbol}
 ";
 
         var module = ParseModule(source);
@@ -252,12 +393,11 @@ public class OperatorOverloadTests
     public void Parse_IncrementDecrementOperators(string operatorSymbol, OperatorOverloadKind expectedKind)
     {
         var source = $@"
-§M{{m1:Test}}
-  §CL{{c1:MyType}}
-    §OP{{op001:{operatorSymbol}:pub}}
-      §I{{MyType:value}}
-      §O{{MyType}}
-      §R value
+module Test
+  class MyType
+    op {operatorSymbol} (MyType:value) → MyType
+      !
+      return value
 ";
 
         var module = ParseModule(source);
@@ -278,14 +418,11 @@ public class OperatorOverloadTests
     public void CodeGen_BinaryAdd_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP{op001}
+module Test
+  class MyType
+    op + (MyType:left, MyType:right) → MyType
+      !
+      return left
 ";
 
         var result = ParseAndEmit(source);
@@ -297,13 +434,11 @@ public class OperatorOverloadTests
     public void CodeGen_UnaryNegate_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:-:pub}
-        §I{MyType:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op - (MyType:value) → MyType
+      !
+      return value
 ";
 
         var result = ParseAndEmit(source);
@@ -315,14 +450,11 @@ public class OperatorOverloadTests
     public void CodeGen_Equality_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:==:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{bool}
-        §R true
-      §/OP{op001}
+module Test
+  class MyType
+    op == (MyType:left, MyType:right) → bool
+      !
+      return true
 ";
 
         var result = ParseAndEmit(source);
@@ -334,13 +466,11 @@ public class OperatorOverloadTests
     public void CodeGen_ImplicitConversion_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:implicit:pub}
-        §I{MyType:value}
-        §O{i32}
-        §R 0
-      §/OP{op001}
+module Test
+  class MyType
+    op implicit (MyType:value) → int
+      !
+      return 0
 ";
 
         var result = ParseAndEmit(source);
@@ -352,13 +482,11 @@ public class OperatorOverloadTests
     public void CodeGen_ExplicitConversion_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:explicit:pub}
-        §I{i32:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op explicit (int:value) → MyType
+      !
+      return value
 ";
 
         var result = ParseAndEmit(source);
@@ -370,15 +498,12 @@ public class OperatorOverloadTests
     public void CodeGen_OperatorWithPreconditions_EmitsGuards()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{i32:left}
-        §I{i32:right}
-        §O{i32}
-        §Q (>= left 0)
-        §R (+ left right)
-      §/OP{op001}
+module Test
+  class MyType
+    op + (int:left, int:right) → int
+      !
+      requires left >= 0
+      return left + right
 ";
 
         var result = ParseAndEmit(source);
@@ -392,26 +517,17 @@ public class OperatorOverloadTests
     public void CodeGen_MultipleOperators_InClass()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP{op001}
-      §OP{op002:-:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP{op002}
-      §OP{op003:==:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{bool}
-        §R true
-      §/OP{op003}
+module Test
+  class MyType
+    op + (MyType:left, MyType:right) → MyType
+      !
+      return left
+    op - (MyType:left, MyType:right) → MyType
+      !
+      return left
+    op == (MyType:left, MyType:right) → bool
+      !
+      return true
 ";
 
         var result = ParseAndEmit(source);
@@ -425,15 +541,12 @@ public class OperatorOverloadTests
     public void CodeGen_OperatorWithPostconditions_EmitsResultCapture()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{i32:left}
-        §I{i32:right}
-        §O{i32}
-        §S (>= result 0)
-        §R (+ left right)
-      §/OP{op001}
+module Test
+  class MyType
+    op + (int:left, int:right) → int
+      !
+      => result >= 0
+      return left + right
 ";
 
         var result = ParseAndEmit(source);
@@ -448,13 +561,11 @@ public class OperatorOverloadTests
     public void CodeGen_LogicalNot_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:!:pub}
-        §I{MyType:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op ! (MyType:value) → MyType
+      !
+      return value
 ";
 
         var result = ParseAndEmit(source);
@@ -466,13 +577,11 @@ public class OperatorOverloadTests
     public void CodeGen_BitwiseNot_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:~:pub}
-        §I{MyType:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op ~ (MyType:value) → MyType
+      !
+      return value
 ";
 
         var result = ParseAndEmit(source);
@@ -484,13 +593,11 @@ public class OperatorOverloadTests
     public void CodeGen_TrueFalseOperator_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:true:pub}
-        §I{MyType:value}
-        §O{bool}
-        §R true
-      §/OP{op001}
+module Test
+  class MyType
+    op true (MyType:value) → bool
+      !
+      return true
 ";
 
         var result = ParseAndEmit(source);
@@ -502,13 +609,11 @@ public class OperatorOverloadTests
     public void CodeGen_UnaryPlus_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{MyType:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op + (MyType:value) → MyType
+      !
+      return value
 ";
 
         var module = ParseModule(source);
@@ -527,21 +632,23 @@ public class OperatorOverloadTests
     public void CodeGen_PrivateOperator_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:priv}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP{op001}
+module Test
+  class MyType
+    op + (MyType:left, MyType:right) → MyType
+      !
+      return left
 ";
 
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
         var op = Assert.Single(cls.OperatorOverloads);
 
-        Assert.Equal(Ast.Visibility.Private, op.Visibility);
+        Assert.Equal(Ast.Visibility.Public, op.Visibility);
+        var diagnostics = new DiagnosticBag();
+        _ = new Parser(new Lexer(source.Replace("op + (", "op + private (", StringComparison.Ordinal), diagnostics)
+            .TokenizeAllForParser(), diagnostics).Parse();
+        Assert.Contains(diagnostics.Errors, diagnostic => diagnostic.Code == DiagnosticCode.UnexpectedToken);
+        Assert.DoesNotContain(diagnostics.Errors, diagnostic => diagnostic.Code == "Calor0006");
 
         // C# operators are always public static, but we should still emit correctly
         var result = ParseAndEmit(source);
@@ -552,13 +659,11 @@ public class OperatorOverloadTests
     public void CodeGen_IncrementOperator_GeneratesValidCSharp()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:++:pub}
-        §I{MyType:value}
-        §O{MyType}
-        §R value
-      §/OP{op001}
+module Test
+  class MyType
+    op ++ (MyType:value) → MyType
+      !
+      return value
 ";
 
         var result = ParseAndEmit(source);
@@ -586,9 +691,8 @@ public class Money
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":+:", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("op + (Money:left, Money:right) → Money", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -607,9 +711,8 @@ public class Money
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":-:", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("op - (Money:value) → Money", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -628,9 +731,8 @@ public class Money
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":implicit:", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("op implicit (Money:value) → decimal", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -649,9 +751,8 @@ public class Money
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":explicit:", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("op explicit (decimal:value) → Money", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -670,9 +771,8 @@ public class Counter
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":++:", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("op ++ (Counter:c) → Counter", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -696,9 +796,9 @@ public class MyBool
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":true:", result);
-        Assert.Contains(":false:", result);
+        Assert.Contains("op true (MyBool:b) → bool", result);
+        Assert.Contains("op false (MyBool:b) → bool", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -717,9 +817,8 @@ public class MyBool
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":!:", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("op ! (MyBool:b) → MyBool", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -735,11 +834,10 @@ public class Vector
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":+:", result);
+        Assert.Contains("op + (Vector:a, Vector:b) → Vector", result);
         // Expression body should be converted to a return statement
-        Assert.Contains("§R", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("return new Vector()", result);
+        Assert.DoesNotContain('§', result);
     }
 
     [Fact]
@@ -755,11 +853,10 @@ public class Wrapper
 
         var result = ConvertCSharpToCalor(csharpCode);
 
-        Assert.Contains("§OP{", result);
-        Assert.Contains(":implicit:", result);
+        Assert.Contains("op implicit (Wrapper:w) → int", result);
         // Expression body should be converted to a return statement
-        Assert.Contains("§R", result);
-        Assert.DoesNotContain("§/OP{", result);
+        Assert.Contains("return w.Value", result);
+        Assert.DoesNotContain('§', result);
     }
 
     #endregion
@@ -770,14 +867,11 @@ public class Wrapper
     public void Roundtrip_ParseEmitReparse_PreservesOperatorOverload()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{MyType:left}
-        §I{MyType:right}
-        §O{MyType}
-        §R left
-      §/OP{op001}
+module Test
+  class MyType
+    op + (MyType:left, MyType:right) → MyType
+      !
+      return left
 ";
 
         // Parse original
@@ -804,16 +898,13 @@ public class Wrapper
     public void Roundtrip_WithContracts_PreservesContracts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{i32:left}
-        §I{i32:right}
-        §O{i32}
-        §Q (>= left 0)
-        §S (>= result 0)
-        §R (+ left right)
-      §/OP{op001}
+module Test
+  class MyType
+    op + (int:left, int:right) → int
+      !
+      requires left >= 0
+      => result >= 0
+      return left + right
 ";
 
         // Parse original
@@ -827,8 +918,8 @@ public class Wrapper
         var emitted = emitter.Emit(module1);
 
         // Verify contracts present in emitted output
-        Assert.Contains("§Q", emitted);
-        Assert.Contains("§S", emitted);
+        Assert.Contains("requires (left >= 0)", emitted);
+        Assert.Contains("=> (result >= 0)", emitted);
 
         // Reparse emitted output
         var module2 = ParseModule(emitted);
@@ -842,13 +933,11 @@ public class Wrapper
     public void Roundtrip_ImplicitConversion_PreservesKind()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:implicit:pub}
-        §I{MyType:value}
-        §O{i32}
-        §R 0
-      §/OP{op001}
+module Test
+  class MyType
+    op implicit (MyType:value) → int
+      !
+      return 0
 ";
 
         var module1 = ParseModule(source);
@@ -870,42 +959,36 @@ public class Wrapper
     public void Formatter_OperatorWithContracts_EmitsContracts()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{i32:left}
-        §I{i32:right}
-        §O{i32}
-        §Q (>= left 0)
-        §S (>= result 0)
-        §R (+ left right)
-      §/OP{op001}
+module Test
+  class MyType
+    op + (int:left, int:right) → int
+      !
+      requires left >= 0
+      => result >= 0
+      return left + right
 ";
 
         var module = ParseModule(source);
         var formatter = new Calor.Compiler.Formatting.CalorFormatter();
         var formatted = formatter.Format(module);
 
-        Assert.Contains("§OP{", formatted);
-        Assert.Contains("§Q", formatted);
-        Assert.Contains("§S", formatted);
-        // Phase 4b: indent form — the operator block ends by dedent, not §/OP.
+        Assert.Contains("op + (int:left, int:right) → int", formatted);
+        Assert.Contains("requires (left >= 0)", formatted);
+        Assert.Contains("=> (result >= 0)", formatted);
+        Assert.DoesNotContain('§', formatted);
     }
 
     [Fact]
     public void Formatter_Output_CanBeReparsed()
     {
         var source = @"
-§M{m1:Test}
-  §CL{c1:MyType}
-      §OP{op001:+:pub}
-        §I{i32:left}
-        §I{i32:right}
-        §O{i32}
-        §Q (>= left 0)
-        §S (>= result 0)
-        §R (+ left right)
-      §/OP{op001}
+module Test
+  class MyType
+    op + (int:left, int:right) → int
+      !
+      requires left >= 0
+      => result >= 0
+      return left + right
 ";
 
         var module = ParseModule(source);
@@ -967,6 +1050,7 @@ public class Wrapper
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.ToString())));
         Assert.NotNull(result.CalorSource);
+        Assert.True(GeneratedCSharpCompiler.Validate(ParseAndEmit(result.CalorSource!)).CompilationSuccess);
 
         return result.CalorSource!;
     }
@@ -1083,15 +1167,12 @@ public class Wrapper
     public void CalorParser_GenericClassOperator_ParsesCorrectly()
     {
         var calor = """
-            §M{m001:TestModule}
-                §CL{c001:Vector<T>:pub}
-                    §WHERE T : struct
-                    §OP{op001:+:pub}
-                      §I{Vector<T>:a}
-                      §I{Vector<T>:b}
-                      §O{Vector<T>}
-                      §R §NEW{Vector<T>} §/NEW
-                    §/OP{op001}
+            module TestModule
+              class Vector<T> public
+                where T : struct
+                op + (Vector<T>:a, Vector<T>:b) → Vector<T>
+                  ! alloc, mut
+                  return new Vector<T>()
             """;
 
         var diagnostics = new DiagnosticBag();
@@ -1128,7 +1209,9 @@ public class Wrapper
             $"Re-parse failed:\n{string.Join("\n", diagnostics.Select(d => d.Message))}\nCalor:\n{calorCode}");
 
         var emitter = new CSharpEmitter();
-        return emitter.Emit(module);
+        var regenerated = emitter.Emit(module);
+        Assert.True(GeneratedCSharpCompiler.Validate(regenerated).CompilationSuccess);
+        return regenerated;
     }
 
     #endregion

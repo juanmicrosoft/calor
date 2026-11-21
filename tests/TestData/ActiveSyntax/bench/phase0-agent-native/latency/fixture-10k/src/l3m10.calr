@@ -1,0 +1,97 @@
+module L3M10 L3M10 block
+  module L3M10Module public
+
+    func l3m10_fn01 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 72)
+
+    func l3m10_fn02 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 52)
+
+    func l3m10_fn03 public (int:x, int:y) → int
+      !
+      requires (x > 6)
+      => (x >= 7)
+      let int:acc = ((x * 3) + y)
+      if (acc > 24151)
+        return (acc + 24151)
+      else
+        return ((acc * 2) + 24151)
+
+    func l3m10_fn04 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24158)
+      if (x >= 24158)
+        return x
+      else
+        return 24158
+
+    func l3m10_fn05 public (int:x, int:y) → int
+      !
+      requires (x >= 0)
+      => (result <= 24165)
+      let int:total = ((x * 3) + y)
+      if (total > 24165)
+        return 24165
+      return total
+
+    func l3m10_fn06 public (int:x, int:y) → int
+      !
+      requires (y >= 0)
+      => (result >= x)
+      => (result >= 24172)
+      if (x >= 24172)
+        return x
+      else
+        return 24172
+
+    func l3m10_fn07 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 20)
+
+    func l3m10_fn08 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 23)
+
+    func l3m10_fn09 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 66)
+
+    func l3m10_fn10 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 42)
+
+    func l3m10_fn11 public (int:x, int:y) → int
+      !
+      requires (x > 4)
+      => (x >= 5)
+      let int:acc = ((x * 5) + y)
+      if (acc > 24179)
+        return (acc + 24179)
+      else
+        return ((acc * 2) + 24179)
+
+    func l3m10_fn12 public (int:x, int:y) → int
+      !
+      let int:@base = ((x * 4) - y)
+      return (@base + 73)
+
+    func l3m10_fn13 public (int:x, int:y) → int
+      !
+      requires (x >= 5)
+      requires (y >= 0)
+      => (result >= 24186)
+      let int:total = ((x * 2) + y)
+      if (total < 24186)
+        return 24186
+      else
+        return total

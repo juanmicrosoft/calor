@@ -80,12 +80,18 @@ public class VersioningTests
 
     private static CompilationResult CompileModule(string semverLine)
     {
+        const string prefix = "  §SEMVER{";
+        // Keep the original version payloads; translate only their complete fixture wrapper.
+        var declarations = string.Join("\n", semverLine.Split('\n').Select(line =>
+            line.StartsWith(prefix, StringComparison.Ordinal) && line.EndsWith('}')
+                ? "  semver " + System.Text.Json.JsonSerializer.Serialize(line[prefix.Length..^1])
+                : line));
         var source = $$"""
-            §M{m001:Test}
-            {{semverLine}}
-              §F{f001:Answer:pub} () -> int
-                §E{}
-                §R INT:42
+            module Test
+            {{declarations}}
+              func Answer public () → int
+                !
+                return 42
             """;
         return Program.Compile(source, "test.calr", new CompilationOptions { EnforceEffects = false });
     }
@@ -223,9 +229,8 @@ public class VersioningTests
     }
 
     /// <summary>
-    /// Review round 1 finding 4: the legacy bracket form the hook used to recommend is
-    /// exactly one clear Calor0702 pointing at braces — not an empty-string 0702 plus a
-    /// cascade of parser errors.
+    /// Retain the historical test identity: the retired bracket directive is rejected
+    /// by the lexer. Native malformed-version recovery is covered separately below.
     /// </summary>
     [Fact]
     public void Compile_BracketSemver_IsSingleError_Calor0702_UseBraces()
@@ -233,13 +238,12 @@ public class VersioningTests
         var result = CompileModule("  §SEMVER[1.0.0]");
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
-        Assert.Contains("use braces: §SEMVER{MAJOR.MINOR.PATCH}", diagnostic.Message);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains("Legacy section marker '§SEMVER' is removed.", diagnostic.Message);
     }
 
     /// <summary>
-    /// Review round 1 finding 9: an unterminated §SEMVER{ stops at the end of its line and
-    /// reports one Calor0702 instead of swallowing the statements that follow it.
+    /// An unterminated retired directive remains a single lexer rejection.
     /// </summary>
     [Fact]
     public void Compile_UnterminatedSemver_IsSingleError_Calor0702()
@@ -247,20 +251,20 @@ public class VersioningTests
         var result = CompileModule("  §SEMVER{2.0.0");
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
-        Assert.Contains("Unterminated §SEMVER", diagnostic.Message);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains("Legacy section marker '§SEMVER' is removed.", diagnostic.Message);
         Assert.Equal(2, diagnostic.Span.Line);
     }
 
-    /// <summary>Bare §SEMVER with no brace group at all is a single Calor0702.</summary>
+    /// <summary>Bare §SEMVER is rejected as a retired marker, not a native version declaration.</summary>
     [Fact]
     public void Compile_BareSemver_IsSingleError_Calor0702()
     {
         var result = CompileModule("  §SEMVER");
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, diagnostic.Code);
-        Assert.Contains("expected §SEMVER{MAJOR.MINOR.PATCH}", diagnostic.Message);
+        Assert.Equal(DiagnosticCode.UnknownSectionMarker, diagnostic.Code);
+        Assert.Contains("Legacy section marker '§SEMVER' is removed.", diagnostic.Message);
     }
 
     /// <summary>
@@ -375,4 +379,124 @@ public class VersioningTests
         // docs/plans/v0.14-nullability-enforcement-scoping.md.
         Assert.True(SemanticsVersion.Major >= 2);
     }
+
+    [Theory]
+    [InlineData("2.0.0", null)]
+    [InlineData("2.0.99", null)]
+    [InlineData("2.1.0", "Calor0700")]
+    [InlineData("0.9.0", "Calor0701")]
+    [InlineData("1.0.0", "Calor0701")]
+    [InlineData("3.0.0", "Calor0701")]
+    public void NativeSemanticsVersion_EnforcesCompatibility(string version, string? code)
+    {
+        var result = CompileNativeVersionedModule($"  semver \"{version}\"");
+        Assert.Equal(version, result.Ast?.DeclaredSemanticsVersion);
+        if (code == null)
+            Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code.StartsWith("Calor070", StringComparison.Ordinal));
+        else
+        {
+            var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == code);
+            Assert.Equal(2, diagnostic.Span.Line);
+            Assert.Equal(code == "Calor0701" ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning, diagnostic.Severity);
+        }
+        Assert.Equal(code == "Calor0701", result.HasErrors);
+        if (result.HasErrors)
+            Assert.Empty(result.GeneratedCode);
+        else
+            Assert.Contains("42", result.GeneratedCode);
+        if (version == "1.0.0")
+        {
+            var error = Assert.Single(result.Diagnostics.Errors);
+            Assert.Contains("semver \"2.0.0\"", error.Message);
+            Assert.DoesNotContain("§SEMVER", error.Message);
+            Assert.Contains("changing the version alone is not a migration", error.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData("semver")]
+    [InlineData("semver 2.0.0")]
+    [InlineData("semver \"\"")]
+    [InlineData("semver \"2.0\"")]
+    [InlineData("semver \"+2.0.0\"")]
+    [InlineData("semver \"2 . 0 . 0\"")]
+    [InlineData("semver \"2.0.0-rc1\"")]
+    [InlineData("semver \"2.0.0\" extra")]
+    [InlineData("semver \"${2}.0.0\"")]
+    [InlineData("semver \"2.0.0\"u8")]
+    public void NativeSemanticsVersion_MalformedDeclarationDoesNotConsumeNextFunction(string declaration)
+    {
+        var result = CompileNativeVersionedModule("  " + declaration);
+        var error = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, error.Code);
+        Assert.Null(result.Ast?.DeclaredSemanticsVersion);
+        Assert.Equal("Answer", Assert.Single(result.Ast!.Functions).Name);
+        Assert.Empty(result.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData("2.0.0", 1, "2.0.0")]
+    [InlineData("2", 2, null)]
+    public void NativeSemanticsVersion_DuplicateNeverReplacesFirstDeclaration(
+        string first, int errors, string? adopted)
+    {
+        var result = CompileNativeVersionedModule($"  semver \"{first}\"\n  semver \"2.0.0\"");
+        Assert.Equal(errors, result.Diagnostics.Errors.Count);
+        Assert.All(result.Diagnostics.Errors, error =>
+            Assert.Equal(DiagnosticCode.SemanticsVersionInvalidDeclaration, error.Code));
+        Assert.Contains(result.Diagnostics.Errors, error => error.Message.Contains("only once", StringComparison.Ordinal));
+        Assert.Equal(adopted, result.Ast?.DeclaredSemanticsVersion);
+    }
+
+    [Fact]
+    public void NativeSemanticsVersion_EmitterRoundTripRetainsVersionAndAdmission()
+    {
+        var original = CompileNativeVersionedModule("  semver \"2.0.99\"");
+        Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics));
+        var emitted = new Calor.Compiler.Migration.CalorEmitter().Emit(original.Ast!);
+        Assert.Contains("  semver \"2.0.99\"", emitted);
+        Assert.DoesNotContain("§SEMVER", emitted);
+        var final = Program.Compile(emitted, "versioned.calr");
+        Assert.False(final.HasErrors, string.Join("\n", final.Diagnostics));
+        Assert.Equal("2.0.99", final.Ast?.DeclaredSemanticsVersion);
+        Assert.Equal(original.GeneratedCode, final.GeneratedCode);
+    }
+
+    [Fact]
+    public void NativeSemanticsVersion_OmissionUsesCurrentSemanticsAndRetiredTagStaysRejected()
+    {
+        var unversioned = CompileNativeVersionedModule("");
+        Assert.False(unversioned.HasErrors, string.Join("\n", unversioned.Diagnostics));
+        Assert.Null(unversioned.Ast?.DeclaredSemanticsVersion);
+        var retired = CompileNativeVersionedModule("  §SEMVER{2.0.0}");
+        Assert.True(retired.HasErrors);
+        Assert.Null(retired.Ast?.DeclaredSemanticsVersion);
+    }
+
+    [Fact]
+    public void NativeSemanticsVersion_KeywordIdentifiersRetainVerbatimRoundTrip()
+    {
+        var original = Program.Compile("""
+            module Versioned
+              semver "2.0.0"
+              func @semver public (int:@semver) → int
+                !
+                return @semver
+            """, "identifier.calr");
+        Assert.False(original.HasErrors, string.Join("\n", original.Diagnostics));
+        var emitted = new Calor.Compiler.Migration.CalorEmitter().Emit(original.Ast!);
+        Assert.Contains("func @semver", emitted);
+        var final = Program.Compile(emitted, "identifier.calr");
+        Assert.False(final.HasErrors, string.Join("\n", final.Diagnostics));
+        Assert.Equal(original.GeneratedCode, final.GeneratedCode);
+    }
+
+    private static CompilationResult CompileNativeVersionedModule(string declarations) =>
+        Program.Compile($$"""
+            module Versioned
+            {{declarations}}
+              func Answer public () → int
+                !
+                return 42
+            """, "versioned.calr");
 }

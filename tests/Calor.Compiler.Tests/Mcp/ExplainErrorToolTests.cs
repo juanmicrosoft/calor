@@ -63,7 +63,21 @@ public class ExplainErrorToolTests
 
         var match = matches[0];
         Assert.Equal("variable-redeclaration", match.GetProperty("id").GetString());
-        Assert.Contains("§ASSIGN", match.GetProperty("correctExample").GetString()!);
+        var example = match.GetProperty("correctExample").GetString()!;
+        Assert.Contains("set k k + 1", example);
+        Assert.DoesNotContain("§", example);
+        var source = "module Redeclaration\n  func Increment (int:rng, int:n) → int\n    !\n"
+            + string.Join("\n", example.Split('\n').Select(line => "    " + line))
+            + "\n    return k\n";
+        var compiled = Program.Compile(source);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal("2", InteropScope.RefOutImplementationTests.Run(compiled.GeneratedCode + """
+
+            public static class Probe
+            {
+                public static object Run() => GlobalModule.Increment(5, 2);
+            }
+            """));
     }
 
     [Fact]

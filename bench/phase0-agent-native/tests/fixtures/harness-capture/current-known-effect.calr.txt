@@ -1,0 +1,4 @@
+§M{PermissiveCanary}
+  §F{Quiet:pub} () -> void
+    §E{}
+    §P "laundered"

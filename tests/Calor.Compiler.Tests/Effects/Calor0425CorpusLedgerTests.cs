@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 using Xunit;
@@ -66,15 +67,14 @@ namespace Calor.Compiler.Tests;
 ///
 /// <para><b>Exact equality, both directions.</b> A rise means the row-less
 /// surface grew or the resolution ceiling fell; a fall means a site went silent.
-/// Both are decisions and both are made in a PR that regenerates this file and
-/// says what moved. Regenerate with
-/// <c>CALOR_REGENERATE_CALOR0425_LEDGER=1 dotnet test --filter Calor0425CorpusLedger</c>.
-/// A MISSING ledger is a failure, never a silent regeneration.</para>
+/// Both require an explanation. The historical ledger now replays its recorded
+/// compiler and original inputs without regeneration. Today's compiler compares
+/// separate ordinary expectations in <c>tests/TestData/Effects/</c>, including a
+/// live CLI cross-check on every run. A missing input is never regenerated.</para>
 ///
-/// <para>Skipped when the corpus submodules are not initialized; the
-/// <c>compiler</c> shard checks them out, and the skip is registered in
-/// <c>eng/test-manifest.json</c>'s <c>expectedSkipped</c> so a silent skip trips
-/// the count.</para>
+/// <para>The current test skips when the corpus submodules are not initialized;
+/// the <c>compiler</c> shard checks them out. Historical replay requires original
+/// history and submodule objects and fails, rather than skips, if unavailable.</para>
 ///
 /// <para><b>v0.16 K1 — schema 3: the ledger now mirrors the SHIPPING rule.</b>
 /// Schema 2 gated the effect pass on the <i>raw</i> binder bag
@@ -126,6 +126,13 @@ public class Calor0425CorpusLedgerTests
     // list (roadmap-v0.17 §3.1 R1, gate 13) + the Calor0411 count over the
     // enforced set, which the IL-rows trigger was being read without.
     private const int SchemaVersion = 4;
+    private const string CurrentScopeText =
+        "Current compiler conversion/effect regression expectations over the pinned MediatR, "
+        + "serilog and FluentValidation source corpora; Lossy/SelectActiveBranchLossy, empty "
+        + "defined symbols, propagated binding errors and built-in manifests only. CLI cross-check "
+        + "executes every converted module in an independent scratch directory. CLR async-void "
+        + "preservation moves 23 CascadingFailuresTester calls behind an opaque boundary; "
+        + "they are not newly proven pure. Enforced-module and Calor0425 counts are unchanged.";
 
     /// <summary>
     /// v0.16 K1 — the rule the denominator is measured under, written into the
@@ -283,21 +290,13 @@ public class Calor0425CorpusLedgerTests
     /// now re-derived on every regeneration from the SAME conversion the
     /// in-process leg uses — so the two legs cannot drift by neglect, only by a
     /// real disagreement, which is what the gate is for.</para>
-    /// <para>Outside a regeneration the committed block is returned unchanged,
-    /// so an ordinary test run stays fast and still checks the committed bytes.
-    /// </para>
+    /// <para>The current-compiler regression always executes this leg. Historical
+    /// gate tests continue to read the immutable recorded block.</para>
     /// </summary>
     private static CliCrossCheck MeasureCliCrossCheck(
         string root,
         List<SubjectVolume> inProcess)
     {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0425_LEDGER"),
-                "1", StringComparison.Ordinal))
-        {
-            return CommittedLedger().CliCrossCheck;
-        }
-
         var rows = new List<CliCrossCheckSubject>();
         foreach (var subject in inProcess)
         {
@@ -315,8 +314,7 @@ public class Calor0425CorpusLedgerTests
             + "defined symbols), each module written to a scratch directory holding no "
             + ".calor-effects.json, then `dotnet calor.dll -i <module>.calr -o <scratch>/out.g.cs` "
             + "— no flags, one process per module",
-            "v0.17 R2: re-derived automatically on every ledger regeneration rather than "
-            + "hand-registered, so the two legs cannot drift by neglect",
+            "Current compiler: executed live on every current-expectation comparison",
             rows);
     }
 
@@ -325,11 +323,12 @@ public class Calor0425CorpusLedgerTests
     /// the two legs differ ONLY in what runs after it: in-process
     /// <c>EffectEnforcementPass</c> versus the shipping CLI, which additionally
     /// runs the documented CLI-only passes (<c>Program.cs:760-808</c>).
+    /// Each unrelated module gets its own input directory and identity store.
     /// </summary>
     private static CliCrossCheckSubject MeasureCliSubject(string root, string subject)
     {
         var srcRoot = Path.Combine(root, "bench", "corpus", subject, "src");
-        var cli = Path.Combine(root, "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
+        var cli = typeof(Program).Assembly.Location;
         var files = Directory
             .EnumerateFiles(srcRoot, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
@@ -352,45 +351,44 @@ public class Calor0425CorpusLedgerTests
                     continue;
                 }
 
-                var modulePath = Path.Combine(scratch, "m.calr");
-                File.WriteAllText(modulePath, calor);
-                var output = RunCli(cli, scratch);
+                var output = RunCliModule(cli, scratch, calor);
+                var codes = output.Diagnostics.Select(d => d.Code).ToHashSet(StringComparer.Ordinal);
 
-                var sites = CountOccurrences(output, "Calor0425");
+                var sites = output.Diagnostics.Count(d => d.Code == "Calor0425");
                 if (sites > 0)
                 {
                     modules0425++;
                     sites0425 += sites;
                 }
 
-                if (output.Contains("Calor0099", StringComparison.Ordinal)
-                    || output.Contains("Calor0100", StringComparison.Ordinal)
-                    || output.Contains("Calor0117", StringComparison.Ordinal))
+                if (codes.Contains("Calor0099")
+                    || codes.Contains("Calor0100")
+                    || codes.Contains("Calor0117"))
                 {
                     parseFailed++;
                     continue;
                 }
 
-                if (output.Contains("Calor0208", StringComparison.Ordinal)
-                    || output.Contains("Calor0250", StringComparison.Ordinal)
-                    || output.Contains("Calor0201", StringComparison.Ordinal)
-                    || output.Contains("Calor0272", StringComparison.Ordinal)
-                    || output.Contains("Calor0273", StringComparison.Ordinal)
-                    || output.Contains("Calor0274", StringComparison.Ordinal))
+                if (codes.Contains("Calor0208")
+                    || codes.Contains("Calor0250")
+                    || codes.Contains("Calor0201")
+                    || codes.Contains("Calor0272")
+                    || codes.Contains("Calor0273")
+                    || codes.Contains("Calor0274"))
                 {
                     bindStopped++;
                     continue;
                 }
 
                 reach++;
-                if (output.Contains("error Calor0410", StringComparison.Ordinal))
+                var disposition = CliDisposition(output);
+                if (disposition == "0410")
                     stop0410++;
-                else if (output.Contains("error Calor0422", StringComparison.Ordinal)
-                    || output.Contains("error Calor0423", StringComparison.Ordinal))
+                else if (disposition == "042X")
                     stop042X++;
-                else if (output.Contains("error Calor1002", StringComparison.Ordinal))
+                else if (disposition == "1002")
                     stop1002++;
-                else if (output.Contains("error Calor", StringComparison.Ordinal))
+                else if (disposition == "other")
                     cliOnly++;
                 else
                     clean++;
@@ -423,7 +421,7 @@ public class Calor0425CorpusLedgerTests
                 }).Convert(File.ReadAllText(file), Path.GetFileName(file));
             return string.IsNullOrEmpty(conversion.CalorSource)
                 ? null
-                : conversion.CalorSource.Replace("\r\n", "\n");
+                : RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
         }
         catch
         {
@@ -431,7 +429,139 @@ public class Calor0425CorpusLedgerTests
         }
     }
 
-    private static string RunCli(string cliDll, string workingDirectory)
+    private sealed record CliProbe(List<(string Code, string Severity)> Diagnostics, int ExitCode);
+
+    private static string CliDisposition(CliProbe probe)
+    {
+        var errors = probe.Diagnostics.Where(d => d.Severity == "error").Select(d => d.Code).ToHashSet();
+        return errors.Contains("Calor0410") ? "0410"
+            : errors.Contains("Calor0422") || errors.Contains("Calor0423") ? "042X"
+            : errors.Contains("Calor1002") ? "1002"
+            : probe.ExitCode != 0 ? "other" : "clean";
+    }
+
+    private static CliProbe ParseCliProbe(string stdout, string stderr, int exitCode)
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(stdout);
+        var diagnostics = document.RootElement.GetProperty("diagnostics").EnumerateArray()
+            .Select(d => (Code: d.GetProperty("code").GetString()!, Severity: d.GetProperty("severity").GetString()!))
+            .ToList();
+        if (diagnostics.Any(d => d.Severity is not ("error" or "warning" or "info"))
+            || (exitCode != 0) != diagnostics.Any(d => d.Severity == "error"))
+            throw new InvalidDataException($"CLI exit and structured diagnostics disagree (exit {exitCode}): {stderr}");
+        return new CliProbe(diagnostics, exitCode);
+    }
+
+    [Theory]
+    [InlineData("Calor0410", "0410")]
+    [InlineData("Calor0422", "042X")]
+    [InlineData("Calor0423", "042X")]
+    [InlineData("Calor1002", "1002")]
+    [InlineData("Calor0200", "other")]
+    public void CliClassifier_UsesSeverityCodeAndExitNotProse(string code, string disposition)
+    {
+        static string Output(string code, string severity) => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            diagnostics = new[] { new { code, severity, message = "error Calor0410 warning Calor1002" } }
+        });
+        const string noisyStderr = "status: error Calor0410; warning Calor1002; Calor0425";
+        Assert.Equal(disposition, CliDisposition(ParseCliProbe(Output(code, "error"), noisyStderr, 1)));
+        Assert.Equal("clean", CliDisposition(ParseCliProbe(Output(code, "warning"), noisyStderr, 0)));
+        Assert.Equal("clean", CliDisposition(ParseCliProbe(Output(code, "info"), noisyStderr, 0)));
+        Assert.Throws<InvalidDataException>(() => ParseCliProbe(Output(code, "warning"), noisyStderr, 1));
+        Assert.Throws<InvalidDataException>(() => ParseCliProbe(Output(code, "error"), noisyStderr, 0));
+    }
+
+    private const string FirstCliModule = """
+        module Probe Probe block
+          func First (int:x) → int
+            !
+            return x
+
+          func Second (int:x) → int
+            !
+            return x
+        """;
+
+    private static string NextCliModule => FirstCliModule.Replace("First", "Third").Replace("Second", "Fourth");
+
+    [Fact]
+    public void CliModules_PooledInputRejectsAmbiguousPreviousModuleIdentity()
+    {
+        var scratch = Path.Combine(Path.GetTempPath(), "calor-cli-pooled-control-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        try
+        {
+            var store = new Compiler.Ids.DeclarationIdentityStore(scratch);
+            store.Sync([]);
+            var modulePath = Path.Combine(scratch, "m.calr");
+            var cli = typeof(Program).Assembly.Location;
+            File.WriteAllText(modulePath, FirstCliModule);
+            Assert.Equal("clean", CliDisposition(RunCli(cli, scratch)));
+            var sidecar = File.ReadAllBytes(store.SidecarPath);
+
+            File.WriteAllText(modulePath, NextCliModule);
+            var pooled = RunCli(cli, scratch);
+            Assert.NotEqual(0, pooled.ExitCode);
+            Assert.Contains(pooled.Diagnostics, diagnostic => diagnostic is ("Calor1312", "error"));
+            Assert.Equal("other", CliDisposition(pooled));
+            Assert.Equal(sidecar, File.ReadAllBytes(store.SidecarPath));
+            Assert.Equal(NextCliModule, File.ReadAllText(modulePath));
+        }
+        finally
+        {
+            Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CliModules_IndependentInputsPreserveBytesAndSeparateIdentityStores()
+    {
+        var scratch = Path.Combine(Path.GetTempPath(), "calor-cli-isolated-control-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(scratch);
+        try
+        {
+            var cli = typeof(Program).Assembly.Location;
+            var sources = new[] { FirstCliModule, NextCliModule, FirstCliModule.Replace("\n", "\r\n") + "\r\n" };
+            foreach (var source in sources)
+                Assert.Equal("clean", CliDisposition(RunCliModule(cli, scratch, source)));
+
+            Assert.False(Directory.Exists(Path.Combine(scratch, ".calor")));
+            var directories = Directory.GetDirectories(scratch);
+            Assert.Equal(sources.Length, directories.Length);
+            var measuredSources = new List<string>();
+            foreach (var directory in directories)
+            {
+                var modulePath = Path.Combine(directory, "m.calr");
+                var source = File.ReadAllText(modulePath);
+                measuredSources.Add(source);
+                Assert.Equal(System.Text.Encoding.UTF8.GetBytes(source), File.ReadAllBytes(modulePath));
+                var store = new Compiler.Ids.DeclarationIdentityStore(directory);
+                var state = store.Sync();
+                Assert.Equal(["m.calr"], state.Files);
+                Assert.Equal(source == NextCliModule ? ["Fourth", "Third"] : ["First", "Second"],
+                    state.Declarations.Where(d => d.Kind == Compiler.Ids.IdKind.Function)
+                        .Select(d => d.Name).Order(StringComparer.Ordinal).ToArray());
+            }
+            Assert.Equal(sources.Order(StringComparer.Ordinal), measuredSources.Order(StringComparer.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    private static CliProbe RunCliModule(string cliDll, string scratch, string calor)
+    {
+        var directory = Path.Combine(scratch, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        // Establish ownership without enrolling or parsing the measured input.
+        new Compiler.Ids.DeclarationIdentityStore(directory).Sync([]);
+        File.WriteAllText(Path.Combine(directory, "m.calr"), calor);
+        return RunCli(cliDll, directory);
+    }
+
+    private static CliProbe RunCli(string cliDll, string workingDirectory)
     {
         var start = new System.Diagnostics.ProcessStartInfo("dotnet")
         {
@@ -445,13 +575,15 @@ public class Calor0425CorpusLedgerTests
         start.ArgumentList.Add("m.calr");
         start.ArgumentList.Add("-o");
         start.ArgumentList.Add("out.g.cs");
+        start.ArgumentList.Add("--format");
+        start.ArgumentList.Add("json");
         start.Environment["LC_ALL"] = "C";
         using var process = System.Diagnostics.Process.Start(start);
         Assert.NotNull(process);
         var stdout = process!.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
-        return stdout.Result + stderr.Result;
+        return ParseCliProbe(stdout.Result, stderr.Result, process.ExitCode);
     }
 
     private static int CountOccurrences(string haystack, string needle)
@@ -479,76 +611,22 @@ public class Calor0425CorpusLedgerTests
     private static string LedgerPath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "calor0425-corpus-ledger.json");
 
-    [SkippableFact]
-    public void Calor0425CorpusLedgerMatchesRecomputation()
+    [Fact]
+    [Trait("Category", "HistoricalReplay")]
+    public async Task Calor0425CorpusLedgerMatchesRecomputation()
     {
-        var root = RepoRoot();
-        var subjectDirs = Subjects
-            .Select(subject => (Name: subject, Path: Path.Combine(root, "bench", "corpus", subject, "src")))
-            .ToList();
-        Skip.IfNot(subjectDirs.All(s => Directory.Exists(s.Path)),
-            "corpus submodules not initialized");
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "registered_ledger_historical_replay.py"), "corpus"],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical corpus replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
 
-        var perSubject = subjectDirs.Select(s => MeasureSubject(s.Name, s.Path)).ToList();
-        foreach (var subject in perSubject)
-        {
-            Console.WriteLine(
-                $"Calor0425-corpus {subject.Subject}: {subject.Diagnostics} across "
-                + $"{subject.ModulesWithDiagnostics} of {subject.ModulesEnforced} enforced modules "
-                + $"(rowless {subject.RowlessDestination}, unknown-source {subject.UnknownSource}, "
-                + $"assumed {subject.Assumed}, external-base {subject.ExternalBase}, "
-                + $"invocation rowless {subject.InvocationRowless} / undetermined "
-                + $"{subject.InvocationUndetermined} / assumed {subject.InvocationAssumed}; "
-                + $"of the rowless, invoked {subject.RowlessInvoked} / "
-                + $"never invoked {subject.RowlessNeverInvoked}; invocation witness "
-                + $"{subject.InvocationWitness}; excluded {subject.ModulesNotMeasured} "
-                + $"= convert {subject.ExcludedConversionFailed} / parse {subject.ExcludedParseFailed} "
-                + $"/ propagated-bind {subject.ExcludedBindFailed} / faulted "
-                + $"{subject.ExcludedEffectPassFaulted}; raw-bag rule would have enforced "
-                + $"{subject.ModulesEnforcedRawBagRule} and excluded {subject.RawBagBindFailed} "
-                + "at bind)");
-        }
+    private static string CurrentExpectationsPath() => Path.Combine(
+        RepoRoot(), "tests", "TestData", "Effects", "calor0425-corpus-current-expectations.json");
 
-        var measured = new Ledger(
-            SchemaVersion,
-            ScopeText,
-            BindRuleText,
-            RegisteredFloorRule(),
-            MeasureCliCrossCheck(root, perSubject),
-            MeasuredCommit(root),
-            perSubject.Sum(s => s.Diagnostics),
-            perSubject.Sum(s => s.ModulesWithDiagnostics),
-            perSubject.Sum(s => s.ModulesEnforced),
-            perSubject.Sum(s => s.ModulesNotMeasured),
-            perSubject);
-
-        Console.WriteLine(
-            $"Calor0425-corpus aggregate: {measured.AggregateDiagnostics} across "
-            + $"{measured.AggregateModulesWithDiagnostics} of {measured.AggregateModulesEnforced} "
-            + $"(raw-bag rule: {perSubject.Sum(s => s.ModulesEnforcedRawBagRule)} enforced; "
-            + $"parse-failed {perSubject.Sum(s => s.ExcludedParseFailed)}; propagated bind-failed "
-            + $"{perSubject.Sum(s => s.ExcludedBindFailed)}; faulted "
-            + $"{perSubject.Sum(s => s.ExcludedEffectPassFaulted)}; UnknownSource+"
-            + "InvocationUndetermined "
-            + $"{perSubject.Sum(s => s.UnknownSource + s.InvocationUndetermined)})");
-
-        var ledgerPath = LedgerPath();
-        if (string.Equals(
-                Environment.GetEnvironmentVariable("CALOR_REGENERATE_CALOR0425_LEDGER"),
-                "1", StringComparison.Ordinal))
-        {
-            File.WriteAllText(ledgerPath, JsonSerializer.Serialize(
-                measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            Console.WriteLine($"Calor0425 corpus ledger regenerated: {ledgerPath}");
-            return;
-        }
-
-        Assert.True(File.Exists(ledgerPath),
-            $"Calor0425 corpus ledger missing at {ledgerPath} — run once with "
-            + "CALOR_REGENERATE_CALOR0425_LEDGER=1. A missing ledger is a FAILURE, not a cue to "
-            + "write one silently: the number is the instrument §13.4 registers.");
-        var committed = JsonSerializer.Deserialize<Ledger>(File.ReadAllText(ledgerPath))!;
-
+    private static void AssertCurrentExpectations(CurrentExpectations committed, CurrentExpectations measured)
+    {
         // Anti-vacuity, now tied to gate 9's own floor rather than a hand-picked
         // number: a ledger that enforced nothing would satisfy every equality
         // below, including a per-subject zero. v0.16 K1 raised this from 90
@@ -562,6 +640,11 @@ public class Calor0425CorpusLedgerTests
             + "measurement stopped mirroring the shipping compiler — the raw-bag guard schema 2 "
             + $"used would report {measured.PerSubject.Sum(s => s.ModulesEnforcedRawBagRule)} "
             + "here (roadmap-v0.16.md §3.1 K1's discriminating pin).");
+        Assert.Equal(Subjects, measured.PerSubject.Select(s => s.Subject));
+        foreach (var subjectFloor in floor.PerSubjectModulesEnforcedMin)
+            Assert.True(measured.PerSubject.Single(s => s.Subject == subjectFloor.Subject).ModulesEnforced
+                >= subjectFloor.ModulesEnforcedMin, $"Current denominator fell below the floor for {subjectFloor.Subject}.");
+        Assert.Equal(0, measured.PerSubject.Sum(s => s.ExcludedParseFailed));
 
         // THE EXCLUSION RATE IS PART OF THE MEASUREMENT, not a footnote to it.
         // 265 of 364 modules (73%) never reach the effect pass, almost all of
@@ -591,7 +674,7 @@ public class Calor0425CorpusLedgerTests
             + "so the Calor0425 counts would mean nothing.");
 
         Assert.Equal(SchemaVersion, committed.SchemaVersion);
-        Assert.Equal(ScopeText, committed.Scope);
+        Assert.Equal(CurrentScopeText, committed.Scope);
 
         // v0.16 K1 — the bind rule and gate 9's floor rule travel WITH the
         // numbers, so a reader of the JSON alone knows what denominator they are
@@ -599,19 +682,9 @@ public class Calor0425CorpusLedgerTests
         // exactly the failure K1 exists to correct.
         Assert.Equal(BindRuleText, committed.BindRule);
         AssertFloorRuleEqual(RegisteredFloorRule(), committed.FloorRule);
-        // v0.17 R2 — the CLI leg is MEASURED on every regeneration, not compared
-        // to a hand-registered constant. That constant was the thing that went
-        // stale the moment R2 moved the in-process denominator, and keeping it
-        // would mean maintaining the same numbers in two places. What guards the
-        // block now is `Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement`,
-        // which holds it against the in-process cells it must agree with —
-        // a real cross-check rather than a copy of itself.
-
-        // measuredCommit is SHAPE-checked, never compared to HEAD — the
-        // convention the two existing ledgers use
-        // (HigherOrderDemandLedgerTests.cs:480-498), because a ledger regenerated
-        // in a PR is stamped with a commit that does not exist until it merges.
-        Assert.Matches("^[0-9a-f]{40}$", committed.MeasuredCommit);
+        AssertCliCrossCheckEqual(committed.CliCrossCheck, measured.CliCrossCheck);
+        AssertCliAgreement(measured.AggregateModulesEnforced, measured.FloorRule,
+            measured.PerSubject, measured.CliCrossCheck);
 
         Assert.Equal(committed.PerSubject.Count, measured.PerSubject.Count);
         foreach (var (expected, actual) in committed.PerSubject.Zip(measured.PerSubject))
@@ -632,14 +705,47 @@ public class Calor0425CorpusLedgerTests
                 + $"  causes   : {Describe(expected.BindFailureCauses)}"
                 + $"  ->  {Describe(actual.BindFailureCauses)}\n"
                 + $"  modules  : {DescribeDelta(expected.BindFailureModules, actual.BindFailureModules)}\n"
-                + "A RISE means the row-less surface grew or the resolution ceiling fell; a FALL "
-                + "means a site went silent. Both are decisions. Regenerate the ledger IN THIS PR "
-                + "with CALOR_REGENERATE_CALOR0425_LEDGER=1 and name the cause — never absorb it.");
+                + "Explain the current compiler delta before updating its ordinary expectations; "
+                + "never regenerate the historical ledger.");
         }
 
         Assert.Equal(committed.AggregateDiagnostics, measured.AggregateDiagnostics);
         Assert.Equal(committed.AggregateModulesWithDiagnostics, measured.AggregateModulesWithDiagnostics);
         Assert.Equal(committed.AggregateModulesEnforced, measured.AggregateModulesEnforced);
+    }
+
+    [Theory]
+    [InlineData("Calor0411Sites")]
+    [InlineData("Diagnostics")]
+    [InlineData("ModulesNotMeasured")]
+    [InlineData("ModulesEnforced")]
+    [InlineData("BindFailureCauses")]
+    [InlineData("BindFailureModules")]
+    [InlineData("BindFailureMultiCause")]
+    [InlineData("CliCrossCheck")]
+    public void CurrentExpectations_RejectCountCauseOrCliTampering(string field)
+    {
+        var text = File.ReadAllText(CurrentExpectationsPath());
+        var measured = JsonSerializer.Deserialize<CurrentExpectations>(text)!;
+        var expected = JsonSerializer.Deserialize<CurrentExpectations>(text)!;
+        AssertCurrentExpectations(expected, measured);
+        var changed = System.Text.Json.Nodes.JsonNode.Parse(text)!;
+        var subject = changed["PerSubject"]![0]!;
+        if (field == "BindFailureCauses")
+        {
+            var causes = subject[field]!.AsObject();
+            var cause = causes.First().Key;
+            causes[cause] = causes[cause]!.GetValue<int>() + 1;
+        }
+        else if (field == "BindFailureModules")
+            subject[field]![0] = "Calor0261 deliberately-wrong-input.cs";
+        else if (field == "CliCrossCheck")
+            changed[field]!["PerSubject"]![0]!["Calor0425Sites"] =
+                changed[field]!["PerSubject"]![0]!["Calor0425Sites"]!.GetValue<int>() + 1;
+        else
+            subject[field] = subject[field]!.GetValue<int>() + 1;
+        var tampered = JsonSerializer.Deserialize<CurrentExpectations>(changed.ToJsonString())!;
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertCurrentExpectations(tampered, measured));
     }
 
     // ---------------------------------------------------------------------
@@ -802,13 +908,18 @@ public class Calor0425CorpusLedgerTests
     public void Gate9_CliCrossCheck_AgreesWithTheInProcessMeasurement()
     {
         var committed = CommittedLedger();
-        var cli = committed.CliCrossCheck;
+        AssertCliAgreement(committed.AggregateModulesEnforced, committed.FloorRule,
+            committed.PerSubject, committed.CliCrossCheck);
+    }
 
+    private static void AssertCliAgreement(int aggregateModulesEnforced, Gate9FloorRule floorRule,
+        List<SubjectVolume> perSubject, CliCrossCheck cli)
+    {
         Assert.Equal(
-            committed.PerSubject.Select(s => s.Subject),
+            perSubject.Select(s => s.Subject),
             cli.PerSubject.Select(s => s.Subject));
 
-        foreach (var (inProcess, cliRow) in committed.PerSubject.Zip(cli.PerSubject))
+        foreach (var (inProcess, cliRow) in perSubject.Zip(cli.PerSubject))
         {
             var why = $"S2 cross-check disagreement for {inProcess.Subject} — the in-process "
                 + "measurement moved and the CLI leg was not re-run. Re-run the pinned CLI pass "
@@ -854,14 +965,14 @@ public class Calor0425CorpusLedgerTests
         // review round 3 caught in PP-R1's effect size, in the opposite
         // direction.
         Assert.Equal(
-            committed.AggregateModulesEnforced,
+            aggregateModulesEnforced,
             cli.PerSubject.Sum(s => s.ReachEffectPass));
         Assert.True(
             cli.PerSubject.Sum(s => s.ReachEffectPass)
-                >= committed.FloorRule.ModulesEnforcedMin,
+                >= floorRule.ModulesEnforcedMin,
             "gate 9's regression floor: the CLI leg reached "
             + $"{cli.PerSubject.Sum(s => s.ReachEffectPass)} modules, below the "
-            + $"{committed.FloorRule.ModulesEnforcedMin} floor. #1385 legitimately moved "
+            + $"{floorRule.ModulesEnforcedMin} floor. #1385 legitimately moved "
             + "active scalar failures before the effect pass; it did not remove this floor.");
         Assert.Equal(0, cli.PerSubject.Sum(s => s.ParseFailed));
     }
@@ -943,15 +1054,17 @@ public class Calor0425CorpusLedgerTests
     [Fact]
     public void K1_ManifestRule_TheLedgerReadsBuiltInManifestsOnly()
     {
-        // A call to a type no built-in manifest covers. Unresolved, the strict
-        // policy fails closed with Calor0411; the manifest below resolves it to
-        // the effect the caller declares, so a pass that reads the manifest is
-        // silent and a pass that does not is not.
+        // A call to a real metadata type no built-in manifest covers. Unresolved, the
+        // strict policy fails closed with Calor0411; the manifest below resolves it to
+        // the effect the caller declares, so a pass that reads the manifest is silent
+        // and a pass that does not is not. (0.30, D3: a manifest no longer resolves a
+        // type that is missing from referenced metadata by name alone, so the old
+        // invented K1ScratchWidget type cannot carry this pin.)
         const string source = """
-            §M{m001:ScratchCwd}
-              §F{f001:Main:pub} () -> void
-                §E{cw}
-                §C{K1ScratchWidget.Ping} §/C
+            module ScratchCwd ScratchCwd block
+              func Main () → void
+                ! cw
+                System.Diagnostics.Debugger.Break()
             """;
 
         var scratch = Path.Combine(Path.GetTempPath(), "calor-k1-manifest-" + Guid.NewGuid().ToString("N"));
@@ -963,7 +1076,7 @@ public class Calor0425CorpusLedgerTests
                   "version": "1.0",
                   "description": "K1 manifest-rule pin — must never be consulted by the ledger",
                   "mappings": [
-                    { "type": "K1ScratchWidget", "methods": { "Ping": ["cw"] } }
+                    { "type": "System.Diagnostics.Debugger", "methods": { "Break": ["cw"] } }
                   ]
                 }
                 """);
@@ -1064,8 +1177,7 @@ public class Calor0425CorpusLedgerTests
     {
         var path = LedgerPath();
         Assert.True(File.Exists(path),
-            $"Calor0425 corpus ledger missing at {path} — run once with "
-            + "CALOR_REGENERATE_CALOR0425_LEDGER=1.");
+            $"Immutable historical Calor0425 corpus ledger missing at {path}; restore its original bytes.");
         return JsonSerializer.Deserialize<Ledger>(File.ReadAllText(path))!;
     }
 
@@ -1092,30 +1204,6 @@ public class Calor0425CorpusLedgerTests
         Assert.Equal(expected.Invocation, actual.Invocation);
         Assert.Equal(expected.MeasuredAt, actual.MeasuredAt);
         Assert.Equal(expected.PerSubject, actual.PerSubject);
-    }
-
-    private static string MeasuredCommit(string root)
-    {
-        // A shallow CI checkout still has HEAD; a worktree's .git is a FILE, so
-        // read the ref rather than assuming a directory layout. Falls back to
-        // forty zeroes, which the shape check accepts and a reader can spot.
-        try
-        {
-            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "git",
-                Arguments = "rev-parse HEAD",
-                WorkingDirectory = root,
-                RedirectStandardOutput = true,
-            })!;
-            var sha = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit();
-            return sha.Length == 40 ? sha : new string('0', 40);
-        }
-        catch
-        {
-            return new string('0', 40);
-        }
     }
 
     private static SubjectVolume MeasureSubject(string name, string srcRoot)
@@ -1185,7 +1273,7 @@ public class Calor0425CorpusLedgerTests
                 continue;
             }
 
-            var source = conversion.CalorSource.Replace("\r\n", "\n");
+            var source = RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource);
             var parseDiagnostics = new DiagnosticBag();
             var module = new Parser(
                 new Lexer(source, parseDiagnostics).TokenizeAllForParser(),
@@ -1861,6 +1949,18 @@ public class Calor0425CorpusLedgerTests
         /// production denominator must NOT land on.</summary>
         int RawBagDenominatorAtRegistration,
         string Note);
+
+    private sealed record CurrentExpectations(
+        int SchemaVersion,
+        string Scope,
+        string BindRule,
+        Gate9FloorRule FloorRule,
+        CliCrossCheck CliCrossCheck,
+        int AggregateDiagnostics,
+        int AggregateModulesWithDiagnostics,
+        int AggregateModulesEnforced,
+        int AggregateModulesExcluded,
+        List<SubjectVolume> PerSubject);
 
     private sealed record Ledger(
         int SchemaVersion,

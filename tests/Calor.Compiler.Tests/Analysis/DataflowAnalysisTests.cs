@@ -51,11 +51,10 @@ public class DataflowAnalysisTests
     public void CFG_SimpleFunction_HasEntryAndExit()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Simple (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -69,14 +68,10 @@ public class DataflowAnalysisTests
     public void CFG_IfStatement_CreatesBranches()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Conditional:pub}
-      §I{i32:x}
-      §O{i32}
-      §IF{if1} (> x INT:0)
-          §R INT:1
-      §EL
-          §R INT:0";
+module Test Test block
+  func Conditional (int:x) → int
+    !
+    return ((x > 0) ? 1 : 0)";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -90,16 +85,13 @@ public class DataflowAnalysisTests
     {
         // Use FOR loop since it has built-in iteration without needing ASSIGN
         var source = @"
-§M{m001:Test}
-  §F{f001:Loop:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R sum";
+module Test Test block
+  func Loop (int:n) → int
+    !
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -111,16 +103,13 @@ public class DataflowAnalysisTests
     public void CFG_ForLoop_CreatesProperStructure()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:ForLoop:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R sum";
+module Test Test block
+  func ForLoop (int:n) → int
+    !
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -132,12 +121,11 @@ public class DataflowAnalysisTests
     public void CFG_Blocks_HaveUniqueIds()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{y:i32} (+ x INT:1)
-      §R y";
+module Test Test block
+  func Multi (int:x) → int
+    !
+    let int:y = (x + 1)
+    return y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -154,11 +142,11 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_SingleAssignment_Reaches()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Single:pub}
-      §O{i32}
-      §B{x:i32} INT:42
-      §R x";
+module Test Test block
+  func Single () → int
+    !
+    let int:x = 42
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -174,13 +162,13 @@ public class DataflowAnalysisTests
         // Test multiple independent bindings instead of redefinition
         // since Calor doesn't support general variable reassignment
         var source = @"
-§M{m001:Test}
-  §F{f001:MultiBind:pub}
-      §O{i32}
-      §B{x:i32} INT:1
-      §B{y:i32} INT:2
-      §B{z:i32} (+ x y)
-      §R z";
+module Test Test block
+  func MultiBind () → int
+    !
+    let int:x = 1
+    let int:y = 2
+    let int:z = (x + y)
+    return z";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -195,12 +183,12 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_AllDefinitions_CollectsAll()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
-      §O{i32}
-      §B{x:i32} INT:1
-      §B{y:i32} INT:2
-      §R (+ x y)";
+module Test Test block
+  func Multi () → int
+    !
+    let int:x = 1
+    let int:y = 2
+    return (x + y)";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -214,12 +202,12 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_GetByVariable_FiltersCorrectly()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Filter:pub}
-      §O{i32}
-      §B{x:i32} INT:1
-      §B{y:i32} INT:2
-      §R x";
+module Test Test block
+  func Filter () → int
+    !
+    let int:x = 1
+    let int:y = 2
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -238,11 +226,10 @@ public class DataflowAnalysisTests
     public void LiveVariables_UsedVariable_IsLive()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Used:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Used (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -256,16 +243,13 @@ public class DataflowAnalysisTests
     public void LiveVariables_ForLoopVariable_Analysis()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Loop:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
-          §C{Console.WriteLine}
-            §A i
-          §/C
-      §R sum";
+module Test Test block
+  func Loop (int:n) → int
+    !
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(i)
+    return sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -279,11 +263,10 @@ public class DataflowAnalysisTests
     public void LiveVariables_ExitBoundary_IsEmpty()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Exit:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Exit (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -301,11 +284,10 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_Parameter_IsInitialized()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Param:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Param (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -320,11 +302,11 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_LocalWithInit_IsInitialized()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Local:pub}
-      §O{i32}
-      §B{x:i32} INT:42
-      §R x";
+module Test Test block
+  func Local () → int
+    !
+    let int:x = 42
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -339,11 +321,10 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_ReportDiagnostics_Works()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Report:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Report (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -520,9 +501,10 @@ public class DataflowAnalysisTests
     public void CFG_EmptyFunction_HasEntryAndExit()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Empty:pub}
-      §O{void}";
+module Test Test block
+  func Empty () → void
+    !
+    return";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -537,18 +519,13 @@ public class DataflowAnalysisTests
     public void CFG_NestedIfStatements_CreatesCorrectStructure()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Nested:pub}
-      §I{i32:x}
-      §I{i32:y}
-      §O{i32}
-      §IF{if1} (> x INT:0)
-          §IF{if2} (> y INT:0)
-              §R INT:1
-          §EL
-              §R INT:2
-      §EL
-          §R INT:3";
+module Test Test block
+  func Nested (int:x, int:y) → int
+    !
+    if (x > 0)
+      return ((y > 0) ? 1 : 2)
+    else
+      return 3";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -561,13 +538,12 @@ public class DataflowAnalysisTests
     public void CFG_EarlyReturn_CreatesSeparateBlocks()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Early:pub}
-      §I{i32:x}
-      §O{i32}
-      §IF{if1} (< x INT:0)
-          §R INT:0
-      §R x";
+module Test Test block
+  func Early (int:x) → int
+    !
+    if (x < 0)
+      return 0
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -580,12 +556,11 @@ public class DataflowAnalysisTests
     public void CFG_ReversePostOrder_ReturnsTopologicalOrder()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{y:i32} (+ x INT:1)
-      §R y";
+module Test Test block
+  func Simple (int:x) → int
+    !
+    let int:y = (x + 1)
+    return y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -600,11 +575,10 @@ public class DataflowAnalysisTests
     public void CFG_ToDot_GeneratesValidOutput()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Simple:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func Simple (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -623,17 +597,15 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_DefinitionInIfBranch_ReachesAfterMerge()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Branch:pub}
-      §I{i32:x}
-      §I{bool:cond}
-      §O{i32}
-      §B{y:i32} INT:0
-      §IF{if1} cond
-          §B{z:i32} INT:1
-      §EL
-          §B{z:i32} INT:2
-      §R y";
+module Test Test block
+  func Branch (int:x, bool:cond) → int
+    !
+    let int:y = 0
+    if cond
+      let int:z = 1
+    else
+      let int:z = 2
+    return y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -648,16 +620,13 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_LoopDefinition_ReachesLoopHeader()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Loop:pub}
-      §I{i32:n}
-      §O{i32}
-      §B{sum:i32} INT:0
-      §L{l1:i:0:10:1}
-          §C{Console.WriteLine}
-            §A sum
-          §/C
-      §R sum";
+module Test Test block
+  func Loop (int:n) → int
+    !
+    let int:sum = 0
+    for i from 0 to 10 step 1
+      Console.WriteLine(sum)
+    return sum";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -672,13 +641,13 @@ public class DataflowAnalysisTests
     public void ReachingDefinitions_MultipleVariables_TrackedSeparately()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
-      §O{i32}
-      §B{a:i32} INT:1
-      §B{b:i32} INT:2
-      §B{c:i32} INT:3
-      §R (+ a (+ b c))";
+module Test Test block
+  func Multi () → int
+    !
+    let int:a = 1
+    let int:b = 2
+    let int:c = 3
+    return (a + (b + c))";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -696,11 +665,10 @@ public class DataflowAnalysisTests
     public void LiveVariables_ParameterUsedInReturn_IsLiveAtEntry()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:UseParam:pub}
-      §I{i32:x}
-      §O{i32}
-      §R x";
+module Test Test block
+  func UseParam (int:x) → int
+    !
+    return x";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -714,13 +682,12 @@ public class DataflowAnalysisTests
     public void LiveVariables_VariableUsedInCondition_IsLive()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Cond:pub}
-      §I{i32:x}
-      §O{i32}
-      §IF{if1} (> x INT:0)
-          §R INT:1
-      §R INT:0";
+module Test Test block
+  func Cond (int:x) → int
+    !
+    if (x > 0)
+      return 1
+    return 0";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -734,13 +701,12 @@ public class DataflowAnalysisTests
     public void LiveVariables_MultipleUses_AllTracked()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Multi:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{a:i32} x
-      §B{b:i32} x
-      §R (+ a b)";
+module Test Test block
+  func Multi (int:x) → int
+    !
+    let int:a = x
+    let int:b = x
+    return (a + b)";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);
@@ -758,12 +724,11 @@ public class DataflowAnalysisTests
     public void UninitializedVariables_ReportDiagnostics_EmptyForSafeCode()
     {
         var source = @"
-§M{m001:Test}
-  §F{f001:Safe:pub}
-      §I{i32:x}
-      §O{i32}
-      §B{y:i32} (+ x INT:1)
-      §R y";
+module Test Test block
+  func Safe (int:x) → int
+    !
+    let int:y = (x + 1)
+    return y";
 
         var func = GetFunction(source);
         var cfg = ControlFlowGraph.Build(func);

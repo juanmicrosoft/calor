@@ -173,61 +173,6 @@ public sealed class LiteralPatternNode : PatternNode
 
 }
 
-/// <summary>
-/// Represents a Some pattern for Option types.
-/// </summary>
-public sealed class SomePatternNode : PatternNode
-{
-    public PatternNode InnerPattern { get; }
-
-    public SomePatternNode(TextSpan span, PatternNode innerPattern) : base(span)
-    {
-        InnerPattern = innerPattern ?? throw new ArgumentNullException(nameof(innerPattern));
-    }
-
-
-}
-
-/// <summary>
-/// Represents a None pattern for Option types.
-/// </summary>
-public sealed class NonePatternNode : PatternNode
-{
-    public NonePatternNode(TextSpan span) : base(span) { }
-
-
-}
-
-/// <summary>
-/// Represents an Ok pattern for Result types.
-/// </summary>
-public sealed class OkPatternNode : PatternNode
-{
-    public PatternNode InnerPattern { get; }
-
-    public OkPatternNode(TextSpan span, PatternNode innerPattern) : base(span)
-    {
-        InnerPattern = innerPattern ?? throw new ArgumentNullException(nameof(innerPattern));
-    }
-
-
-}
-
-/// <summary>
-/// Represents an Err pattern for Result types.
-/// </summary>
-public sealed class ErrPatternNode : PatternNode
-{
-    public PatternNode InnerPattern { get; }
-
-    public ErrPatternNode(TextSpan span, PatternNode innerPattern) : base(span)
-    {
-        InnerPattern = innerPattern ?? throw new ArgumentNullException(nameof(innerPattern));
-    }
-
-
-}
-
 // Phase 10: Advanced Patterns
 
 /// <summary>

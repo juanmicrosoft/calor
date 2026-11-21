@@ -1,0 +1,32 @@
+{
+  "Version": 1,
+  "Files": [
+    "input.calr"
+  ],
+  "Declarations": [
+    {
+      "Id": "m_t24a2xw7ajzp",
+      "File": "input.calr",
+      "Container": "",
+      "Kind": 0,
+      "Name": "Collections",
+      "Signature": ""
+    },
+    {
+      "Id": "m_k79nadp61b64",
+      "File": "input.calr",
+      "Container": "Collections",
+      "Kind": 0,
+      "Name": "CollectionsModule",
+      "Signature": "0"
+    },
+    {
+      "Id": "mt_724gmf4zhtb8",
+      "File": "input.calr",
+      "Container": "Collections.CollectionsModule\u00600",
+      "Kind": 5,
+      "Name": "Main",
+      "Signature": "{\u0022arity\u0022:0,\u0022parameters\u0022:[],\u0022output\u0022:\u0022void\u0022}"
+    }
+  ]
+}

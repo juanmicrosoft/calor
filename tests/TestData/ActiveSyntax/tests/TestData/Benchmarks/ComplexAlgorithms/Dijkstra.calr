@@ -1,0 +1,18 @@
+module Dijkstra Dijkstra
+  module DijkstraModule
+    func Relax public (int:currentDist, int:edgeWeight, int:neighborDist) → bool
+      !
+      requires currentDist >= 0
+      requires edgeWeight > 0
+      return (currentDist + edgeWeight) < neighborDist
+
+    func NewDist public (int:currentDist, int:edgeWeight) → int
+      !
+      requires currentDist >= 0
+      requires edgeWeight > 0
+      => result > currentDist
+      return currentDist + edgeWeight
+
+    func Infinity public () → int
+      !
+      return 2147483647

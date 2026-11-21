@@ -164,7 +164,7 @@ All blockers that can prevent conversion, organized by category:
 
 | Blocker | Description | Workaround |
 |---------|-------------|------------|
-| `ref-parameter` | `out`/`ref` params | Return tuples or Result<T,E> |
+| `ref-parameter` | `out`/`ref` params | Return tuples or preserve supported `out`/`ref` parameters |
 | `in-parameter` | `in` params (readonly ref) | Pass by value or use ref |
 | `named-argument` | `param: value` | Use positional arguments |
 | `out-var` | `out var x` inline declarations | Declare variable before call |
@@ -265,4 +265,4 @@ The verbose output includes 6 scoring dimensions that indicate how much the file
 | `PatternMatchPotential` | 10% | Switch statements, pattern matching |
 | `ApiComplexityPotential` | 15% | Public APIs lacking documentation |
 
-Higher scores indicate more opportunity to benefit from Calor's features (contracts, effects, Option<T>, Result<T,E>).
+Higher scores indicate more opportunity to benefit from Calor's contracts, effects, and nullable-boundary checks.

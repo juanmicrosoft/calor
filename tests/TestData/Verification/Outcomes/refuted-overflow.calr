@@ -1,11 +1,13 @@
-§M{m1:OutcomeRefutedOverflow}
-  §F{f1:Square:pub} (i32:x) -> i32
-    §Q (>= x 0)
-    §S (>= result 0)
-    §R (* x x)
+module OutcomeRefutedOverflow OutcomeRefutedOverflow block
+  func Square (int:x) → int
+    !
+    requires (x >= 0)
+    => (result >= 0)
+    return (x * x)
 
-  §F{f2:AddPositive:pub} (i32:a, i32:b) -> i32
-    §Q (> a 0)
-    §Q (> b 0)
-    §S (> result a)
-    §R (+ a b)
+  func AddPositive (int:a, int:b) → int
+    !
+    requires (a > 0)
+    requires (b > 0)
+    => (result > a)
+    return (a + b)

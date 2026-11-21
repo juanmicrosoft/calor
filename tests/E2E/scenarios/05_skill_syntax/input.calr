@@ -1,38 +1,40 @@
-§M{m001:SkillSyntax}
-  §F{f001:Main:pub} () -> void
-    §E{cw}
-    §C{Console.WriteLine} §A "=== Calor Skill Syntax Validation ===" §/C
-    §C{Console.WriteLine} §A "" §/C
-    §C{TestArithmetic} §/C
-    §C{TestComparison} §/C
-    §C{TestControlFlow} §/C
+module SkillSyntax SkillSyntax block
+  module SkillSyntaxModule
+    func Main () → void
+      ! cw
+      Console.WriteLine("=== Calor Skill Syntax Validation ===")
+      Console.WriteLine("")
+      TestArithmetic()
+      TestComparison()
+      TestControlFlow()
 
-  §F{f002:TestArithmetic:priv} () -> void
-    §E{cw}
-    §C{Console.WriteLine} §A "Testing arithmetic operators..." §/C
+    func TestArithmetic private () → void
+      Console.WriteLine("Testing arithmetic operators...")
 
-  §F{f003:Add:pub} (i32:a, i32:b) -> i32
-    §R (+ a b)
+    func Add (int:a, int:b) → int
+      !
+      return a + b
 
-  §F{f004:Subtract:pub} (i32:a, i32:b) -> i32
-    §R (- a b)
+    func Subtract (int:a, int:b) → int
+      !
+      return a - b
 
-  §F{f005:Multiply:pub} (i32:a, i32:b) -> i32
-    §R (* a b)
+    func Multiply (int:a, int:b) → int
+      !
+      return a * b
 
-  §F{f006:TestComparison:priv} () -> void
-    §E{cw}
-    §C{Console.WriteLine} §A "Testing comparison operators..." §/C
+    func TestComparison private () → void
+      Console.WriteLine("Testing comparison operators...")
 
-  §F{f007:IsPositive:pub} (i32:x) -> bool
-    §R (> x 0)
+    func IsPositive (int:x) → bool
+      !
+      return x > 0
 
-  §F{f008:IsZero:pub} (i32:x) -> bool
-    §R (== x 0)
+    func IsZero (int:x) → bool
+      !
+      return x == 0
 
-  §F{f009:TestControlFlow:priv} () -> void
-    §E{cw}
-    §C{Console.WriteLine} §A "Testing control flow..." §/C
-    §L{for1:i:1:5:1}
-      §C{Console.WriteLine} §A i §/C
-
+    func TestControlFlow private () → void
+      Console.WriteLine("Testing control flow...")
+      for i from 1 to 5 step 1
+        Console.WriteLine(i)

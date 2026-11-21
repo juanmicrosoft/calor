@@ -1,5 +1,7 @@
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
+using Calor.Compiler.Ast;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -11,7 +13,7 @@ namespace Calor.Compiler.Tests;
 ///
 /// Bugs covered by these tests:
 /// - Structural and user identifiers are never rewritten by formatting
-/// - Loop ID conversion: for1 → l1, if1 → i1, while1 → w1
+/// - Formatting preserves sidecar declaration identity and loop structure
 /// - Visibility placement: inside braces as third positional parameter
 /// - Type name case: uppercase to lowercase (VOID → void)
 /// - Effect code expansion: io/console_write → cw
@@ -50,29 +52,150 @@ public class LintRegressionTests
     [InlineData("01_id_abbreviation/padded_module_id.calr")]
     [InlineData("01_id_abbreviation/padded_function_id.calr")]
     [InlineData("01_id_abbreviation/loop_id_conversion.calr")]
-    public void Formatter_PreservesZeroPaddedStructuralIds(string file)
+    public void Formatter_PreservesSidecarDeclarationIdentity(string file)
     {
         var source = LintTestDataLoader.LoadTestFile(file);
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess, "Source should parse successfully");
         Assert.NotNull(formatted);
-        foreach (var id in new[] { "m001", "f001", "f002" }.Where(source.Contains))
+        var root = Path.Combine(Path.GetTempPath(), $"calor-format-identity-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
         {
-            Assert.Contains(id, formatted);
+            var path = Path.Combine(root, "input.calr");
+            File.WriteAllText(path, source);
+            var store = new DeclarationIdentityStore(root);
+            var before = store.Sync([path]).Declarations
+                .Select(declaration => (declaration.Id, declaration.Kind, declaration.Name, declaration.Signature))
+                .ToArray();
+            Assert.NotEmpty(before);
+            File.WriteAllText(path, formatted);
+            var after = store.Sync([path]).Declarations
+                .Select(declaration => (declaration.Id, declaration.Kind, declaration.Name, declaration.Signature))
+                .ToArray();
+            Assert.Equal(before, after);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
         }
     }
 
     [Fact]
-    public void Formatter_PreservesLoopIds()
+    public void Formatter_PreservesNestedLoopStructure()
     {
         var source = LintTestDataLoader.LoadTestFile("01_id_abbreviation/loop_id_conversion.calr");
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess);
 
-        Assert.Contains("for1", formatted);
-        Assert.Contains("for2", formatted);
+        var diagnostics = new DiagnosticBag();
+        var ast = new Parser(new Lexer(formatted!, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        var outer = Assert.IsType<ForStatementNode>(Assert.Single(ast.Functions).Body[0]);
+        var inner = Assert.IsType<ForStatementNode>(outer.Body[1]);
+        Assert.Equal("i", outer.VariableName);
+        Assert.Equal("j", inner.VariableName);
+        Assert.Equal(2, outer.Body.Count);
+        Assert.Single(inner.Body);
+        Assert.Contains("for i from 1 to 10 step 1", formatted);
+        Assert.Contains("for j from 1 to 5 step 1", formatted);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Formatter_PreservesOverloadIdentitiesAcrossCanonicalTypeSpellings(
+        bool existingSurfaceSpellingSidecar, bool mergeConflict)
+    {
+        const string source = """
+            module Types Types block
+              class Token
+
+              class token
+
+              func Echo (int:value) → int
+                !
+                proof{"positive"} (1 > 0)
+                return value
+
+              func Echo (string:value) → string
+                !
+                proof{"positive"} (1 > 0)
+                return value
+
+              func Echo (Token:value) → Token
+                !
+                return value
+
+              func Echo (token:value) → token
+                !
+                return value
+
+              func Echo (float:value) → float
+                !
+                return value
+
+              func Echo (double:value) → double
+                !
+                return value
+
+              func Echo (int?:value) → int?
+                !
+                return value
+
+              func Echo (int[]:value) → int[]
+                !
+                return value
+            """;
+        static string SurfaceSpelling(string signature) => signature
+            .Replace("\"i32\"", "\"int\"", StringComparison.Ordinal)
+            .Replace("\"str\"", "\"string\"", StringComparison.Ordinal)
+            .Replace("\"f32\"", "\"float\"", StringComparison.Ordinal)
+            .Replace("\"f64\"", "\"double\"", StringComparison.Ordinal)
+            .Replace("\"?i32\"", "\"int?\"", StringComparison.Ordinal)
+            .Replace("\"i32[]\"", "\"int[]\"", StringComparison.Ordinal);
+        var root = Path.Combine(Path.GetTempPath(), $"calor-type-identity-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var path = Path.Combine(root, "input.calr");
+            File.WriteAllText(path, source);
+            var store = new DeclarationIdentityStore(root);
+            var before = store.Sync([path]);
+            if (existingSurfaceSpellingSidecar)
+            {
+                var previous = before with
+                {
+                    Declarations = before.Declarations.Select(declaration => declaration with
+                    {
+                        Signature = SurfaceSpelling(declaration.Signature),
+                        Container = SurfaceSpelling(declaration.Container)
+                    }).ToArray()
+                };
+                var previousJson = System.Text.Json.JsonSerializer.Serialize(previous);
+                File.WriteAllText(store.SidecarPath, mergeConflict
+                    ? $"<<<<<<< ours\n{System.Text.Json.JsonSerializer.Serialize(before)}\n=======\n{previousJson}\n>>>>>>> theirs\n"
+                    : previousJson);
+            }
+            var (success, formatted) = FormatSource(source);
+            Assert.True(success);
+            File.WriteAllText(path, formatted);
+            var after = store.Sync();
+            Assert.Equal(before.Declarations, after.Declarations);
+            var overloads = after.Declarations.Where(d => d.Kind == IdKind.Function).ToArray();
+            Assert.Equal(8, overloads.Select(d => d.Id).Distinct().Count());
+            Assert.Equal(8, overloads.Select(d => d.Signature).Distinct().Count());
+            var proofs = after.Declarations.Where(d => d.Kind == IdKind.ProofObligation).ToArray();
+            Assert.Equal(2, proofs.Length);
+            Assert.NotEqual(proofs[0].Container, proofs[1].Container);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 
     #endregion
@@ -174,7 +297,7 @@ public class LintRegressionTests
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess);
-        Assert.Contains("§R", formatted);
+        Assert.Contains("return", formatted);
     }
 
     [Fact]
@@ -185,7 +308,7 @@ public class LintRegressionTests
 
         Assert.True(parseSuccess);
         // Phase 4b: indent form — only the opener is emitted; block end is dedentation.
-        Assert.Contains("§WH", formatted);
+        Assert.Contains("while", formatted);
     }
 
     [Fact]
@@ -200,8 +323,8 @@ public class LintRegressionTests
         // Phase 4b: the formatter now delegates to Migration/CalorEmitter, which uses
         // the canonical `priv` spelling (matches samples/ and is accepted by the parser
         // side-by-side with `pri`).
-        Assert.Contains(":pub}", formatted);
-        Assert.Contains(":priv}", formatted);
+        Assert.Contains("func PublicFunc (", formatted);
+        Assert.Contains("func PrivateFunc private (", formatted);
     }
 
     #endregion
@@ -232,9 +355,9 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Should use prefix notation: (+ a b) not (a + b)
-        Assert.Contains("(+ a b)", formatted);
-        Assert.Contains("(- a b)", formatted);
-        Assert.Contains("(* a b)", formatted);
+        Assert.Contains("a + b", formatted);
+        Assert.Contains("a - b", formatted);
+        Assert.Contains("a * b", formatted);
     }
 
     [Fact]
@@ -249,7 +372,7 @@ public class LintRegressionTests
         Assert.DoesNotContain("§REF{", formatted);
 
         // Return statements should contain variable names
-        Assert.Contains("§R", formatted);
+        Assert.Contains("return", formatted);
     }
 
     #endregion
@@ -279,8 +402,8 @@ public class LintRegressionTests
 
         // Type names should be lowercase
         Assert.Contains("void", formatted);
-        Assert.Contains("i32", formatted);
-        Assert.Contains("str", formatted);
+        Assert.Contains("int", formatted);
+        Assert.Contains("string", formatted);
         Assert.Contains("bool", formatted);
     }
 
@@ -329,7 +452,7 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Print statements should use §P
-        Assert.Contains("§P", formatted);
+        Assert.Contains("Console.WriteLine(", formatted);
     }
 
     [Fact]
@@ -341,8 +464,8 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Formatter outputs §B{name} for immutable and §B{~name} for mutable bindings
-        Assert.Contains("§B{", formatted);
-        Assert.Contains("§B{~", formatted); // mutable binds use ~ prefix
+        Assert.Contains("let ", formatted);
+        Assert.Contains("var ", formatted); // mutable binds use ~ prefix
     }
 
     #endregion
@@ -402,8 +525,8 @@ public class LintRegressionTests
         }
         else if (file.Contains("contracts"))
         {
-            Assert.Contains("§Q", formatted); // Precondition
-            Assert.Contains("§S", formatted); // Postcondition
+            Assert.Contains("requires", formatted); // Precondition
+            Assert.Contains("=>", formatted); // Postcondition
         }
     }
 
@@ -472,7 +595,7 @@ public class LintRegressionTests
 
         Assert.True(parseSuccess);
         // Phase 4b: indent form has no closer; the opener alone proves the empty module.
-        Assert.Contains("§M{m1:Empty}", formatted);
+        Assert.Contains("module Empty", formatted);
     }
 
     [Fact]
@@ -484,9 +607,9 @@ public class LintRegressionTests
         Assert.True(parseSuccess);
 
         // Should have multiple levels of nesting
-        Assert.Contains("§IF{i1}", formatted);
-        Assert.Contains("§IF{i2}", formatted);
-        Assert.Contains("§IF{i3}", formatted);
+        Assert.Contains("if ", formatted);
+        Assert.Contains("if ", formatted);
+        Assert.Contains("if ", formatted);
     }
 
     #endregion

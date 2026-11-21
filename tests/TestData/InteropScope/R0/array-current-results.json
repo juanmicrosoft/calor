@@ -1,0 +1,151 @@
+{
+  "surfaces": [
+    "LibraryDefault",
+    "CliDefault",
+    "CliPassthrough",
+    "McpDefault",
+    "McpPassthroughOnError",
+    "McpPassthroughOnErrorModuleName",
+    "ProjectMigrate",
+    "ProjectMigratePassthrough"
+  ],
+  "preservations": {
+    "UnsupportedShapes": {
+      "recordedStatementCount": 5,
+      "currentMemberCount": 1,
+      "feature": "conditional-expression-hoisting",
+      "owner": "Probe",
+      "member": "Run",
+      "trace": "1,9,0,011,10,11|"
+    }
+  },
+  "rows": {
+    "F5-ARRAY-05": {
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "3|4|3|9|b|6",
+      "getLengthCalls": 0,
+      "arrayProperties": ["Rank"]
+    },
+    "round2": {
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "2,0,42|112|True|1002,3",
+      "getLengthCalls": 3,
+      "arrayProperties": []
+    },
+    "round3": {
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "3,10,123,1118|scsc|sctc",
+      "getLengthCalls": 1,
+      "arrayProperties": []
+    },
+    "F5-ARRAY-01": {
+      "surfaces": ["ProjectMigrate", "ProjectMigratePassthrough"],
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "2x2|2|3",
+      "getLengthCalls": 2,
+      "arrayProperties": [],
+      "getLengthReceivers": [
+        { "rank": 2, "element": "Cell", "sourceElement": "Cell" },
+        { "rank": 2, "element": "Cell", "sourceElement": "Cell" }
+      ],
+      "sourceFields": [
+        { "owner": "Cell", "name": "V", "type": "int", "count": 2 }
+      ],
+      "sourceCalls": [
+        { "owner": "Grid", "name": "Grid.Build", "parameters": [], "returnType": "Cell[,]", "count": 1 }
+      ]
+    },
+    "ordering": {
+      "surfaces": ["ProjectMigrate", "ProjectMigratePassthrough"],
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "0,1,1,1,2,2|3,3|2,4|FalseTrue2|12,12|7,3,3,22|6,boom|n1n2n3234t1t2340013454567671",
+      "getLengthCalls": 2,
+      "arrayProperties": ["Rank"],
+      "getLengthReceivers": [
+        { "rank": 2, "element": "Cell", "sourceElement": "Cell" },
+        { "rank": 3, "element": "int" }
+      ],
+      "sourceFields": [
+        { "owner": "Cell", "name": "V", "type": "int", "count": 4 }
+      ],
+      "sourceCalls": [
+        { "owner": "A3", "name": "A3.Pick", "parameters": ["bool"], "returnType": "Cell[,]", "count": 1 },
+        { "owner": "A3", "name": "A3.Pick1", "parameters": ["bool"], "returnType": "Cell[]", "count": 1 },
+        { "owner": "A7", "name": "A7.Cube", "parameters": [], "returnType": "int[,,]", "count": 1 }
+      ]
+    },
+    "shapes": {
+      "surfaces": ["ProjectMigrate", "ProjectMigratePassthrough"],
+      "recordedUnknownEffects": true,
+      "strictCompileSuccess": true,
+      "trace": "3|001|1236|1|33|True|27|False02|12346",
+      "getLengthCalls": 4,
+      "arrayProperties": [],
+      "getLengthReceivers": [
+        { "rank": 2, "element": "int" },
+        { "rank": 2, "element": "int" },
+        { "rank": 2, "element": "int" },
+        { "rank": 3, "element": "int" }
+      ],
+      "sourceFields": [
+        { "owner": "Cell", "name": "N", "type": "int", "count": 2 }
+      ],
+      "sourceCalls": [
+        { "owner": "Probe", "name": "Probe.Make", "parameters": ["bool"], "returnType": "int[][]", "count": 1 }
+      ]
+    }
+  },
+  "controls": {
+    "X-INT-02": {
+      "row": "F5-ARRAY-01",
+      "surfaces": ["cli-migrate", "mcp-migrate", "mcp-batch"],
+      "recordedCompile": "permissive-effects:Calor0410",
+      "compile": "default"
+    }
+  },
+  "additionalRows": {
+    "F5-ARRAY-01": {
+      "surfaces": [
+        "LibraryDefault", "CliDefault", "CliPassthrough", "McpDefault",
+        "McpPassthroughOnError", "McpPassthroughOnErrorModuleName"
+      ],
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["Oblivious", "Oblivious"]
+    },
+    "ordering": {
+      "surfaces": [
+        "LibraryDefault", "CliDefault", "CliPassthrough", "McpDefault",
+        "McpPassthroughOnError", "McpPassthroughOnErrorModuleName"
+      ],
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["Oblivious", "NotAnnotated"]
+    },
+    "shapes": {
+      "surfaces": [
+        "LibraryDefault", "CliDefault", "CliPassthrough", "McpDefault",
+        "McpPassthroughOnError", "McpPassthroughOnErrorModuleName"
+      ],
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["NotAnnotated", "NotAnnotated", "NotAnnotated", "NotAnnotated"]
+    }
+  },
+  "additionalControls": {
+    "X-INT-02": {
+      "row": "F5-ARRAY-01",
+      "surfaces": ["library", "cli-convert", "mcp-convert", "mcp-convert-passthroughOnError"],
+      "recordedCompile": "permissive-effects:Calor0410",
+      "compile": "default",
+      "obliviousNullability": true,
+      "declarationMetadataMatchesOriginal": true,
+      "getLengthReceiverAnnotations": ["Oblivious", "Oblivious"]
+    }
+  }
+}

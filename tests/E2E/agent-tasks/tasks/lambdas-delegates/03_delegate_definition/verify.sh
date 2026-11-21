@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
-# Verify: Delegate definition
+# Original lam-003 selected-native CLR delegate admission.
 set -euo pipefail
 
-WORKSPACE="$1"
-CALR_FILE="$WORKSPACE/Domain.calr"
-
-[[ -f "$CALR_FILE" ]] || { echo "Domain.calr not found"; exit 1; }
-
-# Check for MathOperation delegate
-grep -q "MathOperation" "$CALR_FILE" || { echo "MathOperation delegate not found"; exit 1; }
-
-# Check for delegate definition §DEL{
-grep -q "§DEL{" "$CALR_FILE" || { echo "Delegate definition (§DEL) not found"; exit 1; }
-
-# Check for delegate closing tag
-grep -q "§/DEL{" "$CALR_FILE" || { echo "Delegate closing tag not found"; exit 1; }
-
-echo "Verification passed: MathOperation delegate definition found"
-exit 0
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$HERE/../../../lib/verify-logic.py" lam003 "$1"

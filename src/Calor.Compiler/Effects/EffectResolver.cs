@@ -94,6 +94,7 @@ public sealed class EffectResolver
         {
             EffectMemberKind.Getter or EffectMemberKind.Setter => ResolveAccessorInternal(key),
             EffectMemberKind.Constructor => ResolveConstructorInternal(key),
+            EffectMemberKind.Field => ResolveFieldInternal(key),
             _ => ResolveMethodInternal(key),
         };
         _resolutionCache[key] = resolution;
@@ -253,6 +254,14 @@ public sealed class EffectResolver
     /// </summary>
     private EffectResolution ResolveAccessorInternal(EffectResolverKey key)
     {
+        // Array Length is declared on System.Array, not on the element/rank-specific receiver.
+        if (key.Kind == EffectMemberKind.Getter && key.MemberName == "Length"
+            && (key.DeclaringType.StartsWith("ARRAY[element=", StringComparison.Ordinal) && key.DeclaringType.EndsWith(']')
+                || key.DeclaringType.StartsWith('[') && key.DeclaringType.EndsWith(']')
+                || key.DeclaringType.LastIndexOf('[') is var rank && rank > 0 && key.DeclaringType.EndsWith(']')
+                    && key.DeclaringType[(rank + 1)..^1].All(character => character == ',')))
+            key = EffectResolverKey.ForManifestEntry(EffectMemberKind.Getter, "System.Array", "Length", null);
+
         // Accessor entries are name-only in every manifest, so the probe drops
         // the parameter list even when the caller supplied an empty one.
         var probe = key.WithoutParameterList();
@@ -283,6 +292,25 @@ public sealed class EffectResolver
         if (ilResolution != null)
             return ilResolution;
 
+        return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
+    }
+
+    /// <summary>
+    /// A metadata field read has exactly one source of authority: a
+    /// <c>fields</c> entry naming that field on that declaring type. Unlike
+    /// accessors it never falls back to <c>defaultEffects</c>, namespace
+    /// defaults, a getter of the same name or IL analysis. A field read runs no
+    /// accessor body, so a type's method or getter defaults say nothing about
+    /// it, and a static read may run the declaring type's initializer, which
+    /// only an explicit entry can vouch for. The caller asks only after the
+    /// binder selected the actual <c>IFieldSymbol</c>; there is no name-only
+    /// route into this table.
+    /// </summary>
+    private EffectResolution ResolveFieldInternal(EffectResolverKey key)
+    {
+        if (_typeCache.TryGetValue(key.DeclaringType, out var typeInfo)
+            && typeInfo.Members.TryGetValue(key.WithoutParameterList(), out var fieldEffects))
+            return CreateResolution(fieldEffects, typeInfo.Source);
         return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
     }
 
@@ -422,6 +450,15 @@ public sealed class EffectResolver
                     }
                 }
 
+                if (mapping.Fields != null)
+                {
+                    foreach (var (field, effects) in mapping.Fields)
+                    {
+                        typeInfo.Members[EffectResolverKey.ForManifestEntry(
+                            EffectMemberKind.Field, mappingType, field, null)] = effects;
+                    }
+                }
+
                 if (mapping.Constructors != null)
                 {
                     foreach (var (sig, effects) in mapping.Constructors)
@@ -477,8 +514,20 @@ public sealed class EffectResolver
             ParseParameterSignature(signature));
     }
 
+    /// <summary>
+    /// The manifest code that charges <see cref="EffectSet.Unknown"/>: the member can run code
+    /// the manifest cannot name (a user's virtual <c>ToString</c>, an <c>IConvertible</c>
+    /// implementation, an <c>IFormatProvider</c>). The answer is still definitive, so the
+    /// resolution is <see cref="EffectResolutionStatus.Resolved"/>: no later fallback (a
+    /// wildcard, a namespace default, IL analysis) may replace it with something weaker.
+    /// </summary>
+    public const string UnknownManifestCode = "unknown";
+
     private static EffectResolution CreateResolution(List<string> effectCodes, string source)
     {
+        if (effectCodes.Contains(UnknownManifestCode, StringComparer.Ordinal))
+            return new EffectResolution(EffectResolutionStatus.Resolved, EffectSet.Unknown, source);
+
         var effectSet = effectCodes.Count == 0
             ? EffectSet.Empty
             : EffectSet.From(effectCodes.ToArray());
@@ -696,6 +745,13 @@ public enum EffectMemberKind
 
     /// <summary>A constructor. <see cref="EffectResolverKey.MemberName"/> is <c>".ctor"</c>.</summary>
     Constructor,
+
+    /// <summary>
+    /// A read of a binder-selected metadata field. <see cref="EffectResolverKey.MemberName"/>
+    /// is the field name. Only a manifest <c>fields</c> entry answers it; see
+    /// <c>EffectResolver.ResolveFieldInternal</c>.
+    /// </summary>
+    Field,
 }
 
 /// <summary>
@@ -933,6 +989,51 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             ? string.Empty
             : declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);
 
+    /// <summary>
+    /// The CLR metadata name a C# built-in type keyword denotes, or null. The
+    /// language defines these aliases, so <c>new object()</c> constructs exactly
+    /// <c>System.Object</c>. Only the exact lower-case keywords are mapped: the
+    /// binder's canonical <c>OBJECT</c> also stands for <c>any</c>/<c>unknown</c>,
+    /// and a capitalized <c>Object</c> may be a source type.
+    ///
+    /// <para>Deliberately NOT applied in <see cref="NormalizeDeclaringType"/>:
+    /// a method key on an <c>object</c>-typed receiver names a virtual call
+    /// (<c>Equals</c>, <c>GetHashCode</c>) that may dispatch to a user
+    /// override, so mapping it onto the <c>System.Object</c> entry would borrow
+    /// a contract the runtime target never promised. Constructors do not
+    /// dispatch, which is why the constructor path uses this.</para>
+    /// </summary>
+    internal static string? KeywordAliasMetadataName(string type) => type switch
+    {
+        "object" => "System.Object",
+        "string" => "System.String",
+        "bool" => "System.Boolean",
+        "char" => "System.Char",
+        "sbyte" => "System.SByte",
+        "byte" => "System.Byte",
+        "short" => "System.Int16",
+        "ushort" => "System.UInt16",
+        "int" => "System.Int32",
+        "uint" => "System.UInt32",
+        "long" => "System.Int64",
+        "ulong" => "System.UInt64",
+        "nint" => "System.IntPtr",
+        "nuint" => "System.UIntPtr",
+        "float" => "System.Single",
+        "double" => "System.Double",
+        "decimal" => "System.Decimal",
+        _ => null,
+    };
+
+    /// <summary>
+    /// The CLR metadata name of a named type: namespace, metadata name with
+    /// generic arity, nested types joined by <c>+</c>. This is the spelling
+    /// every manifest uses, unlike <c>ToDisplayString()</c>, which prints C#
+    /// keywords (<c>object</c>) and type-parameter lists (<c>List&lt;T&gt;</c>).
+    /// </summary>
+    internal static string MetadataTypeName(Microsoft.CodeAnalysis.INamedTypeSymbol type) =>
+        MetadataName(type.OriginalDefinition);
+
     private static IReadOnlyList<string> NormalizeParameters(IReadOnlyList<string> parameterTypes) =>
         parameterTypes.Count == 0
             ? Array.Empty<string>()
@@ -949,7 +1050,9 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// key it replaces name the SAME type. That equality is what lets this
     /// slice re-key the resolver without moving a diagnostic.</para>
     ///
-    /// <para>The one addition is generic instantiation. When the legacy
+    /// <para>Metadata-backed instantiations use the selected CLR definition,
+    /// including nested declaring types, rather than a constructed display name.
+    /// For source-only generic instantiations, when the legacy
     /// name-shape map already knows the type (it hard-codes <c>List</c>,
     /// <c>Dictionary</c>, <c>HashSet</c>, <c>Task</c>) its answer wins, byte for
     /// byte. Otherwise the key falls back to the generic DEFINITION plus arity
@@ -961,8 +1064,13 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// </summary>
     private static string DeclaringTypeOf(Binding.BoundTypes.BoundType type)
     {
+        if (type is Binding.BoundTypes.NominalBoundType
+            { RoslynSymbol: Microsoft.CodeAnalysis.INamedTypeSymbol metadata })
+            return MetadataName(metadata.OriginalDefinition);
         if (type is Binding.BoundTypes.GenericInstantiationBoundType generic)
         {
+            if (generic.RoslynSymbol is { } constructed)
+                return MetadataName(constructed.OriginalDefinition);
             var mappedDisplay = Binding.TypeIdentity.MapShortTypeNameToFullName(generic.DisplayString);
             if (mappedDisplay.Contains('`'))
                 return mappedDisplay;
@@ -973,6 +1081,11 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
 
         return Binding.TypeIdentity.MapShortTypeNameToFullName(type.DisplayString);
     }
+
+    private static string MetadataName(Microsoft.CodeAnalysis.INamedTypeSymbol type) =>
+        type.ContainingType is { } parent ? MetadataName(parent) + "+" + type.MetadataName
+        : type.ContainingNamespace.IsGlobalNamespace ? type.MetadataName
+        : type.ContainingNamespace.ToDisplayString() + "." + type.MetadataName;
 
     private static string WithArity(string qualifiedName, int arity) =>
         string.IsNullOrEmpty(qualifiedName) || qualifiedName.Contains('`') || arity == 0
@@ -1061,6 +1174,7 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             EffectMemberKind.Getter => "g",
             EffectMemberKind.Setter => "s",
             EffectMemberKind.Constructor => "c",
+            EffectMemberKind.Field => "f",
             _ => "?",
         };
         return $"{prefix}:{DeclaringType}::{MemberName}{parameters}";

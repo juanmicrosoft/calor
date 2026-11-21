@@ -106,7 +106,7 @@ public sealed class ContractSimplificationPass
 
         return function.CopyMetadataTo(new FunctionNode(
             function.Span,
-            function.Id,
+            function.LocalId,
             function.Name,
             function.Visibility,
             function.TypeParameters,
@@ -156,7 +156,7 @@ public sealed class ContractSimplificationPass
 
         return cls.CopyMetadataTo(new ClassDefinitionNode(
             cls.Span,
-            cls.Id,
+            cls.LocalId,
             cls.Name,
             cls.IsAbstract,
             cls.IsSealed,
@@ -189,7 +189,11 @@ public sealed class ContractSimplificationPass
             items: RemapItems(
                 cls.Items,
                 cls.Methods,
-                simplifiedMethods)));
+                simplifiedMethods),
+            isModule: cls.IsModule)
+        {
+            StaticInitializerEffects = cls.StaticInitializerEffects
+        });
     }
 
     private InterfaceDefinitionNode SimplifyInterface(InterfaceDefinitionNode iface)
@@ -217,7 +221,7 @@ public sealed class ContractSimplificationPass
         // contracts silently deleted its property and indexer members.
         return iface.CopyMetadataTo(new InterfaceDefinitionNode(
             iface.Span,
-            iface.Id,
+            iface.LocalId,
             iface.Name,
             iface.BaseInterfaces,
             iface.TypeParameters,
@@ -233,7 +237,8 @@ public sealed class ContractSimplificationPass
             items: RemapItems(
                 iface.Items,
                 iface.Methods,
-                simplifiedMethods)));
+                simplifiedMethods),
+            visibility: iface.Visibility));
     }
 
     private static IReadOnlyList<AstNode> RemapItems(
@@ -272,7 +277,7 @@ public sealed class ContractSimplificationPass
 
         return method.CopyMetadataTo(new MethodNode(
             method.Span,
-            method.Id,
+            method.LocalId,
             method.Name,
             method.Visibility,
             method.Modifiers,
@@ -286,7 +291,13 @@ public sealed class ContractSimplificationPass
             method.Attributes,
             method.CSharpAttributes,
             method.IsAsync,
-            method.IdentifierSpan));
+            method.IdentifierSpan,
+            method.Since,
+            method.Deprecated,
+            method.BreakingChanges)
+        {
+            EffectParameters = method.EffectParameters
+        });
     }
 
     private MethodSignatureNode SimplifyMethodSignature(MethodSignatureNode method)
@@ -309,7 +320,7 @@ public sealed class ContractSimplificationPass
 
         return method.CopyMetadataTo(new MethodSignatureNode(
             method.Span,
-            method.Id,
+            method.LocalId,
             method.Name,
             method.TypeParameters,
             method.Parameters,
@@ -318,7 +329,11 @@ public sealed class ContractSimplificationPass
             simplifiedPreconditions,
             simplifiedPostconditions,
             method.Attributes,
-            method.CSharpAttributes));
+            method.CSharpAttributes)
+        {
+            IdentifierSpan = method.IdentifierSpan,
+            EffectParameters = method.EffectParameters
+        });
     }
 
     private IReadOnlyList<T> SimplifyContracts<T>(IReadOnlyList<T> contracts, Func<T, T> simplifier)

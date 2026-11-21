@@ -1,0 +1,20 @@
+module Knapsack Knapsack
+  module KnapsackModule
+    func BetterValue public (int:withItem, int:withoutItem) → int
+      !
+      if withItem > withoutItem
+        return withItem
+      else
+        return withoutItem
+
+    func Fits public (int:weight, int:capacity) → bool
+      !
+      requires weight > 0
+      requires capacity >= 0
+      return weight <= capacity
+
+    func RemainingCapacity public (int:capacity, int:weight) → int
+      !
+      requires capacity >= weight
+      => result >= 0
+      return capacity - weight

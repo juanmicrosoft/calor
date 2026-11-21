@@ -1,0 +1,6 @@
+module DeadCodeExample DeadCodeExample
+  module DeadCodeExampleModule
+    func GetStatus public (int:code) → int
+      !
+      return code
+      let int:unused = 42

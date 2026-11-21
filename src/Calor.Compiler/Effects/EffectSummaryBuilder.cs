@@ -11,7 +11,40 @@ namespace Calor.Compiler.Effects;
 /// </summary>
 public static class EffectSummaryBuilder
 {
-    public static EffectSummary Build(ModuleNode module)
+    public static EffectSummary Build(ModuleNode module) => Build(module, null);
+
+    /// <summary>
+    /// Summaries for a whole set of modules, built over the cross-module
+    /// qualification map <c>calor build</c> passes (see
+    /// <see cref="CrossModuleFunctionMap"/>). Without that map a qualified call
+    /// into another module (<c>OrderService.SaveOrder()</c>) is not recognized as
+    /// one, so every multi-module entry point that builds summaries from ASTs goes
+    /// through here rather than <see cref="Build(ModuleNode)"/>.
+    /// </summary>
+    internal static List<(EffectSummary Summary, string FilePath)> BuildAll(
+        IReadOnlyList<(ModuleNode Ast, string FilePath)> modules)
+    {
+        var crossModuleFunctions = CrossModuleFunctionMap(modules);
+        var summaries = new List<(EffectSummary, string)>(modules.Count);
+        foreach (var (ast, path) in modules)
+            summaries.Add((Build(ast, crossModuleFunctions), path));
+        return summaries;
+    }
+
+    /// <summary>
+    /// The driver's cross-module function map over <paramref name="modules"/> —
+    /// built only when there is more than one module, exactly as
+    /// <c>CompilationDriver</c> builds it before calling
+    /// <see cref="Build(ModuleNode, IReadOnlyDictionary{string, CodeGen.CrossModuleFunctionTarget})"/>.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctionMap(
+        IReadOnlyList<(ModuleNode Ast, string FilePath)> modules) =>
+        modules.Count > 1
+            ? CompilationDriver.BuildCrossModuleFunctionMap(modules.Select(module => module.Ast).ToList())
+            : null;
+
+    internal static EffectSummary Build(ModuleNode module,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
     {
         var summary = new EffectSummary
         {
@@ -54,7 +87,8 @@ public static class EffectSummaryBuilder
         // are gone; `NoNameKeyedEffectStoreRemains` pins it), then attach them
         // with the caller's declared effects + a diagnostic span for any
         // cross-module errors.
-        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module);
+        var callGraph = Analysis.CallGraphAnalysis.Build(module, crossModuleFunctions);
+        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module, crossModuleFunctions, callGraph);
         var callsByCaller = new Dictionary<string, List<RawCall>>(StringComparer.Ordinal);
         foreach (var call in rawCalls)
         {
@@ -83,6 +117,14 @@ public static class EffectSummaryBuilder
                     displayName: $"{cls.Name}.{method.Name}",
                     callsByCaller);
             }
+        }
+
+        var existingCallers = summary.Callers.Select(caller => caller.CallerId).ToHashSet(StringComparer.Ordinal);
+        foreach (var function in callGraph.Functions.Values)
+        {
+            if (!existingCallers.Contains(function.Id))
+                AppendCallerSummary(summary, function.Effects, function.Span,
+                    function.Id, function.Name, callsByCaller);
         }
 
         return summary;

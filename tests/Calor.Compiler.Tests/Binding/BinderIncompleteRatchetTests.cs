@@ -3,8 +3,12 @@ using System.Security.Cryptography;
 using System.Text;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
 
 // Flat test namespace: see BinderDispatchCompletenessTests.
@@ -25,9 +29,11 @@ namespace Calor.Compiler.Tests;
 ///   else fails by NAME (review C2: without this, a parser regression removes files from
 ///   the denominator, the count "improves", and the failure message invites laundering
 ///   the regression into the baseline).
-/// Regenerate: CALOR_UPDATE_BINDER_BASELINE=1 dotnet test --filter BinderIncompleteRatchet
-/// BOTH F-2 legs are active as of B2: the conversion leg (three A-1.5.3 subjects at pinned
-/// submodule commits, converted in-process) skips only where submodules are absent.
+/// CALOR_UPDATE_BINDER_BASELINE updates the native leg only. Conversion artifacts
+/// remain immutable: the original exact conversion test replays its original compiler.
+/// The separate current conversion test retains every source/coverage/count comparison,
+/// with explicit current serialized diagnostic sites instead of historical source IDs.
+/// Only the current conversion test skips where corpus submodules are absent.
 /// </summary>
 public class BinderIncompleteRatchetTests
 {
@@ -48,6 +54,21 @@ public class BinderIncompleteRatchetTests
             ["tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"] =
                 "error fixture (NOTE: currently fails on Calor0830 legacy closers, not the " +
                 "mismatched ids it was built for — stale in its own way, see #901's pattern)",
+            // 0.30 native-syntax cutover: these checked-in files are still written in the
+            // retired `§` syntax and have no active-syntax mirror, so the parser rejects them
+            // (Calor0006). Migrating or deleting them belongs to their owning suites.
+            ["tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/E2E/agent-tasks/fixtures/refactor-signature-calor/Signature.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            ["tests/E2E/scenarios/07_collections/output.g.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
         };
 
     private static string RepoRoot()
@@ -61,6 +82,36 @@ public class BinderIncompleteRatchetTests
 
     private static string BaselinePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-incomplete-baseline.json");
+
+    private static string NativeCurrentExpectationsPath() => Path.Combine(RepoRoot(),
+        "tests", "TestData", "Binding", "binder-native-current-expectations.json");
+
+    /// <summary>
+    /// Why the current native counts differ from the historical baseline (523 parsed,
+    /// 3 failures, 0 incomplete, 5194 expressions bound, measured 2026-10-30 on the
+    /// section-marker spellings). 0.30: 511 parsed, 15 failures, 0 incomplete. The 12
+    /// new parse failures are exactly the retired-syntax inputs AllowedParseFailures
+    /// registers (no active mirror). ExpressionsBound 5194 -> 7386 because every other
+    /// input is now bound in native syntax, where member reads and calls are expression
+    /// nodes; it is recorded, not asserted, and is not a precision claim.
+    /// <para>Follow-up refresh after i8: 511 → 514 parsed, failures still 15, incomplete
+    /// still 0, ExpressionsBound 7386 → 7425. Measured per file with the compiler at
+    /// 1ea0a1280 (where the fixture was pinned; it reproduces 511/15/7386) and at each later
+    /// binder or parser change. Inputs: +3 files, the ES-04 <c>bystander.calr</c> at steps
+    /// 00, 01 and 02 (h3, 5a9d7e7c8; one bound expression each); the null-deref benchmark
+    /// subject re-seeded on a user <c>T?</c> (h2, 723c52dc0) binds 39 → 35. Compiler: +40,
+    /// all from i7 (a9f260a6f), which parses unspaced <c>x.Field</c> on a value as a
+    /// member-access node over a reference (two expressions where the dotted name was one),
+    /// across 18 files (largest: StringContracts +10, bounds-violation +6, null-deref +6,
+    /// 12-03 snapshot +4). 7386 + 3 - 4 + 40 = 7425.</para>
+    /// </summary>
+    private const string NativeCurrentNote =
+        "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no "
+        + "longer parse; all other in-repo inputs are bound in native syntax. Incomplete diagnostics "
+        + "remain zero. ExpressionsBound is informational. Follow-up: the 3 added parsed inputs are "
+        + "the ES-04 bystander.calr steps (h3); ExpressionsBound 7386 to 7425 is 3 bystander "
+        + "expressions, 4 fewer in the re-seeded null-deref benchmark (h2) and 40 more from i7 "
+        + "member-access parsing of x.Field.";
 
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).
@@ -126,7 +177,51 @@ public class BinderIncompleteRatchetTests
         + "budget waivers. All 72 source-carrier identities remain guarded (63 native, nine "
         + "preserved expressions), including all 47 native generic identities. In-repo visits "
         + "4828 -> 4826 come solely from the approved 06-03 declaration-pattern snapshot "
-        + "(seven -> five visits); incomplete diagnostics remain zero";
+        + "(seven -> five visits); incomplete diagnostics remain zero. "
+        + "#1601 (0.30): current binder visits 25268 to 25240 (-28) reflect ordinary Length "
+        + "serialization, not improved precision or native fidelity. Across 21 files, 55 "
+        + "source Length identities explain the original -54; nameless-inference legacy "
+        + "preservation restores 26 visits. The remaining 28 visits fold operation-plus-receiver "
+        + "into dotted references. Three selected metadata array-property reads remove raw "
+        + "Calor0200 errors in ServiceRegistrar (58 to 55); propagated errors are unchanged. "
+        + "The 13 updated source records retain every source, native, opaque, loss and disposition "
+        + "identity; other diagnostic hashes change only by location or the two unresolved "
+        + "bytes references becoming bytes.Length. This is a current structural inventory "
+        + "correction, not a historical remeasurement or an opacity-budget change. "
+        + "Current inventory refreshed on staged 2430c65a7, not final 0.30: named-constructor "
+        + "support exposes AddScanResult and Serilog Logger, moving visits 25240 -> 25276, "
+        + "with 43 additional exact-span mappings, 109 fewer opaque source expressions and "
+        + "66 additional unmapped expressions, not native expressions. Raw binding errors "
+        + "move 1 -> 5 and 7 -> 10 respectively; the indexer-parameter fix moves "
+        + "TrackingCollection 14 -> 13 and conversion success false -> true. The 143 raw "
+        + "and 78 propagated diagnostic identity hashes include those changes and 140 "
+        + "layout-only records; propagated error counts are unchanged. Preserve-all "
+        + "boundaries move 918 -> 914 and expressions 17112 -> 17068, with zero opaque-unmapped "
+        + "boundaries or unconverted files. All source identities and mixed partitions are unchanged. "
+        + "Current inventory refreshed on staged 1d253aab8, not final 0.30: named modules change "
+        + "20 raw and five propagated diagnostic identity hashes through declaration-header "
+        + "locations and class-to-module candidate identities. Correct static registration of "
+        + "two const fields removes two false Calor0261 errors in KeyValuePairSettings "
+        + "(raw 12 -> 10, propagated 3 -> 1); the existing Calor0208 remains blocking. "
+        + "Legal nested access to containing private static members removes one false raw "
+        + "Calor0200 each in LogContext (9 -> 8) and SelfLog (4 -> 3). All other diagnostic "
+        + "counts, source and representation identities, binder visits and preserve-all "
+        + "coverage are unchanged";
+
+    /// <summary>
+    /// The note in the current conversion fixture. The per-phase attribution is on
+    /// <see cref="CurrentCompiler_ConversionLeg_MatchesCoverageAndDiagnosticSitesExactly"/>.
+    /// </summary>
+    private const string CurrentConversionNote =
+        "Current fixture for the 0.30 conversion leg (schema 2). This file pins the native leg "
+        + "(206 converted records, with diagnostic sites in binder-current-diagnostic-sites.json) and the "
+        + "preserve-mode leg exactly: 291 opaque boundaries / 76752 opaque expressions, the 0.30 opacity "
+        + "budget the maintainer accepted on 2026-11-18. The 158 refused files have no record; their names "
+        + "and causes are pinned in current-source-carrier-dispositions.json. The historical cap is "
+        + "bench/phase0-agent-native/binder-incomplete-baseline.json (preserve at most 914 boundaries / "
+        + "17068 expressions); it is immutable and is checked only by its original-compiler replay "
+        + "(ConversionLeg_IncompleteCount_MatchesBaseline). Refreshed from the 2026-11-09 fixture "
+        + "(9e1160ad2) phase by phase; every phase is attributed to its commits on the conversion-leg test.";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");
@@ -135,10 +230,201 @@ public class BinderIncompleteRatchetTests
         JsonSerializer.Deserialize<SourceCarrierEvidence>(File.ReadAllText(Path.Combine(RepoRoot(),
             "bench", "phase0-agent-native", "binder-source-carrier-evidence.json")))!.Cases);
 
-    /// <summary>#943: guarded identities whose whole member is now preserved C#; the source stays verbatim there.</summary>
+    /// <summary>Historically preserved member identities; native restoration must match the original registered carrier.</summary>
     private static readonly Lazy<IReadOnlyList<SourceCarrierCase>> PreservedCarrierCases = new(() =>
         JsonSerializer.Deserialize<SourceCarrierEvidence>(File.ReadAllText(Path.Combine(RepoRoot(),
             "bench", "phase0-agent-native", "binder-source-carrier-evidence.json")))!.PreservedCases ?? []);
+
+    private static readonly Lazy<IReadOnlyList<CurrentSourceCarrier>> CurrentSourceCarriers = new(() =>
+        JsonSerializer.Deserialize<CurrentSourceCarrier[]>(File.ReadAllText(Path.Combine(RepoRoot(),
+            "tests", "TestData", "Binding", "current-source-carrier-compatibility.json")))!);
+
+    /// <summary>
+    /// 0.30 current dispositions of the immutable carrier evidence
+    /// (tests/TestData/Binding/current-source-carrier-dispositions.json). The evidence file is
+    /// byte-pinned by the historical binder replay, so moves are recorded here, never there:
+    /// <list type="bullet">
+    /// <item><c>Refusals</c>: every corpus file the converter now refuses under the leg's one-file
+    /// Lossy/SelectActiveBranchLossy options (no Calor at all; maintainer decision 2026-11-18:
+    /// refusals are kept and counted). The conversion leg checks all of them; the carrier test
+    /// checks the 20 that hold evidence. The cause is the sorted, distinct features of the
+    /// conversion errors, as in the Calor0270 leg. A refused file's carriers and native record
+    /// resume when it converts again (the refusal pin then fails and must be re-adjudicated).</item>
+    /// <item><c>Cases</c>: a single identity that moved in a converted file, with its cause.
+    /// <c>preserved-member</c>: the source expression is now inside a member kept as C#.
+    /// <c>native-carrier</c>: a native carrier of the stated kind, span and tokens.</item>
+    /// </list>
+    /// </summary>
+    private static readonly Lazy<CurrentCarrierDispositions> CarrierDispositions = new(() =>
+        JsonSerializer.Deserialize<CurrentCarrierDispositions>(File.ReadAllText(Path.Combine(RepoRoot(),
+            "tests", "TestData", "Binding", "current-source-carrier-dispositions.json")))!);
+
+    [Fact]
+    public void CurrentSourceCarrierCompatibility_RegistersOnlySixExactHistoricalIdentities()
+    {
+        // 0.30: the seventh (ServiceRegistrar's renamed _chainGetInterfaces capture) has no
+        // capture at all now; it is a native-carrier disposition instead.
+        Assert.Equal(6, CurrentSourceCarriers.Value.Count);
+        Assert.Equal(6, CurrentSourceCarriers.Value.Select(current => current.Original).Distinct().Count());
+        foreach (var current in CurrentSourceCarriers.Value)
+        {
+            Assert.Contains(current.Original, SourceCarrierCases.Value);
+            AssertCurrentCarrierTokenTransition(current);
+        }
+    }
+
+    [Fact]
+    public void CurrentSourceCarrierDispositions_NameEveryRefusalAndMovedIdentity()
+    {
+        var dispositions = CarrierDispositions.Value;
+        var evidenceFiles = SourceCarrierCases.Value.Concat(PreservedCarrierCases.Value)
+            .Select(evidence => evidence.File).ToHashSet(StringComparer.Ordinal);
+        var corpusFiles = JsonSerializer.Deserialize<SortedDictionary<string, SourceCoverageRecord>>(
+            File.ReadAllText(SourceCoveragePath()))!.Keys.ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(158, dispositions.Refusals.Count);
+        Assert.Equal(20, dispositions.Refusals.Keys.Count(evidenceFiles.Contains));
+        Assert.All(dispositions.Refusals, refusal =>
+        {
+            Assert.Contains(refusal.Key, corpusFiles);
+            Assert.False(string.IsNullOrWhiteSpace(refusal.Value));
+        });
+        Assert.Equal(2, dispositions.Cases.Count);
+        Assert.Equal(dispositions.Cases.Count, dispositions.Cases
+            .Select(moved => (moved.File, moved.SourceStart, moved.SourceEnd)).Distinct().Count());
+        foreach (var moved in dispositions.Cases)
+        {
+            var evidence = Assert.Single(SourceCarrierCases.Value, evidence => evidence.File == moved.File
+                && evidence.SourceStart == moved.SourceStart && evidence.SourceEnd == moved.SourceEnd);
+            Assert.DoesNotContain(moved.File, dispositions.Refusals.Keys);
+            Assert.DoesNotContain(CurrentSourceCarriers.Value, current => current.Original == evidence);
+            Assert.False(string.IsNullOrWhiteSpace(moved.Cause));
+            switch (moved.Disposition)
+            {
+                case "preserved-member":
+                    Assert.Null(moved.CarrierKind);
+                    Assert.Null(moved.CarrierCode);
+                    break;
+                case "native-carrier":
+                    Assert.NotNull(moved.CarrierKind);
+                    Assert.NotNull(moved.CarrierStart);
+                    Assert.NotNull(moved.CarrierEnd);
+                    Assert.NotNull(moved.CarrierCode);
+                    Assert.NotEqual(evidence.CarrierCode, moved.CarrierCode);
+                    break;
+                default:
+                    Assert.Fail($"Unknown carrier disposition '{moved.Disposition}'.");
+                    break;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("preserved", false)]
+    [InlineData("preserved-but-native", true)]
+    [InlineData("native", false)]
+    [InlineData("native-wrong-code", true)]
+    [InlineData("native-wrong-span", true)]
+    public void CurrentSourceCarrierDisposition_RequiresTheStatedCurrentForm(string shape, bool fails)
+    {
+        const string source = "class C { object Run(object x) => F(x); }";
+        var start = source.IndexOf("F(x)", StringComparison.Ordinal);
+        var span = new TextSpan(start, "F(x)".Length, 1, start + 1);
+        var evidence = new SourceCarrierCase("control.cs", span.Start, span.End, "InvocationExpression",
+            "F(x)", nameof(CallExpressionNode), span.Start, span.End, "F(_old)");
+        var moved = shape.StartsWith("preserved", StringComparison.Ordinal)
+            ? new CarrierDisposition("control.cs", span.Start, span.End, "preserved-member", "control",
+                null, null, null, null)
+            : new CarrierDisposition("control.cs", span.Start, span.End, "native-carrier", "control",
+                nameof(CallExpressionNode), span.Start, span.End, shape == "native-wrong-code" ? "G(x)" : "F(x)");
+        var call = new CallExpressionNode(
+            shape == "native-wrong-span" ? new TextSpan(span.Start, span.Length + 1, 1, span.Column) : span,
+            "F", [new ReferenceNode(new TextSpan(start + 2, 1, 1, start + 3), "x")]);
+        var module = shape == "preserved"
+            ? new ModuleNode(default, "m", "Control", [], [], [], [], [], [], [], new AttributeCollection(),
+                [], [], [], [], null,
+                interopBlocks: [new CSharpInteropBlockNode(default, "object Run(object x) => F(x);")])
+            : MeasurementModule(call);
+        void Check() => AssertCarrierDisposition(module, Walk(module).OfType<ExpressionNode>().ToArray(),
+            source, evidence, moved);
+        if (fails)
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+        else
+            Check();
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("name-only-swap")]
+    [InlineData("source-span")]
+    [InlineData("carrier-kind")]
+    [InlineData("carrier-span")]
+    [InlineData("unrelated-token")]
+    [InlineData("arbitrary-name")]
+    [InlineData("declaration-span")]
+    [InlineData("operation-span")]
+    [InlineData("operation-change")]
+    [InlineData("opaque-initializer")]
+    [InlineData("declaration-scope")]
+    [InlineData("historical-evidence")]
+    public void CurrentSourceCarrierCompatibility_RequiresSourceOperationAndActualLexicalDeclaration(string mutation)
+    {
+        const string source = "class C { object Run() => F(typeof(int)); }";
+        var callStart = source.IndexOf("F(", StringComparison.Ordinal);
+        var operationStart = source.IndexOf("typeof", StringComparison.Ordinal);
+        var operationSpan = new TextSpan(operationStart, "typeof(int)".Length, 1, operationStart + 1);
+        var callSpan = TextSpan.FromBounds(callStart, operationSpan.End + 1, 1, callStart + 1);
+        var original = new SourceCarrierCase("control.cs", callSpan.Start, callSpan.End,
+            "InvocationExpression", source[callSpan.Start..callSpan.End],
+            nameof(CallExpressionNode), callSpan.Start, callSpan.End, "F(_old)");
+        var current = new CurrentSourceCarrier(original, "_old", "_current", "F(_current)",
+            nameof(BindStatementNode), operationSpan.Start, operationSpan.End,
+            "var _current = typeof(int);", nameof(TypeOfExpressionNode),
+            "TypeOfExpression", operationSpan.Start, operationSpan.End, "typeof(int)");
+        ExpressionNode initializer = new TypeOfExpressionNode(operationSpan, "int");
+        var declarationSpan = operationSpan;
+        var declarationName = "_current";
+        ExpressionNode carrier = new CallExpressionNode(callSpan, "F", [new ReferenceNode(operationSpan, "_current")]);
+        switch (mutation)
+        {
+            case "none": break;
+            case "name-only-swap": declarationName = "_other"; break;
+            case "source-span":
+                current = current with { Original = original with { SourceStart = original.SourceStart + 1 } }; break;
+            case "carrier-kind": carrier = new RawCSharpExpressionNode(callSpan, "F(_current)"); break;
+            case "carrier-span":
+                carrier = new CallExpressionNode(TextSpan.FromBounds(callSpan.Start, callSpan.End + 1, 1, 1),
+                    "F", [new ReferenceNode(operationSpan, "_current")]); break;
+            case "unrelated-token": current = current with { CurrentCarrierCode = "G(_current)" }; break;
+            case "arbitrary-name":
+                carrier = new CallExpressionNode(callSpan, "F", [new ReferenceNode(operationSpan, "_arbitrary")]); break;
+            case "declaration-span":
+                declarationSpan = TextSpan.FromBounds(operationSpan.Start, operationSpan.End + 1, 1, 1); break;
+            case "operation-span":
+                initializer = new TypeOfExpressionNode(new TextSpan(operationSpan.Start + 1, operationSpan.Length, 1, 1), "int"); break;
+            case "operation-change": initializer = new TypeOfExpressionNode(operationSpan, "string"); break;
+            case "opaque-initializer": initializer = new RawCSharpExpressionNode(operationSpan, "typeof(int)"); break;
+            case "declaration-scope": break;
+            case "historical-evidence": original = original with { CarrierCode = "F(_changed)" }; break;
+            default: throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        var declaration = new BindStatementNode(declarationSpan, declarationName, null, false,
+            initializer, new AttributeCollection());
+        FunctionNode Function(string name, params StatementNode[] body) =>
+            new(default, name, name, Visibility.Public, [], new OutputNode(default, "object"),
+                null, body, new AttributeCollection());
+        var module = new ModuleNode(default, "m", "Control", [],
+            mutation == "declaration-scope"
+                ? [Function("Run", new ReturnStatementNode(callSpan, carrier)),
+                    Function("Other", declaration, new ReturnStatementNode(operationSpan, new ReferenceNode(operationSpan, declarationName)))]
+                : [Function("Run", declaration, new ReturnStatementNode(callSpan, carrier))],
+            new AttributeCollection());
+        void Check() => AssertCurrentSourceCarrier(module, source, original, current,
+            CreateCarrierBindingModel(module));
+        if (mutation == "none")
+            Check();
+        else
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(Check);
+    }
 
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()
@@ -150,6 +436,7 @@ public class BinderIncompleteRatchetTests
             .SelectMany(r => Directory.EnumerateFiles(r, "*.calr", SearchOption.AllDirectories))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
                      && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Where(f => !ActiveSyntaxInputs.IsActiveCopy(Path.GetRelativePath(root, f).Replace('\\', '/')))
             .OrderBy(f => f, StringComparer.Ordinal)
             .ToList();
         Assert.NotEmpty(files);
@@ -160,7 +447,8 @@ public class BinderIncompleteRatchetTests
         {
             var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
             var diagnostics = new DiagnosticBag();
-            var lexer = new Lexer(File.ReadAllText(file).Replace("\r\n", "\n"), diagnostics);
+            var active = ActiveSyntaxInputs.ForCurrentCompiler(root, file);
+            var lexer = new Lexer(File.ReadAllText(active).Replace("\r\n", "\n"), diagnostics);
             var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
             var module = parser.Parse();
             if (diagnostics.HasErrors) { parseFailures.Add(rel); continue; }
@@ -185,29 +473,25 @@ public class BinderIncompleteRatchetTests
             "Files on the allowed-parse-failure list now PARSE — remove them from the list " +
             $"(and the F-2 amendment) in this PR:\n  {string.Join("\n  ", recovered)}");
 
-        var measured = new Baseline(incomplete, parsedFiles, parseFailures.Count, expressionsBound,
-            ScopeText);
+        var measured = new NativeCurrentExpectations(incomplete, parsedFiles, parseFailures.Count,
+            expressionsBound, NativeCurrentNote);
 
+        // 0.30: the native leg's counts live in their own current fixture. The original
+        // binder-incomplete-baseline.json is byte-pinned by the historical binder replay
+        // (ConversionLeg_IncompleteCount_MatchesBaseline), so regenerating its native
+        // fields there broke that replay. The hook now writes only the current fixture.
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
-            // Preserve the conversion-leg section — the two regen writers run in
-            // nondeterministic order under one test invocation.
-            var existing = File.Exists(BaselinePath())
-                ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))
-                : null;
-            File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                measured with
-                {
-                    Conversion = existing?.Conversion,
-                    PreserveCoverage = existing?.PreserveCoverage
-                },
-                new JsonSerializerOptions { WriteIndented = true }) + "\n");
+            File.WriteAllText(NativeCurrentExpectationsPath(), JsonSerializer.Serialize(
+                measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
 
-        Assert.True(File.Exists(BaselinePath()),
-            "Baseline missing — run once with CALOR_UPDATE_BINDER_BASELINE=1");
-        var baseline = JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!;
+        Assert.True(File.Exists(NativeCurrentExpectationsPath()),
+            "Current native expectations missing — run once with CALOR_UPDATE_BINDER_BASELINE=1");
+        var baseline = JsonSerializer.Deserialize<NativeCurrentExpectations>(
+            File.ReadAllText(NativeCurrentExpectationsPath()))!;
+        Assert.Equal(NativeCurrentNote, baseline.Note);
 
         Assert.True(parsedFiles == baseline.ParsedFiles && parseFailures.Count == baseline.ParseFailures,
             $"Parse coverage moved: {parsedFiles} parsed/{parseFailures.Count} failed vs baseline " +
@@ -233,15 +517,87 @@ public class BinderIncompleteRatchetTests
         Skip.IfNot(files.All(File.Exists), "corpus submodules not initialized");
         Assert.Multiple(files.Select(file => (Action)(() =>
         {
+            var relative = Path.GetRelativePath(Path.Combine(RepoRoot(), "bench", "corpus"), file)
+                .Replace('\\', '/');
             var coverage = new NativeConversionCoverage();
             MeasureNative(file, File.ReadAllText(file).Replace("\r\n", "\n"), coverage);
-            Assert.NotNull(coverage.LastSourceCoverage);
+            // A refused file produces no Calor, so its carriers cannot be checked. The refusal
+            // must be the pinned one; a refusal that ends or changes cause fails here.
+            var pinned = CarrierDispositions.Value.Refusals.GetValueOrDefault(relative);
+            Assert.True(pinned == coverage.LastRefusal,
+                $"Conversion refusal moved for {relative}: pinned '{pinned ?? "<converted>"}', measured "
+                + $"'{coverage.LastRefusal ?? "<converted>"}'. Re-adjudicate its carriers.");
+            if (pinned is null)
+                Assert.NotNull(coverage.LastSourceCoverage);
+            else
+                Assert.Null(coverage.LastSourceCoverage);
         })).ToArray());
     }
 
-    [SkippableFact]
-    public void ConversionLeg_IncompleteCount_MatchesBaseline()
+    [Fact]
+    [Trait("Category", "HistoricalReplay")]
+    public async Task ConversionLeg_IncompleteCount_MatchesBaseline()
     {
+        var result = await ExecutionWorkspace.CaptureProcessAsync(
+            "python3", [Path.Combine(RepoRoot(), "scripts", "registered_ledger_historical_replay.py"), "binder"],
+            RepoRoot(), TimeSpan.FromMinutes(20), CancellationToken.None);
+        Assert.True(result.ExitCode == 0 && !result.TimedOut,
+            $"Historical binder conversion replay failed (exit {result.ExitCode}).\n{result.Output}");
+    }
+
+    /// <summary>
+    /// <para><b>0.30 refresh (schema 2).</b> The fixture was pinned on 2026-11-09 at 9e1160ad2:
+    /// 364 converted, 25865 binder visits, preserve 909 / 17054. Now: 206 converted, 158 refused,
+    /// 6496 visits, preserve 291 / 76752. Measured by running this leg's converter and binder
+    /// (Lossy/SelectActiveBranchLossy, module Leg2, LF input) at 9e1160ad2, which reproduces
+    /// the old fixture, and at later commits, file by file. Change points inside a phase were
+    /// found by bisecting the per-file state (refusal cause, visits, raw error count,
+    /// conversion success, output text, error sites). "Visits" and "errors" below are summed
+    /// over the files that changed.</para>
+    /// <list type="number">
+    /// <item><b>Native-syntax cutover, 9e1160ad2..5784ac9ca (293 commits, 2026-11-09/10).</b>
+    /// The converter emits native syntax instead of section markers, so all 196 outputs that
+    /// still convert change text and every representation hash moves. Commits inside this range
+    /// emit output their own parser cannot always read (94 files at 246f8508a), so finer
+    /// attribution is not meaningful except for two bisected moves: c58dc67d2 (native namespace
+    /// headers) refuses 168 files as <c>namespace-topology</c> (be8ff56f7 refuses none), and
+    /// 5dad9f937 drops the ServiceRegistrar receiver capture (see the carrier dispositions).
+    /// Preserve mode keeps the same namespace topologies whole: whole-file units 15 → 184.</item>
+    /// <item><b>047dd14b8</b> (<c>class-unresolved-base-kind</c>): 55 files keep classes whose base
+    /// kind cannot be resolved in a one-file model as C#: visits −2784, errors −231; 8 more
+    /// whole-file units in preserve mode.</item>
+    /// <item><b>047dd14b8..372cf7bac, bisected change points.</b> 85b6aa11c: 29 files, visits +275,
+    /// errors −122. 7b09e0302: ObjectDetails errors +10. e0c91e22b: CallableConfigurationMethodFinder
+    /// visits +1. f31a8fe8d: 1 file's text. affcec04f and 0502c9a16: ObjectDetails errors −6 and
+    /// −10; it now converts successfully. 8b8de9215: 3 files, visits −1 each. 9d3e8807f: 1 file's
+    /// sites. 92b4d8c42 (validated scoped imports): of the 168 refusals, 141 become
+    /// <c>scoped-namespace-source-validation</c>, 7 <c>scoped-namespace-fidelity</c>,
+    /// 1 <c>generated-calor-validation</c>, and 6 convert. 599021cf3 (string receivers must be
+    /// proven non-null): LevelOutputFormat errors +3 (Calor0274 after an unresolved name, where the
+    /// guard has no projection proof; sound). 9262062e4 (slot rows): 7 files' text. 11d236798
+    /// (no synthesized rows on non-public bodies): 7. 3b439c47a (explicit <c>!</c> rows): 111.
+    /// b93fbe618 (<c>! unknown</c> own rows): 27, and ComparableComparer converts. 010b3fde1: 11.</item>
+    /// <item><b>af5d914ab</b> (native printing only): ServiceRegistrar visits −291 and LogEvent −33,
+    /// errors −6; TrackingCollection's refusal cause becomes <c>scoped-namespace-fidelity</c>.</item>
+    /// <item><b>Merges after af5d914ab.</b> a21ac1c46 (R1, constructor rows): 15 files' text, and
+    /// AsyncValidatorInvokedSynchronouslyException converts. 7f6b4379e (g3, native nullable hints):
+    /// 57 Calor0273 messages. 0c049e2b0 (g1): 1 file's text. adb832055 (h1, accessor and type
+    /// rows): 16 files' text, and TestMessages.Designer converts. 1fa1a4140 (i5, no uncompilable
+    /// temporaries or guesses): CultureScope converts; 15 files visits −228 and errors −27.
+    /// 1b2c0cb67 (i7, unspaced member access): 15 files visits −83, errors −1; enum reads such as
+    /// <c>LogEventLevel.Fatal</c> now report as one dotted name (13 files' messages). 1b1fc16e4
+    /// (i8): LogContext's row returns. No other merge moves this leg.</item>
+    /// </list>
+    /// <para>Every source identity (SourceHash, SelectedSourceHash, SourceExpressions) still equals
+    /// the immutable binder-source-coverage.json, and incomplete diagnostics stay zero.</para>
+    /// </summary>
+    [SkippableFact]
+    public void CurrentCompiler_ConversionLeg_MatchesCoverageAndDiagnosticSitesExactly()
+    {
+        Assert.True(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE")),
+            "Conversion baselines are immutable; CALOR_UPDATE_BINDER_BASELINE is forbidden.");
+        Assert.True(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CALOR_REGENERATE_CURRENT_BINDING_SITES")),
+            "Current binding sites are explicit regression expectations, not a live regeneration target.");
         var root = RepoRoot();
         var subjects = new[] { "MediatR", "serilog", "FluentValidation" }
             .Select(subject => Path.Combine(root, "bench", "corpus", subject, "src"))
@@ -266,6 +622,8 @@ public class BinderIncompleteRatchetTests
         var opaqueIdentities = new HashSet<string>(StringComparer.Ordinal);
         var unconvertedIdentities = new HashSet<string>(StringComparer.Ordinal);
         var sourceCoverage = new SortedDictionary<string, SourceCoverageRecord>(StringComparer.Ordinal);
+        var diagnosticSites = new SortedDictionary<string, BindingDiagnosticSites>(StringComparer.Ordinal);
+        var refusals = new SortedDictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var file in files)
         {
@@ -273,7 +631,20 @@ public class BinderIncompleteRatchetTests
             MeasureNative(file, source, native);
             var relative = Path.GetRelativePath(Path.Combine(root, "bench", "corpus"), file)
                 .Replace('\\', '/');
-            sourceCoverage.Add(relative, native.LastSourceCoverage!);
+            if (native.LastRefusal is { } refusal)
+            {
+                // 0.30: a refused file produces no Calor (maintainer decision 2026-11-18:
+                // refusals are kept and counted). It has no native record; its name and
+                // cause are pinned in current-source-carrier-dispositions.json.
+                Assert.Null(native.LastSourceCoverage);
+                refusals.Add(relative, refusal);
+            }
+            else
+            {
+                sourceCoverage.Add(relative, native.LastSourceCoverage!);
+                Assert.NotNull(native.LastBindingSites);
+                diagnosticSites.Add(relative, native.LastBindingSites);
+            }
             MeasurePreserve(
                 file,
                 source,
@@ -292,29 +663,14 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
         Assert.Equal(measuredPreserve.OpaqueBoundaries, measuredPreserve.OpaqueIdentityCount);
         Assert.Equal(measuredPreserve.UnconvertedFiles, measuredPreserve.UnconvertedIdentityCount);
-        Assert.Equal(files.Length, measuredNative.ConvertedAndBound);
+        Assert.Equal(files.Length, measuredNative.ConvertedAndBound + refusals.Count);
         Assert.Equal(0, measuredNative.ConvertExceptions);
-        Assert.Equal(0, measuredNative.EmptyOutput);
+        Assert.Equal(refusals.Count, measuredNative.EmptyOutput);
         Assert.Equal(0, measuredNative.OutputParseFailures);
-        if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
-        {
-            var baseline = File.Exists(BaselinePath())
-                ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!
-                : new Baseline(0, 0, 0, 0, ScopeText);
-            File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                baseline with
-                {
-                    Conversion = measuredNative,
-                    PreserveCoverage = measuredPreserve,
-                    Scope = ScopeText
-                },
-                new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            File.WriteAllText(SourceCoveragePath(),
-                JsonSerializer.Serialize(sourceCoverage,
-                    new JsonSerializerOptions { WriteIndented = true }) + "\n");
-            return;
-        }
-
+        // Every refusal is pinned by name and cause; a refusal that appears, ends or
+        // changes cause is a move to adjudicate, never a smaller denominator.
+        Assert.Equal(CarrierDispositions.Value.Refusals.OrderBy(pair => pair.Key, StringComparer.Ordinal),
+            refusals);
         var recorded = JsonSerializer.Deserialize<Baseline>(
             File.ReadAllText(BaselinePath()))!;
         Assert.NotNull(recorded.Conversion);
@@ -322,17 +678,26 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(
             LegacySourceOrderAttempted,
             measuredNative.LegacySourceOrderAttempted);
-        // Binder visits include lowering artifacts and opaque expressions. Exact equality
-        // still catches drift; a monotonic lower bound would reward unnecessary temporaries.
-        Assert.Equal(recorded.Conversion, measuredNative);
+        var current = ReadCurrentConversionExpectations();
+        // The current fixture (tests/TestData/Binding/binder-current-conversion-expectations.json)
+        // pins both legs exactly, the preserve-mode leg included. The historical cap in
+        // bench/phase0-agent-native/binder-incomplete-baseline.json (preserve at most 914
+        // boundaries / 17068 expressions) is immutable and is checked only by its replay,
+        // ConversionLeg_IncompleteCount_MatchesBaseline; 0.30 accepted a larger opacity
+        // budget (CurrentConversionNote).
+        AssertCurrentConversionTotals(current, measuredNative, measuredPreserve);
         var recordedSources = JsonSerializer.Deserialize<
             SortedDictionary<string, SourceCoverageRecord>>(
                 File.ReadAllText(SourceCoveragePath()))!;
-        Assert.Equal(recordedSources.Keys.Order(StringComparer.Ordinal), sourceCoverage.Keys);
+        Assert.Equal(recordedSources.Keys.Order(StringComparer.Ordinal),
+            sourceCoverage.Keys.Concat(refusals.Keys).Order(StringComparer.Ordinal));
+        Assert.Equal(sourceCoverage.Keys, current.SourceCoverage.Keys);
+        var expectedSites = ReadCurrentDiagnosticSites();
+        Assert.Equal(sourceCoverage.Keys, expectedSites.Keys);
+        Assert.Equal(sourceCoverage.Keys, diagnosticSites.Keys);
         foreach (var (file, measured) in sourceCoverage)
-            Assert.True(recordedSources[file] == measured,
-                $"Source representation changed in {file}: {recordedSources[file]} -> {measured}. "
-                + "Audit source identities and expression interop, not just the binder-visit total.");
+            AssertCurrentSourceCoverage(file, recordedSources[file], current.SourceCoverage[file], measured,
+                expectedSites[file], diagnosticSites[file]);
         Assert.Equal(0, measuredPreserve.OpaqueUnmapped);
         Assert.Equal(
             measuredPreserve.OpaqueBoundaries,
@@ -340,13 +705,172 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(
             measuredPreserve.UnconvertedFiles,
             measuredPreserve.UnconvertedIdentityCount);
-        Assert.True(
-            measuredPreserve.OpaqueBoundaries <= recorded.PreserveCoverage.OpaqueBoundaries
-            && measuredPreserve.OpaqueExpressions <= recorded.PreserveCoverage.OpaqueExpressions
-            && measuredPreserve.UnconvertedFiles <= recorded.PreserveCoverage.UnconvertedFiles,
-            $"Preserve-mode opaque coverage regressed: measured {measuredPreserve} "
-            + $"vs baseline {recorded.PreserveCoverage}.");
-        Assert.Equal(recorded.PreserveCoverage, measuredPreserve);
+    }
+
+    private static CurrentConversionExpectations ReadCurrentConversionExpectations()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot(),
+            "tests", "TestData", "Binding", "binder-current-conversion-expectations.json")));
+        Assert.False(document.RootElement.TryGetProperty("measuredCommit", out _));
+        var current = document.RootElement.Deserialize<CurrentConversionExpectations>()!;
+        Assert.Equal(CurrentConversionNote, current.Note);
+        return current with
+        {
+            SourceCoverage = new SortedDictionary<string, SourceCoverageRecord>(
+                current.SourceCoverage, StringComparer.Ordinal)
+        };
+    }
+
+    private static void AssertCurrentConversionTotals(
+        CurrentConversionExpectations expected, NativeConversionLeg native, PreserveCoverageLeg preserve)
+    {
+        Assert.Equal(2, expected.SchemaVersion);
+        Assert.Equal(expected.Conversion, native);
+        Assert.Equal(expected.PreserveCoverage, preserve);
+    }
+
+    [Theory]
+    [InlineData("schema")]
+    [InlineData("native-visits")]
+    [InlineData("incomplete")]
+    [InlineData("empty-output")]
+    [InlineData("preserve-boundaries")]
+    [InlineData("preserve-expressions")]
+    public void CurrentConversionGuard_RejectsAggregateTampering(string field)
+    {
+        var expected = ReadCurrentConversionExpectations();
+        var changed = field switch
+        {
+            "schema" => expected with { SchemaVersion = expected.SchemaVersion + 1 },
+            "native-visits" => expected with
+            {
+                Conversion = expected.Conversion with
+                {
+                    RoslynSelectedAttempted = expected.Conversion.RoslynSelectedAttempted + 1
+                }
+            },
+            "incomplete" => expected with
+                { Conversion = expected.Conversion with { Incomplete = expected.Conversion.Incomplete + 1 } },
+            "empty-output" => expected with
+                { Conversion = expected.Conversion with { EmptyOutput = expected.Conversion.EmptyOutput + 1 } },
+            "preserve-boundaries" => expected with
+            {
+                PreserveCoverage = expected.PreserveCoverage with
+                {
+                    OpaqueBoundaries = expected.PreserveCoverage.OpaqueBoundaries + 1
+                }
+            },
+            "preserve-expressions" => expected with
+            {
+                PreserveCoverage = expected.PreserveCoverage with
+                {
+                    OpaqueExpressions = expected.PreserveCoverage.OpaqueExpressions + 1
+                }
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertCurrentConversionTotals(changed, expected.Conversion, expected.PreserveCoverage));
+    }
+
+    private static SortedDictionary<string, BindingDiagnosticSites> ReadCurrentDiagnosticSites() =>
+        new(JsonSerializer.Deserialize<Dictionary<string, BindingDiagnosticSites>>(File.ReadAllText(
+            Path.Combine(RepoRoot(), "tests", "TestData", "Binding", "binder-current-diagnostic-sites.json")))!,
+            StringComparer.Ordinal);
+
+    private static SourceCoverageRecord WithCurrentDiagnosticIdentities(
+        SourceCoverageRecord coverage, BindingDiagnosticSites expected)
+    {
+        static string Identities(IEnumerable<BindingErrorSite> errors) => HashIdentities(errors
+            .Select(error => $"{error.Code}:{error.Start}:{error.End}:{error.Message}")
+            .Order(StringComparer.Ordinal));
+        return coverage with
+        {
+            BindingErrorIdentityHash = Identities(expected.RawErrors),
+            PropagatedBindingErrorIdentityHash = Identities(expected.PropagatedErrors)
+        };
+    }
+
+    private static void AssertCurrentSourceCoverage(
+        string file, SourceCoverageRecord historical, SourceCoverageRecord expectedCoverage,
+        SourceCoverageRecord measured,
+        BindingDiagnosticSites expected, BindingDiagnosticSites actual)
+    {
+        var original = JsonSerializer.Deserialize<SortedDictionary<string, SourceCoverageRecord>>(
+            File.ReadAllText(SourceCoveragePath()))![file];
+        Assert.Equal(original, historical);
+        Assert.Equal(historical.SourceHash, expectedCoverage.SourceHash);
+        Assert.Equal(historical.SelectedSourceHash, expectedCoverage.SelectedSourceHash);
+        Assert.Equal(historical.SourceExpressions, expectedCoverage.SourceExpressions);
+        Assert.Equal(expected.RawErrors, actual.RawErrors);
+        Assert.Equal(expected.PropagatedErrors, actual.PropagatedErrors);
+        Assert.Equal(expectedCoverage.BindingErrorCount, expected.RawErrors.Length);
+        Assert.Equal(expectedCoverage.PropagatedBindingErrorCount, expected.PropagatedErrors.Length);
+        Assert.Equal(WithCurrentDiagnosticIdentities(expectedCoverage, expected), expectedCoverage);
+        Assert.Equal(expectedCoverage, measured);
+    }
+
+    [Theory]
+    [InlineData("code")]
+    [InlineData("message")]
+    [InlineData("start")]
+    [InlineData("end")]
+    [InlineData("line")]
+    [InlineData("column")]
+    [InlineData("span-text")]
+    [InlineData("raw-count")]
+    [InlineData("propagated-count")]
+    [InlineData("propagated-message")]
+    [InlineData("source-hash")]
+    [InlineData("coverage-identity")]
+    [InlineData("loss-identity")]
+    [InlineData("conversion-success")]
+    [InlineData("binder-attempts")]
+    [InlineData("historical-raw-count")]
+    [InlineData("historical-propagated-count")]
+    public void CurrentConversionGuard_RejectsDiagnosticAndCoverageTampering(string mutation)
+    {
+        var (file, expected) = ReadCurrentDiagnosticSites().First(pair =>
+            pair.Value.RawErrors.Length > 0 && pair.Value.PropagatedErrors.Length > 0);
+        var historical = JsonSerializer.Deserialize<SortedDictionary<string, SourceCoverageRecord>>(
+            File.ReadAllText(SourceCoveragePath()))![file];
+        var expectedCoverage = ReadCurrentConversionExpectations().SourceCoverage[file];
+        var measured = expectedCoverage;
+        AssertCurrentSourceCoverage(file, historical, expectedCoverage, measured, expected, expected);
+        var actual = expected with
+        {
+            RawErrors = expected.RawErrors.ToArray(),
+            PropagatedErrors = expected.PropagatedErrors.ToArray()
+        };
+        var first = actual.RawErrors[0];
+        switch (mutation)
+        {
+            case "code": actual.RawErrors[0] = first with { Code = "Calor9999" }; break;
+            case "message": actual.RawErrors[0] = first with { Message = first.Message + " changed" }; break;
+            case "start": actual.RawErrors[0] = first with { Start = first.Start + 1 }; break;
+            case "end": actual.RawErrors[0] = first with { End = first.End + 1 }; break;
+            case "line": actual.RawErrors[0] = first with { Line = first.Line + 1 }; break;
+            case "column": actual.RawErrors[0] = first with { Column = first.Column + 1 }; break;
+            case "span-text": actual.RawErrors[0] = first with { SpanText = first.SpanText + " changed" }; break;
+            case "raw-count": actual = actual with { RawErrors = actual.RawErrors.Skip(1).ToArray() }; break;
+            case "propagated-count":
+                actual = actual with { PropagatedErrors = actual.PropagatedErrors.Skip(1).ToArray() }; break;
+            case "propagated-message":
+                actual.PropagatedErrors[0] = actual.PropagatedErrors[0] with { Message = "changed" }; break;
+            case "source-hash": measured = measured with { SourceHash = "changed" }; break;
+            case "coverage-identity": measured = measured with { ExactExpressionSourceIdentityHash = "changed" }; break;
+            case "loss-identity": measured = measured with { LossIdentityHash = "changed" }; break;
+            case "conversion-success":
+                measured = measured with { ConversionReportedSuccess = !measured.ConversionReportedSuccess }; break;
+            case "binder-attempts": measured = measured with { BinderAttempts = measured.BinderAttempts + 1 }; break;
+            case "historical-raw-count":
+                historical = historical with { BindingErrorCount = historical.BindingErrorCount + 1 }; break;
+            case "historical-propagated-count":
+                historical = historical with { PropagatedBindingErrorCount = historical.PropagatedBindingErrorCount + 1 }; break;
+            default: throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+            AssertCurrentSourceCoverage(file, historical, expectedCoverage, measured, expected, actual));
     }
 
     [Fact]
@@ -363,11 +887,15 @@ public class BinderIncompleteRatchetTests
         Assert.Equal(3, coverage.OpaqueSourceExpressions); // Invocation, callee, argument.
         Assert.Equal(0, coverage.ExactExpressionSourceSpans);
 
-        var calor = new Compiler.Migration.CalorEmitter().Emit(module);
-        var diagnostics = new DiagnosticBag();
-        var reparsed = new Parser(new Lexer(calor, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
-        Assert.False(diagnostics.HasErrors);
-        AssertOpaqueSerializationPreserved(module, reparsed, "expression.cs");
+        // 0.30 (af5d914ab): native syntax has no inline raw C# expression form, and
+        // the converter no longer builds RawCSharpExpressionNode; an expression it
+        // cannot express natively is preserved at its member boundary instead (see
+        // SelectedBranchMode_UsesRoslynBooleanConditions). So this node no longer
+        // round-trips through CalorEmitter (which still prints the retired `§CS{}`
+        // marker). The identity guard below is exercised directly; converted corpus
+        // output, whose opaque boundaries are raw members, is reparsed in MeasureNative.
+        AssertOpaqueSerializationPreserved(module, MeasurementModule(
+            new RawCSharpExpressionNode(expression.Span, "Call(1)")), "expression.cs");
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
             AssertOpaqueSerializationPreserved(module, MeasurementModule(), "dropped.cs"));
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
@@ -442,6 +970,69 @@ public class BinderIncompleteRatchetTests
         AssertSourceCarrierPreserved([new IntLiteralNode(firstSpan, 1)], source, carrier);
         Assert.Throws<Xunit.Sdk.TrueException>(() =>
             AssertSourceCarrierPreserved([new IntLiteralNode(firstSpan, 2)], source, carrier));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PreviouslyPreservedSourceCarrier_RequiresExactNativeOrPreservedIdentity(bool preserveMember)
+    {
+        var source = $$"""
+            using System;
+            public static class C
+            {
+                public static object Run(Func<int, bool> filter, int value)
+                {
+                    bool shouldRegister = filter?.Invoke(value) ?? true;
+                    {{(preserveMember ? "bool Captured() => shouldRegister;" : "")}}
+                    return new Tuple<bool, int>(item2: value, item1: {{(preserveMember ? "Captured()" : "shouldRegister")}});
+                }
+            }
+            """;
+        var conditional = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source)
+            .GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ConditionalAccessExpressionSyntax>().Single();
+        var carrier = new SourceCarrierCase("named-constructor.cs",
+            conditional.Span.Start, conditional.Span.End, "ConditionalAccessExpression",
+            conditional.ToString(), nameof(ExpressionCallNode),
+            conditional.WhenNotNull.Span.Start, conditional.WhenNotNull.Span.End,
+            conditional.ToString());
+        var conversion = new Compiler.Migration.CSharpToCalorConverter(
+            new Compiler.Migration.ConversionOptions
+            {
+                Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
+                PreprocessorMode = Compiler.Migration.PreprocessorConversionMode.SelectActiveBranchLossy
+            }).Convert(source);
+        Assert.NotNull(conversion.Ast);
+        AssertSourceCarrierPreservedOrInMember(conversion.Ast, source, carrier);
+        if (preserveMember)
+            Assert.Single(Walk(conversion.Ast).OfType<CSharpInteropBlockNode>());
+        else
+        {
+            Assert.Empty(OpaqueCodeIdentities(conversion.Ast));
+            Assert.Equal(["item2", "item1"],
+                Assert.Single(Walk(conversion.Ast).OfType<NewExpressionNode>()).ArgumentNames);
+        }
+
+        var span = new TextSpan(carrier.CarrierStart,
+            carrier.CarrierEnd - carrier.CarrierStart, 1, 1);
+        var native = new ExpressionCallNode(span,
+            new NullConditionalNode(default, new ReferenceNode(default, "filter"), "Invoke"),
+            [new ReferenceNode(default, "value")]);
+        AssertSourceCarrierPreservedOrInMember(MeasurementModule(native), source, carrier);
+        foreach (var invalid in new[]
+        {
+            MeasurementModule(),
+            MeasurementModule(new RawCSharpExpressionNode(span, carrier.CarrierCode)),
+            MeasurementModule(new ExpressionCallNode(default, native.TargetExpression, native.Arguments)),
+            MeasurementModule(new ExpressionCallNode(span, native.TargetExpression,
+                [new ReferenceNode(default, "other")])),
+            MeasurementModule(new ExpressionCallNode(span,
+                new FieldAccessNode(default, new ReferenceNode(default, "filter"), "Invoke"),
+                native.Arguments))
+        })
+            Assert.Throws<Xunit.Sdk.TrueException>(() =>
+                AssertSourceCarrierPreservedOrInMember(invalid, source, carrier));
     }
 
     [Theory]
@@ -529,7 +1120,13 @@ public class BinderIncompleteRatchetTests
         Assert.NotEqual(shifted.SourceHash, shifted.SelectedSourceHash);
         Assert.Equal(identity.SourceHash, identity.SelectedSourceHash);
         Assert.Equal(1, shifted.OpaqueBoundaries);
-        Assert.Equal(selectedInvocation.DescendantNodesAndSelf()
+        // 0.30 (af5d914ab): native syntax has no inline raw C# expression, so the
+        // out-var call inside `&&` (conditional-expression-hoisting) is preserved at
+        // its member boundary, not as the invocation alone: the opaque expressions are
+        // every expression of the selected method (its types, `&&`, `gate`, the call).
+        var selectedMethod = Assert.Single(selectedInvocation.Ancestors()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>());
+        Assert.Equal(selectedMethod.DescendantNodes()
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax>().Count(),
             shifted.OpaqueSourceExpressions);
         Assert.Equal(identity.OpaqueSourceExpressionIdentityHash, shifted.OpaqueSourceExpressionIdentityHash);
@@ -579,6 +1176,8 @@ public class BinderIncompleteRatchetTests
     {
         coverage.FilesSeen++;
         coverage.LastSourceCoverage = null;
+        coverage.LastBindingSites = null;
+        coverage.LastRefusal = null;
         var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
             Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview,
             Microsoft.CodeAnalysis.DocumentationMode.Parse,
@@ -609,11 +1208,12 @@ public class BinderIncompleteRatchetTests
         if (string.IsNullOrEmpty(conversion.CalorSource))
         {
             coverage.EmptyOutput++;
+            coverage.LastRefusal = RefusalOf(conversion, file);
             return;
         }
         var diagnostics = new DiagnosticBag();
         var module = new Parser(
-            new Lexer(conversion.CalorSource.Replace("\r\n", "\n"), diagnostics)
+            new Lexer(RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource), diagnostics)
                 .TokenizeAllForParser(),
             diagnostics).Parse();
         if (diagnostics.HasErrors)
@@ -626,6 +1226,8 @@ public class BinderIncompleteRatchetTests
         var bindDiagnostics = new DiagnosticBag();
         var binder = new Binder(bindDiagnostics);
         binder.Bind(module);
+        coverage.LastBindingSites = CaptureBindingSites(bindDiagnostics,
+            RawCSharpFrame.NormalizeLineEndings(conversion.CalorSource));
         Assert.NotNull(conversion.Ast);
         // Branch selection removes trivia/text and shifts offsets. Conversion AST spans
         // belong to this selected source, not the original file.
@@ -917,20 +1519,187 @@ public class BinderIncompleteRatchetTests
         };
     }
 
+    private static BindingDiagnosticSites CaptureBindingSites(DiagnosticBag diagnostics, string serialized)
+    {
+        BindingErrorSite[] Sites(DiagnosticBag bag) => bag.Errors.Select(error => new BindingErrorSite(
+            error.Code, error.Span.Start, error.Span.End, error.Span.Line, error.Span.Column,
+            error.Message, serialized[error.Span.Start..error.Span.End])).ToArray();
+        var propagated = new DiagnosticBag();
+        BindingDiagnosticPolicy.PropagateCompilationErrors(diagnostics, propagated);
+        return new BindingDiagnosticSites(Sites(diagnostics), Sites(propagated));
+    }
+
     private static void AssertSourceCarriersPreserved(ModuleNode module, string source, string file)
     {
         var relative = Path.GetRelativePath(Path.Combine(RepoRoot(), "bench", "corpus"), file)
             .Replace('\\', '/');
         var nodes = Walk(module).OfType<ExpressionNode>().ToArray();
+        var current = CurrentSourceCarriers.Value.Where(c => c.Original.File == relative).ToArray();
+        var bindingModel = current.Length == 0 ? null : CreateCarrierBindingModel(module);
         Assert.Multiple(SourceCarrierCases.Value.Where(c => c.File == relative)
-            .Select(evidence => (Action)(() => AssertSourceCarrierPreserved(nodes, source, evidence)))
+            .Select(evidence => (Action)(() =>
+            {
+                var compatibility = current.SingleOrDefault(c => c.Original == evidence);
+                var moved = CarrierDispositions.Value.Cases.SingleOrDefault(c => c.File == evidence.File
+                    && c.SourceStart == evidence.SourceStart && c.SourceEnd == evidence.SourceEnd);
+                if (moved is not null)
+                    AssertCarrierDisposition(module, nodes, source, evidence, moved);
+                else if (compatibility is null)
+                    AssertSourceCarrierPreserved(nodes, source, evidence);
+                else
+                    AssertCurrentSourceCarrier(module, source, evidence, compatibility, bindingModel!);
+            }))
             .ToArray());
         foreach (var evidence in PreservedCarrierCases.Value.Where(c => c.File == relative))
+            AssertSourceCarrierPreservedOrInMember(module, source, evidence);
+    }
+
+    /// <summary>
+    /// A registered 0.30 move of one carrier identity. <c>preserved-member</c>: the exact source
+    /// expression is inside a member kept as C#, and no native carrier of the original kind and
+    /// span survives beside it. <c>native-carrier</c>: a native node of the stated kind, span
+    /// and emitted tokens carries the source expression.
+    /// </summary>
+    private static void AssertCarrierDisposition(ModuleNode module, IReadOnlyList<ExpressionNode> nodes,
+        string source, SourceCarrierCase evidence, CarrierDisposition moved)
+    {
+        Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
+        switch (moved.Disposition)
         {
-            Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
-            Assert.True(Walk(module).OfType<CSharpInteropBlockNode>().Any(block => block.CSharpCode.Contains(evidence.SourceExpression, StringComparison.Ordinal)),
-                $"Preserved source {evidence.File}:{evidence.SourceStart} is neither native nor inside a §CSHARP member.");
+            case "preserved-member":
+                Assert.True(Walk(module).OfType<CSharpInteropBlockNode>().Any(block =>
+                        block.CSharpCode.Contains(evidence.SourceExpression, StringComparison.Ordinal)),
+                    $"Carrier for {evidence.File}:{evidence.SourceStart}..{evidence.SourceEnd} is pinned as "
+                    + "preserved in a C# member, but no preserved member contains the source expression.");
+                Assert.DoesNotContain(nodes, node => node.GetType().Name == evidence.CarrierKind
+                    && node.Span.Start == evidence.CarrierStart && node.Span.End == evidence.CarrierEnd);
+                break;
+            case "native-carrier":
+                AssertSourceCarrierPreserved(nodes, source, evidence with
+                {
+                    CarrierKind = moved.CarrierKind!,
+                    CarrierStart = moved.CarrierStart!.Value,
+                    CarrierEnd = moved.CarrierEnd!.Value,
+                    CarrierCode = moved.CarrierCode!
+                });
+                break;
+            default:
+                Assert.Fail($"Unknown carrier disposition '{moved.Disposition}'.");
+                break;
         }
+    }
+
+    /// <summary>
+    /// The sorted, distinct features of a refused conversion's errors (the Calor0270 leg's rule).
+    /// </summary>
+    private static string RefusalOf(Compiler.Migration.ConversionResult conversion, string file)
+    {
+        var features = conversion.Issues
+            .Where(issue => issue.Severity == Compiler.Migration.ConversionIssueSeverity.Error)
+            .Select(issue => issue.Feature ?? "unattributed")
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.True(features.Length > 0, $"Empty conversion without a conversion error: {file}");
+        return string.Join(",", features);
+    }
+
+    private static SemanticModel CreateCarrierBindingModel(ModuleNode module)
+    {
+        var tree = CSharpSyntaxTree.ParseText(new Compiler.CodeGen.CSharpEmitter().Emit(module));
+        return CSharpCompilation.Create("CurrentCarrierBindings", [tree],
+                Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .GetSemanticModel(tree);
+    }
+
+    private static void AssertCurrentCarrierTokenTransition(CurrentSourceCarrier current)
+    {
+        var before = OpaqueTokens(current.Original.CarrierCode).ToArray();
+        var after = OpaqueTokens(current.CurrentCarrierCode).ToArray();
+        Assert.Equal(before.Length, after.Length);
+        Assert.NotEqual(current.OriginalGeneratedName, current.CurrentGeneratedName);
+        var originalIdentifier = $"{(int)SyntaxKind.IdentifierToken}:{current.OriginalGeneratedName}";
+        var currentIdentifier = $"{(int)SyntaxKind.IdentifierToken}:{current.CurrentGeneratedName}";
+        Assert.Equal(current.DeclarationKind == "VarPattern" ? 2 : 1,
+            before.Count(token => token == originalIdentifier));
+        for (var index = 0; index < before.Length; index++)
+            Assert.Equal(before[index] == originalIdentifier ? currentIdentifier : before[index], after[index]);
+    }
+
+    private static void AssertCurrentSourceCarrier(
+        ModuleNode module, string source, SourceCarrierCase original, CurrentSourceCarrier current,
+        SemanticModel bindingModel)
+    {
+        Assert.Equal(original, current.Original);
+        AssertCurrentCarrierTokenTransition(current);
+        AssertSourceCarrierPreserved(Walk(module).OfType<ExpressionNode>().ToArray(), source,
+            original with { CarrierCode = current.CurrentCarrierCode });
+        var sourceRoot = CSharpSyntaxTree.ParseText(source).GetRoot();
+        Assert.Single(sourceRoot.DescendantNodes().OfType<ExpressionSyntax>().Where(node =>
+            node.Span.Start == original.SourceStart && node.Span.End == original.SourceEnd
+            && node.Kind().ToString() == original.SourceKind));
+        Assert.Equal(current.SourceOperation, source[current.SourceOperationStart..current.SourceOperationEnd]);
+        Assert.Single(sourceRoot.DescendantNodes().OfType<ExpressionSyntax>().Where(node =>
+            node.Span.Start == current.SourceOperationStart && node.Span.End == current.SourceOperationEnd
+            && node.Kind().ToString() == current.SourceOperationKind));
+
+        var emittedRoot = bindingModel.SyntaxTree.GetRoot();
+        var emittedCarrier = Assert.Single(emittedRoot.DescendantNodes().OfType<ExpressionSyntax>()
+            .Where(node => OpaqueTokens(node.ToString()).SequenceEqual(OpaqueTokens(current.CurrentCarrierCode))));
+        ISymbol? declarationSymbol;
+        if (current.DeclarationKind == nameof(BindStatementNode))
+        {
+            var binding = Assert.Single(Walk(module).OfType<BindStatementNode>()
+                .Where(node => node.Name == current.CurrentGeneratedName));
+            Assert.Equal(current.DeclarationStart, binding.Span.Start);
+            Assert.Equal(current.DeclarationEnd, binding.Span.End);
+            Assert.Equal(OpaqueTokens(current.DeclarationCode),
+                OpaqueTokens(binding.Accept(new Compiler.CodeGen.CSharpEmitter())));
+            Assert.NotNull(binding.Initializer);
+            Assert.Equal(current.OperationCarrierKind, binding.Initializer.GetType().Name);
+            Assert.Equal(current.SourceOperationStart, binding.Initializer.Span.Start);
+            Assert.Equal(current.SourceOperationEnd, binding.Initializer.Span.End);
+            Assert.Equal(OpaqueTokens(current.SourceOperation),
+                OpaqueTokens(binding.Initializer.Accept(new Compiler.CodeGen.CSharpEmitter())));
+            var emittedDeclaration = Assert.Single(emittedRoot.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+                .Where(node => node.Identifier.ValueText == current.CurrentGeneratedName));
+            Assert.Equal(OpaqueTokens(current.DeclarationCode),
+                OpaqueTokens(Assert.IsType<LocalDeclarationStatementSyntax>(emittedDeclaration.Parent?.Parent).ToString()));
+            declarationSymbol = bindingModel.GetDeclaredSymbol(emittedDeclaration);
+        }
+        else
+        {
+            Assert.Equal("VarPattern", current.DeclarationKind);
+            Assert.Null(current.DeclarationStart);
+            Assert.Null(current.DeclarationEnd);
+            Assert.Null(current.OperationCarrierKind);
+            var capture = Assert.Single(emittedCarrier.DescendantNodesAndSelf().OfType<IsPatternExpressionSyntax>());
+            Assert.Equal(OpaqueTokens(current.DeclarationCode), OpaqueTokens(capture.ToString()));
+            Assert.Equal(OpaqueTokens(current.SourceOperation), OpaqueTokens(capture.Expression.ToString()));
+            var designation = Assert.IsType<SingleVariableDesignationSyntax>(
+                Assert.IsType<VarPatternSyntax>(capture.Pattern).Designation);
+            Assert.Equal(current.CurrentGeneratedName, designation.Identifier.ValueText);
+            declarationSymbol = bindingModel.GetDeclaredSymbol(designation);
+        }
+        var local = Assert.IsAssignableFrom<ILocalSymbol>(declarationSymbol);
+        var reference = Assert.Single(emittedCarrier.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
+            .Where(node => node.Identifier.ValueText == current.CurrentGeneratedName));
+        Assert.True(SymbolEqualityComparer.Default.Equals(local, bindingModel.GetSymbolInfo(reference).Symbol),
+            "The renamed carrier reference must resolve to its actual source-corresponding local declaration.");
+    }
+
+    private static void AssertSourceCarrierPreservedOrInMember(
+        ModuleNode module, string source, SourceCarrierCase evidence)
+    {
+        Assert.Equal(evidence.SourceExpression, source[evidence.SourceStart..evidence.SourceEnd]);
+        if (Walk(module).OfType<CSharpInteropBlockNode>().Any(block =>
+                block.CSharpCode.Contains(evidence.SourceExpression, StringComparison.Ordinal)))
+            return;
+
+        // New native support must restore the registered kind, span and emitted tokens.
+        // Aggregate source/opacity equalities remain independent of this identity check.
+        AssertSourceCarrierPreserved(Walk(module).OfType<ExpressionNode>().ToArray(), source, evidence);
     }
 
     private static void AssertSourceCarrierPreserved(
@@ -1038,6 +1807,12 @@ public class BinderIncompleteRatchetTests
         int ExactExpressionsWithOpaqueDescendants = 0,
         string MixedExpressionSourceIdentityHash = "");
 
+    private sealed record BindingErrorSite(
+        string Code, int Start, int End, int Line, int Column, string Message, string SpanText);
+
+    private sealed record BindingDiagnosticSites(
+        BindingErrorSite[] RawErrors, BindingErrorSite[] PropagatedErrors);
+
     private sealed record SourceCarrierEvidence(IReadOnlyList<SourceCarrierCase> Cases, IReadOnlyList<SourceCarrierCase>? PreservedCases = null);
 
     private sealed record SourceCarrierCase(
@@ -1051,6 +1826,36 @@ public class BinderIncompleteRatchetTests
         int CarrierEnd,
         string CarrierCode);
 
+    private sealed record CurrentCarrierDispositions(
+        IReadOnlyDictionary<string, string> Refusals,
+        IReadOnlyList<CarrierDisposition> Cases);
+
+    private sealed record CarrierDisposition(
+        string File,
+        int SourceStart,
+        int SourceEnd,
+        string Disposition,
+        string Cause,
+        string? CarrierKind,
+        int? CarrierStart,
+        int? CarrierEnd,
+        string? CarrierCode);
+
+    private sealed record CurrentSourceCarrier(
+        SourceCarrierCase Original,
+        string OriginalGeneratedName,
+        string CurrentGeneratedName,
+        string CurrentCarrierCode,
+        string DeclarationKind,
+        int? DeclarationStart,
+        int? DeclarationEnd,
+        string DeclarationCode,
+        string? OperationCarrierKind,
+        string SourceOperationKind,
+        int SourceOperationStart,
+        int SourceOperationEnd,
+        string SourceOperation);
+
     private sealed class NativeConversionCoverage
     {
         public int Incomplete;
@@ -1061,6 +1866,8 @@ public class BinderIncompleteRatchetTests
         public int EmptyOutput;
         public int OutputParseFailures;
         public SourceCoverageRecord? LastSourceCoverage;
+        public BindingDiagnosticSites? LastBindingSites;
+        public string? LastRefusal;
         public NativeConversionLeg ToRecord() => new(
             Incomplete,
             LegacySourceOrderAttempted,
@@ -1118,6 +1925,24 @@ public class BinderIncompleteRatchetTests
         int ConvertExceptions,
         int EmptyOutput,
         int OutputParseFailures);
+
+    private sealed record CurrentConversionExpectations(
+        int SchemaVersion,
+        string Note,
+        NativeConversionLeg Conversion,
+        PreserveCoverageLeg PreserveCoverage,
+        SortedDictionary<string, SourceCoverageRecord> SourceCoverage);
+
+    /// <summary>
+    /// The in-repo native leg's current counts (tests/TestData/Binding). Separate from the
+    /// byte-pinned historical baseline; ExpressionsBound is recorded, not asserted.
+    /// </summary>
+    private sealed record NativeCurrentExpectations(
+        int IncompleteCount,
+        int ParsedFiles,
+        int ParseFailures,
+        int ExpressionsBound,
+        string Note);
 
     private sealed record Baseline(
         int IncompleteCount,

@@ -209,10 +209,13 @@ public sealed class DecimalLiteralNode : ExpressionNode
 public sealed class ReferenceNode : ExpressionNode
 {
     public string Name { get; }
+    public bool IsVerbatim { get; }
+    public bool IsNullLiteral => Name == "null" && !IsVerbatim;
 
-    public ReferenceNode(TextSpan span, string name) : base(span)
+    public ReferenceNode(TextSpan span, string name, bool isVerbatim = false) : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IsVerbatim = isVerbatim;
     }
 
 
@@ -257,15 +260,15 @@ public static class UnaryOperatorExtensions
 {
     public static UnaryOperator? FromString(string? value)
     {
-        return value?.ToUpperInvariant() switch
+        return value switch
         {
-            "NEG" or "NEGATE" or "-" => UnaryOperator.Negate,
-            "NOT" or "!" => UnaryOperator.Not,
-            "BNOT" or "BITWISENOT" or "~" => UnaryOperator.BitwiseNot,
-            "INC" or "++" or "PRE-INC" => UnaryOperator.PreIncrement,
-            "DEC" or "--" or "PRE-DEC" => UnaryOperator.PreDecrement,
-            "POST-INC" => UnaryOperator.PostIncrement,
-            "POST-DEC" => UnaryOperator.PostDecrement,
+            "-" => UnaryOperator.Negate,
+            "!" => UnaryOperator.Not,
+            "~" => UnaryOperator.BitwiseNot,
+            "inc" or "++" or "pre-inc" => UnaryOperator.PreIncrement,
+            "dec" or "--" or "pre-dec" => UnaryOperator.PreDecrement,
+            "post-inc" => UnaryOperator.PostIncrement,
+            "post-dec" => UnaryOperator.PostDecrement,
             _ => null
         };
     }
@@ -288,7 +291,7 @@ public static class UnaryOperatorExtensions
 
 /// <summary>
 /// Represents a fallback expression for unsupported C# constructs.
-/// Emitted as §ERR{"TODO: feature"} /* C#: originalCode */ in Calor output.
+/// Preserved as a raw C# expression in Calor output.
 /// </summary>
 public sealed class FallbackExpressionNode : ExpressionNode
 {

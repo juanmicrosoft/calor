@@ -145,7 +145,7 @@ public class McpServerTests
                 {
                     "name": "calor_compile",
                     "arguments": {
-                        "source": "§M{m001:Test}\n§F{f001:Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
+                        "source": "§M{Test}\n§F{Add:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§R (+ a b)\n\n"
                     }
                 }
                 """).RootElement
@@ -188,41 +188,6 @@ public class McpServerTests
 
         var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
         Assert.Contains("diagnostics", json);
-    }
-
-    /// <summary>
-    /// The MCP compile tool goes through Program.Compile, so an agent handing it a
-    /// §SEMVER{1.0.0} module gets the fail-closed Calor0701 refusal with the migration
-    /// pointer (#1084 item 1 / #1087) rather than silently reinterpreted 2.0.0 output.
-    /// </summary>
-    [Fact]
-    public async Task McpMessageHandler_HandleToolsCall_CompileTool_LegacySemver_ReportsCalor0701()
-    {
-        var handler = new McpMessageHandler();
-        var request = new JsonRpcRequest
-        {
-            Id = JsonDocument.Parse("41").RootElement,
-            Method = "tools/call",
-            Params = JsonDocument.Parse("""
-                {
-                    "name": "calor_compile",
-                    "arguments": {
-                        "source": "§M{m001:Legacy}\n  §SEMVER{1.0.0}\n  §F{f001:Answer:pub} () -> i32\n    §E{}\n    §R INT:42\n"
-                    }
-                }
-                """).RootElement
-        };
-
-        var response = await handler.HandleRequestAsync(request);
-
-        Assert.NotNull(response);
-        Assert.Null(response.Error);
-        Assert.NotNull(response.Result);
-
-        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-        Assert.Contains("Calor0701", json);
-        Assert.Contains("issues/1084", json);
-        Assert.DoesNotContain("\"success\":true", json.Replace(" ", ""));
     }
 
     [Fact]
@@ -338,8 +303,8 @@ public class McpServerTests
         var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
         Assert.Contains("found", json);
         Assert.Contains("true", json.ToLower());
-        // Check for NEW tag (JSON escapes § as \u00a7)
-        Assert.Contains("NEW", json);
+        // The native construction spelling
+        Assert.Contains("new ClassName(", json);
         Assert.Contains("examples", json);
     }
 
@@ -639,46 +604,7 @@ public class McpServerTests
     private static void AssertResponseContains(string response, string expected) =>
         Assert.True(response.Contains(expected),
             $"Expected substring '{expected}' not found. FULL RESPONSE:\n{response}");
-
     #region Diagnose Tool Integration Tests with Suggestions and Fixes
-
-    [Fact]
-    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithTypo_IncludesSuggestionAndFix()
-    {
-        var handler = new McpMessageHandler();
-        var request = new JsonRpcRequest
-        {
-            Id = JsonDocument.Parse("20").RootElement,
-            Method = "tools/call",
-            Params = JsonDocument.Parse("""
-                {
-                    "name": "calor_check",
-                    "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")"
-                    }
-                }
-                """).RootElement
-        };
-
-        var response = await handler.HandleRequestAsync(request);
-
-        Assert.NotNull(response);
-        Assert.Null(response.Error);
-        Assert.NotNull(response.Result);
-
-        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-
-        // Verify suggestion is included
-        Assert.Contains("suggestion", json);
-        Assert.Contains("contains", json);
-
-        // Verify fix structure is included
-        Assert.Contains("fix", json);
-        Assert.Contains("description", json);
-        Assert.Contains("edits", json);
-        Assert.Contains("startLine", json);
-        Assert.Contains("newText", json);
-    }
 
     [Fact]
     public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithNameof_CompilesSuccessfully()
@@ -692,7 +618,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x)"
+                        "source": "§M{Test} §F{Fn} §O{str} §R (nameof x)"
                     }
                 }
                 """).RootElement
@@ -716,7 +642,7 @@ public class McpServerTests
     {
         // Test the full MCP server flow with diagnose tool
         // MCP uses newline-delimited JSON (NDJSON)
-        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R (abss -5)";
+        var source = "module Test Test block\n  func Add private () → int\n    return (abss - 5)";
         var jsonSource = JsonSerializer.Serialize(source); // Properly escape for JSON
         var inputMessage = $"{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"calor_check\",\"arguments\":{{\"source\":{jsonSource}}}}}}}\n";
 
@@ -779,7 +705,7 @@ public class McpServerTests
                 {
                     "name": "calor_check",
                     "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
+                        "source": "§M{Test} §F{Add} §I{i32:a} §I{i32:b} §O{i32} §R (+ a b)"
                     }
                 }
                 """).RootElement

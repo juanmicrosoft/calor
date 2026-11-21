@@ -1,4 +1,4 @@
-§M{m1:EmptyFunc}
-  §F{f1:NoBody:pub} () -> void
-    §R
-
+module EmptyFunc EmptyFunc block
+  func NoBody () → void
+    !
+    return

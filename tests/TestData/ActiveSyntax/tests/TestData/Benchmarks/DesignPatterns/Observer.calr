@@ -1,0 +1,13 @@
+module Observer Observer
+  module ObserverModule
+    func ShouldNotify public (int:subscriberCount) → bool
+      !
+      return subscriberCount > 0
+
+    func NextId public (int:currentId) → int
+      !
+      return currentId + 1
+
+    func IsSubscribed public (int:subscriberId, int:targetId) → bool
+      !
+      return subscriberId == targetId

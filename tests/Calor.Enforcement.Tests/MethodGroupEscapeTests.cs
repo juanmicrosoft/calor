@@ -7,15 +7,15 @@ namespace Calor.Enforcement.Tests;
 public sealed class MethodGroupEscapeTests
 {
     [Theory]
-    [InlineData("§B{chosen:Func<i32>} (?? fallback Loud)", "")]
-    [InlineData("§B{chosen:Func<i32>} (? condition fallback Loud)", "")]
-    [InlineData("§B{created:Func<i32>[]} §ARR{Func<i32>:values} Loud", "alloc")]
-    [InlineData("§ASSIGN holder.Saved Loud", "mut")]
-    [InlineData("§ASSIGN §IDX items 0 Loud", "mut")]
-    [InlineData("§B{chosen:Func<i32>} (?? fallback Helpers.LoudStatic)", "")]
-    [InlineData("§ASSIGN holder.Saved Helpers.LoudStatic", "mut")]
-    [InlineData("§B{chosen:Func<i32>} (?? fallback holder.LoudInstance)", "")]
-    [InlineData("§ASSIGN holder.Saved holder.LoudInstance", "mut")]
+    [InlineData("let Func<int>:chosen = fallback ?? Loud", "")]
+    [InlineData("let Func<int>:chosen = condition ? fallback : Loud", "")]
+    [InlineData("let Func<int>[]:created = new Func<int>[] { Loud }", "alloc")]
+    [InlineData("set holder.Saved Loud", "mut")]
+    [InlineData("set items[0] Loud", "mut")]
+    [InlineData("let Func<int>:chosen = fallback ?? Helpers.LoudStatic", "")]
+    [InlineData("set holder.Saved Helpers.LoudStatic", "mut")]
+    [InlineData("let Func<int>:chosen = fallback ?? holder.LoudInstance", "")]
+    [InlineData("set holder.Saved holder.LoudInstance", "mut")]
     public void UncheckedMethodGroupValues_ChargeTheirEffects(string statement, string otherEffects)
     {
         var source = Source(statement, otherEffects);
@@ -31,7 +31,7 @@ public sealed class MethodGroupEscapeTests
     [Fact]
     public void DirectBinding_StillCarriesItsRowWithoutInvokingTheMethod()
     {
-        var result = Compile(Source("§B{chosen:Func<i32>} §E{cw} Loud", ""));
+        var result = Compile(Source("let Func<int>:chosen ! cw = Loud", ""));
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
     }
 
@@ -39,8 +39,8 @@ public sealed class MethodGroupEscapeTests
     public void LocalShadowInNestedExpression_IsNotMistakenForAMethodGroup()
     {
         var result = Compile(Source("""
-            §B{Loud:Func<i32>} §E{} fallback
-            §B{chosen:Func<i32>} (?? fallback Loud)
+            let Func<int>:Loud ! = fallback
+            let Func<int>:chosen = fallback ?? Loud
             """.Replace("\n", "\n    ", StringComparison.Ordinal), ""));
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
     }
@@ -51,18 +51,18 @@ public sealed class MethodGroupEscapeTests
     public void MethodBody_UsesItsOwnMethodGroupBeforeAModuleFunction(bool shadowsModuleFunction)
     {
         var source = $$"""
-            §M{m1:MethodScope}
-              §F{f1:Loud:pub} () -> i32
-                §E{cw}
-                §P "loud"
-                §R 1
-              §CL{c1:Owner:pub}
-                §MT{mt1:{{(shadowsModuleFunction ? "Loud" : "Quiet")}}:pub} () -> i32
-                  §E{}
-                  §R 2
-                §MT{mt2:Choose:pub} (Func<i32>:fallback) -> void
-                  §E{}
-                  §B{chosen:Func<i32>} (?? fallback Loud)
+            module MethodScope
+              func Loud () → int
+                ! cw
+                Console.WriteLine("loud")
+                return 1
+              class Owner
+                func {{(shadowsModuleFunction ? "Loud" : "Quiet")}} () → int
+                  !
+                  return 2
+                func Choose (Func<int>:fallback ! unknown) → void
+                  !
+                  let Func<int>:chosen = fallback ?? Loud
             """;
         var result = Compile(source);
         if (shadowsModuleFunction)
@@ -81,24 +81,24 @@ public sealed class MethodGroupEscapeTests
         });
 
     private static string Source(string statement, string effects) => $$"""
-        §M{m1:MethodGroups}
-          §F{f1:Loud:pub} () -> i32
-            §E{cw}
-            §P "loud"
-            §R 1
-          §CL{c1:Holder:pub}
-            §FLD{Func<i32>:Saved:pub} §E{}
-            §MT{mt2:LoudInstance:pub} () -> i32
-              §E{cw}
-              §P "loud"
-              §R 1
-          §CL{c2:Helpers:pub}
-            §MT{mt1:LoudStatic:pub:stat} () -> i32
-              §E{cw}
-              §P "loud"
-              §R 1
-          §F{f2:Make:pub} (Func<i32>:fallback, bool:condition, Holder:holder, Func<i32>[]:items) -> void
-            §E{ {{effects}} }
+        module MethodGroups
+          func Loud () → int
+            ! cw
+            Console.WriteLine("loud")
+            return 1
+          class Holder
+            field Func<int>:Saved !
+            func LoudInstance () → int
+              ! cw
+              Console.WriteLine("loud")
+              return 1
+          class Helpers
+            func LoudStatic static () → int
+              ! cw
+              Console.WriteLine("loud")
+              return 1
+          func Make (Func<int>:fallback ! unknown, bool:condition, Holder:holder, Func<int>[]:items) → void
+            ! {{effects}}
             {{statement}}
         """;
 }

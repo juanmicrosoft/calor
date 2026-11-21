@@ -1,0 +1,13 @@
+module Test_11_05 Test_11_05 overflow unchecked
+  using System.Collections.Generic
+  using System.Collections.Immutable
+
+  class DictExample public
+    func GetScores public () → Dictionary<string,int>
+      ! alloc
+      let Dictionary<string,int>:dict003 = new Dictionary<string,int>() {{"Alice", 95}, {"Bob", 87}, {"Charlie", 92}}
+      return dict003
+
+    func GetImmutableScores public () → ImmutableDictionary<string,int>
+      !
+      return ImmutableDictionary<@str,@i32>.Empty

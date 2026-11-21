@@ -24,7 +24,7 @@ public sealed class EdgeCaseCoverageResult
     public int ElseBranches { get; init; }
 
     /// <summary>
-    /// Number of match expressions/statements with wildcard, None, or Err patterns (exhaustive).
+    /// Number of match expressions/statements with wildcard patterns (exhaustive).
     /// </summary>
     public int ExhaustiveMatches { get; init; }
 
@@ -232,7 +232,7 @@ public static class EdgeCaseCoverageAnalyzer
     {
         foreach (var c in cases)
         {
-            if (c.Pattern is WildcardPatternNode or NonePatternNode or ErrPatternNode)
+            if (c.Pattern is WildcardPatternNode)
                 return true;
         }
         return false;

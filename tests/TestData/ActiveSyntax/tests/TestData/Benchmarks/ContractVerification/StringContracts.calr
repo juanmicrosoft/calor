@@ -1,0 +1,34 @@
+module StringContracts StringContracts
+  module StringContractsModule
+    func NonEmptyLength public (string:s) → int
+      !
+      requires !string.IsNullOrEmpty(s)
+      => result > 0
+      return s.Length
+
+    func EmptyStringLength public (string:s) → bool
+      !
+      => result == (s.Length == 0)
+      return string.IsNullOrEmpty(s)
+
+    func ConcatLonger public (string:a, string:b) → string
+      !
+      requires !string.IsNullOrEmpty(a)
+      => result.Length > b.Length
+      return string.Concat(a, b)
+
+    func ContainsImpliesLength public (string:haystack, string:needle) → bool
+      !
+      requires !string.IsNullOrEmpty(needle)
+      => !result || haystack.Length >= needle.Length
+      return haystack.Contains(needle)
+
+    func PrefixLength public (string:s, string:prefix) → bool
+      !
+      => !result || s.Length >= prefix.Length
+      return s.StartsWith(prefix)
+
+    func SuffixLength public (string:s, string:suffix) → bool
+      !
+      => !result || s.Length >= suffix.Length
+      return s.EndsWith(suffix)

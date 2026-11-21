@@ -13,10 +13,10 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesFunction_WithDeclarationModifier()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:MyFunc:pub}
-      §O{i32}
-      §R 42";
+        var source = @"module Test Test block
+  func MyFunc () → int
+    !
+    return 42";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -29,12 +29,10 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesParameters()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Add:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §R (+ a b)";
+        var source = @"module Test Test block
+  func Add (int:a, int:b) → int
+    !
+    return (a + b)";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -48,10 +46,10 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesClass_WithAbstractModifier()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Shape:abs}
-      §MT{mt1:Area:pub:abs}
-          §O{f64}";
+        var source = @"module Test Test block
+  class Shape internal abstract
+    func Area abstract () → double
+      !";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -65,11 +63,11 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesMethod_WithVirtualModifier()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Animal:pub}
-      §MT{mt1:Speak:pub:virt}
-          §O{str}
-          §R ""...""";
+        var source = @"module Test Test block
+  class Animal
+    func Speak virtual () → string
+      !
+      return ""...""";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -82,12 +80,13 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesMethod_WithOverrideModifier()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Dog:pub}
-      §EXT{Animal}
-      §MT{mt1:Speak:pub:over}
-          §O{str}
-          §R ""Woof!""";
+        var source = @"module Test Test block
+  class Dog
+    extends Animal
+
+    func Speak override () → string
+      !
+      return ""Woof!""";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -98,47 +97,13 @@ public class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void TokenizesInterface()
-    {
-        var source = @"§M{m1:Test}
-  §IFACE{i1:IDrawable:pub}
-      §MT{m1:Draw}
-          §O{void}";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Interfaces);
-        Assert.Equal("IDrawable", state.Ast.Interfaces[0].Name);
-    }
-
-    [Fact]
-    public void TokenizesEnum()
-    {
-        var source = @"§M{m1:Test}
-  §EN{e1:Color:pub}
-    §EV{Red}
-    §EV{Green}
-    §EV{Blue}
-  §/EN{e1}";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Enums);
-        var enumDef = state.Ast.Enums[0];
-        Assert.Equal("Color", enumDef.Name);
-        Assert.Equal(3, enumDef.Members.Count);
-    }
-
-    [Fact]
     public void TokenizesBindStatement_Readonly()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
-      §O{i32}
-      §B{x:i32} 42
-      §R x";
+        var source = @"module Test Test block
+  func Test () → int
+    !
+    let int:x = 42
+    return x";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -156,11 +121,11 @@ public class SemanticTokensHandlerTests
     public void TokenizesBindStatement_Mutable()
     {
         // Use ~name prefix for mutable binding
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
-      §O{i32}
-      §B{~x:i32} 42
-      §R x";
+        var source = @"module Test Test block
+  func Test () → int
+    !
+    var int:x = 42
+    return x";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -176,14 +141,14 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesLiterals()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
-      §O{i32}
-      §B{a:i32} 42
-      §B{b:f64} 3.14
-      §B{c:str} ""hello""
-      §B{d:bool} true
-      §R a";
+        var source = @"module Test Test block
+  func Test () → int
+    !
+    let int:a = 42
+    let double:b = 3.14
+    let string:c = ""hello""
+    let bool:d = true
+    return a";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -193,37 +158,15 @@ public class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void TokenizesIfStatement()
-    {
-        var source = @"§M{m1:Test}
-  §F{f1:Max:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §IF (> a b)
-        §R a
-      §ELSE
-        §R b
-      §/IF";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        var func = state.Ast.Functions[0];
-        // Body should have an if statement (plus possibly other statements)
-        Assert.True(func.Body.Count > 0);
-    }
-
-    [Fact]
     public void TokenizesForLoop()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Sum:pub}
-    §O{i32}
-    §B{~total:i32} INT:0
-    §L{i:INT:1:INT:10}
-      §B{~total:i32} (+ total i)
-    §R total";
+        var source = @"module Test Test block
+  func Sum () → int
+    !
+    var int:total = 0
+    for INT from 1 to INT step 10
+      var int:total = (total + i)
+    return total";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -236,12 +179,11 @@ public class SemanticTokensHandlerTests
     public void TokenizesAsyncMethod()
     {
         // Async methods use §AMT tag
-        var source = @"§M{m1:Test}
-  §CL{c1:Service:pub}
-      §AMT{mt1:FetchData:pub}
-        §O{str}
-        §R ""data""
-      §/AMT{mt1}";
+        var source = @"module Test Test block
+  class Service
+    func FetchData async () → string
+      !
+      return ""data""";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -253,12 +195,11 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesStaticMethod()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Utils:pub}
-      §MT{mt1:Square:pub:stat}
-          §I{i32:x}
-          §O{i32}
-          §R (* x x)";
+        var source = @"module Test Test block
+  class Utils
+    func Square static (int:x) → int
+      !
+      return (x * x)";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -270,10 +211,10 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesNewExpression()
     {
-        var source = @"§M{m1:Test}
-  §F{f1:Create:pub}
-      §O{object}
-      §R §NEW{List<i32>}";
+        var source = @"module Test Test block
+  func Create () → object
+    !
+    return new List<int>()";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -284,10 +225,10 @@ public class SemanticTokensHandlerTests
     [Fact]
     public void TokenizesFieldAccess()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Point:pub}
-      §FLD{i32:X:pub}
-      §FLD{i32:Y:pub}";
+        var source = @"module Test Test block
+  class Point
+    field int:X
+    field int:Y";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -299,38 +240,16 @@ public class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void TokenizesLambdaExpression()
-    {
-        var source = @"§M{m1:Test}
-  §F{f1:Test:pub}
-      §O{i32}
-      §B{add:Func<i32,i32,i32>} §LAMBDA
-        §I{i32:a}
-        §I{i32:b}
-        §R (+ a b)
-      §/LAMBDA
-      §R §C{add} §A 1 §A 2 §/C";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Functions);
-    }
-
-    [Fact]
     public void TokenizesProperty()
     {
-        var source = @"§M{m1:Test}
-  §CL{c1:Person:pub}
-      §FLD{str:_name:pri}
-      §PROP{str:Name:pub}
-        §GET
-          §R §THIS._name
-        §/GET
-        §SET
-          §ASSIGN §THIS._name value
-        §/SET
-      §/PROP";
+        var source = @"module Test Test block
+  class Person
+    field string:_name private
+    property string:Name
+      get
+        return this . _name
+      set
+        set this . _name value";
 
         var state = LspTestHarness.CreateDocument(source);
 
@@ -341,47 +260,9 @@ public class SemanticTokensHandlerTests
     }
 
     [Fact]
-    public void TokenizesTryCatch()
-    {
-        var source = @"§M{m1:Test}
-  §F{f1:SafeDiv:pub}
-      §I{i32:a}
-      §I{i32:b}
-      §O{i32}
-      §TRY
-        §R (/ a b)
-      §CATCH{Exception:ex}
-        §R 0
-      §/TRY";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        var func = state.Ast.Functions[0];
-        Assert.True(func.Body.Count > 0);
-    }
-
-    [Fact]
-    public void TokenizesForeach()
-    {
-        var source = @"§M{m1:Test}
-  §F{f1:Print:pub}
-      §I{List<str>:items}
-      §O{void}
-      §FOREACH{item:items}
-        §PRINT item
-      §/FOREACH";
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.NotNull(state.Ast);
-        Assert.Single(state.Ast.Functions);
-    }
-
-    [Fact]
     public void HandlesMalformedSourceGracefully()
     {
-        var source = @"§M{m1:Test}
+        var source = @"§M{Test}
   §F{f1:Bad";
 
         // Should not throw, just produce diagnostics

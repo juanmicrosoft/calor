@@ -6,7 +6,10 @@ description: "Automatic effect discovery through referenced .NET assemblies"
 ---
 
 
-When your Calor code calls a method in a referenced assembly, and that method eventually calls `DbContext.SaveChanges()`, Calor can now trace through the IL of the referenced assembly and discover the `db:w` effect automatically — without you writing a manifest entry for every intermediate method.
+IL analysis can propagate manifest-covered effects through concrete methods in
+referenced .NET assemblies. It can reduce the number of intermediate methods
+that need manual manifest entries. It is not a proof of arbitrary external code:
+missing bodies, dynamic dispatch and leaf assumptions still matter.
 
 ---
 
@@ -15,10 +18,10 @@ When your Calor code calls a method in a referenced assembly, and that method ev
 Effect manifests cover .NET framework types (`DbCommand`, `HttpClient`, `ILogger`), but they don't cover **your** code. If you have a data access layer:
 
 ```csharp
-// In your MyApp.DataAccess.dll
-public class UserRepository
+// Fragment from MyApp.DataAccess.dll; CreateConnection is supplied by the project.
+public static class UserRepository
 {
-    public void Save(User user)
+    public static void Save(string name)
     {
         using var conn = CreateConnection();
         conn.Open();
@@ -29,19 +32,21 @@ public class UserRepository
 }
 ```
 
-And your Calor code calls it:
+The corresponding Calor caller has this shape. This is a fragment requiring the
+referenced project and its dependencies, not a standalone native acceptance case:
 
-```calor
-§F{f001:CreateUser:pub}
-  §I{str:name}
-  §O{void}
-  §E{db:w}
-  §C{UserRepository.Save} §A name §/C
+```calor-fragment
+func CreateUser public (string:name) → void
+  ! db:w
+  UserRepository.Save(name)
 ```
 
 Without IL analysis, the compiler doesn't know that `UserRepository.Save` has `db:w` — it would flag it as an Unknown external call (Calor0411). You'd need to write a custom manifest for every intermediate method.
 
-With IL analysis, the compiler reads the IL of `UserRepository.Save`, traces the call chain to `DbCommand.ExecuteNonQuery`, finds the `db:w` seed in the built-in manifest, and propagates it back. No custom manifest needed.
+With the required implementations available, analysis can trace the call chain
+to `DbCommand.ExecuteNonQuery` and propagate its `db:w` manifest seed. This
+does not establish that the call binds or that the project builds; those are
+separate checks against the project's actual references.
 
 ## Enabling IL Analysis
 
@@ -53,7 +58,9 @@ Add one property to your project file:
 </PropertyGroup>
 ```
 
-That's it. The compiler will analyze all referenced assemblies during the next build.
+The build task initializes an analyzer from the referenced assemblies and reuses
+it across Calor inputs. Missing or unusable requested implementation assemblies
+fail initialization rather than silently disabling analysis.
 
 ## What It Finds
 
@@ -72,9 +79,9 @@ IL analysis traces through **concrete call chains** — method A calls method B 
 
 ### Example: What the compiler sees
 
-For a typical 3-layer architecture:
+An illustrative propagation tree, not output measured from a supplied project:
 
-```
+```text illustrative
 UserService.CreateUser()     → db:rw, db:w   (propagated)
   UserRepository.Save()      → db:rw, db:w   (propagated)
     DbConnection.Open()      → db:rw         (from manifest)
@@ -90,10 +97,10 @@ IL analysis has known limitations. These patterns still require manifests:
 
 | Pattern | Why | Solution |
 |---------|-----|---------|
-| **Interface-heavy calls** (`ILogger.Log`, `IConfiguration.GetSection`) | 0% resolution rate — delegates and BCL internals block the trace | Use built-in Tier B manifests |
+| **Interface-heavy calls** (`ILogger.Log`, `IConfiguration.GetSection`) | Runtime implementations may be unavailable or exceed the dispatch cap | Use applicable reviewed manifests and inspect unresolved results |
 | **Delegate invocations** (`Func<T>.Invoke`) | Runtime-determined target, not visible in IL | Mark as Unknown or cover with manifests |
 | **Reflection** (`MethodInfo.Invoke`, `dynamic`) | Not visible as direct calls in IL | Cover with manifests |
-| **P/Invoke / native calls** | No IL body to analyze | Cover with manifests |
+| **P/Invoke / native calls** | No managed IL body to inspect; a leaf assumption is not verified behavior | Cover with reviewed manifests |
 
 The key insight: IL analysis works well for **your** code (repositories, services, handlers) where the call chain is concrete. For .NET framework types (ILogger, IConfiguration), the built-in manifests already cover them. The two approaches complement each other.
 
@@ -107,36 +114,53 @@ The resolution pipeline, in order:
 3. Wildcard in manifest
 4. Type default effects in manifest
 5. Namespace defaults in manifest
-6. IL analysis                       ← new
+6. IL analysis
 7. Unknown (Calor0411)
 ```
 
-Manifests always win. IL analysis only runs for calls that no manifest covers. If IL analysis can't resolve a method either (e.g., the trace hits a depth limit or too many virtual implementations), it falls through to Unknown — it never reports a method as pure when it's unsure.
+Manifests take precedence. IL analysis supplies results for calls not already
+covered by a manifest. A trace marked incomplete, for example after a depth or
+dispatch limit, cannot supply a resolved effect row.
 
 ### Soundness guarantee
 
 IL analysis uses three-state resolution:
 
-- **Resolved** — complete call graph analyzed, effects are precise
-- **Pure** — complete call graph analyzed, no effects found
+- **Resolved** — propagation produced effects under the analyzer's model
+- **Pure** — propagation found no effects under that model
 - **Incomplete** — analysis cut short (depth limit, missing body, too many implementations)
 
-Incomplete traces are **never** reported as pure. They fall through to Unknown, and you get the same Calor0411 diagnostic you would without IL analysis.
+Incomplete traces are not reported as pure. They fall through to unresolved
+effect handling.
+
+There is a separate limitation: a missing method or a declaration with no IL
+body can become an **assumed empty leaf** during propagation. Detailed results
+record those assumptions, but the ordinary IL resolver's effect status does
+not itself establish that the chain is assumption-free. An empty row is
+therefore not an unconditional safety proof.
+
+`calor import` applies a stricter publication rule: a chain with such leaf
+assumptions remains unresolved and is excluded from the generated manifest.
+Supply the missing dependencies or a reviewed contract, then inspect the report.
+Do not treat build-time IL resolution and assumption-free import derivation as
+the same guarantee.
 
 ## Performance
 
-IL analysis is fast because it only runs at build time and caches results:
+The analyzer caches results and is reused across `.calr` inputs in a build.
+Cost depends on the loaded implementations, reachable call graph, dispatch
+fan-out and configured budgets. Measure clean and incremental builds on your
+project; this page does not establish a universal millisecond overhead.
 
-- **Assembly index construction**: ~2ms for typical projects
-- **Full analysis**: ~3ms for 8 call sites across 2 assemblies
-- **Scaling**: analysis cost is proportional to the number of Unknown external calls, not total file count
-- **Caching**: the analyzer is constructed once per build and reused across all `.calr` files
-
-When `CalorEnableILAnalysis` is `false` (the default), there is zero overhead.
+IL analysis is disabled by default.
 
 ## Interaction with Incremental Builds
 
-When IL analysis is enabled, changes to referenced assemblies (e.g., updating a NuGet package) will trigger recompilation of affected `.calr` files. This is handled by the incremental build cache's options hash — the `EnableILAnalysis` flag is included in the cache invalidation key.
+When IL analysis is enabled, the build state includes the analysis options and
+referenced implementation inputs, not just the Boolean flag. A changed
+dependency must invalidate the result that depended on it. Check the build
+receipt after changing package versions or implementation paths; an old cached
+effect result is not evidence about the new binary.
 
 ## Diagnostics
 
@@ -156,7 +180,7 @@ When IL analysis is enabled, changes to referenced assemblies (e.g., updating a 
 **Don't bother if:**
 - All your external calls are to .NET framework types already covered by manifests
 - Your project is small enough that a few custom manifest entries are easy to maintain
-- Build time is critical and every millisecond matters (though the overhead is under 5ms)
+- Your measured analysis cost exceeds the budget for the pilot
 
 ## Relationship to Manifests
 

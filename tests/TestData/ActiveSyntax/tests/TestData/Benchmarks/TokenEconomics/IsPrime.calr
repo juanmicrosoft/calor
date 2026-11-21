@@ -1,0 +1,17 @@
+module PrimeCheck PrimeCheck
+  module PrimeCheckModule
+    func IsPrime public (int:n) → bool
+      !
+      requires n > 0
+      if n <= 1
+        return false
+      if n <= 3
+        return true
+      if n % 2 == 0
+        return false
+      for i from 3 to 1000 step 2
+        if i * i > n
+          return true
+        if n % i == 0
+          return false
+      return true

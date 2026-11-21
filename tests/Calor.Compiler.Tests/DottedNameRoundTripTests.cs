@@ -92,11 +92,10 @@ public class DottedNameRoundTripTests
     public void Compile_DottedReference_EmitsCorrectly()
     {
         var calor = """
-            §M{m001:DottedRef}
-              §F{f001:Area:pub}
-                  §I{f64:r}
-                  §O{f64}
-                  §R (* Math.PI (* r r))
+            module DottedRef DottedRef block
+              func Area (double:r) → double
+                !
+                return (Math.PI * (r * r))
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -112,10 +111,10 @@ public class DottedNameRoundTripTests
     public void Compile_EnumDottedReference_EmitsCorrectly()
     {
         var calor = """
-            §M{m001:EnumRef}
-              §F{f001:GetMode:pub}
-                  §O{i32}
-                  §R StringComparison.Ordinal
+            module EnumRef EnumRef block
+              func GetMode () → int
+                !
+                return StringComparison.Ordinal
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -132,12 +131,12 @@ public class DottedNameRoundTripTests
     public void Compile_MultipleDottedReferences_AllPreserved()
     {
         var calor = """
-            §M{m001:MultiDot}
-              §F{f001:Constants:pub}
-                  §O{f64}
-                  §B{pi} Math.PI
-                  §B{e} Math.E
-                  §R (+ pi e)
+            module MultiDot MultiDot block
+              func Constants () → double
+                !
+                let pi = Math.PI
+                let e = Math.E
+                return (pi + e)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -206,7 +205,10 @@ public class DottedNameRoundTripTests
 
         var calrEmitter = new CalorEmitter();
         var calrText = calrEmitter.Emit(convertResult.Ast!);
-        Assert.Contains("StringComparison.Ordinal", calrText);
+        // The restored System.String contract converts this natively (it used to be preserved
+        // C#); the native emitter spaces member access, so match the dotted name loosely.
+        Assert.Matches(@"StringComparison\s*\.\s*Ordinal", calrText);
+        Assert.Equal(0, convertResult.InteropPreservationCount);
 
         var compileResult = Program.Compile(calrText, "round-trip.calr", new CompilationOptions
         {
@@ -258,10 +260,10 @@ public class DottedNameRoundTripTests
     {
         // Verify the lexer/parser creates ReferenceNode (not FieldAccessNode) for dotted names
         var calor = """
-            §M{m001:Test}
-              §F{f001:Get:pub}
-                  §O{f64}
-                  §R Math.PI
+            module Test Test block
+              func Get () → double
+                !
+                return Math.PI
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -309,10 +311,10 @@ public class DottedNameRoundTripTests
     {
         // ReferenceNode path (from Calor source)
         var calor = """
-            §M{m001:Test}
-              §F{f001:Get:pub}
-                  §O{f64}
-                  §R Math.PI
+            module Test Test block
+              func Get () → double
+                !
+                return Math.PI
             """;
 
         var fromCalor = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -346,10 +348,10 @@ public class DottedNameRoundTripTests
     public void Compile_DeepDottedName_Works()
     {
         var calor = """
-            §M{m001:Deep}
-              §F{f001:Get:pub}
-                  §O{str}
-                  §R System.Environment.NewLine
+            module Deep Deep block
+              func Get () → string
+                !
+                return System.Environment.NewLine
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -365,10 +367,10 @@ public class DottedNameRoundTripTests
     public void Compile_DottedNameInExpression_Works()
     {
         var calor = """
-            §M{m001:Expr}
-              §F{f001:Tau:pub}
-                  §O{f64}
-                  §R (* 2.0 Math.PI)
+            module Expr Expr block
+              func Tau () → double
+                !
+                return (2.0 * Math.PI)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
@@ -384,11 +386,10 @@ public class DottedNameRoundTripTests
     public void Compile_DottedNameInCondition_Works()
     {
         var calor = """
-            §M{m001:Cond}
-              §F{f001:IsMax:pub}
-                  §I{i32:x}
-                  §O{bool}
-                  §R (== x int.MaxValue)
+            module Cond Cond block
+              func IsMax (int:x) → bool
+                !
+                return (x == int.MaxValue)
             """;
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions

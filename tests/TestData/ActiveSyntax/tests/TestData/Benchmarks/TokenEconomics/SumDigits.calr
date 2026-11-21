@@ -1,0 +1,32 @@
+module SumDigits SumDigits
+  module SumDigitsModule
+    func LastDigit public (int:n) → int
+      !
+      => result >= 0
+      let r = n % 10
+      if r < 0
+        return 0 - r
+      else
+        return r
+
+    func RemoveLastDigit public (int:n) → int
+      !
+      return n / 10
+
+    func SumDigitsPositive public (int:n) → int
+      !
+      requires n >= 0
+      => result >= 0
+      if n == 0
+        return 0
+      let digit = LastDigit(n)
+      let remaining = SumDigitsPositive(n / 10)
+      return digit + remaining
+
+    func SumDigits public (int:n) → int
+      !
+      => result >= 0
+      if n < 0
+        let posN = 0 - n
+        return SumDigitsPositive(posN)
+      return SumDigitsPositive(n)

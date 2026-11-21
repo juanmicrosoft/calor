@@ -1,0 +1,18 @@
+module CsvParser CsvParser
+  module CsvParserModule
+    func FieldCount public (int:commaCount) → int
+      !
+      => result > 0
+      return commaCount + 1
+
+    func IsQuoted public (int:firstChar) → bool
+      !
+      return firstChar == 34
+
+    func IsDelimiter public (int:charCode) → bool
+      !
+      return charCode == 44
+
+    func IsNewline public (int:charCode) → bool
+      !
+      return charCode == 10 || charCode == 13

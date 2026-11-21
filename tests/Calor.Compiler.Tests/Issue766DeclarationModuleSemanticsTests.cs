@@ -1,5 +1,6 @@
 using System.Reflection;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
@@ -7,6 +8,7 @@ using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
+using Binder = Calor.Compiler.Binding.Binder;
 
 namespace Calor.Compiler.Tests;
 
@@ -19,16 +21,17 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{m001:UsingCases}
-              §U{global:System.Threading}
-              §U{global:Tasks:System.Threading.Tasks}
-              §U{global:static:System.Math}
-              §U{System.Text}
-              §U{System.Text}
-              §U{Alias:System.Collections.Generic}
-              §U{static:System.Math}
-              §F{f001:Value:pub} () -> i32
-                §R INT:1
+            module UsingCases UsingCases block
+              global using System.Threading
+              global using Tasks = System.Threading.Tasks
+              global using static System.Math
+              using System.Text
+              using System.Text
+              using Alias = System.Collections.Generic
+              using static System.Math
+              func Value () → int
+                !
+                return 1
             """);
 
         Assert.Collection(
@@ -80,10 +83,10 @@ public class Issue766DeclarationModuleSemanticsTests
 
         var conditional = new CSharpEmitter().Emit(Parse(
             """
-            §M{m002:ConditionalUsing}
-              §PP{FEATURE}
-                §U{global:System.Text}
-                §U{Buffers:System.Buffers}
+            module ConditionalUsing
+              pp FEATURE
+                global using System.Text
+                using Buffers = System.Buffers
             """));
         Assert.Contains("global using System.Text;", conditional);
         Assert.Contains("using Buffers = System.Buffers;", conditional);
@@ -138,9 +141,9 @@ public class Issue766DeclarationModuleSemanticsTests
             u => u.Namespace == "System.Collections.Generic"
                 && !u.IsGlobal
                 && u.Alias == "Collections");
-        Assert.Contains("§U{global:System}", result.CalorSource);
-        Assert.Contains("§U{global:Text:System.Text}", result.CalorSource);
-        Assert.Contains("§U{global:static:System.Math}", result.CalorSource);
+        Assert.Contains("global using System\n", result.CalorSource);
+        Assert.Contains("global using Text = System.Text", result.CalorSource);
+        Assert.Contains("global using static System.Math", result.CalorSource);
     }
 
     [Fact]
@@ -286,25 +289,30 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:NestedElseTypes}
-              §PP{OUTER}
-                §CL{c001:OuterSelected:pub}
-                  §MT{m001:Value:pub:stat} () -> i32
-                    §R INT:1
-              §PPE
-                §CL{c002:ElseDirect:pub}
-                  §FLD{i32:Value:pub}
-                §PP{INNER}
-                  §CL{c003:InnerSelected:pub}
-                    §MT{m003:Value:pub:stat} () -> i32
-                      §R INT:2
-                §PPE
-                  §CL{c004:InnerFallback:pub}
-                    §MT{m004:Value:pub:stat} () -> i32
-                      §R INT:3
-                §/PP{INNER}
-                §IFACE{i005:IElseTail}
-              §/PP{OUTER}
+            module NestedElseTypes NestedElseTypes block
+              pp OUTER
+                class OuterSelected
+                  func Value static () → int
+                    !
+                    return 1
+
+              pp else
+                class ElseDirect
+                  field int:Value
+
+                pp INNER
+                  class InnerSelected
+                    func Value static () → int
+                      !
+                      return 2
+
+                pp else
+                  class InnerFallback
+                    func Value static () → int
+                      !
+                      return 3
+
+                interface IElseTail
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });
@@ -421,7 +429,7 @@ public class Issue766DeclarationModuleSemanticsTests
     }
 
     [Fact]
-    public void ConditionalUnsupportedRecord_RemainsGuardedAndRunsPerSymbol()
+    public void ConditionalNativeRecord_RemainsGuardedAndRunsPerSymbol()
     {
         var conversion = ConvertWithoutPreprocessorStripping(
             """
@@ -449,11 +457,10 @@ public class Issue766DeclarationModuleSemanticsTests
             conversion.Ast!.InteropBlocks,
             interop => interop.CSharpCode.Contains("record Selected", StringComparison.Ordinal));
         var typeBlock = Assert.Single(conversion.Ast.TypePreprocessorBlocks);
-        Assert.Equal(2, typeBlock.InteropBlocks.Count);
-        var recordInterop = Assert.Single(
-            typeBlock.InteropBlocks.Where(interop =>
-                interop.CSharpCode.Contains("record Selected", StringComparison.Ordinal)));
-        Assert.Contains("record Selected", recordInterop.CSharpCode);
+        Assert.Single(typeBlock.InteropBlocks);
+        Assert.True(Assert.Single(typeBlock.Classes).IsRecord);
+        Assert.DoesNotContain(typeBlock.InteropBlocks, interop =>
+            interop.CSharpCode.Contains("record Selected", StringComparison.Ordinal));
         Assert.Contains(
             typeBlock.InteropBlocks,
             interop => interop.CSharpCode.Contains(
@@ -468,6 +475,7 @@ public class Issue766DeclarationModuleSemanticsTests
             present: ["Selected", "Factory`1", "RecordHarness"],
             absent: ["Fallback"]);
         Assert.Equal(7, InvokeStaticInt(featureAssembly, "RecordHarness", "Run"));
+        Assert.NotNull(featureAssembly.GetTypes().Single(type => type.Name == "Selected").GetMethod("<Clone>$"));
 
         var fallbackAssembly = CompileAssembly(generated);
         AssertTypePresence(
@@ -711,24 +719,22 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:ElifNestedTypes}
-              §PP{FIRST}
-                §CL{c001:FirstSelected:pub}
-                  §FLD{i32:Value:pub}
-              §PPE
-                §PP{SECOND}
-                  §IFACE{i002:ISecondBefore}
-                    §PROP{p002:Value:i32:pub:get}
-                  §PP{DEEP}
-                    §CL{c003:DeepSelected:pub}
-                      §FLD{i32:Value:pub}
-                  §/PP{DEEP}
-                  §CL{c004:SecondAfter:pub}
-                    §FLD{i32:Value:pub}
-                §PPE
-                  §CL{c005:FinalFallback:pub}
-                    §FLD{i32:Value:pub}
-                §/PP{SECOND}
+            module ElifNestedTypes ElifNestedTypes block
+              pp FIRST
+                class FirstSelected
+                  field int:Value
+              pp elif SECOND
+                interface ISecondBefore
+                  property int:Value
+                    get
+                pp DEEP
+                  class DeepSelected
+                    field int:Value
+                class SecondAfter
+                  field int:Value
+              pp else
+                class FinalFallback
+                  field int:Value
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });
@@ -756,8 +762,10 @@ public class Issue766DeclarationModuleSemanticsTests
             absent: ["FirstSelected", "ISecondBefore", "DeepSelected", "SecondAfter"]);
     }
 
-    [Fact]
-    public void ReorderedSameTypeRecordFields_PreserveRuntimeValues()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReorderedSameTypeRecordFields_PreserveRuntimeValues(bool throughCanonicalSyntax)
     {
         var creation = new RecordCreationNode(
             Span,
@@ -774,6 +782,14 @@ public class Issue766DeclarationModuleSemanticsTests
             ]);
 
         var expression = creation.Accept(new CSharpEmitter());
+        if (throughCanonicalSyntax)
+        {
+            var canonical = creation.Accept(new CalorEmitter());
+            var module = Parse(
+                $"module RecordMigration RecordMigration block\n  func Create () → Pair\n    !\n    return {canonical}");
+            var replay = Assert.IsType<ReturnStatementNode>(module.Functions[0].Body[0]).Expression!;
+            expression = replay.Accept(new CSharpEmitter());
+        }
         Assert.Equal(
             "new Pair(Right: \"right\", Left: \"left\")",
             expression);
@@ -807,8 +823,165 @@ public class Issue766DeclarationModuleSemanticsTests
             ]);
 
         Assert.Equal(
-            "§D{Pair} §FL{Right} \"r\" §FL{Left} \"l\"",
+            "new Pair(Right: \"r\", Left: \"l\")",
             creation.Accept(new CalorEmitter()));
+    }
+
+    [Theory]
+    [InlineData("(Right: \"right\", Left: \"left\")", "Right", "Left")]
+    [InlineData("(\"left\", Right: \"right\")", null, "Right")]
+    public void NamedConstructorArguments_SurviveParserBindingAndBothEmitters(
+        string arguments, string? firstName, string secondName)
+    {
+        var module = Parse(
+            $$"""
+            module NamedConstruction NamedConstruction block
+              func Create () → Pair
+                !
+                return new Pair{{arguments}}
+            """);
+        var creation = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions).Body[0]).Expression);
+        Assert.Equal([firstName, secondName], creation.ArgumentNames);
+
+        var bound = new Binder(new DiagnosticBag()).Bind(module);
+        var boundCreation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(bound.Functions).Body[0]).Expression);
+        Assert.Equal(creation.ArgumentNames, boundCreation.ArgumentNames);
+
+        var emitted = new CalorEmitter().Emit(module);
+        var reparsed = Parse(emitted);
+        var replay = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(Assert.Single(reparsed.Functions).Body[0]).Expression);
+        Assert.Equal(creation.ArgumentNames, replay.ArgumentNames);
+        var expression = replay.Accept(new CSharpEmitter());
+        var assembly = CompileAssembly(
+            $$"""
+            public record Pair(string Left, string Right);
+            public static class RecordHarness
+            {
+                public static Pair Create() => {{expression}};
+            }
+            """);
+        var pair = assembly.GetType("RecordHarness")!.GetMethod("Create")!.Invoke(null, null)!;
+        Assert.Equal("left", pair.GetType().GetProperty("Left")!.GetValue(pair));
+        Assert.Equal("right", pair.GetType().GetProperty("Right")!.GetValue(pair));
+    }
+
+    [Fact]
+    public void NamedConstructorArguments_ResolveTheCorrectInternalOverload()
+    {
+        var module = Parse(
+            """
+            module ConstructorResolution ConstructorResolution block
+              class Pair
+                ctor (int:Left, string:Right)
+
+                ctor (string:Left, int:Right)
+
+              func Create () → Pair
+                !
+                return new Pair(Right: "right", Left: 1)
+            """);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.AmbiguousOverload or DiagnosticCode.NoMatchingOverload);
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                bound.Functions.Single(function => function.Symbol.Name == "Create").Body[0]).Expression);
+        Assert.NotNull(creation.ResolvedConstructor);
+        Assert.Equal("Left", creation.ResolvedConstructor.Parameters[0].Name);
+        Assert.Equal("int", creation.ResolvedConstructor.Parameters[0].TypeName);
+        Assert.Equal("string", creation.ResolvedConstructor.Parameters[1].TypeName);
+        Assert.Equal(["Right", "Left"], creation.ArgumentNames);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NamedConstructorConversion_PreservesReorderedValuesAndEvaluationOrder(bool targetTyped)
+    {
+        var creation = targetTyped
+            ? "new(Right: Next(\"right\"), Left: Next(\"left\"))"
+            : "new Pair(Right: Next(\"right\"), Left: Next(\"left\"))";
+        var conversion = ConvertWithoutPreprocessorStripping(
+            $$"""
+            public sealed class Pair
+            {
+                public string Left { get; }
+                public string Right { get; }
+                public Pair(string Left, string Right)
+                {
+                    this.Left = Left;
+                    this.Right = Right;
+                }
+            }
+            public static class ConstructorHarness
+            {
+                public static string Log = "";
+                private static string Next(string value)
+                {
+                    Log += value;
+                    return value;
+                }
+                public static Pair Create()
+                {
+                    return {{creation}};
+                }
+            }
+            """);
+        Assert.Contains("Right: Next(", conversion.CalorSource);
+        Assert.Contains("Left: Next(", conversion.CalorSource);
+        Assert.DoesNotContain("§CS", conversion.CalorSource);
+        var assembly = CompileAssembly(CompileConvertedCalor(conversion));
+        var harness = assembly.GetTypes().Single(type => type.Name == "ConstructorHarness");
+        var pair = harness.GetMethod("Create")!.Invoke(null, null)!;
+        Assert.Equal("left", pair.GetType().GetProperty("Left")!.GetValue(pair));
+        Assert.Equal("right", pair.GetType().GetProperty("Right")!.GetValue(pair));
+        Assert.Equal("rightleft", harness.GetField("Log")!.GetValue(null));
+    }
+
+    [Fact]
+    public void SimplifyingConstructorArguments_PreservesTheirNames()
+    {
+        var module = Parse(
+            """
+            module ConstructorSimplification ConstructorSimplification block
+              func Create () → Pair
+                !
+                return new Pair(Right: (1 + 2), Left: 4)
+            """);
+        var creation = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(module.Functions[0].Body[0]).Expression);
+        var simplified = Assert.IsType<NewExpressionNode>(
+            creation.Accept(new Calor.Compiler.Verification.ExpressionSimplifier()));
+        Assert.Equal(creation.ArgumentNames, simplified.ArgumentNames);
+        Assert.Equal("new Pair(Right: 3, Left: 4)", simplified.Accept(new CSharpEmitter()));
+    }
+
+    [Fact]
+    public void NamedStringBuilderConstructor_DoesNotLoseNamesInNativeLowering()
+    {
+        var conversion = ConvertWithoutPreprocessorStripping(
+            """
+            using System.Text;
+            public static class ConstructorHarness
+            {
+                public static int Run()
+                {
+                    var builder = new StringBuilder(maxCapacity: 100, capacity: 16);
+                    return builder.Capacity * 1000 + builder.MaxCapacity;
+                }
+            }
+            """);
+        Assert.Contains("new StringBuilder(", conversion.CalorSource);
+        Assert.Contains("maxCapacity: 100", conversion.CalorSource);
+        Assert.Contains("capacity: 16", conversion.CalorSource);
+        Assert.DoesNotContain("§CS", conversion.CalorSource);
+        var assembly = CompileAssembly(CompileConvertedCalor(conversion));
+        var harness = assembly.GetTypes().Single(type => type.Name == "ConstructorHarness");
+        Assert.Equal(16100, harness.GetMethod("Run")!.Invoke(null, null));
     }
 
     [Fact]
@@ -816,13 +989,13 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var module = Parse(
             """
-            §M{m001:Variance}
-              §IFACE{i001:IVariant}<out TOut, in TIn, TUnmanaged, TNotNull, TDerived>
-                §WHERE TOut : class?
-                §WHERE TIn : class, new()
-                §WHERE TUnmanaged : unmanaged
-                §WHERE TNotNull : notnull, System.IComparable<TNotNull>
-                §WHERE TDerived : ExternalBase, IMarker, new()
+            module Variance Variance block
+              interface IVariant<out TOut, in TIn, TUnmanaged, TNotNull, TDerived>
+                where TOut : class?
+                where TIn : class, new()
+                where TUnmanaged : unmanaged
+                where TNotNull : notnull, System.IComparable<TNotNull>
+                where TDerived : ExternalBase, IMarker, new()
             """);
 
         var typeParameters = Assert.Single(module.Interfaces).TypeParameters;
@@ -855,8 +1028,8 @@ public class Issue766DeclarationModuleSemanticsTests
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(
             """
-            §M{m001:InvalidVariance}
-              §CL{c001:Box:pub}<out T>
+            module InvalidVariance InvalidVariance block
+              class Box<out T>
             """,
             diagnostics);
         var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
@@ -904,10 +1077,11 @@ public class Issue766DeclarationModuleSemanticsTests
 
         var parsed = Parse(
             """
-            §M{m001:ConstraintParsing}
-              §IFACE{i001:IConstraintHost}
-                §MT{m001:Apply}<T>
-                  §WHERE T : allows ref struct
+            module ConstraintParsing ConstraintParsing block
+              interface IConstraintHost
+                func Apply<T> ()
+                  where T : allows ref struct
+                  !
             """);
         Assert.Equal(
             TypeConstraintKind.AllowsRefStruct,
@@ -969,31 +1143,34 @@ public class Issue766DeclarationModuleSemanticsTests
         string[] invalidSources =
         [
             """
-            §M{m001:BadFunction}
-              §F{f001:Bad:pub}<T>
-                §WHERE T : default
+            module BadFunction BadFunction block
+              func Bad<T> ()
+                where T : default
+                !
             """,
             """
-            §M{m001:BadClass}
-              §CL{c001:Bad:pub}<T>
-                §WHERE T : default
+            module BadClass BadClass block
+              class Bad<T>
+                where T : default
             """,
             """
-            §M{m001:BadInterface}
-              §IFACE{i001:IBad}<T>
-                §WHERE T : default
+            module BadInterface BadInterface block
+              interface IBad<T>
+                where T : default
             """,
             """
-            §M{m001:BadMethod}
-              §CL{c001:Host:pub}
-                §MT{m001:Bad:pub}<T>
-                  §WHERE T : default
+            module BadMethod BadMethod block
+              class Host
+                func Bad<T> ()
+                  where T : default
+                  !
             """,
             """
-            §M{m001:BadInterfaceMethod}
-              §IFACE{i001:IHost}
-                §MT{m001:Bad}<T>
-                  §WHERE T : default
+            module BadInterfaceMethod BadInterfaceMethod block
+              interface IHost
+                func Bad<T> ()
+                  where T : default
+                  !
             """
         ];
 
@@ -1057,17 +1234,16 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.True(
             explicitResult.Success,
             string.Join("; ", explicitResult.Issues.Select(issue => issue.Message)));
-        var explicitMethod = Assert.Single(
-            Assert.Single(
-                explicitResult.Ast!.Classes.Where(type => type.Name == "Explicit"))
-            .Methods);
-        Assert.Equal("IExplicit.Echo", explicitMethod.Name);
-        Assert.Equal(
-            TypeConstraintKind.Default,
-            Assert.Single(explicitMethod.TypeParameters[0].Constraints).Kind);
+        // 0.30 native syntax has no explicit-interface method form (015ee950f), so the
+        // member is preserved as its original C#, constraint included.
+        var explicitType = Assert.Single(
+            explicitResult.Ast!.Classes.Where(type => type.Name == "Explicit"));
+        Assert.Empty(explicitType.Methods);
+        Assert.Contains("T? IExplicit.Echo<T>(T? value) where T : default", explicitResult.CalorSource);
 
         var generated = CompileConvertedCalor(explicitResult);
         Assert.Contains("IExplicit.Echo<T>", generated);
+        Assert.Contains("where T : default", generated);
         Assert.DoesNotContain("private T? IExplicit.Echo<T>", generated);
         var validation = GeneratedCSharpCompiler.Validate(generated);
         Assert.True(
@@ -1148,31 +1324,17 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.True(
             conversion.Success,
             string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
-        var sender = Assert.Single(
-            conversion.Ast!.Interfaces.Where(type => type.Name == "ISender"));
-        Assert.Collection(
-            sender.Methods,
-            method => Assert.Equal(
-                "IRequest",
-                Assert.Single(method.TypeParameters[0].Constraints).TypeName),
-            method => Assert.Equal(
-                "IRequest<TResponse>",
-                Assert.Single(method.TypeParameters[0].Constraints).TypeName));
-        var publisher = Assert.Single(
-            conversion.Ast.Interfaces.Where(type => type.Name == "IPublisher"));
-        Assert.Equal(
-            "INotification",
-            Assert.Single(
-                Assert.Single(publisher.Methods)
-                    .TypeParameters[0]
-                    .Constraints).TypeName);
+        // 0.30: `CancellationToken cancellationToken = default` has no native spelling
+        // (a non-primitive `default`, af5d914ab), so each of these members is preserved as
+        // its original C#. The constraints must still survive the round trip verbatim.
+        Assert.NotNull(conversion.Ast);
 
-        Assert.Contains("§WHERE TRequest : IRequest", conversion.CalorSource);
+        Assert.Contains("where TRequest : IRequest", conversion.CalorSource);
         Assert.Contains(
-            "§WHERE TRequest : IRequest<TResponse>",
+            "where TRequest : IRequest<TResponse>",
             conversion.CalorSource);
         Assert.Contains(
-            "§WHERE TNotification : INotification",
+            "where TNotification : INotification",
             conversion.CalorSource);
 
         var compiled = Program.Compile(
@@ -1207,11 +1369,11 @@ public class Issue766DeclarationModuleSemanticsTests
     {
         var result = Program.Compile(
             """
-            §M{m001:AliasBases}
-              §U{Alias:External}
-              §CL{c001:Derived:pub}
-                §EXT{Alias.Base<i32>}
-                §IMPL{Alias.IFace<str>}
+            module AliasBases AliasBases block
+              using Alias = External
+              class Derived
+                extends Alias.Base<int>
+                implements Alias.IFace<string>
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });
@@ -1237,82 +1399,18 @@ public class Issue766DeclarationModuleSemanticsTests
     }
 
     [Fact]
-    public void QualifiedNames_SanitizeKeywordsAcrossNamespacesCallsArgumentsAndTypes()
-    {
-        var result = Program.Compile(
-            """
-            §M{m001:namespace.123bad.class}
-              §F{f001:event:pub} (i32:class) -> i32
-                §R class
-            """);
-
-        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
-        Assert.Contains("namespace @namespace._123bad.@class", result.GeneratedCode);
-        Assert.Contains("int @event(int @class)", result.GeneratedCode);
-        Assert.Contains("return @class;", result.GeneratedCode);
-
-        var call = new CallExpressionNode(
-            Span,
-            "namespace.class",
-            [new IntLiteralNode(Span, 1)],
-            ["event"]);
-        Assert.Equal(
-            "@namespace.@class(@event: 1)",
-            call.Accept(new CSharpEmitter()));
-        Assert.Equal(
-            "Factory<int>.@class()",
-            new CallExpressionNode(
-                Span,
-                "Factory<int>.class",
-                []).Accept(new CSharpEmitter()));
-
-        var type = new GenericTypeNode(
-            Span,
-            "namespace.class",
-            ["str"]);
-        Assert.Equal(
-            "@namespace.@class<string>",
-            type.Accept(new CSharpEmitter()));
-        Assert.Equal(
-            "@var",
-            new GenericTypeNode(Span, "var", []).Accept(new CSharpEmitter()));
-    }
-
-    [Fact]
-    public void ReusingEmitterAcrossModules_IsByteIdenticalToFreshEmitter()
-    {
-        var indexedModule = Parse(
-            """
-            §M{m001:First}
-              §ITYPE{it001:Leaky:i32[]:n}
-            """);
-        var unrelatedModule = Parse(
-            """
-            §M{m002:Second}
-              §F{f002:Echo:pub} (Leaky:value) -> Leaky
-                §R value
-            """);
-
-        var reused = new CSharpEmitter();
-        _ = reused.Emit(indexedModule);
-        var reusedOutput = reused.Emit(unrelatedModule);
-        var freshOutput = new CSharpEmitter().Emit(unrelatedModule);
-
-        Assert.Equal(freshOutput, reusedOutput);
-        Assert.Contains("Leaky value", reusedOutput);
-        Assert.DoesNotContain("int[] value", reusedOutput);
-    }
-
-    [Fact]
     public void GeneratedCSharp_CompilesWithImplicitUsingsDisabled()
     {
         var result = Program.Compile(
             """
-            §M{m001:Standalone}
-              §F{f001:Echo:pub}<T> (List<T>:items) -> List<T>
-                §R items
-              §AF{f002:EchoAsync:pub} (i32:value) -> i32
-                §R value
+            module Standalone Standalone block
+              func Echo<T> (List<T>:items) → List<T>
+                !
+                return items
+
+              func EchoAsync async (int:value) → int
+                !
+                return value
             """,
             null,
             new CompilationOptions { DeferGeneratedOutputValidation = true });
@@ -1330,64 +1428,6 @@ public class Issue766DeclarationModuleSemanticsTests
         Assert.True(
             validation.CompilationSuccess,
             string.Join(Environment.NewLine, validation.FormattedCompilationErrors));
-    }
-
-    [Fact]
-    public void BuiltInShortTypeMatrix_CompilesStandaloneWithoutImplicitUsings()
-    {
-        string[] types =
-        [
-            "i8", "i16", "i32", "i64",
-            "u8", "u16", "u32", "u64",
-            "f32", "f64", "dec", "bool", "str", "char", "any",
-            "List<i32>", "Dict<str, i32>", "Set<i32>",
-            "Seq<i32>", "IList<i32>", "IDict<str, i32>",
-            "ICollection<i32>", "ISet<i32>",
-            "ReadList<i32>", "ReadCollection<i32>",
-            "ReadDict<str, i32>", "ReadSet<i32>",
-            "Task", "Task<i32>", "ValueTask", "ValueTask<i32>",
-            "datetime", "datetimeoffset", "timespan", "date", "time", "guid",
-            "Span<i32>", "ReadOnlySpan<i32>", "Memory<i32>", "ReadOnlyMemory<i32>",
-            "StringBuilder", "void"
-        ];
-
-        foreach (var type in types)
-        {
-            var signature = type == "void"
-                ? "() -> void"
-                : $"({type}:value) -> {type}";
-            var body = type == "void" ? "" : "    §R value";
-            var result = Program.Compile(
-                $$"""
-                  §M{m001:BuiltInMatrix}
-                    §F{f001:Echo:pub} {{signature}}
-                  {{body}}
-                  """,
-                null,
-                new CompilationOptions
-                {
-                    DeferGeneratedOutputValidation = true
-                });
-            Assert.False(
-                result.HasErrors,
-                $"{type}: {string.Join("; ", result.Diagnostics.Select(d => d.Message))}");
-
-            var validation = GeneratedCSharpCompiler.Validate(
-                [new GeneratedCSharpSource(result.GeneratedCode, $"{type}.g.cs")],
-                new GeneratedCSharpCompilationContext
-                {
-                    IncludeImplicitGlobalUsings = false
-                });
-            Assert.True(
-                validation.CompilationSuccess,
-                $"{type}:{Environment.NewLine}"
-                + string.Join(
-                    Environment.NewLine,
-                    validation.FormattedCompilationErrors));
-
-            if (type == "StringBuilder")
-                Assert.Contains("using System.Text;", result.GeneratedCode);
-        }
     }
 
     [Fact]

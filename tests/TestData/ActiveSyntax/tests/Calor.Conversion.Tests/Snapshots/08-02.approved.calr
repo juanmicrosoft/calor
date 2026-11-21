@@ -1,0 +1,5 @@
+module Test_08_02 Test_08_02 overflow unchecked
+  class TupleDemo public
+    func GetPair public () → (int,string)
+      !
+      return (42, "hello")

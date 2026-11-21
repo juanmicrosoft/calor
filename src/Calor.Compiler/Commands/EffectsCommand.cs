@@ -259,6 +259,7 @@ public static class EffectsCommand
                 var methodCount = (mapping.Methods?.Count ?? 0) +
                                   (mapping.Getters?.Count ?? 0) +
                                   (mapping.Setters?.Count ?? 0) +
+                                  (mapping.Fields?.Count ?? 0) +
                                   (mapping.Constructors?.Count ?? 0);
 
                 types.Add(new TypeListEntry(

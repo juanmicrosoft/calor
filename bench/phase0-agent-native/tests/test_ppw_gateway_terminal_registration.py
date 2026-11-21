@@ -53,7 +53,7 @@ class TerminalRegistrationTests(unittest.TestCase):
             analysis.TERMINAL_EVIDENCE,
             historical["gatewayRecoveryEvidence"]["path"],
         )
-        with self.assertRaisesRegex(ValueError, "analysis artifact changed: ppw-budget-gateway.py"):
+        with self.assertRaisesRegex(ValueError, r"analysis artifact changed: (harness-capture|ppw-budget-gateway)\.py"):
             analysis.validate_analysis_registration()
         with tempfile.TemporaryDirectory(
                 prefix="SYNTHETIC-current-analysis-", dir=BENCH / "tests") as raw:
