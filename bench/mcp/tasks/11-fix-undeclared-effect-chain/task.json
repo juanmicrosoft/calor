@@ -1,10 +1,12 @@
 {
   "id": "11-fix-undeclared-effect-chain",
   "category": "effect-fix",
-  "description": "Function calls another function that has db:w, but doesn't declare db:w itself",
+  "description": "Public function calls a private helper that writes a file (inferred fs:w), but declares only ! cw",
   "targetPhase": "phase1",
   "input": "input.calr",
   "expected": "expected.calr",
-  "expectedDiagnostics": ["Calor0401"],
-  "successCriteria": "Compiles without errors after propagating the db:w effect to the caller"
+  "expectedDiagnostics": [
+    "Calor0410"
+  ],
+  "successCriteria": "Compiles without errors after adding fs:w to the caller's effect row"
 }

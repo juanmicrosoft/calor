@@ -6,33 +6,52 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
 
-namespace NotificationService
+public class Messenger
 {
-    public static class NotificationServiceModule
+    public static void Post(string target, string payload)
     {
-        public static bool SendEmail(string to, string subject, string body)
-        {
-            if (!(to != "")) throw new Calor.Runtime.ContractViolationException("Precondition failed: to != \"\"", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 128, length: 17, sourceFile: null, line: 9, column: 3, condition: "to != \"\"");
-            if (!(subject != "")) throw new Calor.Runtime.ContractViolationException("Precondition failed: subject != \"\"", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 148, length: 22, sourceFile: null, line: 10, column: 3, condition: "subject != \"\"");
-            Console.WriteLine("Sending email to: " + to);
-            HttpClient.PostAsync(to, body);
-            return true;
-        }
+        return;
+    }
 
-        public static bool SendSms(string phoneNumber, string message)
-        {
-            if (!(phoneNumber != "")) throw new Calor.Runtime.ContractViolationException("Precondition failed: phoneNumber != \"\"", "f002", Calor.Runtime.ContractKind.Requires, startOffset: 395, length: 26, sourceFile: null, line: 21, column: 3, condition: "phoneNumber != \"\"");
-            Console.WriteLine("Sending SMS to: " + phoneNumber);
-            HttpClient.PostAsync(phoneNumber, message);
-            return true;
-        }
+}
 
-        public static void LogNotification(string type, string recipient, bool success)
-        {
-            DbContext.SaveChanges();
-        }
+public class DbContext
+{
+    public static int SaveChanges()
+    {
+        return 1;
+    }
+
+}
+
+public static partial class GlobalModule
+{
+    public static bool SendEmail(string address, string subject, string body)
+    {
+        if (!(address != "")) throw new ArgumentOutOfRangeException(nameof(address), "Violation of inline refinement for parameter 'address'");
+        if (!(subject != "")) throw new ArgumentOutOfRangeException(nameof(subject), "Violation of inline refinement for parameter 'subject'");
+        Console.WriteLine(checked("Sending email to: " + address));
+
+        Messenger.Post(address, body);
+
+        return true;
+    }
+
+    public static bool SendSms(string phoneNumber, string message)
+    {
+        if (!(phoneNumber != "")) throw new ArgumentOutOfRangeException(nameof(phoneNumber), "Violation of inline refinement for parameter 'phoneNumber'");
+        Console.WriteLine(checked("Sending SMS to: " + phoneNumber));
+
+        Messenger.Post(phoneNumber, message);
+
+        return true;
+    }
+
+    public static void LogNotification(string type, string recipient, bool success)
+    {
+        DbContext.SaveChanges();
 
     }
+
 }

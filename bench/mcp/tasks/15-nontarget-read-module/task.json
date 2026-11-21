@@ -4,7 +4,7 @@
   "description": "Given a correct .calr file, describe what functions it exports and their effects. Tests comprehension, not fixing.",
   "targetPhase": "phase3",
   "input": "input.calr",
-  "expectedAnswer": "The module 'NotificationService' exports three public functions: (1) SendEmail with effects cw,net:w — takes str:to, str:subject, str:body and returns bool; (2) SendSms with effects cw,net:w — takes str:phoneNumber, str:message and returns bool; (3) LogNotification with effect db:w — takes str:type, str:recipient, bool:success and returns void.",
+  "expectedAnswer": "The module 'NotificationService' exports three public functions: (1) SendEmail with effects cw,net:rw — takes string:address, string:subject, string:body (address and subject must be non-empty) and returns bool; (2) SendSms with effects cw,net:rw — takes string:phoneNumber, string:message (phoneNumber must be non-empty) and returns bool; (3) LogNotification with effect db:w — takes string:type, string:recipient, bool:success and returns void.",
   "expectedDiagnostics": [],
-  "successCriteria": "Agent correctly identifies all exported functions, their signatures, and their declared effects"
+  "successCriteria": "Agent correctly identifies all exported functions, their signatures, preconditions, and their declared effects"
 }

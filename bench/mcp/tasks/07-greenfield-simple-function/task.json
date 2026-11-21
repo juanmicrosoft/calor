@@ -1,9 +1,9 @@
 {
   "id": "07-greenfield-simple-function",
   "category": "greenfield",
-  "description": "Write an Add function taking two i32 and returning i32",
+  "description": "Write an Add function taking two int and returning int",
   "targetPhase": "phase2",
   "expected": "expected.calr",
   "expectedDiagnostics": [],
-  "successCriteria": "Generated Calor compiles and contains a correct Add function with proper IDs, inputs, output, and return expression"
+  "successCriteria": "Generated Calor compiles and contains a correct Add function with a pure effect row, typed parameters, return type, and return expression"
 }

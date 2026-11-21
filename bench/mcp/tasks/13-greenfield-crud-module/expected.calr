@@ -1,50 +1,26 @@
-§M{m001:UserCrud}
+module UserCrud
+  func CreateUser (string:name, string:email) → bool
+    ! db:w
+    let user = new User { Name = name, Email = email }
+    _dbContext.Users.Add(user)
+    let result = _dbContext.SaveChanges()
+    return result > 0
 
-§F{f001:CreateUser:pub}
-  §I{str:name}
-  §I{str:email}
-  §O{bool}
-  §E{db:w}
-  §B{user} §NEW{User}
-  §ASSIGN user.Name name
-  §ASSIGN user.Email email
-  §C{_dbContext.Users.Add}
-    §A user
-  §/C
-  §B{result} §C{_dbContext.SaveChanges} §/C
-  §R (> result INT:0)
-§/F{f001}
+  func GetUser (int:userId) → User
+    ! db:r
+    return _dbContext.Users.Find(userId)
 
-§F{f002:GetUser:pub}
-  §I{i32:userId}
-  §O{User}
-  §E{db:r}
-  §R §C{_dbContext.Users.Find} §A userId §/C
-§/F{f002}
+  func UpdateUser (int:userId, string:name, string:email) → bool
+    ! db:w
+    var user = _dbContext.Users.Find(userId)
+    set user.Name name
+    set user.Email email
+    let result = _dbContext.SaveChanges()
+    return result > 0
 
-§F{f003:UpdateUser:pub}
-  §I{i32:userId}
-  §I{str:name}
-  §I{str:email}
-  §O{bool}
-  §E{db:w}
-  §B{~user} §C{_dbContext.Users.Find} §A userId §/C
-  §ASSIGN user.Name name
-  §ASSIGN user.Email email
-  §B{result} §C{_dbContext.SaveChanges} §/C
-  §R (> result INT:0)
-§/F{f003}
-
-§F{f004:DeleteUser:pub}
-  §I{i32:userId}
-  §O{bool}
-  §E{db:w}
-  §B{user} §C{_dbContext.Users.Find} §A userId §/C
-  §C{_dbContext.Users.Remove}
-    §A user
-  §/C
-  §B{result} §C{_dbContext.SaveChanges} §/C
-  §R (> result INT:0)
-§/F{f004}
-
-§/M{m001}
+  func DeleteUser (int:userId) → bool
+    ! db:w
+    let user = _dbContext.Users.Find(userId)
+    _dbContext.Users.Remove(user)
+    let result = _dbContext.SaveChanges()
+    return result > 0

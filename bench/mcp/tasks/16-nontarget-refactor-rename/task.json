@@ -1,7 +1,7 @@
 {
   "id": "16-nontarget-refactor-rename",
   "category": "refactor",
-  "description": "Given a correct .calr file, rename function 'Save' to 'Persist' including its ID references",
+  "description": "Given a correct .calr file, rename function 'Save' to 'Persist' (and 'SaveAndLog' to 'PersistAndLog'), updating every call site",
   "targetPhase": "phase3",
   "input": "input.calr",
   "expected": "expected.calr",

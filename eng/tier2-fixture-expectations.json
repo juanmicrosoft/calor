@@ -41,16 +41,11 @@
         "tests/Calor.Conversion.Tests/Snapshots/01-04.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/02-01.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/02-02.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/03-01.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/03-02.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/03-03.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/03-04.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/04-03.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/05-01.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/05-02.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/05-03.approved.calr",
@@ -70,33 +65,18 @@
         "tests/Calor.Conversion.Tests/Snapshots/10-02.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/10-03.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/11-01.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/11-04.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/12-01.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/12-02.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/12-03.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/12-04.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/12-05.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/13-04.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/13-06.approved.calr",
-        "tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/13-08.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/13-09.approved.calr",
         "tests/Calor.Conversion.Tests/Snapshots/13-11.approved.calr"
-      ]
-    },
-    {
-      "id": "conversion-snapshots:08-03.approved",
-      "expect": "compile",
-      "mode": "each",
-      "options": [
-        "--permissive-effects"
-      ],
-      "evidence": "Current approved converter output explicitly preserves public List<string> Items { get; set; } = []; in raw C#. The former string[]-to-List<string> CS0029 cause is absent on this input; this is interop preservation, not a native conversion claim. Checkout CLI compilation and generated-C# runtime witnesses verify distinct empty List<string> instances, Add, getter and setter behavior. The existing --permissive-effects policy is unchanged. Historical failure reports are not rewritten.",
-      "files": [
-        "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"
       ]
     },
     {
@@ -320,9 +300,9 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Issue1104_BatchingSink_LoopAsync.calr|Calor0410|[\"Issue1104_BatchingSink_LoopAsync.calr\",5,\"Calor0425Leg.BatchingSink`0\",\"LoopAsync\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'LoopAsync' uses effect 'unknown' but does not declare it"
+        "Issue1104_BatchingSink_LoopAsync.calr|Calor0410|[\"Issue1104_BatchingSink_LoopAsync.calr\",5,\"Calor0425Leg.BatchingSink`0\",\"LoopAsync\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'LoopAsync' uses effect 'unknown'; inferred effects are incomplete. Resolve its calls through authoritative source declarations or effect contracts."
       ],
-      "evidence": "Not an intended negative. EffectInferrerRecursionTests only parses this Serilog-derived fixture and runs effect inference with the permissive policy; nothing compiles it. Under the strict default its unresolved external calls (Calor0411 warnings) make LoopAsync use the undeclared effect unknown, which Calor0410 reports correctly.",
+      "evidence": "Not an intended negative. EffectInferrerRecursionTests only parses this Serilog-derived fixture and runs effect inference with the permissive policy; nothing compiles it. Under the strict default its unresolved external calls (Calor0411 warnings) make LoopAsync use the undeclared effect unknown, which Calor0410 reports correctly. 0.30 rewrote the fixture in native syntax with the same members; Calor0410 now reports the unknown effect as incomplete inference.",
       "files": [
         "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"
       ]
@@ -515,21 +495,6 @@
         "tests/E2E/scenarios/08_multi_project_solution/solution/Shared/utils.calr",
         "tests/E2E/scenarios/08_multi_project_solution/solution/WebApi/api_handler.calr",
         "tests/E2E/scenarios/09_codegen_bugfixes/input.calr"
-      ]
-    },
-    {
-      "id": "e2e:scenarios:output.g",
-      "expect": "reject",
-      "negativeKind": "incidental",
-      "mode": "each",
-      "errors": [
-        "output.g.calr|Calor0410|[\"output.g.calr\",5,\"Collections.CollectionsModule`0\",\"Main\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Main' uses effect 'alloc' but does not declare it",
-        "output.g.calr|Calor0410|[\"output.g.calr\",5,\"Collections.CollectionsModule`0\",\"Main\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Main' uses effect 'cw' but does not declare it",
-        "output.g.calr|Calor0410|[\"output.g.calr\",5,\"Collections.CollectionsModule`0\",\"Main\",\"{\\\"arity\\\":0,\\\"parameters\\\":[],\\\"output\\\":\\\"void\\\"}\"]|Function 'Main' uses effect 'mut' but does not declare it"
-      ],
-      "evidence": "Not an intended negative. Nothing reads this file (run-tests.sh compiles input.calr and verify.sh reads output.g.cs). Main uses alloc, cw and mut without declaring them; Calor0410 reports this correctly.",
-      "files": [
-        "tests/E2E/scenarios/07_collections/output.g.calr"
       ]
     },
     {
@@ -1688,28 +1653,14 @@
       ]
     },
     {
-      "id": "lint-scenarios:mismatched_ids",
-      "expect": "reject",
-      "negativeKind": "designed",
-      "mode": "each",
-      "errors": [
-        "mismatched_ids.calr|Calor0830|-|Legacy structural closing tag '§/F' was removed in Phase 4d and is no longer accepted. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends.",
-        "mismatched_ids.calr|Calor0830|-|Legacy structural closing tag '§/M' was removed in Phase 4d and is no longer accepted. A block now ends at the dedent of its body, so delete the closer line -- the indentation already marks where the block ends."
-      ],
-      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path. Actual checkout CLI output retains exactly both registered Calor0830 causes and messages. Invalid source has no authoritative declaration sidecar, and parser/local IDs are not public declaration identities, so only the former f1/m1 slots become '-'; file, code, message and multiplicity remain exact. Unknown nonnull diagnostic IDs still fail closed.",
-      "files": [
-        "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"
-      ]
-    },
-    {
       "id": "lint-scenarios:syntax_error",
       "expect": "reject",
       "negativeKind": "designed",
       "mode": "each",
       "errors": [
-        "syntax_error.calr|Calor0006|-|Unknown section marker '§INVALID_TAG'. Common markers: §M (Module), §F (Function), §B (Bind), §C (Call), §IF, §L (Loop), §W (Match)"
+        "syntax_error.calr|Calor0100|-|Expected operand after '+' but found Star"
       ],
-      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
+      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose. 0.30 rewrote the fixture in native syntax; it keeps a parse error (a dangling binary operator) instead of the retired unknown section marker.",
       "files": [
         "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr"
       ]

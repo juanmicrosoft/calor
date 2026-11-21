@@ -5,5 +5,5 @@
   "targetPhase": "phase2",
   "expected": "expected.calr",
   "expectedDiagnostics": [],
-  "successCriteria": "Generated Calor compiles and contains four functions (Create, Read, Update, Delete) with correct effect declarations for database operations"
+  "successCriteria": "Generated Calor contains four functions (Create, Read, Update, Delete) with correct effect rows for database operations; it compiles against a project that supplies the EF Core data context"
 }

@@ -1,12 +1,4 @@
-§M{m001:Greeter}
-
-§F{f001:Greet:pub}
-  §I{str:name}
-  §O{void}
-  §E{cw}
-  §C{Console.WriteLine}
-    §A (+ "Hello, " name)
-  §/C
-§/F{f001}
-
-§/M{m001}
+module Greeter
+  func Greet (string:name) → void
+    ! cw
+    Console.WriteLine("Hello, " + name)

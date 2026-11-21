@@ -532,15 +532,6 @@
       "notes": "Invalid syntax - parse should fail"
     },
     {
-      "id": "err_002",
-      "file": "10_error_cases/mismatched_ids.calr",
-      "category": "10_error_cases",
-      "expectedIssues": -1,
-      "issueTypes": ["parse_error"],
-      "canAutoFix": false,
-      "notes": "Closing ID mismatch"
-    },
-    {
       "id": "err_003",
       "file": "10_error_cases/unterminated_string.calr",
       "category": "10_error_cases",

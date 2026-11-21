@@ -1,9 +1,12 @@
 {
   "id": "17-fix-missing-return",
   "category": "parser-fix",
-  "description": "Function declares output type but has no §R return statement",
+  "description": "Function declares a return type but has no return statement",
   "targetPhase": "phase1",
   "input": "input.calr",
   "expected": "expected.calr",
-  "successCriteria": "Compiles without errors after adding return"
+  "successCriteria": "Compiles without errors after adding return",
+  "expectedDiagnostics": [
+    "Calor1002"
+  ]
 }

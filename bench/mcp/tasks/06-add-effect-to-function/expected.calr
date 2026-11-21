@@ -1,21 +1,16 @@
-§M{m001:UserService}
+module UserService
+  class DbContext
+    func SaveChanges static () → int
+      ! db:w
+      return 1
 
-§F{f001:SaveUser:pub}
-  §I{str:name}
-  §I{str:email}
-  §O{bool}
-  §E{db:w,cw}
-  §C{Console.WriteLine} §A (+ STR:"Saving user: " name) §/C
-  §C{DbContext.SaveChanges} §/C
-  §C{Console.WriteLine} §A STR:"User saved" §/C
-  §R BOOL:true
-§/F{f001}
+  func SaveUser (string:name, string:email) → bool
+    ! cw, db:w
+    Console.WriteLine("Saving user: " + name)
+    DbContext.SaveChanges()
+    Console.WriteLine("User saved")
+    return true
 
-§F{f002:GetUser:pub}
-  §I{str:email}
-  §O{str}
-  §E{db:r}
-  §R STR:""
-§/F{f002}
-
-§/M{m001}
+  func GetUser (string:email) → string
+    ! db:r
+    return ""

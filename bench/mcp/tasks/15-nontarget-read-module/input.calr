@@ -1,36 +1,26 @@
-§M{m001:NotificationService}
+module NotificationService
+  class Messenger
+    func Post static (string:target, string:payload) → void
+      ! net:rw
+      return
 
-§F{f001:SendEmail:pub}
-  §I{str:to}
-  §I{str:subject}
-  §I{str:body}
-  §O{bool}
-  §E{cw,net:rw}
-  §Q (!= to STR:"")
-  §Q (!= subject STR:"")
-  §C{Console.WriteLine} §A (+ STR:"Sending email to: " to) §/C
-  §C{HttpClient.PostAsync} §A to §A body §/C
-  §R BOOL:true
-§/F{f001}
+  class DbContext
+    func SaveChanges static () → int
+      ! db:w
+      return 1
 
-§F{f002:SendSms:pub}
-  §I{str:phoneNumber}
-  §I{str:message}
-  §O{bool}
-  §E{cw,net:rw}
-  §Q (!= phoneNumber STR:"")
-  §C{Console.WriteLine} §A (+ STR:"Sending SMS to: " phoneNumber) §/C
-  §C{HttpClient.PostAsync} §A phoneNumber §A message §/C
-  §R BOOL:true
-§/F{f002}
+  func SendEmail (string:address | (# != ""), string:subject | (# != ""), string:body) → bool
+    ! cw,net:rw
+    Console.WriteLine("Sending email to: " + address)
+    Messenger.Post(address, body)
+    return true
 
-§F{f003:LogNotification:pub}
-  §I{str:type}
-  §I{str:recipient}
-  §I{bool:success}
-  §O{void}
-  §E{db:w}
-  §C{DbContext.SaveChanges} §/C
-§/F{f003}
+  func SendSms (string:phoneNumber | (# != ""), string:message) → bool
+    ! cw,net:rw
+    Console.WriteLine("Sending SMS to: " + phoneNumber)
+    Messenger.Post(phoneNumber, message)
+    return true
 
-§/M{m001}
+  func LogNotification (string:type, string:recipient, bool:success) → void
+    ! db:w
+    DbContext.SaveChanges()
