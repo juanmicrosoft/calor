@@ -381,6 +381,42 @@ public sealed class EffectSummaryBoundModuleReuseTests
         Assert.Equal(modules.Count, reused);
     }
 
+    /// <summary>
+    /// #1738: the effect summary reads a declaration scan instead of a whole call graph
+    /// (which also Roslyn-binds a C# image of the module). The scan's declarations,
+    /// contract inheritance and plain binding are the call graph's, so the summary's
+    /// raw calls are exactly the ones the call graph gives.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Subjects))]
+    public void DeclarationScan_GivesTheCallGraphsDeclarationsAndCalls(string subject)
+    {
+        var directory = Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot, subject);
+        var modules = Directory.GetFiles(directory, "*.calr").Order(StringComparer.Ordinal)
+            .Select(path =>
+            {
+                var diagnostics = new DiagnosticBag();
+                return new Parser(new Lexer(File.ReadAllText(path), diagnostics).TokenizeAllForParser(),
+                    diagnostics).Parse();
+            })
+            .Where(module => module is not null)
+            .ToList();
+        var map = CompilationDriver.BuildCrossModuleFunctionMap(modules);
+        foreach (var module in modules)
+        {
+            var graph = CallGraphAnalysis.Build(module, map);
+            var scan = CallGraphAnalysis.ScanDeclarations(module, map);
+            static IEnumerable<string> Describe(IReadOnlyDictionary<string, FunctionNode> functions) =>
+                functions.Select(entry => $"{entry.Key}|{entry.Value.Id}|{entry.Value.Name}|"
+                    + $"{entry.Value.Span.Start}..{entry.Value.Span.End}|{entry.Value.Parameters.Count}");
+            Assert.Equal(Describe(graph.Functions), Describe(scan.Functions));
+            Assert.NotNull(scan.PlainModule);
+            Assert.Equal(
+                ExternalCallCollector.CollectPerFunctionWithBareNames(module, map, graph),
+                ExternalCallCollector.CollectPerFunctionWithBareNames(scan));
+        }
+    }
+
     [Fact]
     public void ProjectContextBinding_IsNeverReused()
     {

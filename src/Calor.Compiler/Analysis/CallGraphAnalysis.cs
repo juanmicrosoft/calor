@@ -3366,15 +3366,32 @@ public sealed class CallGraphAnalysis
     }
 
     /// <summary>
-    /// Builds a call graph analysis from a module AST.
+    /// The first phase of <see cref="Build(ModuleNode, IReadOnlyDictionary{string, CodeGen.CrossModuleFunctionTarget}?, Verification.ModuleInheritanceResult?, ContractMode, CrossModuleTypeRegistry?, string?)"/>:
+    /// every declaration as a function, the contract inheritance, and the module bound
+    /// once. Nothing here reads the C# operator bindings, which the second phase adds.
     /// </summary>
-    public static CallGraphAnalysis Build(ModuleNode ast) => Build(ast, null);
+    private sealed record DeclarationPhase(
+        Dictionary<string, FunctionNode> Functions,
+        Dictionary<string, string> FunctionNameToId,
+        Dictionary<string, List<string>> MethodNameToIds,
+        Dictionary<string, List<string>> CalleeToCallers,
+        Dictionary<string, List<(string, TextSpan)>> CallerToCallees,
+        Verification.ModuleInheritanceResult ContractInheritance,
+        Dictionary<AstCallKey, IReadOnlyList<string>> ResolvedCallIds,
+        HashSet<AstCallKey> BoundCallSites,
+        bool BoundResolutionComplete,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>> BoundValueTypes,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>>
+            DeclaredFunctionTypes,
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredReturnTypes,
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredFieldTypes,
+        BoundValueIndex BoundValues);
 
-    internal static CallGraphAnalysis Build(ModuleNode ast,
+    private static DeclarationPhase BuildDeclarations(ModuleNode ast,
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
-        Verification.ModuleInheritanceResult? contractInheritance = null,
-        ContractMode projectionContractMode = ContractMode.Debug,
-        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
+        Verification.ModuleInheritanceResult? contractInheritance,
+        ContractMode projectionContractMode,
+        CrossModuleTypeRegistry? crossModuleTypes, string? sourcePath)
     {
         if (contractInheritance is null)
         {
@@ -3513,6 +3530,52 @@ public sealed class CallGraphAnalysis
             calleeToCallers[id] = [];
             callerToCallees[id] = [];
         }
+
+        return new(functions, functionNameToId, methodNameToIds, calleeToCallers, callerToCallees,
+            contractInheritance, resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
+            declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues);
+    }
+
+    /// <summary>
+    /// What an effect summary reads of a module's call graph: its declarations as
+    /// functions, its contract inheritance and, when binding succeeded, the plain bound
+    /// module (the one <see cref="PlainBoundModule"/> returns). These are exactly the
+    /// values <see cref="Build(ModuleNode, IReadOnlyDictionary{string, CodeGen.CrossModuleFunctionTarget}?, Verification.ModuleInheritanceResult?, ContractMode, CrossModuleTypeRegistry?, string?)"/>
+    /// computes for the same module and map before it resolves operator calls, and
+    /// they do not depend on that resolution, which binds a C# image of the module
+    /// with Roslyn and is the most expensive part of the call graph (#1738).
+    /// </summary>
+    internal sealed record DeclarationScan(
+        ModuleNode Module,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctions,
+        IReadOnlyDictionary<string, FunctionNode> Functions,
+        Verification.ModuleInheritanceResult ContractInheritance,
+        BoundModule? PlainModule);
+
+    internal static DeclarationScan ScanDeclarations(ModuleNode ast,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
+    {
+        var phase = BuildDeclarations(ast, crossModuleFunctions, null, ContractMode.Debug, null, null);
+        return new(ast, crossModuleFunctions, phase.Functions, phase.ContractInheritance, phase.BoundValues.Module);
+    }
+
+    /// <summary>
+    /// Builds a call graph analysis from a module AST.
+    /// </summary>
+    public static CallGraphAnalysis Build(ModuleNode ast) => Build(ast, null);
+
+    internal static CallGraphAnalysis Build(ModuleNode ast,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        Verification.ModuleInheritanceResult? contractInheritance = null,
+        ContractMode projectionContractMode = ContractMode.Debug,
+        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
+    {
+        var (functions, functionNameToId, methodNameToIds, calleeToCallers, callerToCallees,
+            phaseInheritance, resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
+            declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
+            BuildDeclarations(ast, crossModuleFunctions, contractInheritance, projectionContractMode,
+                crossModuleTypes, sourcePath);
+        contractInheritance = phaseInheritance;
 
         // Build call edges
         var unresolvedCalls = new List<AstUnresolvedCallSite>();

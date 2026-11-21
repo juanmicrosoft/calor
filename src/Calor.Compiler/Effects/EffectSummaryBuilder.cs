@@ -87,8 +87,12 @@ public static class EffectSummaryBuilder
         // are gone; `NoNameKeyedEffectStoreRemains` pins it), then attach them
         // with the caller's declared effects + a diagnostic span for any
         // cross-module errors.
-        var callGraph = Analysis.CallGraphAnalysis.Build(module, crossModuleFunctions);
-        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(module, crossModuleFunctions, callGraph);
+        // The summary reads only the module's declarations, contract inheritance and
+        // plain binding, never the call graph's edges or its C# operator bindings, so it
+        // scans those instead of building (and Roslyn-binding) the whole call graph
+        // (#1738). The scan computes them exactly as CallGraphAnalysis.Build does.
+        var callGraph = Analysis.CallGraphAnalysis.ScanDeclarations(module, crossModuleFunctions);
+        var rawCalls = ExternalCallCollector.CollectPerFunctionWithBareNames(callGraph);
         var callsByCaller = new Dictionary<string, List<RawCall>>(StringComparer.Ordinal);
         foreach (var call in rawCalls)
         {
