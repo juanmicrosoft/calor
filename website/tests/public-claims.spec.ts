@@ -313,7 +313,7 @@ for (const width of [1366, 390]) {
     await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
     if (width >= 640) await expect(pill).toBeVisible();
     await expect(page.getByText(
-      'Sharper bug analysis, reliable resource cleanup, and stronger test and CI checks.',
+      'One syntax with no section markers, preconditions as parameter refinements, and a migrate that always writes.',
       { exact: true },
     )).toBeVisible();
     await page.getByRole('link', { name: "See what's new", exact: true }).click();
