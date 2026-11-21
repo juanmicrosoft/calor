@@ -21,6 +21,8 @@ internal interface ISourceBindingContext
     // One annotated image of every module of the pass, shared by every projection that
     // binds a module of it (null when there is none to share).
     CallGraphAnalysis.SharedProjectionImage? SharedImage(string? sourcePath, ContractMode mode) => null;
+    // The operator bindings the pass already resolved, by request (null when not shared).
+    CallGraphAnalysis.OperatorBindingsMemo? OperatorBindingsMemo => null;
     SourceCallable? FindCallable(AstNode declaration);
 }
 
@@ -611,22 +613,16 @@ public sealed class Binder
             namespaceCount++;
         }
         var spelling = arity == 0 ? name : name + "<" + new string(',', arity - 1) + ">";
-        source.Append("class __CalorMetadataTypeLookup_").Append(Guid.NewGuid().ToString("N"))
-            .Append(" { static global::System.Type Resolve() => typeof(").Append(spelling).AppendLine("); }");
-        source.Append('}', namespaceCount);
-        var tree = CSharpSyntaxTree.ParseText(source.ToString());
-        var compilation = context.HostCompilationForBinder.AddSyntaxTrees(tree);
-        var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>().Single().Type;
-        var diagnostics = model.GetDiagnostics();
-        var symbol = model.GetTypeInfo(syntax).Type;
-        var ambiguous = diagnostics.Any(diagnostic => diagnostic.Id is "CS0104" or "CS0576" or "CS1537");
+        source.Append("class __CalorMetadataTypeLookup_");
+        var prefix = source.ToString();
+        var suffix = new System.Text.StringBuilder()
+            .Append(" { static global::System.Type Resolve() => typeof(").Append(spelling).AppendLine("); }")
+            .Append('}', namespaceCount).ToString();
+        var (ambiguous, rejected, symbol) = ScopedMetadataLookup.Resolve(
+            context.HostCompilationForBinder, prefix, suffix);
         // Missing peer imports do not invalidate an independently resolved BCL type.
         // Errors at the lookup itself and conflicting imports still veto its identity.
-        if (!ambiguous && !diagnostics.Any(diagnostic =>
-                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
-                && (!diagnostic.Location.IsInSource
-                    || diagnostic.Location.SourceSpan.IntersectsWith(syntax.Span)))
+        if (!ambiguous && !rejected
             && symbol is Microsoft.CodeAnalysis.INamedTypeSymbol { TypeKind: not Microsoft.CodeAnalysis.TypeKind.Error } named)
             return _scopedMetadataTypes[key] = (true, named.IsUnboundGenericType ? named.OriginalDefinition : named);
 
@@ -634,6 +630,60 @@ public sealed class Binder
         var alias = !name.StartsWith("global::", StringComparison.Ordinal)
             && imports.Any(import => import.Alias == head);
         return _scopedMetadataTypes[key] = (alias || ambiguous, null);
+    }
+
+    /// <summary>
+    /// The Roslyn answer for one scoped metadata type lookup: whether the lookup was
+    /// ambiguous (CS0104/CS0576/CS1537), whether an error at the lookup itself (or one
+    /// with no source location) rejects it, and the type <c>typeof</c> bound to.
+    ///
+    /// <para>The answer is a function of the host compilation and the lookup text alone.
+    /// The lookup class is named with a fresh GUID so that it can never be the type
+    /// looked up; the name has a fixed length, so every span and diagnostic is the same
+    /// for any GUID. Every binder of a pass (the symbol index's, the effect summary's,
+    /// the effect pass's) asks the same lookups of the same process-wide host, and each
+    /// one compiled a throwaway image per lookup; the answer is now computed once per
+    /// host and text. The type returned is equal (SymbolEqualityComparer) to the one a
+    /// fresh compilation returns, with the same original definition and annotation.</para>
+    /// </summary>
+    private static class ScopedMetadataLookup
+    {
+        // Bounded: a long-lived host (the language server) keeps one table per host
+        // compilation and starts it over rather than growing without limit.
+        private const int Capacity = 4096;
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<
+            CSharpCompilation,
+            System.Collections.Concurrent.ConcurrentDictionary<string,
+                (bool Ambiguous, bool Rejected, Microsoft.CodeAnalysis.ITypeSymbol? Symbol)>> Answers = new();
+
+        internal static (bool Ambiguous, bool Rejected, Microsoft.CodeAnalysis.ITypeSymbol? Symbol) Resolve(
+            CSharpCompilation host, string prefix, string suffix)
+        {
+            var answers = Answers.GetValue(host, _ => new(StringComparer.Ordinal));
+            var key = prefix + "\0" + suffix;
+            if (answers.TryGetValue(key, out var answer))
+                return answer;
+            if (answers.Count >= Capacity)
+                answers.Clear();
+            return answers.GetOrAdd(key, _ => Compute(host, prefix + Guid.NewGuid().ToString("N") + suffix));
+        }
+
+        private static (bool, bool, Microsoft.CodeAnalysis.ITypeSymbol?) Compute(CSharpCompilation host, string text)
+        {
+            var tree = CSharpSyntaxTree.ParseText(text);
+            var compilation = host.AddSyntaxTrees(tree);
+            var model = compilation.GetSemanticModel(tree);
+            var syntax = tree.GetRoot().DescendantNodes().OfType<TypeOfExpressionSyntax>().Single().Type;
+            var diagnostics = model.GetDiagnostics();
+            var symbol = model.GetTypeInfo(syntax).Type;
+            var ambiguous = diagnostics.Any(diagnostic => diagnostic.Id is "CS0104" or "CS0576" or "CS1537");
+            var rejected = diagnostics.Any(diagnostic =>
+                diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error
+                && (!diagnostic.Location.IsInSource
+                    || diagnostic.Location.SourceSpan.IntersectsWith(syntax.Span)));
+            return (ambiguous, rejected, symbol);
+        }
     }
 
     private Microsoft.CodeAnalysis.ITypeParameterSymbol? ResolveMetadataTypeParameter(
