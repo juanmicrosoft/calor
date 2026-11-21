@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.29.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.30.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Sharper bug analysis, reliable resource cleanup, and stronger test and CI checks.</span>
+            <span className="text-foreground">One syntax with no section markers, preconditions as parameter refinements, and a migrate that always writes.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

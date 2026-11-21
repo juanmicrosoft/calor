@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-21
+
+Calor 0.30 has one way to write each thing. The `§` section markers are gone: code is
+lowercase keywords, indentation and ordinary C# expressions. A precondition is a refinement
+on the parameter it constrains. Effect rows are required only at public boundaries. Default
+`calor migrate` and `calor convert` write every C# file that parses. This is a breaking
+release with no automatic rewriter for 0.29 source; see the first entry below.
+
+This release publishes no new benchmark results.
+
+### Release health
+
+- **Silent wrong-output reports since 0.29.0: 0 new reports** in the repository issue
+  inventory checked on 2026-11-21 (33 issues opened since 2026-10-29). This is a report
+  count, not proof that the package has no defects.
+- **Merge-to-publication lag: not measured** as a median. `main` received no compiler fix
+  between 0.29.0 and the 0.30 merge; the 0.30 work merges and publishes on the same day.
+  Package availability is checked separately after publication.
+
 ### Breaking changes
 
 - **Calor has one syntax, and `§` section markers are not part of it.** Calor 0.30
