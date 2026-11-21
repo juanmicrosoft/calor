@@ -4,141 +4,17 @@
   "floorRule": "Pre-registered (roadmap §4.1): if dA.total + dB.aggregate.total is below 25 sites, §4.4 gate 2 adjudicates NOT-ADJUDICATED, never HIT. The floor is frozen with the ledger's registration PR and is not re-tuned after the design doc opens.",
   "scope": "D-A: every .calr under the repository root (bin/, obj/, .git/, .claude/, node_modules/, bench/corpus/ submodules, docs/design/spikes/ artifacts and the PP-W-rows measurement fixtures (bench/phase0-agent-native/{pairs,epochs/*}/W-<ddd>-*, roadmap §4.1) excluded; nothing else filtered), compiled one file at a time via Program.Compile with EnforceEffects=true, UnknownCallPolicy.Strict, StrictEffects=false, EnableTypeChecking=true (the CLI default), UnsafeTranspileOnly=false, DeferGeneratedOutputValidation=true (per-file Roslyn validation of the emitted C# is skipped; it runs after the effect pass and cannot affect the counts), ProjectDirectory=null (the CLI sets it to the file's directory; here no project-local manifest is consulted), and a shared hermetic EffectResolver loading built-in manifests only; no project/solution/user-level manifests. Files that fail before the effect pass (lexer/parser/type-check/binder errors; witnessed by the absence of Program.Compile's verbose 'Effect enforcement completed' status line) are listed by name with their first error code in notReachingEffectPass, never dropped. Calor0419 is counted per DIAGNOSTIC (one per function, first three reasons shown), so a function with more than three assumptions whose function-typed reason is truncated out of the message is under-counted — a known floor, not a ceiling. D-B: Roslyn syntax-only (CSharpSyntaxTree.ParseText, LanguageVersion.Preview, no preprocessor symbols defined, so inactive #if branches are not scanned) over bench/corpus/{MediatR,serilog,FluentValidation}/src/**/*.cs (bin/, obj/ excluded). delegate declarations are collected per SUBJECT (all files) before classifying, so a delegate declared in one file counts where it is used in another.",
   "purpose": "Current-compiler D-A regression expectations, not historical raw-source replay or a ledger identity.",
-  "fileCount": 961,
-  "filesNotReachingEffectPass": 82,
-  "notReachingEffectPassNote": "Current compiler over 961 logical subjects (the original 952, the six D-S1.5 checked/unchecked/record fixtures and the three ES-04 bystander steps), resolving explicitly registered active copies. 82 files fail before the effect pass; the w5-parity-002 treatment run-3 CSV subject now reaches it with authoritative List<str> indexed element typing. Intentionally obsolete MCP inputs retain their original bytes and, like the 14 inputs still written in the retired section-marker syntax with no native mirror, first fail on that marker (Calor0006). benchmarks/null-safety/null-deref.calr reaches it again: its seeds moved from string? to a user T? (29c8755c1). Sixteen benchmark subjects now stop at Calor0202, and HashMap first fails there instead of Calor0213: the type checker rejects their implicit double-to-float narrowing (i1); Visitor joins them once its unspaced `expr.Value` is a typed member read (i7). Every named first error remains exact.",
+  "fileCount": 934,
+  "filesNotReachingEffectPass": 36,
+  "notReachingEffectPassNote": "Current compiler over 934 logical subjects (the original 952, the six D-S1.5 checked/unchecked/record fixtures and the three ES-04 bystander steps, less 27 retired-syntax inputs the 0.30 legacy cleanup deleted or moved out of .calr), resolving explicitly registered active copies. 36 files fail before the effect pass; the w5-parity-002 treatment run-3 CSV subject now reaches it with authoritative List<str> indexed element typing. The surviving MCP benchmark tasks are written natively; only the two deliberately broken inputs stop early (02 on the missing effect row Calor0124, 18 on the unknown effect code Calor0403), and the two lint error fixtures stop on their parse (Calor0100) and lex (Calor0002) errors. benchmarks/null-safety/null-deref.calr reaches it again: its seeds moved from string? to a user T? (29c8755c1). Sixteen benchmark subjects now stop at Calor0202, and HashMap first fails there instead of Calor0213: the type checker rejects their implicit double-to-float narrowing (i1); Visitor joins them once its unspaced `expr.Value` is a typed member read (i7). Every named first error remains exact.",
   "notReachingEffectPass": [
     {
-      "file": "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/01-fix-closing-tag/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/02-fix-missing-effect/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
       "file": "bench/mcp/tasks/02-fix-missing-effect/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/03-fix-wrong-id-prefix/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/03-fix-wrong-id-prefix/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/04-fix-duplicate-id/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/04-fix-duplicate-id/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/05-fix-multiple-errors/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/05-fix-multiple-errors/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/06-add-effect-to-function/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/06-add-effect-to-function/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/07-greenfield-simple-function/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/08-greenfield-module-with-class/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/09-convert-csharp-simple/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/10-convert-csharp-with-effects/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/11-fix-undeclared-effect-chain/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/12-fix-mismatched-closing-tag/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/12-fix-mismatched-closing-tag/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/13-greenfield-crud-module/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/14-fix-test-ids-in-production/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/14-fix-test-ids-in-production/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/15-nontarget-read-module/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/16-nontarget-refactor-rename/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/16-nontarget-refactor-rename/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/17-fix-missing-return/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/17-fix-missing-return/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/18-fix-wrong-effect-code/expected.calr",
-      "firstError": "Calor0006"
+      "firstError": "Calor0124"
     },
     {
       "file": "bench/mcp/tasks/18-fix-wrong-effect-code/input.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/19-greenfield-async-function/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/20-fix-unclosed-call/expected.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "bench/mcp/tasks/20-fix-unclosed-call/input.calr",
-      "firstError": "Calor0006"
+      "firstError": "Calor0403"
     },
     {
       "file": "bench/phase0-agent-native/epochs/e1-rows-parity-001/N1-002-inventory/calor+v0.14.3/run-1/final-src/Inventory.calr",
@@ -177,64 +53,8 @@
       "firstError": "Calor0213"
     },
     {
-      "file": "scripts/h2_deep_fixture.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "scripts/h2_edit_fixture.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr",
-      "firstError": "Calor0006"
-    },
-    {
       "file": "tests/Calor.Conversion.Tests/Snapshots/13-10.approved.calr",
       "firstError": "Calor1006"
-    },
-    {
-      "file": "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/E2E/agent-tasks/fixtures/refactor-signature-calor/Signature.calr",
-      "firstError": "Calor0006"
-    },
-    {
-      "file": "tests/E2E/scenarios/07_collections/output.g.calr",
-      "firstError": "Calor0006"
     },
     {
       "file": "tests/TestData/Benchmarks/ComplexAlgorithms/EditDistance.calr",
@@ -325,16 +145,12 @@
       "firstError": "Calor0202"
     },
     {
-      "file": "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
-      "firstError": "Calor0006"
-    },
-    {
       "file": "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr",
-      "firstError": "Calor0006"
+      "firstError": "Calor0100"
     },
     {
       "file": "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr",
-      "firstError": "Calor0006"
+      "firstError": "Calor0002"
     }
   ],
   "compileExceptions": [],

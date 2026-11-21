@@ -134,9 +134,13 @@ public sealed class EffectRowCorpusShapeTests
         // unchecked-expression D-S1.5 fixtures, bringing it to 958.
         // 0.30 also adds an unedited, independent bystander.calr to each of ES-04's three
         // steps (so ES-04 keeps a CLI cache hit), bringing it to 961.
-        // The sweep below still covers every file. A drift from 961 means the sweep is no
+        // The 0.30 legacy cleanup deletes 25 retired-syntax inputs with no native mirror
+        // (14 bench/mcp task files, nine stale conversion snapshots, 07_collections'
+        // output.g.calr and mismatched_ids.calr) and moves scripts/h2_edit_fixture.calr and
+        // h2_deep_fixture.calr to scripts/historical/*.calr.txt, bringing it to 934.
+        // The sweep below still covers every file. A drift from 934 means the sweep is no
         // longer measuring the corpus it claims to.
-        Assert.Equal(961, files.Count);
+        Assert.Equal(934, files.Count);
 
         // The allowlist must not go stale: an entry earns its place by actually
         // writing a same-line row, and it must still be a committed file.

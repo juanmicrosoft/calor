@@ -129,6 +129,16 @@ public class EffectResolverKeyLedgerTests
     /// selected accessor with a bound key (bench +409, samples +3, src +3, tests +3).
     /// Measured with the indexer charge disabled, the counts are exactly the previous
     /// fixture (2099 / 685), so the manifest review in the same change moved nothing.</para>
+    /// <para><b>0.30 legacy cleanup: bound 2517 -> 2536, string 685 -> 702.</b> Inputs only,
+    /// no compiler change. The 50 retired-syntax inputs with no native mirror that this fixture
+    /// listed in notMeasured left it: seven obsolete bench/mcp tasks (closing tags, IDs), nine
+    /// stale conversion snapshots, 07_collections/output.g.calr and mismatched_ids.calr were
+    /// deleted; scripts/h2_*_fixture.calr moved to scripts/historical/*.calr.txt (the scripts
+    /// subject disappears). The 13 surviving bench/mcp tasks were rewritten natively: 17 of their 19
+    /// files now parse; the two others are deliberately broken inputs (02 input lacks its effect row,
+    /// 18 input names an unknown effect code), adding bench +19 bound / +17 string. The
+    /// natively rewritten Issue1104 and refactor-signature-calor/Signature.calr now parse
+    /// (tests +2 files measured) and add no keys.</para>
     /// </summary>
     [SkippableFact]
     public void CurrentCompiler_KeyOrigins_OverCommittedCalorCorpus_MatchExpectationsExactly()

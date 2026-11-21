@@ -1,23 +1,13 @@
-§M{m001:DataService}
+module DataService
+  using System.IO
 
-§F{f001:WriteRecord:priv}
-  §I{str:key}
-  §I{str:value}
-  §O{bool}
-  §E{db:w}
-  §C{DbContext.SaveChanges} §/C
-  §R BOOL:true
-§/F{f001}
+  func WriteRecord private (string:key, string:value) → bool
+    File.AppendAllText(key, value)
+    return true
 
-§F{f002:CreateUser:pub}
-  §I{str:name}
-  §I{str:email}
-  §O{bool}
-  §E{cw}
-  §C{Console.WriteLine} §A (+ STR:"Creating user: " name) §/C
-  §B{success:bool} §C{WriteRecord} §A STR:"user" §A name §/C
-  §C{Console.WriteLine} §A STR:"Done" §/C
-  §R success
-§/F{f002}
-
-§/M{m001}
+  func CreateUser (string:name, string:email) → bool
+    ! cw
+    Console.WriteLine("Creating user: " + name)
+    let bool:success = WriteRecord("user", name)
+    Console.WriteLine("Done")
+    return success

@@ -109,17 +109,21 @@ public class HigherOrderDemandLedgerTests
         + "All seven #901 benchmark subjects now reach the effect pass.";
 
     private const string CurrentNotReachingEffectPassNote =
-        "Current compiler over 961 logical subjects (the original 952, the six D-S1.5 "
-        + "checked/unchecked/record fixtures and the three ES-04 bystander steps), resolving explicitly registered active copies. "
-        + "82 files fail before the effect pass; the w5-parity-002 treatment run-3 "
-        + "CSV subject now reaches it with authoritative List<str> indexed element typing. Intentionally obsolete "
-        + "MCP inputs retain their original bytes and, like the 14 inputs still written in the retired "
-        + "section-marker syntax with no native mirror, first fail on that marker (Calor0006). "
-        + "benchmarks/null-safety/null-deref.calr reaches it again: its seeds moved from string? to a user T? "
-        + "(29c8755c1). Sixteen benchmark subjects now stop at Calor0202, and HashMap first fails there instead "
-        + "of Calor0213: the type checker rejects their "
-        + "implicit double-to-float narrowing (i1); Visitor joins them once its unspaced `expr.Value` is a "
-        + "typed member read (i7). Every named first error remains exact.";
+        "Current compiler over 934 logical subjects (the original 952, the six D-S1.5 "
+        + "checked/unchecked/record fixtures and the three ES-04 bystander steps, less 27 "
+        + "retired-syntax inputs the 0.30 legacy cleanup deleted or moved out of .calr), "
+        + "resolving explicitly registered active copies. 36 files fail before the effect "
+        + "pass; the w5-parity-002 treatment run-3 CSV subject now reaches it with "
+        + "authoritative List<str> indexed element typing. The surviving MCP benchmark "
+        + "tasks are written natively; only the two deliberately broken inputs stop early "
+        + "(02 on the missing effect row Calor0124, 18 on the unknown effect code "
+        + "Calor0403), and the two lint error fixtures stop on their parse (Calor0100) and "
+        + "lex (Calor0002) errors. benchmarks/null-safety/null-deref.calr reaches it "
+        + "again: its seeds moved from string? to a user T? (29c8755c1). Sixteen benchmark "
+        + "subjects now stop at Calor0202, and HashMap first fails there instead of "
+        + "Calor0213: the type checker rejects their implicit double-to-float narrowing "
+        + "(i1); Visitor joins them once its unspaced `expr.Value` is a typed member read "
+        + "(i7). Every named first error remains exact.";
 
     /// <summary>
     /// The D-B classification, pinned as data: identifiers a declared type syntax

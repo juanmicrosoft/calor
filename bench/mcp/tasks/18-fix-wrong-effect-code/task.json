@@ -1,9 +1,12 @@
 {
   "id": "18-fix-wrong-effect-code",
   "category": "effect-fix",
-  "description": "Function declares §E{database:write} instead of §E{db:w} — invalid effect code",
+  "description": "Function declares ! database:write instead of ! db:w — invalid effect code",
   "targetPhase": "phase2",
   "input": "input.calr",
   "expected": "expected.calr",
-  "successCriteria": "Compiles with correct effect code"
+  "successCriteria": "Compiles with correct effect code",
+  "expectedDiagnostics": [
+    "Calor0403"
+  ]
 }

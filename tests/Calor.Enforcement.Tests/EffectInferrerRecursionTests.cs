@@ -77,7 +77,7 @@ public class EffectInferrerRecursionTests
     {
         // The issue's exact API: a default-constructed pass over the parsed,
         // UNBOUND module. Before the fix this line killed the process.
-        var module = Parse(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
+        var module = Parse(TestHarness.LoadScenario(FixturePath));
         var bag = new DiagnosticBag();
 
         new EffectEnforcementPass(bag).Enforce(module);
@@ -99,7 +99,7 @@ public class EffectInferrerRecursionTests
         // re-implementation is what catches a refactor that reintroduces an
         // unbounded pass on either path.
         var parse = CalorSourceHelper.Parse(
-            NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative), "Issue1104.calr");
+            TestHarness.LoadScenario(FixturePath), "Issue1104.calr");
         Assert.True(parse.IsSuccess);
 
         var result = new EditPreviewTool.EffectCheckResult();
@@ -116,7 +116,7 @@ public class EffectInferrerRecursionTests
     {
         // The native parse yields an ExpressionCallNode initializer, whose type
         // comes from the bound call graph: no AST ask re-enters the binding.
-        var (bag, bound) = Enforce(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative));
+        var (bag, bound) = Enforce(TestHarness.LoadScenario(FixturePath));
 
         Assert.Equal(0, bound.CycleStops);
         Assert.Equal(0, bound.DepthCapStops);
@@ -128,7 +128,7 @@ public class EffectInferrerRecursionTests
     public void SerilogFixture_CycleResolvesToSentinel_ByVisitedSetNotByCap()
     {
         var (bag, bound) = Enforce(WithDottedCallInitializers(
-            Parse(NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative))));
+            Parse(TestHarness.LoadScenario(FixturePath))));
 
         // The hoisted `out var` binding is the name whose own resolution was
         // re-entered; it resolved by the VISITED SET, never by the backstop.
@@ -153,7 +153,7 @@ public class EffectInferrerRecursionTests
         // "pure". If a future change makes a cycle resolve to a REAL type,
         // this goes red and the change gets looked at. Checked on both the
         // cycle-stopped (dotted call) shape and the native parse.
-        var source = NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative);
+        var source = TestHarness.LoadScenario(FixturePath);
         var (cycled, cycledBound) = Enforce(WithDottedCallInitializers(Parse(source)));
         Assert.True(cycledBound.CycleStops >= 1);
         Assert.Contains(cycled, d => d.Code == DiagnosticCode.UnknownExternalCall
@@ -175,7 +175,7 @@ public class EffectInferrerRecursionTests
         // with something that no longer exercises the cycle: a binding with no
         // initializer on its own line, followed by a call that names it as an
         // argument, on a receiver that resolves (the field).
-        var source = NativeCounterpart(TestHarness.LoadScenario(FixturePath), SerilogFixtureNative);
+        var source = TestHarness.LoadScenario(FixturePath);
         var module = Parse(source);
 
         var cls = Assert.Single(module.Classes);
@@ -302,15 +302,6 @@ public class EffectInferrerRecursionTests
     }
 
     // ===== helpers =====
-
-    private const string SerilogFixtureNative = """
-        module Calor0425Leg Calor0425Leg
-          class BatchingSink internal sealed
-            field FailureAwareBatchScheduler:_batchScheduler private readonly
-
-            func LoopAsync private async ()
-              var shouldDropQueue = _batchScheduler.MarkFailure(shouldDropBatch, shouldDropQueue)
-        """;
 
     // Retain each original input and oracle; only the explicitly paired input is parsed.
     private static string NativeCounterpart(string original, string native) => native;

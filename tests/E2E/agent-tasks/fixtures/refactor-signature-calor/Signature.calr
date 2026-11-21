@@ -1,16 +1,16 @@
-§M{SignatureExamples}
-  §F{Greet:pub} (str:name) -> str
-    §R name
+module SignatureExamples SignatureExamples block
+  func Greet (string:name) → string
+    !
+    return name
 
-  §F{TryParse:pub} (str:input) -> i32
-    §R 0
+  func TryParse (string:input) → int
+    !
+    return 0
 
-  §F{CreateRange:pub} (i32:start, i32:end, i32:step) -> i32
-    §Q (<= start end)
-    §Q (> step 0)
-    §R (/ (- end start) step)
+  func CreateRange (int:start, int:end | (start <= #), int:@step | (# > 0)) → int
+    !
+    return ((end - start) / @step)
 
-  §F{CountSteps:pub} (i32:max) -> i32
-    §Q (> max 0)
-    §R §C{CreateRange} §A 0 §A max §A 1 §/C
-
+  func CountSteps (int:max | (# > 0)) → int
+    !
+    return CreateRange(0, max, 1)

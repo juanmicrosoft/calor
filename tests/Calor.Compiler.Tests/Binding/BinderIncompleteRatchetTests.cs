@@ -51,24 +51,10 @@ public class BinderIncompleteRatchetTests
             // Deliberately-invalid lint fixtures (they exist to fail):
             ["tests/TestData/LintScenarios/10_error_cases/syntax_error.calr"] = "error fixture",
             ["tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"] = "error fixture",
-            ["tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"] =
-                "error fixture (NOTE: currently fails on Calor0830 legacy closers, not the " +
-                "mismatched ids it was built for — stale in its own way, see #901's pattern)",
-            // 0.30 native-syntax cutover: these checked-in files are still written in the
-            // retired `§` syntax and have no active-syntax mirror, so the parser rejects them
-            // (Calor0006). Migrating or deleting them belongs to their owning suites.
-            ["tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/E2E/agent-tasks/fixtures/refactor-signature-calor/Signature.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
-            ["tests/E2E/scenarios/07_collections/output.g.calr"] = "retired § syntax without an active mirror (0.30 cutover)",
+            // 0.30 native-syntax cutover: the retired-syntax inputs with no active mirror
+            // that used to be registered here were migrated or deleted (mismatched_ids, the
+            // nine stale conversion snapshots and 07_collections/output.g.calr were deleted;
+            // Issue1104 and refactor-signature-calor/Signature.calr now parse natively).
         };
 
     private static string RepoRoot()
@@ -104,6 +90,14 @@ public class BinderIncompleteRatchetTests
     /// member-access node over a reference (two expressions where the dotted name was one),
     /// across 18 files (largest: StringContracts +10, bounds-violation +6, null-deref +6,
     /// 12-03 snapshot +4). 7386 + 3 - 4 + 40 = 7425.</para>
+    /// <para>Legacy cleanup (0.30 acceptance audit): 514 → 516 parsed, 15 → 2 failures. The
+    /// nine stale conversion snapshots, <c>07_collections/output.g.calr</c> and
+    /// <c>mismatched_ids.calr</c> were deleted (11 failures, no bound expressions);
+    /// <c>Issue1104_BatchingSink_LoopAsync.calr</c> (+4) and
+    /// <c>refactor-signature-calor/Signature.calr</c> (+20) were rewritten natively and now
+    /// parse. ExpressionsBound 7425 → 7478; removing those two files gives 7454, so 29 of
+    /// the change predates this cleanup (the informational count is not asserted and had
+    /// drifted) and is recorded rather than attributed.</para>
     /// </summary>
     private const string NativeCurrentNote =
         "0.30 current native leg: 12 retired-syntax inputs registered in AllowedParseFailures no "
@@ -111,7 +105,11 @@ public class BinderIncompleteRatchetTests
         + "remain zero. ExpressionsBound is informational. Follow-up: the 3 added parsed inputs are "
         + "the ES-04 bystander.calr steps (h3); ExpressionsBound 7386 to 7425 is 3 bystander "
         + "expressions, 4 fewer in the re-seeded null-deref benchmark (h2) and 40 more from i7 "
-        + "member-access parsing of x.Field.";
+        + "member-access parsing of x.Field. Legacy cleanup: 514 to 516 parsed and 15 to 2 failures; "
+        + "11 retired-syntax inputs were deleted and Issue1104 and Signature.calr now parse natively, "
+        + "leaving only the two lint error fixtures. ExpressionsBound 7425 to 7478: 24 from the two "
+        + "newly parsed files (Signature 20, Issue1104 4); the other 29 were already present before "
+        + "this change (7454 with both files removed) and are not attributed here.";
 
     // ONE scope string — the two regen writers previously hardcoded different texts,
     // making the committed file depend on writer order (review minor 5).

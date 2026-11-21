@@ -1,68 +1,16 @@
 [
   {
-    "taskId": "01-fix-closing-tag",
-    "category": "parser-fix",
-    "status": "pass",
-    "reason": null,
-    "medianRoundTrips": 2,
-    "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 3.0197,
-    "successRate": 100,
-    "matchesExpected": true,
-    "inputSizeBytes": 166
-  },
-  {
     "taskId": "02-fix-missing-effect",
     "category": "effect-fix",
-    "status": "pass",
-    "reason": null,
-    "medianRoundTrips": 2,
-    "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 5.4105,
-    "successRate": 100,
-    "matchesExpected": false,
-    "inputSizeBytes": 151
-  },
-  {
-    "taskId": "03-fix-wrong-id-prefix",
-    "category": "id-fix",
-    "status": "pass",
+    "status": "fail",
     "reason": null,
     "medianRoundTrips": 1,
-    "medianDiagnosticsBefore": 0,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.3379,
-    "successRate": 100,
-    "matchesExpected": false,
-    "inputSizeBytes": 202
-  },
-  {
-    "taskId": "04-fix-duplicate-id",
-    "category": "id-fix",
-    "status": "pass",
-    "reason": null,
-    "medianRoundTrips": 1,
-    "medianDiagnosticsBefore": 0,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.4364,
-    "successRate": 100,
-    "matchesExpected": false,
-    "inputSizeBytes": 272
-  },
-  {
-    "taskId": "05-fix-multiple-errors",
-    "category": "multi-fix",
-    "status": "pass",
-    "reason": null,
-    "medianRoundTrips": 3,
     "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 5.0978,
-    "successRate": 100,
+    "medianDiagnosticsAfter": 1,
+    "medianTimeMs": 0.0426,
+    "successRate": 0,
     "matchesExpected": false,
-    "inputSizeBytes": 312
+    "inputSizeBytes": 89
   },
   {
     "taskId": "06-add-effect-to-function",
@@ -72,10 +20,10 @@
     "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 1,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 4.983,
+    "medianTimeMs": 65.867,
     "successRate": 100,
-    "matchesExpected": false,
-    "inputSizeBytes": 375
+    "matchesExpected": true,
+    "inputSizeBytes": 356
   },
   {
     "taskId": "07-greenfield-simple-function",
@@ -137,23 +85,10 @@
     "medianRoundTrips": 2,
     "medianDiagnosticsBefore": 1,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 5.0117,
-    "successRate": 100,
-    "matchesExpected": false,
-    "inputSizeBytes": 454
-  },
-  {
-    "taskId": "12-fix-mismatched-closing-tag",
-    "category": "parser-fix",
-    "status": "pass",
-    "reason": null,
-    "medianRoundTrips": 2,
-    "medianDiagnosticsBefore": 2,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.9345,
+    "medianTimeMs": 73.0732,
     "successRate": 100,
     "matchesExpected": true,
-    "inputSizeBytes": 340
+    "inputSizeBytes": 359
   },
   {
     "taskId": "13-greenfield-crud-module",
@@ -169,19 +104,6 @@
     "inputSizeBytes": 0
   },
   {
-    "taskId": "14-fix-test-ids-in-production",
-    "category": "id-fix",
-    "status": "pass",
-    "reason": null,
-    "medianRoundTrips": 1,
-    "medianDiagnosticsBefore": 0,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.5117,
-    "successRate": 100,
-    "matchesExpected": false,
-    "inputSizeBytes": 371
-  },
-  {
     "taskId": "15-nontarget-read-module",
     "category": "comprehension",
     "status": "pass",
@@ -189,10 +111,10 @@
     "medianRoundTrips": 1,
     "medianDiagnosticsBefore": 0,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.6746,
+    "medianTimeMs": 46.9181,
     "successRate": 100,
     "matchesExpected": false,
-    "inputSizeBytes": 733
+    "inputSizeBytes": 749
   },
   {
     "taskId": "16-nontarget-refactor-rename",
@@ -202,36 +124,36 @@
     "medianRoundTrips": 1,
     "medianDiagnosticsBefore": 0,
     "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.5692,
+    "medianTimeMs": 30.4738,
     "successRate": 100,
     "matchesExpected": false,
-    "inputSizeBytes": 457
+    "inputSizeBytes": 446
   },
   {
     "taskId": "17-fix-missing-return",
     "category": "parser-fix",
-    "status": "pass",
+    "status": "fail",
     "reason": null,
     "medianRoundTrips": 1,
-    "medianDiagnosticsBefore": 0,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 2.3136,
-    "successRate": 100,
+    "medianDiagnosticsBefore": 1,
+    "medianDiagnosticsAfter": 1,
+    "medianTimeMs": 8.7873,
+    "successRate": 0,
     "matchesExpected": false,
-    "inputSizeBytes": 116
+    "inputSizeBytes": 73
   },
   {
     "taskId": "18-fix-wrong-effect-code",
     "category": "effect-fix",
-    "status": "pass",
+    "status": "fail",
     "reason": null,
-    "medianRoundTrips": 2,
+    "medianRoundTrips": 1,
     "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 0,
-    "medianTimeMs": 4.6137,
-    "successRate": 100,
+    "medianDiagnosticsAfter": 1,
+    "medianTimeMs": 0.0753,
+    "successRate": 0,
     "matchesExpected": false,
-    "inputSizeBytes": 150
+    "inputSizeBytes": 185
   },
   {
     "taskId": "19-greenfield-async-function",
@@ -245,18 +167,5 @@
     "successRate": 0,
     "matchesExpected": false,
     "inputSizeBytes": 0
-  },
-  {
-    "taskId": "20-fix-unclosed-call",
-    "category": "parser-fix",
-    "status": "fail",
-    "reason": null,
-    "medianRoundTrips": 1,
-    "medianDiagnosticsBefore": 1,
-    "medianDiagnosticsAfter": 1,
-    "medianTimeMs": 0.0646,
-    "successRate": 0,
-    "matchesExpected": false,
-    "inputSizeBytes": 138
   }
 ]
