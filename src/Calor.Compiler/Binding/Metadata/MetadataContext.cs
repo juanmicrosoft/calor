@@ -209,6 +209,9 @@ internal sealed class MetadataContext : IDisposable
         private Lazy<(ImmutableArray<MetadataReference> References, CSharpCompilation Host)>? _host;
     }
 
+    /// <summary>The explicit-reference scope in effect (null outside one); identity only.</summary>
+    internal static object? CurrentReferenceScope => AmbientReferences.Value;
+
     /// <summary>The explicit references in scope; empty outside a compilation.</summary>
     internal static IReadOnlyList<string> CurrentReferencePaths => AmbientReferences.Value?.Paths ?? [];
 
