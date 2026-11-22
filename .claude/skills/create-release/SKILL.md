@@ -152,7 +152,7 @@ Trusted Publishing policy must still name this repository, workflow, and environ
    blocking existing-version comparison, pushes with `--skip-duplicate`, and polls/compares
    both served packages (60 attempts, 30 seconds apart, per package).
 6. **`install-check`** installs from nuget.org on linux-x64, osx-arm64 and win-x64 (30 attempts,
-   a minute apart). The candidate sample must produce `Proven: 14` and `Skipped: 0`.
+   a minute apart). The candidate sample must produce `Proven: 11` and `Skipped: 0`.
 7. **`release`** downloads by immutable artifact ID and checks the recorded inventory again.
    It retains remote tag/candidate and existing release title/body checks; metadata assets must
    be identical or absent, never overwritten.
@@ -214,7 +214,7 @@ If only one is there, say exactly which.
 | `publish` | `NuGet/login` fails, or `Trusted Publishing returned no key` | The nuget.org `calor-release` policy or the `nuget-release` environment is wrong. Run `scripts/check_release_credentials.py --live`; settings are a maintainer action. |
 | `promotion-check` / `publish` | promotion refused | Inspect identity, artifact expiry/digest, gate results and environment approval controls. Do not edit the bundle or bypass the check. |
 | `publish` | `nuget.org does not serve ... after 60 attempts` | Indexing lag longer than the poll (60 attempts per package). Rerun failed jobs of the same run: the push uses `--skip-duplicate` and the compare accepts an identical package. |
-| `install-check` | `could not be installed ... after 30 attempts`, or no `Proven: 14` / `Skipped: 0` | A broken package (for example Z3 missing, `Calor0710`). Investigate before anything else; the GitHub release was not created. |
+| `install-check` | `could not be installed ... after 30 attempts`, or no `Proven: 11` / `Skipped: 0` | A broken package (for example Z3 missing, `Calor0710`). Investigate before anything else; the GitHub release was not created. |
 | `release` | `tag vX.Y.Z already points at ...` / `existing release ... has a body other than these notes` | A tag or release was made by hand. Releases are never edited; the maintainer must resolve it. |
 
 ### Re-running
