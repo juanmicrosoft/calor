@@ -695,7 +695,7 @@ jobs:
             ${{ runner.temp }}/bundle/release-metadata/*.json
 
   # Install calor from nuget.org as a user would, and require `calor verify` to prove the sample
-  # (Proven: 14, Skipped: 0). The sample comes from the candidate commit, not a tag. A failure
+  # (Proven: 11, Skipped: 0). The sample comes from the candidate commit, not a tag. A failure
   # stops the GitHub release, its metadata, and the website.
   install-check:
     needs: [preflight, publish]
