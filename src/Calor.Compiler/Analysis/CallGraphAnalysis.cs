@@ -301,6 +301,48 @@ public sealed class CallGraphAnalysis
     private static CompilationErrorState ErrorStateOf(Compilation compilation) =>
         CompilationErrorStates.GetValue(compilation, image => new CompilationErrorState(image));
 
+    // For the same reason one semantic model per tree and one diagnostic list per span
+    // answer every later request against the same compilation. A semantic model binds
+    // each member body once and keeps it, so a second model of the same tree (a shared
+    // image's tree bound by another request of the pass) bound every body again; and
+    // GetDiagnostics(span) compiles the bodies the span intersects on every call, so
+    // the checks that ask about the same span (a type header for every call into that
+    // type, a member asked about by more than one request) compiled them again. Both
+    // answers are functions of the compilation, the tree and the span alone:
+    // SemanticModel.GetDiagnostics(span) is the compilation's diagnostics for that tree
+    // and span, independent of the model instance.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Compilation,
+        CompilationQueries> CompilationQueryCaches = new();
+
+    private sealed class CompilationQueries(Compilation compilation)
+    {
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<SyntaxTree, SemanticModel> _models = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<
+            (SyntaxTree Tree, Microsoft.CodeAnalysis.Text.TextSpan Span),
+            System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> _diagnostics = new();
+
+        internal SemanticModel Model(SyntaxTree tree) =>
+            _models.GetOrAdd(tree, key => compilation.GetSemanticModel(key));
+
+        internal System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic> Diagnostics(
+            SyntaxTree tree, Microsoft.CodeAnalysis.Text.TextSpan span) =>
+            _diagnostics.GetOrAdd((tree, span), key => Model(key.Tree).GetDiagnostics(key.Span));
+    }
+
+    private static CompilationQueries QueriesOf(Compilation compilation) =>
+        CompilationQueryCaches.GetValue(compilation, image => new CompilationQueries(image));
+
+    /// <summary>The (shared) semantic model of <paramref name="tree"/> in <paramref name="compilation"/>.</summary>
+    private static SemanticModel ModelOf(Compilation compilation, SyntaxTree tree) =>
+        QueriesOf(compilation).Model(tree);
+
+    /// <summary>
+    /// <c>model.GetDiagnostics(span)</c>, computed once per compilation, tree and span.
+    /// </summary>
+    private static System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic> DiagnosticsIn(
+        SemanticModel model, Microsoft.CodeAnalysis.Text.TextSpan span) =>
+        QueriesOf(model.Compilation).Diagnostics(model.SyntaxTree, span);
+
     /// <summary>
     /// Where an image's errors are. C# binds each method, accessor and expression body
     /// against declaration symbols only; no body's contents can change how another body
@@ -489,7 +531,7 @@ public sealed class CallGraphAnalysis
     private static IEnumerable<(IMethodSymbol Method, AstNode Origin)> DeclaredCompanionMethods(
         Compilation compilation, SyntaxTree tree, string marker, IReadOnlyList<AstNode> callables)
     {
-        var model = compilation.GetSemanticModel(tree);
+        var model = ModelOf(compilation, tree);
         foreach (var declaration in tree.GetRoot().DescendantNodes().OfType<BaseMethodDeclarationSyntax>())
         {
             foreach (var trivia in declaration.GetLeadingTrivia())
@@ -700,6 +742,53 @@ public sealed class CallGraphAnalysis
             or SyntaxKind.CharacterLiteralToken or SyntaxKind.XmlTextLiteralToken;
     }
 
+    /// <summary>
+    /// The operator bindings one project pass has resolved, by request, so that a
+    /// second identical request (the same module object, contract mode, effective module
+    /// context, source path and reference set) returns the first answer instead of
+    /// compiling and binding the same projection again. An answer is returned only when
+    /// the request's projection text is exactly the text it was computed from, so a
+    /// module whose content (or cross-module qualification) differs is resolved afresh.
+    /// Answers are read-only to every consumer. Owned by the pass's
+    /// <see cref="ISourceBindingContext"/> and dropped with it.
+    /// </summary>
+    internal sealed class OperatorBindingsMemo
+    {
+        internal sealed record Request(ModuleNode Module, ContractMode Mode, bool SingleModuleContext,
+            string? SourcePath, object References, object? ReferenceScope)
+        {
+            // Identity, not structure: the module and the reference set are the objects
+            // the answer was computed from.
+            public bool Equals(Request? other) => other is not null
+                && ReferenceEquals(Module, other.Module) && Mode == other.Mode
+                && SingleModuleContext == other.SingleModuleContext
+                && string.Equals(SourcePath, other.SourcePath, StringComparison.Ordinal)
+                && ReferenceEquals(References, other.References)
+                && ReferenceEquals(ReferenceScope, other.ReferenceScope);
+
+            public override int GetHashCode() => HashCode.Combine(
+                System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Module), Mode, SingleModuleContext,
+                SourcePath is null ? 0 : StringComparer.Ordinal.GetHashCode(SourcePath),
+                System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(References));
+        }
+
+        private readonly Dictionary<Request, (string Source, OperatorBindings Bindings)> _answers = [];
+
+        internal OperatorBindings? Find(Request request, string source)
+        {
+            lock (_answers)
+                return _answers.TryGetValue(request, out var answer)
+                    && string.Equals(answer.Source, source, StringComparison.Ordinal)
+                        ? answer.Bindings : null;
+        }
+
+        internal void Record(Request request, string source, OperatorBindings bindings)
+        {
+            lock (_answers)
+                _answers[request] = (source, bindings);
+        }
+    }
+
     /// <summary>One configuration of a <see cref="SharedProjectionImage"/>.</summary>
     internal sealed class SharedCompilation
     {
@@ -871,6 +960,22 @@ public sealed class CallGraphAnalysis
                 $"{diagnostic.Code}: {diagnostic.Message}"));
             return bindings;
         }
+        // A project pass asks for the same module's bindings more than once (the symbol
+        // index's binder, the effect pass's call-graph binder and the effect pass's call
+        // graph itself). The answer is a function of the request and of this projection
+        // text, so a request already answered for exactly this text returns that answer.
+        // The cross-module map is not part of the request: it reaches the answer only
+        // through the projection text, which is compared. The module context is, but only
+        // where it is read: for a partial type of this module's own image (below), so
+        // without one the two contexts are the same request. The emission diagnostics
+        // above were reported to this caller's bag either way.
+        var memo = image is null ? null : crossModuleTypes?.OperatorBindingsMemo;
+        var memoKey = new OperatorBindingsMemo.Request(module, contractMode,
+            singleModuleContext || !emittedTypes.Any(type => type.IsPartial), sourcePath,
+            Binding.Metadata.MetadataContext.ProjectionReferences(),
+            Binding.Metadata.MetadataContext.CurrentReferenceScope);
+        if (memo?.Find(memoKey, source) is { } answered)
+            return answered;
         var options = new CSharpParseOptions(LanguageVersion.Preview);
         var initial = CSharpSyntaxTree.ParseText(source, options);
         // A companion's condition symbols are read once per parsed companion, not once
@@ -897,6 +1002,7 @@ public sealed class CallGraphAnalysis
             foreach (var compilation in shared.Compilations)
                 BindTree(compilation.Trees[shared.Index], compilation.Compilation,
                     compilation.CompanionMethodsExcept(shared.Index));
+            memo?.Record(memoKey, source, bindings);
             return bindings;
         }
         foreach (var configuration in configurations)
@@ -912,12 +1018,13 @@ public sealed class CallGraphAnalysis
             BindTree(tree, compilation, companionTrees.SelectMany(companion => DeclaredCompanionMethods(
                 compilation, companion.Tree, companion.Projection.Marker, companion.Projection.Callables)));
         }
+        memo?.Record(memoKey, source, bindings);
         return bindings;
 
         void BindTree(SyntaxTree tree, CSharpCompilation compilation,
             IEnumerable<(IMethodSymbol Method, AstNode Origin)> companionMethods)
         {
-            var model = compilation.GetSemanticModel(tree);
+            var model = ModelOf(compilation, tree);
             var root = tree.GetRoot();
             var methods = new Dictionary<ISymbol, AstNode>(SymbolEqualityComparer.Default);
             foreach (var (method, origin) in companionMethods)
@@ -954,7 +1061,7 @@ public sealed class CallGraphAnalysis
                         || HasErrorType(type) || HasErrorType(invoke.ReturnType)
                         || invoke.Parameters.Any(parameter => HasErrorType(parameter.Type))
                         || HasInvalidEventOwner(symbol.ContainingType)
-                        || model.GetDiagnostics(declaration.Span).Any(diagnostic =>
+                        || DiagnosticsIn(model, declaration.Span).Any(diagnostic =>
                             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
                         || symbol.ContainingType.GetMembers(symbol.Name).Length != 1
                         || bindings.EventTypes.TryGetValue(origin, out var previous) && !SameEventType(previous, type))
@@ -995,7 +1102,7 @@ public sealed class CallGraphAnalysis
                             if (!bindings.InitializationBodies.TryGetValue(functionId, out var bodies))
                                 bindings.InitializationBodies[functionId] = bodies = [];
                             if (model.GetOperation(declaration) is not { } body
-                                || model.GetDiagnostics(declaration.Span).Any(diagnostic =>
+                                || DiagnosticsIn(model, declaration.Span).Any(diagnostic =>
                                     diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                                 bindings.InitializationBodies[functionId] = null;
                             else
@@ -1010,7 +1117,7 @@ public sealed class CallGraphAnalysis
                         {
                             if (model.GetOperation(constructorSyntax) is not IConstructorBodyOperation
                                 { Initializer: IExpressionStatementOperation { Operation: IInvocationOperation initializer } }
-                                || model.GetDiagnostics(initializer.Syntax.Span).Any(diagnostic =>
+                                || DiagnosticsIn(model, initializer.Syntax.Span).Any(diagnostic =>
                                     diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                             {
                                 conflictingConstructorInitializers.Add(constructorOrigin);
@@ -1091,7 +1198,7 @@ public sealed class CallGraphAnalysis
                     bindings.InitializationFunctions[accessor.OriginalDefinition] = functionId;
                     if (!bindings.InitializationBodies.TryGetValue(functionId, out var bodies))
                         bindings.InitializationBodies[functionId] = bodies = [];
-                    if (model.GetDiagnostics(declaration.Span).Any(diagnostic =>
+                    if (DiagnosticsIn(model, declaration.Span).Any(diagnostic =>
                             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                         bindings.InitializationBodies[functionId] = null;
                     else if (declaration.Body != null || declaration.ExpressionBody != null)
@@ -1277,7 +1384,7 @@ public sealed class CallGraphAnalysis
                         && events.TryGetValue(eventReference.Event.OriginalDefinition, out var eventOrigin)
                         && bindings.EventTypes.ContainsKey(eventOrigin)
                         && eventReference.Event.Type is INamedTypeSymbol { DelegateInvokeMethod: not null } eventType
-                        && !model.GetDiagnostics(operation.Syntax.Span).Any(diagnostic =>
+                        && !DiagnosticsIn(model, operation.Syntax.Span).Any(diagnostic =>
                             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
                         var selection = new EventStorageSelection(eventOrigin, eventType,
@@ -1393,7 +1500,7 @@ public sealed class CallGraphAnalysis
                             Type: INamedTypeSymbol { DelegateInvokeMethod: not null } target
                         } delegateCreation
                         && Origin(delegateCreation) is LambdaExpressionNode lambda
-                        && !model.GetDiagnostics(delegateCreation.Syntax.Span).Any(diagnostic =>
+                        && !DiagnosticsIn(model, delegateCreation.Syntax.Span).Any(diagnostic =>
                             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
                         if (bindings.LambdaTargets.TryGetValue(lambda, out var previous)
@@ -1537,7 +1644,7 @@ public sealed class CallGraphAnalysis
                     bindings.SourceExtensionCalls.Add(extensionCall.Span);
                 // A reduced extension candidate (`color.Take(value)`) is declared as its static form.
                 if (!candidates.Any(candidate => methods.ContainsKey((candidate.ReducedFrom ?? candidate).OriginalDefinition))
-                    || !model.GetDiagnostics(syntax.Span).Any(diagnostic => diagnostic.Id == "CS0121"))
+                    || !DiagnosticsIn(model, syntax.Span).Any(diagnostic => diagnostic.Id == "CS0121"))
                     continue;
                 var arguments = syntax switch
                 {
@@ -1871,7 +1978,7 @@ public sealed class CallGraphAnalysis
                             if (record.BaseList?.Types.OfType<PrimaryConstructorBaseTypeSyntax>()
                                     .Select(baseType => model.GetOperation(baseType))
                                     .OfType<IInvocationOperation>().Take(2).ToArray() is [var baseCall]
-                                && !model.GetDiagnostics(baseCall.Syntax.Span).Any(diagnostic =>
+                                && !DiagnosticsIn(model, baseCall.Syntax.Span).Any(diagnostic =>
                                     diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                                 SetRecordInitializer(primaryOrigin, baseCall.TargetMethod);
                         }
@@ -1898,7 +2005,7 @@ public sealed class CallGraphAnalysis
                 {
                     if (parts is not [var part] || !bindings.InitializationClasses.ContainsKey(type)
                         || part.Origin.IsPartial && !singleModuleContext
-                        || model.GetDiagnostics(Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                        || DiagnosticsIn(model, Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
                             part.Syntax.SpanStart, part.Syntax.OpenBraceToken.SpanStart)).Any(diagnostic =>
                             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
@@ -1989,7 +2096,7 @@ public sealed class CallGraphAnalysis
                             _ => null
                         };
                         if (operation == null
-                            || model.GetDiagnostics(initializer.Span).Any(diagnostic =>
+                            || DiagnosticsIn(model, initializer.Span).Any(diagnostic =>
                                 diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                         {
                             if (isStatic) validStatic = false;
@@ -2015,7 +2122,7 @@ public sealed class CallGraphAnalysis
                         continue;
                     }
                     if (model.GetOperation(syntax) is IObjectCreationOperation { Constructor: { } constructor }
-                        && !model.GetDiagnostics(syntax.Span).Any(diagnostic =>
+                        && !DiagnosticsIn(model, syntax.Span).Any(diagnostic =>
                             diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
                         if (bindings.SourceConstructors.TryGetValue(creation, out var previous)
@@ -2042,7 +2149,7 @@ public sealed class CallGraphAnalysis
                                 .OfType<IPropertySymbol>().Any(property =>
                                     declarations.ContainsKey(property.ContainingType.OriginalDefinition));
                         }) ?? [];
-                    foreach (var error in invalidReads.SelectMany(member => model.GetDiagnostics(member.Span))
+                    foreach (var error in invalidReads.SelectMany(member => DiagnosticsIn(model, member.Span))
                                  .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
                         var message = $"Generated C# failed compilation ({error.Id}): {error.GetMessage()}";
@@ -2094,7 +2201,7 @@ public sealed class CallGraphAnalysis
                         or SpecialType.System_Int64 or SpecialType.System_UInt64
                         or SpecialType.System_Single or SpecialType.System_Double
                         or SpecialType.System_Decimal or SpecialType.System_String)
-                    || model.GetDiagnostics(operation.Syntax.Span).Any(diagnostic =>
+                    || DiagnosticsIn(model, operation.Syntax.Span).Any(diagnostic =>
                         diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     return;
                 var receiverOperations = new Stack<IOperation>();
@@ -2149,8 +2256,8 @@ public sealed class CallGraphAnalysis
                 for (INamedTypeSymbol? current = owner; current is not null; current = current.ContainingType)
                     foreach (var reference in current.DeclaringSyntaxReferences)
                         if (reference.GetSyntax() is TypeDeclarationSyntax declaration
-                            && compilation.GetSemanticModel(reference.SyntaxTree)
-                                .GetDiagnostics(Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
+                            && DiagnosticsIn(ModelOf(compilation, reference.SyntaxTree),
+                                Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(
                                 declaration.SpanStart, declaration.OpenBraceToken.Span.End))
                                 .Any(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                             return true;
@@ -2168,7 +2275,7 @@ public sealed class CallGraphAnalysis
                         bindingFailures.Add($"The selected source call '{method}' has no Calor declaration origin for its implicit argument conversion.");
                     return;
                 }
-                if (model.GetDiagnostics(operation.Syntax.Span).Any(diagnostic =>
+                if (DiagnosticsIn(model, operation.Syntax.Span).Any(diagnostic =>
                         diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     return;
                 if (HasErrorType(method.ContainingType) || HasErrorType(method.ReturnType)
@@ -3259,15 +3366,32 @@ public sealed class CallGraphAnalysis
     }
 
     /// <summary>
-    /// Builds a call graph analysis from a module AST.
+    /// The first phase of <see cref="Build(ModuleNode, IReadOnlyDictionary{string, CodeGen.CrossModuleFunctionTarget}?, Verification.ModuleInheritanceResult?, ContractMode, CrossModuleTypeRegistry?, string?)"/>:
+    /// every declaration as a function, the contract inheritance, and the module bound
+    /// once. Nothing here reads the C# operator bindings, which the second phase adds.
     /// </summary>
-    public static CallGraphAnalysis Build(ModuleNode ast) => Build(ast, null);
+    private sealed record DeclarationPhase(
+        Dictionary<string, FunctionNode> Functions,
+        Dictionary<string, string> FunctionNameToId,
+        Dictionary<string, List<string>> MethodNameToIds,
+        Dictionary<string, List<string>> CalleeToCallers,
+        Dictionary<string, List<(string, TextSpan)>> CallerToCallees,
+        Verification.ModuleInheritanceResult ContractInheritance,
+        Dictionary<AstCallKey, IReadOnlyList<string>> ResolvedCallIds,
+        HashSet<AstCallKey> BoundCallSites,
+        bool BoundResolutionComplete,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.BoundType>> BoundValueTypes,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType>>
+            DeclaredFunctionTypes,
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredReturnTypes,
+        IReadOnlyDictionary<string, Binding.BoundTypes.FunctionBoundType> DeclaredFieldTypes,
+        BoundValueIndex BoundValues);
 
-    internal static CallGraphAnalysis Build(ModuleNode ast,
+    private static DeclarationPhase BuildDeclarations(ModuleNode ast,
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
-        Verification.ModuleInheritanceResult? contractInheritance = null,
-        ContractMode projectionContractMode = ContractMode.Debug,
-        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
+        Verification.ModuleInheritanceResult? contractInheritance,
+        ContractMode projectionContractMode,
+        CrossModuleTypeRegistry? crossModuleTypes, string? sourcePath)
     {
         if (contractInheritance is null)
         {
@@ -3406,6 +3530,52 @@ public sealed class CallGraphAnalysis
             calleeToCallers[id] = [];
             callerToCallees[id] = [];
         }
+
+        return new(functions, functionNameToId, methodNameToIds, calleeToCallers, callerToCallees,
+            contractInheritance, resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
+            declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues);
+    }
+
+    /// <summary>
+    /// What an effect summary reads of a module's call graph: its declarations as
+    /// functions, its contract inheritance and, when binding succeeded, the plain bound
+    /// module (the one <see cref="PlainBoundModule"/> returns). These are exactly the
+    /// values <see cref="Build(ModuleNode, IReadOnlyDictionary{string, CodeGen.CrossModuleFunctionTarget}?, Verification.ModuleInheritanceResult?, ContractMode, CrossModuleTypeRegistry?, string?)"/>
+    /// computes for the same module and map before it resolves operator calls, and
+    /// they do not depend on that resolution, which binds a C# image of the module
+    /// with Roslyn and is the most expensive part of the call graph (#1738).
+    /// </summary>
+    internal sealed record DeclarationScan(
+        ModuleNode Module,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctions,
+        IReadOnlyDictionary<string, FunctionNode> Functions,
+        Verification.ModuleInheritanceResult ContractInheritance,
+        BoundModule? PlainModule);
+
+    internal static DeclarationScan ScanDeclarations(ModuleNode ast,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
+    {
+        var phase = BuildDeclarations(ast, crossModuleFunctions, null, ContractMode.Debug, null, null);
+        return new(ast, crossModuleFunctions, phase.Functions, phase.ContractInheritance, phase.BoundValues.Module);
+    }
+
+    /// <summary>
+    /// Builds a call graph analysis from a module AST.
+    /// </summary>
+    public static CallGraphAnalysis Build(ModuleNode ast) => Build(ast, null);
+
+    internal static CallGraphAnalysis Build(ModuleNode ast,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        Verification.ModuleInheritanceResult? contractInheritance = null,
+        ContractMode projectionContractMode = ContractMode.Debug,
+        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
+    {
+        var (functions, functionNameToId, methodNameToIds, calleeToCallers, callerToCallees,
+            phaseInheritance, resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
+            declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
+            BuildDeclarations(ast, crossModuleFunctions, contractInheritance, projectionContractMode,
+                crossModuleTypes, sourcePath);
+        contractInheritance = phaseInheritance;
 
         // Build call edges
         var unresolvedCalls = new List<AstUnresolvedCallSite>();

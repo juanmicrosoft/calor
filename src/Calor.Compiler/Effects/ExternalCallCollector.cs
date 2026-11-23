@@ -191,13 +191,38 @@ public sealed class ExternalCallCollector
             _crossModuleFunctions = crossModuleFunctions
         };
         callGraph ??= CallGraphAnalysis.Build(module, crossModuleFunctions);
-        collector.IndexBoundCallReceivers(module, callGraph);
+        var contractInheritance = callGraph.ContractInheritance;
+        return collector.CollectRaw(module, callGraph.Functions, contractInheritance,
+            callGraph.PlainBoundModule(module, crossModuleFunctions, contractInheritance));
+    }
+
+    /// <summary>
+    /// The same raw calls, read from a <see cref="CallGraphAnalysis.DeclarationScan"/>
+    /// of the module instead of a whole call graph: the collector reads only the
+    /// declarations, the contract inheritance and the plain bound module, which the
+    /// scan computes exactly as the call graph does.
+    /// </summary>
+    internal static List<RawCall> CollectPerFunctionWithBareNames(CallGraphAnalysis.DeclarationScan scan)
+    {
+        var collector = new ExternalCallCollector
+        {
+            _rawMode = true,
+            _crossModuleFunctions = scan.CrossModuleFunctions
+        };
+        return collector.CollectRaw(scan.Module, scan.Functions, scan.ContractInheritance, scan.PlainModule);
+    }
+
+    private List<RawCall> CollectRaw(ModuleNode module, IReadOnlyDictionary<string, FunctionNode> functions,
+        Verification.ModuleInheritanceResult? contractInheritance, BoundModule? plainModule)
+    {
+        var collector = this;
+        collector.IndexBoundCallReceivers(module, contractInheritance, plainModule);
         var methodNames = CallGraphAnalysis.EnumerateClasses(module)
             .SelectMany(cls => CallGraphAnalysis.EnumerateMethods(cls)
                 .Select(method => (Id: $"{cls.Name}.{method.Id}", Name: $"{cls.Name}.{method.Name}")))
             .ToLookup(method => method.Id, method => method.Name, StringComparer.Ordinal);
 
-        foreach (var function in callGraph.Functions.Values)
+        foreach (var function in functions.Values)
         {
             collector._currentCallerId = function.Id;
             collector._currentCaller = methodNames[function.Id].FirstOrDefault() ?? function.Name;
@@ -350,13 +375,20 @@ public sealed class ExternalCallCollector
 
     private void IndexBoundCallReceivers(ModuleNode module, CallGraphAnalysis callGraph)
     {
+        var contractInheritance = callGraph.ContractInheritance;
+        IndexBoundCallReceivers(module, contractInheritance,
+            callGraph.PlainBoundModule(module, _crossModuleFunctions, contractInheritance));
+    }
+
+    private void IndexBoundCallReceivers(ModuleNode module,
+        Verification.ModuleInheritanceResult? contractInheritance, BoundModule? plainModule)
+    {
         try
         {
             // The call graph already bound this module with exactly these inputs when
             // it was built without a source path or project registry; read that tree
             // instead of binding the module a second time.
-            var contractInheritance = callGraph.ContractInheritance;
-            var bound = callGraph.PlainBoundModule(module, _crossModuleFunctions, contractInheritance)
+            var bound = plainModule
                 ?? new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag())
                 {
                     CrossModuleFunctionModules = _crossModuleFunctions

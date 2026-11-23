@@ -117,6 +117,115 @@ public sealed class SharedProjectionImageTests
     }
 
     /// <summary>
+    /// #1738: a project pass asks for one module's operator bindings several times (the
+    /// symbol index's binder, the effect pass's binder, the effect pass's call graph).
+    /// A repeated request returns the first answer, and every answer the pass returns
+    /// is exactly the one a fresh per-module compilation computes for that request.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(DebugSubjects))]
+    public void RepeatedRequest_ReturnsTheAnswerAFreshCompilationComputes(string subject)
+    {
+        const ContractMode mode = ContractMode.Debug;
+        var project = Load(subject);
+        var fresh = Load(subject);
+        var unshared = new UnsharedContext(fresh.Registry);
+        var map = CompilationDriver.BuildCrossModuleFunctionMap(project.Modules.Select(module => module.Ast).ToList());
+        var freshMap = CompilationDriver.BuildCrossModuleFunctionMap(fresh.Modules.Select(module => module.Ast).ToList());
+        for (var index = 0; index < project.Modules.Count; index++)
+        {
+            var (ast, path) = project.Modules[index];
+            var (freshAst, freshPath) = fresh.Modules[index];
+
+            // The binders' request (no map, single-module context), twice.
+            var firstDiagnostics = new DiagnosticBag();
+            var first = CallGraphAnalysis.ResolveOperatorCalls(ast, firstDiagnostics, mode,
+                crossModuleTypes: project.Registry, sourcePath: path);
+            var secondDiagnostics = new DiagnosticBag();
+            var second = CallGraphAnalysis.ResolveOperatorCalls(ast, secondDiagnostics, mode,
+                crossModuleTypes: project.Registry, sourcePath: path);
+            Assert.Same(first, second);
+            Assert.Equal(firstDiagnostics.Select(Describe), secondDiagnostics.Select(Describe));
+            var expectedDiagnostics = new DiagnosticBag();
+            Assert.Equal(Dump(CallGraphAnalysis.ResolveOperatorCalls(freshAst, expectedDiagnostics, mode,
+                crossModuleTypes: unshared, sourcePath: freshPath)), Dump(first));
+            Assert.Equal(expectedDiagnostics.Select(Describe), firstDiagnostics.Select(Describe));
+
+            // The call graph's request (the map, project context): answered from the
+            // same entry only when its text is the same and the context is not read.
+            var pass = CallGraphAnalysis.ResolveOperatorCalls(ast, new DiagnosticBag(), mode,
+                singleModuleContext: false, crossModuleTypes: project.Registry, sourcePath: path,
+                crossModuleFunctions: map);
+            Assert.Equal(Dump(CallGraphAnalysis.ResolveOperatorCalls(freshAst, new DiagnosticBag(), mode,
+                singleModuleContext: false, crossModuleTypes: unshared, sourcePath: freshPath,
+                crossModuleFunctions: freshMap)), Dump(pass));
+        }
+    }
+
+    public static IEnumerable<object[]> DebugSubjects() => Subjects.Select(subject => new object[] { subject });
+
+    /// <summary>
+    /// The cross-module map is not part of a request's key: it reaches the answer only
+    /// through the projection text, which the memo compares. A request whose map
+    /// qualifies calls differently projects different text and is resolved afresh,
+    /// exactly as its own compilation resolves it.
+    /// </summary>
+    [Fact]
+    public void RequestWhoseProjectionDiffers_IsResolvedAfresh()
+    {
+        const ContractMode mode = ContractMode.Debug;
+        var directory = Path.Combine(Path.GetTempPath(), $"calor-memo-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "a.calr"),
+                "module Alpha\n  func Helper public (int:x) → int\n    !\n    return x + 1\n");
+            File.WriteAllText(Path.Combine(directory, "b.calr"),
+                "module Beta\n  func Use public (int:x) → int\n    !\n    return Alpha.Helper(x) * 2\n");
+            var project = LoadDirectory(directory);
+            var fresh = LoadDirectory(directory);
+            static Dictionary<string, CodeGen.CrossModuleFunctionTarget> Redirect(
+                IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget> targets) =>
+                targets.ToDictionary(entry => entry.Key,
+                    entry => entry.Value with { ModuleClassName = "Elsewhere" + entry.Value.ModuleClassName },
+                    StringComparer.Ordinal);
+            var map = CompilationDriver.BuildCrossModuleFunctionMap(project.Modules.Select(module => module.Ast).ToList());
+            var redirected = Redirect(map);
+            var freshRedirected = Redirect(
+                CompilationDriver.BuildCrossModuleFunctionMap(fresh.Modules.Select(module => module.Ast).ToList()));
+            var index = project.Modules.FindIndex(module => module.Ast.Name == "Beta");
+            var (ast, path) = project.Modules[index];
+            var markers = project.Registry.SharedImage(path, mode)!.Markers;
+            Assert.NotEqual(CallGraphAnalysis.EmitAnnotatedProjection(ast, mode, map, markers).Source,
+                CallGraphAnalysis.EmitAnnotatedProjection(ast, mode, redirected, markers).Source);
+
+            var plain = CallGraphAnalysis.ResolveOperatorCalls(ast, new DiagnosticBag(), mode,
+                singleModuleContext: false, crossModuleTypes: project.Registry, sourcePath: path,
+                crossModuleFunctions: map);
+            var moved = CallGraphAnalysis.ResolveOperatorCalls(ast, new DiagnosticBag(), mode,
+                singleModuleContext: false, crossModuleTypes: project.Registry, sourcePath: path,
+                crossModuleFunctions: redirected);
+            Assert.NotSame(plain, moved);
+            var (freshAst, freshPath) = fresh.Modules[index];
+            Assert.Equal(Dump(CallGraphAnalysis.ResolveOperatorCalls(freshAst, new DiagnosticBag(), mode,
+                singleModuleContext: false, crossModuleTypes: new UnsharedContext(fresh.Registry),
+                sourcePath: freshPath, crossModuleFunctions: freshRedirected)), Dump(moved));
+            // The original map's request is still answered as its own compilation answers it.
+            Assert.Equal(Dump(CallGraphAnalysis.ResolveOperatorCalls(freshAst, new DiagnosticBag(), mode,
+                singleModuleContext: false, crossModuleTypes: new UnsharedContext(fresh.Registry),
+                sourcePath: freshPath, crossModuleFunctions: CompilationDriver.BuildCrossModuleFunctionMap(
+                    fresh.Modules.Select(module => module.Ast).ToList()))),
+                Dump(CallGraphAnalysis.ResolveOperatorCalls(ast, new DiagnosticBag(), mode,
+                    singleModuleContext: false, crossModuleTypes: project.Registry, sourcePath: path,
+                    crossModuleFunctions: map)));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    /// <summary>
     /// A file the registry does not hold gets no image and no companions, as before.
     /// </summary>
     [Fact]
@@ -131,9 +240,11 @@ public sealed class SharedProjectionImageTests
 
     private sealed record Project(List<(ModuleNode Ast, string Path)> Modules, CrossModuleTypeRegistry Registry);
 
-    private static Project Load(string subject)
+    private static Project Load(string subject) =>
+        LoadDirectory(Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot, subject));
+
+    private static Project LoadDirectory(string directory)
     {
-        var directory = Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot, subject);
         var modules = new List<(ModuleNode Ast, string Path)>();
         var hashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
         foreach (var path in Directory.GetFiles(directory, "*.calr").Order(StringComparer.Ordinal))
@@ -147,7 +258,7 @@ public sealed class SharedProjectionImageTests
             modules.Add((ast, Path.GetFullPath(path)));
             hashes[Path.GetFullPath(path)] = BuildStateCache.ComputeContentHash(bytes);
         }
-        Assert.True(modules.Count > 1, $"{subject} must be a multi-file project");
+        Assert.True(modules.Count > 1, $"{directory} must be a multi-file project");
         return new(modules, CrossModuleTypeRegistry.Build(modules, hashes));
     }
 
@@ -268,6 +379,42 @@ public sealed class EffectSummaryBoundModuleReuseTests
             Assert.Equal(withoutReuse, withReuse);
         }
         Assert.Equal(modules.Count, reused);
+    }
+
+    /// <summary>
+    /// #1738: the effect summary reads a declaration scan instead of a whole call graph
+    /// (which also Roslyn-binds a C# image of the module). The scan's declarations,
+    /// contract inheritance and plain binding are the call graph's, so the summary's
+    /// raw calls are exactly the ones the call graph gives.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Subjects))]
+    public void DeclarationScan_GivesTheCallGraphsDeclarationsAndCalls(string subject)
+    {
+        var directory = Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot, subject);
+        var modules = Directory.GetFiles(directory, "*.calr").Order(StringComparer.Ordinal)
+            .Select(path =>
+            {
+                var diagnostics = new DiagnosticBag();
+                return new Parser(new Lexer(File.ReadAllText(path), diagnostics).TokenizeAllForParser(),
+                    diagnostics).Parse();
+            })
+            .Where(module => module is not null)
+            .ToList();
+        var map = CompilationDriver.BuildCrossModuleFunctionMap(modules);
+        foreach (var module in modules)
+        {
+            var graph = CallGraphAnalysis.Build(module, map);
+            var scan = CallGraphAnalysis.ScanDeclarations(module, map);
+            static IEnumerable<string> Describe(IReadOnlyDictionary<string, FunctionNode> functions) =>
+                functions.Select(entry => $"{entry.Key}|{entry.Value.Id}|{entry.Value.Name}|"
+                    + $"{entry.Value.Span.Start}..{entry.Value.Span.End}|{entry.Value.Parameters.Count}");
+            Assert.Equal(Describe(graph.Functions), Describe(scan.Functions));
+            Assert.NotNull(scan.PlainModule);
+            Assert.Equal(
+                ExternalCallCollector.CollectPerFunctionWithBareNames(module, map, graph),
+                ExternalCallCollector.CollectPerFunctionWithBareNames(scan));
+        }
     }
 
     [Fact]

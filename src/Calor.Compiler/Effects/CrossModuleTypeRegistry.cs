@@ -110,6 +110,8 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
         }
     }
 
+    public CallGraphAnalysis.OperatorBindingsMemo OperatorBindingsMemo { get; } = new();
+
     private bool Contains(string? sourcePath) => sourcePath is not null
         && _sourcePaths.Values.Contains(Path.GetFullPath(sourcePath), BuildStateCache.GetPathComparer());
 
