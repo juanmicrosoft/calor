@@ -107,7 +107,7 @@ def is_tracked(path: Path) -> bool:
 
 
 def validate(trx, project: str, manifest_path: Path,
-             submodules: bool = False) -> list[str]:
+             submodules: bool = False, partial: bool = False) -> list[str]:
     """`submodules` selects the skip expectation for the CALLER'S CHECKOUT.
 
     A corpus-gated test skips when bench/corpus/ is absent and runs when it is
@@ -167,6 +167,11 @@ def validate(trx, project: str, manifest_path: Path,
         total += part.total
         executed += part.executed
         passed += part.passed
+    # #1749: a job that runs only some parts of a project checks each part here and leaves the sum
+    # to the job that gathers every part's report (test.yml `tests (compiler)`), which runs without
+    # --partial. Only the summed counts are skipped; every per-part check above still applies.
+    if partial:
+        return part_errors
     expected_total = int(entry["expectedTotal"])
     # A project that declares `corpusDependent` MUST declare both skip counts.
     # Falling back silently is how this bug class reappears: add a corpus-gated
@@ -354,6 +359,19 @@ def self_test() -> None:
         bare.write_text(first.read_text(encoding="utf-8").replace(' codeBase="/w/bin/Split.Tests.dll"', ""), encoding="utf-8")
         if not any("names no test assembly" in e for e in validate([bare, second], split, manifest)):
             raise AssertionError("a TRX without test assemblies was accepted")
+        # #1749: --partial checks every part but not the sum, so one pair of parts passes on its own,
+        # and every per-part failure still fails it.
+        if validate([first], split, manifest, partial=True):
+            raise AssertionError("a passing partial job was rejected")
+        if not validate([first], split, manifest):
+            raise AssertionError("one part of two was accepted against the full manifest total")
+        for bad, why in (([first, first], "ran in"), ([whole, empty], "executed no tests"),
+                         ([first, failed], "did not pass"), ([first, foreign], "expected only Split.Tests.dll")):
+            if not any(why in e for e in validate(bad, split, manifest, partial=True)):
+                raise AssertionError(f"--partial accepted a part that fails the per-part check: {why}")
+        if validate([first], "tests/Missing.Tests/Missing.Tests.csproj", manifest, partial=True) != [
+                "project is not in test manifest: tests/Missing.Tests/Missing.Tests.csproj"]:
+            raise AssertionError("--partial accepted a project that is not in the manifest")
         # A committed TRX is not a report this run wrote.
         if subprocess.run(["git", "init", "-q", str(root)], capture_output=True, check=False).returncode == 0:
             subprocess.run(["git", "-C", str(root), "add", "p1.trx"], capture_output=True, check=True)
@@ -382,6 +400,10 @@ def main() -> int:
         help="the caller checked out bench/corpus/ (submodules: recursive), so corpus-gated "
              "tests RUN instead of skipping; use expectedSkippedWithSubmodules where the "
              "manifest declares one")
+    parser.add_argument(
+        "--partial", action="store_true",
+        help="#1749: these reports are some of the project's parts (one CI job of a split shard). Check "
+             "every part on its own but not the sum; the job that gathers all the parts checks the sum.")
     args = parser.parse_args()
     if args.self_test:
         self_test()
@@ -395,11 +417,13 @@ def main() -> int:
             return 1
     if not args.trx or args.project is None:
         parser.error("--trx (or --trx-dir) and --project are required")
-    errors = validate(args.trx, args.project, args.manifest, submodules=args.submodules)
+    errors = validate(args.trx, args.project, args.manifest, submodules=args.submodules,
+                      partial=args.partial)
     for error in errors:
         print(f"ERROR: {error}")
     if not errors:
-        print(f"TRX inventory matches manifest for {args.project}.")
+        print(f"TRX parts pass for {args.project} (sum checked by the gathering job)." if args.partial
+              else f"TRX inventory matches manifest for {args.project}.")
     return 1 if errors else 0
 
 
