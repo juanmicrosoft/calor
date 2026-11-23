@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Text.Json;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
@@ -20,90 +19,94 @@ public static class IdsCommand
         };
         // Capture obsolete positional actions only to refuse them with guidance;
         // no source-assignment subcommand is registered.
-        command.AddArgument(new Argument<string[]>("retired-action")
+        command.Arguments.Add(new Argument<string[]>("retired-action")
         {
             Arity = ArgumentArity.ZeroOrMore,
-            IsHidden = true
+            Hidden = true
         });
-        command.SetHandler((InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
             Console.Error.WriteLine(
                 "Unknown or retired ids action. ids assign is retired. " +
                 "Run calor ids sync PROJECT --register FILE; IDs are never written to source.");
-            context.ExitCode = 1;
+            return 1;
         });
         return command;
     }
 
     private static Command CreateSyncCommand()
     {
-        var root = new Argument<string>("project", "Project root containing .calor/ids.json");
-        var files = new Option<string[]>("--register", "Explicit active .calr files to register (never discovers historical fixtures)")
+        var root = new Argument<string>("project") { Description = "Project root containing .calor/ids.json" };
+        var files = new Option<string[]>("--register")
         {
+            Description = "Explicit active .calr files to register (never discovers historical fixtures)",
             AllowMultipleArgumentsPerToken = true
         };
         var command = new Command("sync", "Synchronize declaration identities without rewriting source") { root, files };
-        command.SetHandler((InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
             try
             {
-                var store = new DeclarationIdentityStore(context.ParseResult.GetValueForArgument(root));
-                var state = store.Sync(context.ParseResult.GetValueForOption(files));
+                var store = new DeclarationIdentityStore(parseResult.GetValue(root)!);
+                var state = store.Sync(parseResult.GetValue(files));
                 Console.WriteLine($"Synchronized {state.Declarations.Count} declarations in {state.Files.Count} registered files.");
             }
             catch (Exception ex) when (IsIdentityFailure(ex))
             {
                 Console.Error.WriteLine($"Identity sync failed: {ex.Message}");
-                context.ExitCode = 1;
+                return 1;
             }
+
+            return 0;
         });
         return command;
     }
 
     private static Command CreateCheckCommand()
     {
-        var paths = new Argument<string[]>("paths", "Active .calr files or directories of registered files")
+        var paths = new Argument<string[]>("paths")
         {
+            Description = "Active .calr files or directories of registered files",
             Arity = ArgumentArity.OneOrMore
         };
-        var allowTestIds = new Option<bool>("--allow-test-ids", "Allow test identities in the sidecar");
-        var verbose = new Option<bool>(["--verbose", "-v"], "Show detailed output");
-        var format = new Option<string>(["--format", "-f"], () => "text", "Output format: text or json (envelope v1.1)");
+        var allowTestIds = new Option<bool>("--allow-test-ids") { Description = "Allow test identities in the sidecar" };
+        var verbose = new Option<bool>("--verbose", "-v") { Description = "Show detailed output" };
+        var format = new Option<string>("--format", "-f") { Description = "Output format: text or json (envelope v1.1)", DefaultValueFactory = _ => "text" };
         var command = new Command("check", "Synchronize and validate sidecar declaration identities")
         {
             paths, allowTestIds, verbose, format
         };
-        command.SetHandler(async (InvocationContext context) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            context.ExitCode = await CheckAsync(
-                context.ParseResult.GetValueForArgument(paths),
-                context.ParseResult.GetValueForOption(allowTestIds),
-                context.ParseResult.GetValueForOption(verbose),
-                context.ParseResult.GetValueForOption(format) ?? "text");
+            return await CheckAsync(
+                parseResult.GetValue(paths)!,
+                parseResult.GetValue(allowTestIds),
+                parseResult.GetValue(verbose),
+                parseResult.GetValue(format) ?? "text");
         });
         return command;
     }
 
     private static Command CreateIndexCommand()
     {
-        var paths = new Argument<string[]>("paths", "Active .calr files or directories of registered files")
+        var paths = new Argument<string[]>("paths")
         {
+            Description = "Active .calr files or directories of registered files",
             Arity = ArgumentArity.OneOrMore
         };
-        var output = new Option<FileInfo?>(["--output", "-o"], "Output file path (default: calor.ids.json)");
+        var output = new Option<FileInfo?>("--output", "-o") { Description = "Output file path (default: calor.ids.json)" };
         var command = new Command("index", "Synchronize and export sidecar declaration identities") { paths, output };
-        command.SetHandler(async (InvocationContext context) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             var diagnostics = new DiagnosticBag();
-            var entries = await ReadEntriesAsync(context.ParseResult.GetValueForArgument(paths), diagnostics);
+            var entries = await ReadEntriesAsync(parseResult.GetValue(paths)!, diagnostics);
             if (diagnostics.HasErrors)
             {
                 foreach (var diagnostic in diagnostics) Console.Error.WriteLine(diagnostic);
-                context.ExitCode = 1;
-                return;
+                return 1;
             }
 
-            var outputPath = context.ParseResult.GetValueForOption(output)?.FullName ?? "calor.ids.json";
+            var outputPath = parseResult.GetValue(output)?.FullName ?? "calor.ids.json";
             try
             {
                 // An export is not a second identity store and must never overwrite
@@ -128,8 +131,10 @@ public static class IdsCommand
             catch (Exception ex) when (IsIdentityFailure(ex))
             {
                 Console.Error.WriteLine($"Identity index failed: {ex.Message}");
-                context.ExitCode = 1;
+                return 1;
             }
+
+            return 0;
         });
         return command;
     }

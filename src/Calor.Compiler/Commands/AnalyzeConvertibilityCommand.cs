@@ -15,31 +15,36 @@ public static class AnalyzeConvertibilityCommand
 {
     public static Command Create()
     {
-        var pathArgument = new Argument<string>(
-            name: "path",
-            description: "File or directory to analyze")
+        var pathArgument = new Argument<string>("path")
         {
+            Description = "File or directory to analyze",
             Arity = ArgumentArity.ExactlyOne
         };
 
-        var formatOption = new Option<string>(
-            aliases: ["--format", "-f"],
-            getDefaultValue: () => "text",
-            description: "Output format: text or json");
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Output format: text or json",
+            DefaultValueFactory = _ => "text"
+        };
 
-        var outputOption = new Option<FileInfo?>(
-            aliases: ["--output", "-o"],
-            description: "Output file (stdout if not specified)");
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "Output file (stdout if not specified)"
+        };
 
-        var quickOption = new Option<bool>(
-            aliases: ["--quick", "-q"],
-            description: "Stage 1 only (no conversion attempt)");
+        var quickOption = new Option<bool>("--quick", "-q")
+        {
+            Description = "Stage 1 only (no conversion attempt)"
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show per-file breakdown for directories");
-        var noImplicitSystemOption = new Option<bool>(
-            "--no-implicit-system", "Validate without the implicit System project import");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Show per-file breakdown for directories"
+        };
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system")
+        {
+            Description = "Validate without the implicit System project import"
+        };
 
         var command = new Command("analyze-convertibility",
             "Analyze how likely C# code is to successfully convert to Calor")
@@ -52,8 +57,13 @@ public static class AnalyzeConvertibilityCommand
             noImplicitSystemOption
         };
 
-        command.SetHandler(ExecuteAsync, pathArgument, formatOption, outputOption, quickOption, verboseOption,
-            noImplicitSystemOption);
+        command.SetAction((parseResult, cancellationToken) => ExecuteAsync(
+            parseResult.GetValue(pathArgument)!,
+            parseResult.GetValue(formatOption)!,
+            parseResult.GetValue(outputOption),
+            parseResult.GetValue(quickOption),
+            parseResult.GetValue(verboseOption),
+            parseResult.GetValue(noImplicitSystemOption)));
 
         return command;
     }

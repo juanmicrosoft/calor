@@ -22,7 +22,7 @@
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="2.0.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageVersion Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
-    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.15" />
     <PackageVersion Include="Ulid" Version="1.3.4" />
     <PackageVersion Include="xunit" Version="2.6.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.4" />

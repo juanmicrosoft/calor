@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Security;
 using System.Text;
@@ -53,73 +52,81 @@ internal static class ExecutionWorkspace
     /// <paramref name="command"/>, and returns a binder that extracts an
     /// <see cref="ExecutionSettings"/> from an invocation.
     /// </summary>
-    internal static Func<InvocationContext, ExecutionSettings> AddCommonOptions(Command command)
+    internal static Func<ParseResult, ExecutionSettings> AddCommonOptions(Command command)
     {
-        var permissiveOption = new Option<bool>(
-            aliases: ["--permissive"],
-            description: "Relax effect enforcement: unknown calls assumed pure, forbidden effects (including cross-module violations) demoted to warnings");
+        var permissiveOption = new Option<bool>("--permissive")
+        {
+            Description = "Relax effect enforcement: unknown calls assumed pure, forbidden effects (including cross-module violations) demoted to warnings"
+        };
 
-        var keepTempOption = new Option<bool>(
-            aliases: ["--keep-temp"],
-            description: "Preserve the materialized temp project and print its path");
+        var keepTempOption = new Option<bool>("--keep-temp")
+        {
+            Description = "Preserve the materialized temp project and print its path"
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show compilation details and stream build output live");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Show compilation details and stream build output live"
+        };
 
-        var enforceEffectsOption = new Option<bool>(
-            aliases: ["--enforce-effects"],
-            description: "Enforce effect declarations (default: true; pass 'false' to opt out)",
-            getDefaultValue: () => true);
+        var enforceEffectsOption = new Option<bool>("--enforce-effects")
+        {
+            Description = "Enforce effect declarations (default: true; pass 'false' to opt out)",
+            DefaultValueFactory = _ => true
+        };
 
-        var verifyOption = new Option<bool>(
-            aliases: ["--verify"],
-            description: "Enable static contract verification with Z3 SMT solver");
+        var verifyOption = new Option<bool>("--verify")
+        {
+            Description = "Enable static contract verification with Z3 SMT solver"
+        };
 
         // Same aliases as `calor compile`: run/test execute the generated code, so
         // the v0.15 default-on elision needs its opt-out here too (PR #1088 review).
-        var keepProvenGuardsOption = new Option<bool>(
-            aliases: ["--keep-proven-guards", "--no-elide-proven-guards"],
-            description: "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; only matters with --verify)");
+        var keepProvenGuardsOption = new Option<bool>("--keep-proven-guards", "--no-elide-proven-guards")
+        {
+            Description = "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; only matters with --verify)"
+        };
 
-        var contractModeOption = new Option<string>(
-            aliases: ["--contract-mode"],
-            description: "Contract enforcement mode: off, debug, or release (default: debug)",
-            getDefaultValue: () => "debug");
+        var contractModeOption = new Option<string>("--contract-mode")
+        {
+            Description = "Contract enforcement mode: off, debug, or release (default: debug)",
+            DefaultValueFactory = _ => "debug"
+        };
 
-        var timeoutOption = new Option<int>(
-            aliases: ["--timeout"],
-            description: $"Timeout in seconds for each child process (build/run/test; default: {DefaultTimeoutSeconds})",
-            getDefaultValue: () => DefaultTimeoutSeconds);
-        timeoutOption.AddValidator(result =>
+        var timeoutOption = new Option<int>("--timeout")
+        {
+            Description = $"Timeout in seconds for each child process (build/run/test; default: {DefaultTimeoutSeconds})",
+            DefaultValueFactory = _ => DefaultTimeoutSeconds
+        };
+        timeoutOption.Validators.Add(result =>
         {
             if (result.GetValueOrDefault<int>() <= 0)
             {
-                result.ErrorMessage = "Timeout must be a positive number of seconds";
+                result.AddError("Timeout must be a positive number of seconds");
             }
         });
 
-        command.AddOption(permissiveOption);
-        command.AddOption(keepTempOption);
-        command.AddOption(verboseOption);
-        command.AddOption(enforceEffectsOption);
-        command.AddOption(verifyOption);
-        command.AddOption(keepProvenGuardsOption);
-        command.AddOption(contractModeOption);
-        command.AddOption(timeoutOption);
-        var noImplicitSystemOption = new Option<bool>("--no-implicit-system", "Validate standalone without the default System-only project import");
-        command.AddOption(noImplicitSystemOption);
+        command.Options.Add(permissiveOption);
+        command.Options.Add(keepTempOption);
+        command.Options.Add(verboseOption);
+        command.Options.Add(enforceEffectsOption);
+        command.Options.Add(verifyOption);
+        command.Options.Add(keepProvenGuardsOption);
+        command.Options.Add(contractModeOption);
+        command.Options.Add(timeoutOption);
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system") { Description = "Validate standalone without the default System-only project import" };
+        command.Options.Add(noImplicitSystemOption);
 
-        return ctx => new ExecutionSettings(
-            Permissive: ctx.ParseResult.GetValueForOption(permissiveOption),
-            KeepTemp: ctx.ParseResult.GetValueForOption(keepTempOption),
-            Verbose: ctx.ParseResult.GetValueForOption(verboseOption),
-            EnforceEffects: ctx.ParseResult.GetValueForOption(enforceEffectsOption),
-            Verify: ctx.ParseResult.GetValueForOption(verifyOption),
-            KeepProvenGuards: ctx.ParseResult.GetValueForOption(keepProvenGuardsOption),
-            ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
-            TimeoutSeconds: ctx.ParseResult.GetValueForOption(timeoutOption),
-            IncludeImplicitSystemUsing: !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
+        return parseResult => new ExecutionSettings(
+            Permissive: parseResult.GetValue(permissiveOption),
+            KeepTemp: parseResult.GetValue(keepTempOption),
+            Verbose: parseResult.GetValue(verboseOption),
+            EnforceEffects: parseResult.GetValue(enforceEffectsOption),
+            Verify: parseResult.GetValue(verifyOption),
+            KeepProvenGuards: parseResult.GetValue(keepProvenGuardsOption),
+            ContractMode: parseResult.GetValue(contractModeOption) ?? "debug",
+            TimeoutSeconds: parseResult.GetValue(timeoutOption),
+            IncludeImplicitSystemUsing: !parseResult.GetValue(noImplicitSystemOption));
     }
 
     internal sealed record PreparedExecution(string Dotnet, List<CompiledUnit> Units);

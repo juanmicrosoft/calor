@@ -45,7 +45,7 @@ public class LspCommandTests
     {
         var command = LspCommand.Create();
 
-        Assert.NotNull(command.Handler);
+        Assert.NotNull(command.Action);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class LspCommandTests
     {
         // Create a minimal root command setup similar to Program.cs
         var rootCommand = new RootCommand("Test");
-        rootCommand.AddCommand(LspCommand.Create());
+        rootCommand.Subcommands.Add(LspCommand.Create());
 
         var lspCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "lsp");
 

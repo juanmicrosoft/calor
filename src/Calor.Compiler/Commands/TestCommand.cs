@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
@@ -32,9 +31,10 @@ public static class TestCommand
 
     public static Command Create()
     {
-        var pathArgument = new Argument<string>(
-            name: "path",
-            description: "A .calr file, or a directory containing .calr files (with an optional tests/ subdirectory of *.cs xUnit tests; bin/, obj/ and reference/ subdirectories are excluded)");
+        var pathArgument = new Argument<string>("path")
+        {
+            Description = "A .calr file, or a directory containing .calr files (with an optional tests/ subdirectory of *.cs xUnit tests; bin/, obj/ and reference/ subdirectories are excluded)"
+        };
 
         var command = new Command("test", "Compile Calor sources and run tests against them (no project file required)")
         {
@@ -43,10 +43,10 @@ public static class TestCommand
 
         var bindSettings = ExecutionWorkspace.AddCommonOptions(command);
 
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            var path = ctx.ParseResult.GetValueForArgument(pathArgument);
-            ctx.ExitCode = Execute(path, bindSettings(ctx));
+            var path = parseResult.GetValue(pathArgument)!;
+            return Execute(path, bindSettings(parseResult));
         });
 
         return command;
@@ -54,37 +54,37 @@ public static class TestCommand
 
     public static Command CreateLoop()
     {
-        var path = new Argument<string>("path", "Calor source file or directory with tests/*.cs xUnit tests");
-        var format = new Option<string>("--format", () => "text", "Output format: text or json");
-        format.FromAmong("text", "json");
-        var timeout = new Option<int>("--timeout", () => 600, "Timeout per build/test process in seconds");
-        var solverTimeout = new Option<int>("--verification-timeout", () => 5000, "Solver timeout per contract in milliseconds");
-        var noImplicitSystem = new Option<bool>("--no-implicit-system", "Validate without the implicit System project import");
+        var path = new Argument<string>("path") { Description = "Calor source file or directory with tests/*.cs xUnit tests" };
+        var format = new Option<string>("--format") { Description = "Output format: text or json", DefaultValueFactory = _ => "text" };
+        format.AcceptOnlyFromAmong("text", "json");
+        var timeout = new Option<int>("--timeout") { Description = "Timeout per build/test process in seconds", DefaultValueFactory = _ => 600 };
+        var solverTimeout = new Option<int>("--verification-timeout") { Description = "Solver timeout per contract in milliseconds", DefaultValueFactory = _ => 5000 };
+        var noImplicitSystem = new Option<bool>("--no-implicit-system") { Description = "Validate without the implicit System project import" };
         foreach (var option in new[] { timeout, solverTimeout })
-            option.AddValidator(r => { if (r.GetValueOrDefault<int>() <= 0) r.ErrorMessage = "Timeout must be positive."; });
+            option.Validators.Add(r => { if (r.GetValueOrDefault<int>() <= 0) r.AddError("Timeout must be positive."); });
         var command = new Command("check", "Build, test and verify one source snapshot; return only failures")
         {
             path, format, timeout, solverTimeout, noImplicitSystem
         };
-        command.SetHandler(async (InvocationContext context) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             try
             {
                 var result = await RunLoopAsync(
-                    context.ParseResult.GetValueForArgument(path),
-                    context.ParseResult.GetValueForOption(timeout),
-                    context.ParseResult.GetValueForOption(solverTimeout),
-                    context.GetCancellationToken(),
-                    !context.ParseResult.GetValueForOption(noImplicitSystem));
-                Console.WriteLine(context.ParseResult.GetValueForOption(format) == "json"
+                    parseResult.GetValue(path)!,
+                    parseResult.GetValue(timeout),
+                    parseResult.GetValue(solverTimeout),
+                    cancellationToken,
+                    !parseResult.GetValue(noImplicitSystem));
+                Console.WriteLine(parseResult.GetValue(format) == "json"
                     ? JsonSerializer.Serialize(result, LoopJsonOptions)
                     : result.ToText());
-                context.ExitCode = result.ExitCode;
+                return result.ExitCode;
             }
             catch (OperationCanceledException)
             {
                 Console.Error.WriteLine("Validation cancelled.");
-                context.ExitCode = 130;
+                return 130;
             }
         });
         return command;

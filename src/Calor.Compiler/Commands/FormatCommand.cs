@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
@@ -17,48 +16,54 @@ public static class FormatCommand
 {
     public static Command Create()
     {
-        var inputArgument = new Argument<FileInfo[]>(
-            name: "files",
-            description: "The Calor source file(s) to format")
+        var inputArgument = new Argument<FileInfo[]>("files")
         {
+            Description = "The Calor source file(s) to format",
             Arity = ArgumentArity.OneOrMore
         };
 
-        var checkOption = new Option<bool>(
-            aliases: ["--check", "-c"],
-            description: "Check if files are formatted without modifying them (exit 1 if not formatted)");
+        var checkOption = new Option<bool>("--check", "-c")
+        {
+            Description = "Check if files are formatted without modifying them (exit 1 if not formatted)"
+        };
 
-        var writeOption = new Option<bool>(
-            aliases: ["--write", "-w"],
-            description: "Write formatted output back to the file(s)");
+        var writeOption = new Option<bool>("--write", "-w")
+        {
+            Description = "Write formatted output back to the file(s)"
+        };
 
-        var diffOption = new Option<bool>(
-            aliases: ["--diff", "-d"],
-            description: "Show diff of formatting changes");
+        var diffOption = new Option<bool>("--diff", "-d")
+        {
+            Description = "Show diff of formatting changes"
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Enable verbose output");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
 
-        var healOption = new Option<bool>(
-            aliases: ["--heal"],
-            description: "Best-effort source-level repair: strip forbidden structural closers, " +
+        var healOption = new Option<bool>("--heal")
+        {
+            Description = "Best-effort source-level repair: strip forbidden structural closers, " +
                          "normalize indentation to 2-space levels from structural nesting, and fix " +
                          "common whitespace issues. Works on files too broken for the AST formatter. Idempotent. " +
                          "WARNING: healing is NOT semantics-preserving — re-anchoring ambiguous statements " +
                          "into a chain-clause body guesses the intended control flow (each guess is reported " +
-                         "as a warning). Always review the healed output.");
+                         "as a warning). Always review the healed output."
+        };
 
         // No -f short alias (consistent with lint, where -f means --fix).
-        var formatOption = new Option<string>(
-            aliases: ["--format"],
-            getDefaultValue: () => "text",
-            description: "Output format: text (human-readable) or json (envelope document on stdout). No short alias.");
-        formatOption.FromAmong("text", "json");
+        var formatOption = new Option<string>("--format")
+        {
+            Description = "Output format: text (human-readable) or json (envelope document on stdout). No short alias.",
+            DefaultValueFactory = _ => "text"
+        };
+        formatOption.AcceptOnlyFromAmong("text", "json");
 
-        var experimentalOption = new Option<bool>(
-            aliases: ["--experimental"],
-            description: "Deprecated compatibility flag. Lossless validated writes are enabled by default.");
+        var experimentalOption = new Option<bool>("--experimental")
+        {
+            Description = "Deprecated compatibility flag. Lossless validated writes are enabled by default."
+        };
 
         var command = new Command("format", "Format Calor source files to canonical style")
         {
@@ -72,22 +77,22 @@ public static class FormatCommand
             experimentalOption
         };
 
-        // Return the exit code through the handler (ctx.ExitCode) instead of
+        // Return the exit code from the action instead of
         // stomping Environment.ExitCode: the root command's InvokeAsync
         // result is what Program.Main returns, so a code parked only on
         // Environment.ExitCode is overwritten by Main's return value.
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var wantsWrite = ctx.ParseResult.GetValueForOption(writeOption);
+            var wantsWrite = parseResult.GetValue(writeOption);
 
-            ctx.ExitCode = await ExecuteAsync(
-                ctx.ParseResult.GetValueForArgument(inputArgument),
-                ctx.ParseResult.GetValueForOption(checkOption),
+            return await ExecuteAsync(
+                parseResult.GetValue(inputArgument)!,
+                parseResult.GetValue(checkOption),
                 wantsWrite,
-                ctx.ParseResult.GetValueForOption(diffOption),
-                ctx.ParseResult.GetValueForOption(verboseOption),
-                ctx.ParseResult.GetValueForOption(healOption),
-                ctx.ParseResult.GetValueForOption(formatOption) ?? "text");
+                parseResult.GetValue(diffOption),
+                parseResult.GetValue(verboseOption),
+                parseResult.GetValue(healOption),
+                parseResult.GetValue(formatOption) ?? "text");
         });
 
         return command;

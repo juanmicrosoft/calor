@@ -11,21 +11,24 @@ public static class McpCommand
 {
     public static Command Create()
     {
-        var stdioOption = new Option<bool>(
-            aliases: ["--stdio"],
-            getDefaultValue: () => true,
-            description: "Use standard input/output for communication (default: true)");
+        var stdioOption = new Option<bool>("--stdio")
+        {
+            Description = "Use standard input/output for communication (default: true)",
+            DefaultValueFactory = _ => true
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Enable verbose output to stderr for debugging");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output to stderr for debugging"
+        };
 
-        var rootOption = new Option<string?>(
-            aliases: ["--root"],
-            description: "Confinement root for project sessions and file writes " +
+        var rootOption = new Option<string?>("--root")
+        {
+            Description = "Confinement root for project sessions and file writes " +
                          "(calor_session_open/calor_file_write). Defaults to the server " +
                          "process working directory — which depends on how the MCP client " +
-                         "spawns the server, so pin it explicitly in harness/CI setups.");
+                         "spawns the server, so pin it explicitly in harness/CI setups."
+        };
 
         var command = new Command("mcp", "Start the Calor MCP server for AI coding agents")
         {
@@ -34,7 +37,10 @@ public static class McpCommand
             rootOption
         };
 
-        command.SetHandler(ExecuteAsync, stdioOption, verboseOption, rootOption);
+        command.SetAction((parseResult, cancellationToken) => ExecuteAsync(
+            parseResult.GetValue(stdioOption),
+            parseResult.GetValue(verboseOption),
+            parseResult.GetValue(rootOption)));
 
         return command;
     }

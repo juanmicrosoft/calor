@@ -47,7 +47,7 @@ public class DefaultModeOptionsParityTests
             ConvertCommand.ConversionOptionsObserver.Value = options => captured = options;
             try
             {
-                await ConvertCommand.Create().InvokeAsync([input, .. flags]);
+                await ConvertCommand.Create().Parse([input, .. flags]).InvokeAsync();
             }
             finally
             {
@@ -137,7 +137,7 @@ public class DefaultModeOptionsParityTests
     public void ConvertCommand_DefinesOnlyTheReviewedOptions()
     {
         var actual = ConvertCommand.Create().Options
-            .Select(option => option.Aliases.Where(alias => alias.StartsWith("--", StringComparison.Ordinal))
+            .Select(option => option.Aliases.Prepend(option.Name).Where(alias => alias.StartsWith("--", StringComparison.Ordinal))
                 .OrderBy(alias => alias, StringComparer.Ordinal).First())
             .OrderBy(alias => alias, StringComparer.Ordinal)
             .ToArray();

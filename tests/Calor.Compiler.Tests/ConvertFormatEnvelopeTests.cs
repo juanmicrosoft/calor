@@ -869,7 +869,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
             Console.SetError(error);
             ConvertCommand.ConversionCompletedObserver.Value = completed;
             ConvertCommand.AdditionalValidationError.Value = additionalValidation;
-            var exit = await ConvertCommand.Create().InvokeAsync(args);
+            var exit = await ConvertCommand.Create().Parse(args).InvokeAsync();
             return (exit, output.ToString(), error.ToString());
         }
         finally

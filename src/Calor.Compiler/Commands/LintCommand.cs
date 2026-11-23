@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
@@ -17,36 +16,40 @@ public static class LintCommand
 {
     public static Command Create()
     {
-        var inputArgument = new Argument<FileInfo[]>(
-            name: "files",
-            description: "The Calor source file(s) to lint")
+        var inputArgument = new Argument<FileInfo[]>("files")
         {
+            Description = "The Calor source file(s) to lint",
             Arity = ArgumentArity.OneOrMore
         };
 
-        var fixOption = new Option<bool>(
-            aliases: ["--fix", "-f"],
-            description: "Auto-fix lint issues through the lossless validated formatter");
+        var fixOption = new Option<bool>("--fix", "-f")
+        {
+            Description = "Auto-fix lint issues through the lossless validated formatter"
+        };
 
-        var experimentalOption = new Option<bool>(
-            aliases: ["--experimental"],
-            description: "Deprecated compatibility flag. Lossless validated fixes are enabled by default.");
+        var experimentalOption = new Option<bool>("--experimental")
+        {
+            Description = "Deprecated compatibility flag. Lossless validated fixes are enabled by default."
+        };
 
-        var checkOption = new Option<bool>(
-            aliases: ["--check", "-c"],
-            description: "Check only, exit 1 if issues found");
+        var checkOption = new Option<bool>("--check", "-c")
+        {
+            Description = "Check only, exit 1 if issues found"
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show detailed lint issues");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Show detailed lint issues"
+        };
 
         // Unlike the root command, --format has NO -f short alias here: -f is
         // taken by --fix on lint. Documented in docs/cli/structured-output.md.
-        var formatOption = new Option<string>(
-            aliases: ["--format"],
-            getDefaultValue: () => "text",
-            description: "Output format: text (human-readable), json, or sarif (machine-readable diagnostics on stdout). Note: no -f alias on lint (-f means --fix).");
-        formatOption.FromAmong("text", "json", "sarif");
+        var formatOption = new Option<string>("--format")
+        {
+            Description = "Output format: text (human-readable), json, or sarif (machine-readable diagnostics on stdout). Note: no -f alias on lint (-f means --fix).",
+            DefaultValueFactory = _ => "text"
+        };
+        formatOption.AcceptOnlyFromAmong("text", "json", "sarif");
 
         var command = new Command("lint", "Check and fix Calor code for agent-optimal format")
         {
@@ -58,19 +61,19 @@ public static class LintCommand
             experimentalOption
         };
 
-        // Set the exit code through InvocationContext: Main returns InvokeAsync's
+        // Return the exit code from the action: Main returns InvokeAsync's
         // result as the process exit code, which would stomp a bare
         // Environment.ExitCode assignment (lint --check must exit nonzero on issues).
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var wantsFix = ctx.ParseResult.GetValueForOption(fixOption);
+            var wantsFix = parseResult.GetValue(fixOption);
 
-            ctx.ExitCode = await ExecuteAsync(
-                ctx.ParseResult.GetValueForArgument(inputArgument),
+            return await ExecuteAsync(
+                parseResult.GetValue(inputArgument)!,
                 wantsFix,
-                ctx.ParseResult.GetValueForOption(checkOption),
-                ctx.ParseResult.GetValueForOption(verboseOption),
-                ctx.ParseResult.GetValueForOption(formatOption) ?? "text");
+                parseResult.GetValue(checkOption),
+                parseResult.GetValue(verboseOption),
+                parseResult.GetValue(formatOption) ?? "text");
         });
 
         return command;

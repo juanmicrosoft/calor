@@ -89,9 +89,9 @@ public class CliEnforceEffectsDefaultTests : IDisposable
     {
         var command = WatchCommand.Create();
         var option = Assert.IsType<System.CommandLine.Option<bool>>(Assert.Single(command.Options,
-            candidate => candidate.HasAlias("--enforce-effects")));
+            candidate => candidate.Name == "--enforce-effects"));
         var parseResult = command.Parse(["."]);
 
-        Assert.True(parseResult.GetValueForOption(option));
+        Assert.True(parseResult.GetValue(option));
     }
 }

@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 
 namespace Calor.Compiler.Commands;
 
@@ -13,9 +12,10 @@ public static class RunCommand
 {
     public static Command Create()
     {
-        var pathArgument = new Argument<string>(
-            name: "path",
-            description: "A .calr file, or a directory containing .calr files (bin/, obj/ and reference/ subdirectories are excluded)");
+        var pathArgument = new Argument<string>("path")
+        {
+            Description = "A .calr file, or a directory containing .calr files (bin/, obj/ and reference/ subdirectories are excluded)"
+        };
 
         var command = new Command("run", "Compile and execute a Calor program (no project file required)")
         {
@@ -24,10 +24,10 @@ public static class RunCommand
 
         var bindSettings = ExecutionWorkspace.AddCommonOptions(command);
 
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            var path = ctx.ParseResult.GetValueForArgument(pathArgument);
-            ctx.ExitCode = Execute(path, bindSettings(ctx));
+            var path = parseResult.GetValue(pathArgument)!;
+            return Execute(path, bindSettings(parseResult));
         });
 
         return command;

@@ -13,7 +13,7 @@ public static class LspCommand
     {
         var command = new Command("lsp", "Start the Calor Language Server (stdio transport)");
 
-        command.SetHandler(async () =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             // Spawn calor-lsp process (can't reference directly due to circular dependency)
             var startInfo = new ProcessStartInfo("calor-lsp")

@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -21,31 +20,35 @@ public static class EffectsCommand
     {
         var command = new Command("effects", "Work with effect declarations and manifests");
 
-        command.AddCommand(CreateResolveCommand());
-        command.AddCommand(CreateValidateCommand());
-        command.AddCommand(CreateListCommand());
-        command.AddCommand(CreateSuggestCommand());
+        command.Subcommands.Add(CreateResolveCommand());
+        command.Subcommands.Add(CreateValidateCommand());
+        command.Subcommands.Add(CreateListCommand());
+        command.Subcommands.Add(CreateSuggestCommand());
 
         return command;
     }
 
     private static Command CreateResolveCommand()
     {
-        var signatureArgument = new Argument<string>(
-            name: "signature",
-            description: "Method signature to resolve (e.g., 'System.Console.WriteLine' or 'File.ReadAllText')");
+        var signatureArgument = new Argument<string>("signature")
+        {
+            Description = "Method signature to resolve (e.g., 'System.Console.WriteLine' or 'File.ReadAllText')"
+        };
 
-        var projectOption = new Option<DirectoryInfo?>(
-            aliases: ["--project", "-p"],
-            description: "Project directory for loading project-local manifests");
+        var projectOption = new Option<DirectoryInfo?>("--project", "-p")
+        {
+            Description = "Project directory for loading project-local manifests"
+        };
 
-        var solutionOption = new Option<DirectoryInfo?>(
-            aliases: ["--solution", "-s"],
-            description: "Solution directory for loading solution-level manifests");
+        var solutionOption = new Option<DirectoryInfo?>("--solution", "-s")
+        {
+            Description = "Solution directory for loading solution-level manifests"
+        };
 
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Output in JSON format");
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Output in JSON format"
+        };
 
         var command = new Command("resolve", "Resolve effects for a method signature")
         {
@@ -55,15 +58,15 @@ public static class EffectsCommand
             jsonOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            ctx.ExitCode = ExecuteResolve(
-                ctx.ParseResult.GetValueForArgument(signatureArgument),
-                ctx.ParseResult.GetValueForOption(projectOption),
-                ctx.ParseResult.GetValueForOption(solutionOption),
-                ctx.ParseResult.GetValueForOption(jsonOption));
+            return ExecuteResolve(
+                parseResult.GetValue(signatureArgument)!,
+                parseResult.GetValue(projectOption),
+                parseResult.GetValue(solutionOption),
+                parseResult.GetValue(jsonOption));
         });
 
         return command;
@@ -71,13 +74,15 @@ public static class EffectsCommand
 
     private static Command CreateValidateCommand()
     {
-        var projectOption = new Option<DirectoryInfo?>(
-            aliases: ["--project", "-p"],
-            description: "Project directory for loading project-local manifests");
+        var projectOption = new Option<DirectoryInfo?>("--project", "-p")
+        {
+            Description = "Project directory for loading project-local manifests"
+        };
 
-        var solutionOption = new Option<DirectoryInfo?>(
-            aliases: ["--solution", "-s"],
-            description: "Solution directory for loading solution-level manifests");
+        var solutionOption = new Option<DirectoryInfo?>("--solution", "-s")
+        {
+            Description = "Solution directory for loading solution-level manifests"
+        };
 
         var command = new Command("validate", "Validate all manifests in search path")
         {
@@ -85,13 +90,13 @@ public static class EffectsCommand
             solutionOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            ctx.ExitCode = ExecuteValidate(
-                ctx.ParseResult.GetValueForOption(projectOption),
-                ctx.ParseResult.GetValueForOption(solutionOption));
+            return ExecuteValidate(
+                parseResult.GetValue(projectOption),
+                parseResult.GetValue(solutionOption));
         });
 
         return command;
@@ -99,21 +104,25 @@ public static class EffectsCommand
 
     private static Command CreateListCommand()
     {
-        var projectOption = new Option<DirectoryInfo?>(
-            aliases: ["--project", "-p"],
-            description: "Project directory for loading project-local manifests");
+        var projectOption = new Option<DirectoryInfo?>("--project", "-p")
+        {
+            Description = "Project directory for loading project-local manifests"
+        };
 
-        var solutionOption = new Option<DirectoryInfo?>(
-            aliases: ["--solution", "-s"],
-            description: "Solution directory for loading solution-level manifests");
+        var solutionOption = new Option<DirectoryInfo?>("--solution", "-s")
+        {
+            Description = "Solution directory for loading solution-level manifests"
+        };
 
-        var typeOption = new Option<string?>(
-            aliases: ["--type", "-t"],
-            description: "Filter by type name (partial match)");
+        var typeOption = new Option<string?>("--type", "-t")
+        {
+            Description = "Filter by type name (partial match)"
+        };
 
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Output in JSON format");
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Output in JSON format"
+        };
 
         var command = new Command("list", "List all types with effect declarations")
         {
@@ -123,7 +132,11 @@ public static class EffectsCommand
             jsonOption
         };
 
-        command.SetHandler(ExecuteList, projectOption, solutionOption, typeOption, jsonOption);
+        command.SetAction(parseResult => ExecuteList(
+            parseResult.GetValue(projectOption),
+            parseResult.GetValue(solutionOption),
+            parseResult.GetValue(typeOption),
+            parseResult.GetValue(jsonOption)));
 
         return command;
     }
@@ -332,49 +345,56 @@ public static class EffectsCommand
 
     private static Command CreateSuggestCommand()
     {
-        var inputOption = new Option<FileInfo[]>(
-            aliases: ["--input", "-i"],
-            description: "Calor source file(s) to analyze")
-        { IsRequired = true, Arity = ArgumentArity.OneOrMore };
+        var inputOption = new Option<FileInfo[]>("--input", "-i")
+        {
+            Description = "Calor source file(s) to analyze",
+            Required = true,
+            Arity = ArgumentArity.OneOrMore
+        };
 
-        var projectOption = new Option<DirectoryInfo?>(
-            aliases: ["--project", "-p"],
-            description: "Project directory for manifest loading context");
+        var projectOption = new Option<DirectoryInfo?>("--project", "-p")
+        {
+            Description = "Project directory for manifest loading context"
+        };
 
-        var solutionOption = new Option<DirectoryInfo?>(
-            aliases: ["--solution", "-s"],
-            description: "Solution directory for manifest loading context");
+        var solutionOption = new Option<DirectoryInfo?>("--solution", "-s")
+        {
+            Description = "Solution directory for manifest loading context"
+        };
 
-        var outputOption = new Option<FileInfo?>(
-            aliases: ["--output", "-o"],
-            description: "Output file path (default: .calor-effects.suggested.json)");
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "Output file path (default: .calor-effects.suggested.json)"
+        };
 
-        var mergeOption = new Option<bool>(
-            aliases: ["--merge"],
-            description: "Merge into existing .calor-effects.json instead of writing a separate file",
-            getDefaultValue: () => false);
+        var mergeOption = new Option<bool>("--merge")
+        {
+            Description = "Merge into existing .calor-effects.json instead of writing a separate file",
+            DefaultValueFactory = _ => false
+        };
 
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Output JSON to stdout",
-            getDefaultValue: () => false);
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Output JSON to stdout",
+            DefaultValueFactory = _ => false
+        };
 
         var command = new Command("suggest", "Generate a manifest template for unresolved external calls")
         {
             inputOption, projectOption, solutionOption, outputOption, mergeOption, jsonOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            ctx.ExitCode = ExecuteSuggest(
-                ctx.ParseResult.GetValueForOption(inputOption) ?? [],
-                ctx.ParseResult.GetValueForOption(projectOption),
-                ctx.ParseResult.GetValueForOption(solutionOption),
-                ctx.ParseResult.GetValueForOption(outputOption),
-                ctx.ParseResult.GetValueForOption(mergeOption),
-                ctx.ParseResult.GetValueForOption(jsonOption));
+            return ExecuteSuggest(
+                parseResult.GetValue(inputOption) ?? [],
+                parseResult.GetValue(projectOption),
+                parseResult.GetValue(solutionOption),
+                parseResult.GetValue(outputOption),
+                parseResult.GetValue(mergeOption),
+                parseResult.GetValue(jsonOption));
         });
 
         return command;

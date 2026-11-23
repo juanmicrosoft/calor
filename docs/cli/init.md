@@ -400,7 +400,7 @@ The following properties control Calor build behavior. Set them in your `.csproj
 When set, `CalorCompilerOverride` derives `CalorCompilerPath` automatically. This is intended for developers working on the Calor compiler itself who want to test local changes without modifying project files:
 
 ```bash
-dotnet build -p:CalorCompilerOverride=path/to/Calor.Compiler/bin/Debug/net8.0/calor
+dotnet build -p:CalorCompilerOverride=path/to/Calor.Compiler/bin/Debug/net10.0/calor
 ```
 
 **Precedence** (highest to lowest):
@@ -412,7 +412,7 @@ When `CalorCompilerOverride` is set, the build emits a warning confirming which 
 
 > **Note:** For projects using `Calor.Sdk` (MSBuild task integration) rather than `calor init`, `CalorCompilerOverride` derives `CalorTasksAssembly` instead. Point it at your local `Calor.Tasks.dll`:
 > ```bash
-> dotnet build -p:CalorCompilerOverride=path/to/Calor.Tasks/bin/Debug/net8.0/Calor.Tasks.dll
+> dotnet build -p:CalorCompilerOverride=path/to/Calor.Tasks/bin/Debug/net10.0/Calor.Tasks.dll
 > ```
 
 ---

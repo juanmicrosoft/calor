@@ -7,13 +7,15 @@ public static class SelfTestCommand
 {
     public static Command Create()
     {
-        var scenarioOption = new Option<string?>(
-            aliases: ["--scenario", "-s"],
-            description: "Run only a specific scenario by name (e.g., '01_hello_world')");
+        var scenarioOption = new Option<string?>("--scenario", "-s")
+        {
+            Description = "Run only a specific scenario by name (e.g., '01_hello_world')"
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show detailed output including diffs for failures");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Show detailed output including diffs for failures"
+        };
 
         var command = new Command("self-test",
             "Verify compiler correctness by compiling embedded reference files and diffing output against golden files")
@@ -22,11 +24,11 @@ public static class SelfTestCommand
             verboseOption
         };
 
-        command.SetHandler(context =>
+        command.SetAction(parseResult =>
         {
-            context.ExitCode = Execute(
-                context.ParseResult.GetValueForOption(scenarioOption),
-                context.ParseResult.GetValueForOption(verboseOption));
+            return Execute(
+                parseResult.GetValue(scenarioOption),
+                parseResult.GetValue(verboseOption));
         });
         return command;
     }

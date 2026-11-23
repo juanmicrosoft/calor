@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
@@ -19,50 +18,56 @@ public static class ReviewPacketCommand
 {
     public static Command Create()
     {
-        var filesArgument = new Argument<FileInfo[]>(
-            name: "files",
-            description: "The Calor source file(s) the packet covers")
+        var filesArgument = new Argument<FileInfo[]>("files")
         {
+            Description = "The Calor source file(s) the packet covers",
             Arity = ArgumentArity.OneOrMore
         };
 
-        var changedOption = new Option<string[]>(
-            aliases: ["--changed"],
-            description: "Declaration id or name treated as changed (repeatable); drives the caller-impact section")
-        { Arity = ArgumentArity.ZeroOrMore, AllowMultipleArgumentsPerToken = true };
-
-        var baselineRefOption = new Option<string?>(
-            aliases: ["--baseline-ref"],
-            description: "Git ref to diff against; changed declarations are derived from the diff's line ranges. "
-                + "Approximation: a declaration's extent runs to the next declaration's start, so an edit between "
-                + "declarations attributes to the preceding one (conservative over-inclusion, never omission)");
-
-        var permissiveOption = new Option<bool>(
-            aliases: ["--permissive-effects"],
-            description: "The module is built with permissive effects — disclosed as a waiver on the packet's first line");
-
-        var contractModeOption = new Option<string>(
-            aliases: ["--contract-mode"],
-            getDefaultValue: () => "debug",
-            description: "Contract mode the module is built with: debug, release, or off (off = waiver, disclosed first)");
-
-        var timeoutOption = new Option<int>(
-            aliases: ["--timeout", "-t"],
-            getDefaultValue: () => 5000,
-            description: "Z3 solver timeout per contract in milliseconds");
-
-        var outputOption = new Option<FileInfo?>(
-            aliases: ["--output", "-o"],
-            description: "Write the markdown packet to a file (default: stdout)");
-
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Emit the envelope document (packet under data) to stdout");
-
-        var referenceOption = new Option<FileInfo[]>(
-            aliases: ["--reference", "-r"],
-            description: "Assembly reference: calls on its types bind to their metadata, and generated C# is validated against it (repeatable)")
+        var changedOption = new Option<string[]>("--changed")
         {
+            Description = "Declaration id or name treated as changed (repeatable); drives the caller-impact section",
+            Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true
+        };
+
+        var baselineRefOption = new Option<string?>("--baseline-ref")
+        {
+            Description = "Git ref to diff against; changed declarations are derived from the diff's line ranges. "
+                + "Approximation: a declaration's extent runs to the next declaration's start, so an edit between "
+                + "declarations attributes to the preceding one (conservative over-inclusion, never omission)"
+        };
+
+        var permissiveOption = new Option<bool>("--permissive-effects")
+        {
+            Description = "The module is built with permissive effects — disclosed as a waiver on the packet's first line"
+        };
+
+        var contractModeOption = new Option<string>("--contract-mode")
+        {
+            Description = "Contract mode the module is built with: debug, release, or off (off = waiver, disclosed first)",
+            DefaultValueFactory = _ => "debug"
+        };
+
+        var timeoutOption = new Option<int>("--timeout", "-t")
+        {
+            Description = "Z3 solver timeout per contract in milliseconds",
+            DefaultValueFactory = _ => 5000
+        };
+
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "Write the markdown packet to a file (default: stdout)"
+        };
+
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Emit the envelope document (packet under data) to stdout"
+        };
+
+        var referenceOption = new Option<FileInfo[]>("--reference", "-r")
+        {
+            Description = "Assembly reference: calls on its types bind to their metadata, and generated C# is validated against it (repeatable)",
             AllowMultipleArgumentsPerToken = true
         };
 
@@ -80,20 +85,20 @@ public static class ReviewPacketCommand
             referenceOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            ctx.ExitCode = Execute(
-                ctx.ParseResult.GetValueForArgument(filesArgument),
-                ctx.ParseResult.GetValueForOption(changedOption) ?? [],
-                ctx.ParseResult.GetValueForOption(baselineRefOption),
-                ctx.ParseResult.GetValueForOption(permissiveOption),
-                ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
-                (uint)Math.Max(1, ctx.ParseResult.GetValueForOption(timeoutOption)),
-                ctx.ParseResult.GetValueForOption(outputOption),
-                ctx.ParseResult.GetValueForOption(jsonOption),
-                ctx.ParseResult.GetValueForOption(referenceOption) ?? []);
+            return Execute(
+                parseResult.GetValue(filesArgument)!,
+                parseResult.GetValue(changedOption) ?? [],
+                parseResult.GetValue(baselineRefOption),
+                parseResult.GetValue(permissiveOption),
+                parseResult.GetValue(contractModeOption) ?? "debug",
+                (uint)Math.Max(1, parseResult.GetValue(timeoutOption)),
+                parseResult.GetValue(outputOption),
+                parseResult.GetValue(jsonOption),
+                parseResult.GetValue(referenceOption) ?? []);
         });
 
         return command;

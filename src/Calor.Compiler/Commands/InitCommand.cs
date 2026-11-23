@@ -13,24 +13,26 @@ public static class InitCommand
 {
     public static Command Create()
     {
-        var aiOption = new Option<string[]>(
-            aliases: new[] { "--ai", "-a" },
-            description: $"AI agent(s) to configure (can specify multiple): {string.Join(", ", AiInitializerFactory.SupportedAgents)}")
+        var aiOption = new Option<string[]>("--ai", "-a")
         {
+            Description = $"AI agent(s) to configure (can specify multiple): {string.Join(", ", AiInitializerFactory.SupportedAgents)}",
             AllowMultipleArgumentsPerToken = true
         };
 
-        var projectOption = new Option<string?>(
-            aliases: new[] { "--project", "-p" },
-            description: "The .csproj file to configure (auto-detects if single .csproj exists)");
+        var projectOption = new Option<string?>("--project", "-p")
+        {
+            Description = "The .csproj file to configure (auto-detects if single .csproj exists)"
+        };
 
-        var solutionOption = new Option<string?>(
-            aliases: new[] { "--solution", "-s" },
-            description: "The .sln or .slnx file to configure (initializes all projects in solution)");
+        var solutionOption = new Option<string?>("--solution", "-s")
+        {
+            Description = "The .sln or .slnx file to configure (initializes all projects in solution)"
+        };
 
-        var forceOption = new Option<bool>(
-            aliases: new[] { "--force", "-f" },
-            description: "Overwrite existing files without prompting");
+        var forceOption = new Option<bool>("--force", "-f")
+        {
+            Description = "Overwrite existing files without prompting"
+        };
 
         var command = new Command("init", "Initialize the current directory for Calor development with AI coding agents")
         {
@@ -40,7 +42,11 @@ public static class InitCommand
             forceOption
         };
 
-        command.SetHandler(ExecuteAsync, aiOption, projectOption, solutionOption, forceOption);
+        command.SetAction((parseResult, cancellationToken) => ExecuteAsync(
+            parseResult.GetValue(aiOption)!,
+            parseResult.GetValue(projectOption),
+            parseResult.GetValue(solutionOption),
+            parseResult.GetValue(forceOption)));
 
         return command;
     }

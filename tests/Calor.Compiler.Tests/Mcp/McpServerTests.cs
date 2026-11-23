@@ -31,7 +31,7 @@ public class McpServerTests
     {
         var command = McpCommand.Create();
 
-        var stdioOption = command.Options.FirstOrDefault(o => o.Name == "stdio");
+        var stdioOption = command.Options.FirstOrDefault(o => o.Name == "--stdio");
         Assert.NotNull(stdioOption);
     }
 
@@ -40,7 +40,7 @@ public class McpServerTests
     {
         var command = McpCommand.Create();
 
-        var verboseOption = command.Options.FirstOrDefault(o => o.Name == "verbose");
+        var verboseOption = command.Options.FirstOrDefault(o => o.Name == "--verbose");
         Assert.NotNull(verboseOption);
     }
 
@@ -49,14 +49,14 @@ public class McpServerTests
     {
         var command = McpCommand.Create();
 
-        Assert.NotNull(command.Handler);
+        Assert.NotNull(command.Action);
     }
 
     [Fact]
     public void McpCommand_IsRegisteredInRootCommand()
     {
         var rootCommand = new RootCommand("Test");
-        rootCommand.AddCommand(McpCommand.Create());
+        rootCommand.Subcommands.Add(McpCommand.Create());
 
         var mcpCommand = rootCommand.Subcommands.FirstOrDefault(c => c.Name == "mcp");
 

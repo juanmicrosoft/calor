@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using Calor.Compiler.Refactoring;
 
 namespace Calor.Compiler.Commands;
@@ -15,43 +14,49 @@ public static class RenameCommand
 {
     public static Command Create()
     {
-        var pathArgument = new Argument<string>(
-            name: "path",
-            description: "Project directory (or a single .calr file) to rename within");
-        var fileOption = new Option<string>(
-            aliases: ["--file"],
-            description: "File containing the symbol occurrence to rename")
-        { IsRequired = true };
-        var lineOption = new Option<int>(
-            aliases: ["--line"],
-            description: "1-based line of the identifier to rename")
-        { IsRequired = true };
-        var columnOption = new Option<int>(
-            aliases: ["--column"],
-            description: "1-based column of the identifier to rename")
-        { IsRequired = true };
-        var toOption = new Option<string>(
-            aliases: ["--to"],
-            description: "New identifier")
-        { IsRequired = true };
-        var dryRunOption = new Option<bool>(
-            aliases: ["--dry-run"],
-            description: "Report the edits without writing them");
+        var pathArgument = new Argument<string>("path")
+        {
+            Description = "Project directory (or a single .calr file) to rename within"
+        };
+        var fileOption = new Option<string>("--file")
+        {
+            Description = "File containing the symbol occurrence to rename",
+            Required = true
+        };
+        var lineOption = new Option<int>("--line")
+        {
+            Description = "1-based line of the identifier to rename",
+            Required = true
+        };
+        var columnOption = new Option<int>("--column")
+        {
+            Description = "1-based column of the identifier to rename",
+            Required = true
+        };
+        var toOption = new Option<string>("--to")
+        {
+            Description = "New identifier",
+            Required = true
+        };
+        var dryRunOption = new Option<bool>("--dry-run")
+        {
+            Description = "Report the edits without writing them"
+        };
 
         var command = new Command("rename", "Rename a symbol and every reference to it")
         {
             pathArgument, fileOption, lineOption, columnOption, toOption, dryRunOption,
         };
 
-        command.SetHandler((InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            context.ExitCode = Execute(
-                context.ParseResult.GetValueForArgument(pathArgument),
-                context.ParseResult.GetValueForOption(fileOption)!,
-                context.ParseResult.GetValueForOption(lineOption),
-                context.ParseResult.GetValueForOption(columnOption),
-                context.ParseResult.GetValueForOption(toOption)!,
-                context.ParseResult.GetValueForOption(dryRunOption));
+            return Execute(
+                parseResult.GetValue(pathArgument)!,
+                parseResult.GetValue(fileOption)!,
+                parseResult.GetValue(lineOption),
+                parseResult.GetValue(columnOption),
+                parseResult.GetValue(toOption)!,
+                parseResult.GetValue(dryRunOption));
         });
 
         return command;

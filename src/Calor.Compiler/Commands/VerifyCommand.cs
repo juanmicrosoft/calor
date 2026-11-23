@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -26,54 +25,62 @@ public static class VerifyCommand
 {
     public static Command Create()
     {
-        var inputArgument = new Argument<FileInfo[]>(
-            name: "files",
-            description: "The Calor source file(s) to verify")
+        var inputArgument = new Argument<FileInfo[]>("files")
         {
+            Description = "The Calor source file(s) to verify",
             Arity = ArgumentArity.OneOrMore
         };
 
-        var formatOption = new Option<string>(
-            aliases: ["--format", "-f"],
-            getDefaultValue: () => "text",
-            description: "Output format: text or json");
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Output format: text or json",
+            DefaultValueFactory = _ => "text"
+        };
 
-        var outputOption = new Option<FileInfo?>(
-            aliases: ["--output", "-o"],
-            description: "Output file (stdout if not specified)");
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "Output file (stdout if not specified)"
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Enable verbose output with detailed verification info");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output with detailed verification info"
+        };
 
-        var timeoutOption = new Option<int>(
-            aliases: ["--timeout", "-t"],
-            getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs,
-            description: "Z3 solver timeout per contract in milliseconds (default: 5000)");
-        timeoutOption.AddValidator(result =>
+        var timeoutOption = new Option<int>("--timeout", "-t")
+        {
+            Description = "Z3 solver timeout per contract in milliseconds (default: 5000)",
+            DefaultValueFactory = _ => (int)VerificationOptions.DefaultTimeoutMs
+        };
+        timeoutOption.Validators.Add(result =>
         {
             var value = result.GetValueOrDefault<int>();
             if (value <= 0)
             {
-                result.ErrorMessage = "Timeout must be a positive integer";
+                result.AddError("Timeout must be a positive integer");
             }
         });
 
-        var noCacheOption = new Option<bool>(
-            aliases: ["--no-cache"],
-            description: "Disable verification result caching");
+        var noCacheOption = new Option<bool>("--no-cache")
+        {
+            Description = "Disable verification result caching"
+        };
 
-        var clearCacheOption = new Option<bool>(
-            aliases: ["--clear-cache"],
-            description: "Clear verification cache before verifying");
-        var noImplicitSystemOption = new Option<bool>(
-            "--no-implicit-system", "Validate without the implicit System project import");
+        var clearCacheOption = new Option<bool>("--clear-cache")
+        {
+            Description = "Clear verification cache before verifying"
+        };
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system")
+        {
+            Description = "Validate without the implicit System project import"
+        };
 
-        var weakeningOption = new Option<string?>(
-            aliases: ["--weakening-check"],
-            description: "M-G4 mode (gates doc Annex A-1.3): with exactly two input files "
+        var weakeningOption = new Option<string?>("--weakening-check")
+        {
+            Description = "M-G4 mode (gates doc Annex A-1.3): with exactly two input files "
                 + "(frozen, final), mechanically decide whether the named declaration's "
-                + "requires/=> conjunction was weakened — prints a JSON verdict, exit 0");
+                + "requires/=> conjunction was weakened — prints a JSON verdict, exit 0"
+        };
 
         var command = new Command("verify", "Verify contracts in Calor files using Z3 SMT solver")
         {
@@ -88,29 +95,28 @@ public static class VerifyCommand
             weakeningOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var weakeningDeclaration = ctx.ParseResult.GetValueForOption(weakeningOption);
+            var weakeningDeclaration = parseResult.GetValue(weakeningOption);
             if (weakeningDeclaration != null)
             {
-                ctx.ExitCode = ExecuteWeakeningCheck(
-                    ctx.ParseResult.GetValueForArgument(inputArgument),
+                return ExecuteWeakeningCheck(
+                    parseResult.GetValue(inputArgument)!,
                     weakeningDeclaration,
-                    (uint)ctx.ParseResult.GetValueForOption(timeoutOption));
-                return;
+                    (uint)parseResult.GetValue(timeoutOption));
             }
 
-            ctx.ExitCode = await ExecuteAsync(
-                ctx.ParseResult.GetValueForArgument(inputArgument),
-                ctx.ParseResult.GetValueForOption(formatOption) ?? "text",
-                ctx.ParseResult.GetValueForOption(outputOption),
-                ctx.ParseResult.GetValueForOption(verboseOption),
-                ctx.ParseResult.GetValueForOption(timeoutOption),
-                ctx.ParseResult.GetValueForOption(noCacheOption),
-                ctx.ParseResult.GetValueForOption(clearCacheOption),
-                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
+            return await ExecuteAsync(
+                parseResult.GetValue(inputArgument)!,
+                parseResult.GetValue(formatOption) ?? "text",
+                parseResult.GetValue(outputOption),
+                parseResult.GetValue(verboseOption),
+                parseResult.GetValue(timeoutOption),
+                parseResult.GetValue(noCacheOption),
+                parseResult.GetValue(clearCacheOption),
+                !parseResult.GetValue(noImplicitSystemOption));
         });
 
         return command;
@@ -237,7 +243,7 @@ public static class VerifyCommand
             Console.WriteLine(formatted);
         }
 
-        // Exit code based on results (returned through ctx.ExitCode).
+        // Exit code based on results (returned from the action).
         var exitCode = hasErrors ? 1 : 0;
 
         sw.Stop();

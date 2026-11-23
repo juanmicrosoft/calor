@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
@@ -15,41 +14,47 @@ public static class BenchmarkCommand
 {
     public static Command Create()
     {
-        var calorOption = new Option<FileInfo?>(
-            aliases: new[] { "--calor" },
-            description: "The Calor file to benchmark");
-
-        var csharpOption = new Option<FileInfo?>(
-            aliases: new[] { "--csharp", "--cs" },
-            description: "The C# file to benchmark");
-
-        var projectArgument = new Argument<DirectoryInfo?>(
-            name: "project",
-            description: "The project directory to benchmark (optional)")
+        var calorOption = new Option<FileInfo?>("--calor")
         {
+            Description = "The Calor file to benchmark"
+        };
+
+        var csharpOption = new Option<FileInfo?>("--csharp", "--cs")
+        {
+            Description = "The C# file to benchmark"
+        };
+
+        var projectArgument = new Argument<DirectoryInfo?>("project")
+        {
+            Description = "The project directory to benchmark (optional)",
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var categoryOption = new Option<string?>(
-            aliases: new[] { "--category", "-c" },
-            description: "Filter by category (TokenEconomics, GenerationAccuracy, Comprehension, EditPrecision, ErrorDetection, InformationDensity, TaskCompletion)");
+        var categoryOption = new Option<string?>("--category", "-c")
+        {
+            Description = "Filter by category (TokenEconomics, GenerationAccuracy, Comprehension, EditPrecision, ErrorDetection, InformationDensity, TaskCompletion)"
+        };
 
-        var formatOption = new Option<string>(
-            aliases: new[] { "--format", "-f" },
-            description: "Output format (console, markdown, json)",
-            getDefaultValue: () => "console");
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Output format (console, markdown, json)",
+            DefaultValueFactory = _ => "console"
+        };
 
-        var outputOption = new Option<FileInfo?>(
-            aliases: new[] { "--output", "-o" },
-            description: "Save benchmark results to file");
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "Save benchmark results to file"
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Show detailed per-metric breakdown");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Show detailed per-metric breakdown"
+        };
 
-        var quickOption = new Option<bool>(
-            aliases: new[] { "--quick", "-q" },
-            description: "Use quick source-size benchmark over tokens, lines, and characters");
+        var quickOption = new Option<bool>("--quick", "-q")
+        {
+            Description = "Use quick source-size benchmark over tokens, lines, and characters"
+        };
 
         var command = new Command("benchmark", "Compare Calor vs C# across 7 evaluation categories")
         {
@@ -63,19 +68,19 @@ public static class BenchmarkCommand
             quickOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            ctx.ExitCode = await ExecuteAsync(
-                ctx.ParseResult.GetValueForArgument(projectArgument),
-                ctx.ParseResult.GetValueForOption(calorOption),
-                ctx.ParseResult.GetValueForOption(csharpOption),
-                ctx.ParseResult.GetValueForOption(categoryOption),
-                ctx.ParseResult.GetValueForOption(formatOption) ?? "console",
-                ctx.ParseResult.GetValueForOption(outputOption),
-                ctx.ParseResult.GetValueForOption(verboseOption),
-                ctx.ParseResult.GetValueForOption(quickOption));
+            return await ExecuteAsync(
+                parseResult.GetValue(projectArgument),
+                parseResult.GetValue(calorOption),
+                parseResult.GetValue(csharpOption),
+                parseResult.GetValue(categoryOption),
+                parseResult.GetValue(formatOption) ?? "console",
+                parseResult.GetValue(outputOption),
+                parseResult.GetValue(verboseOption),
+                parseResult.GetValue(quickOption));
         });
 
         return command;
