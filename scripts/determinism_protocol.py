@@ -161,7 +161,12 @@ def check_gates(protocol, text) -> list[str]:
         wf = parsed.setdefault(gate["workflow"], parse_workflow(text(gate["workflow"])))
         job = wf.get(gate["job"])
         where = f"{gate['workflow']} {gate['job']} '{gate['step']}'"
-        if job is None or {"if", "continue-on-error", "__unparsed__"} & set(job["keys"]):
+        # #1749: a gate that gathers other jobs' reports must run when one of them failed, or the
+        # required check would report a skipped job, which GitHub counts as passing. It registers
+        # jobIf "always()" and its job must carry exactly that; any other job condition is refused.
+        job_if = gate.get("jobIf")
+        if job is None or {"continue-on-error", "__unparsed__"} & set(job["keys"]) \
+                or job_if not in (None, "always()") or job["keys"].get("if") != job_if:
             problems.append(f"{where}: job missing, conditional, or allowed to fail")
             continue
         names = [s.get("name") for s in job["steps"]]

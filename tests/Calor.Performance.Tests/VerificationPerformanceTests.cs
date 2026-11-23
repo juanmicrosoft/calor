@@ -569,8 +569,11 @@ module Test Test block
         var avgTime = sw.Elapsed.TotalMilliseconds / 100.0;
         _output.WriteLine($"CFG construction avg time: {avgTime:F2}ms");
 
-        Assert.True(avgTime < 0.1,
-            $"CFG construction took {avgTime:F2}ms, smoke budget < 0.1ms");
+        // #1749: CI measures 0.03-0.04 ms; a loaded release runner measured 0.11 ms (run 44947647159),
+        // so 0.1 ms failed on noise. 1 ms (the complex-function budget) keeps ~25x headroom and still
+        // catches a real regression in ControlFlowGraph.Build.
+        Assert.True(avgTime < 1,
+            $"CFG construction took {avgTime:F2}ms, smoke budget < 1ms");
     }
 
     [Fact]
