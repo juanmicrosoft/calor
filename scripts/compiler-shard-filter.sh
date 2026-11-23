@@ -54,13 +54,23 @@
 # environment, console and CALOR_HOME). Paired by measured duration so the pairs finish close
 # together: parts 1 and 4, then 2 and 3. Coverage loops still run --parts one at a time.
 # or:
+#   bash scripts/compiler-shard-filter.sh --job compiler-1   # the parts one CI job runs (#1749)
+# or:
 #   bash scripts/compiler-shard-filter.sh --self-test
+#
+# JOBS (0.31, #1749): five hosts on one 4-vCPU runner took 32-33 min on a good runner and hit
+# the 40-minute cap on slow ones (main runs 44932686266 and 45077844186; PR #1740 twice), with
+# every test still passing. test.yml now spreads them over three runners: compiler-1 runs the
+# first pair, compiler-2 the second, compiler-replay only the historical replays, and the
+# `tests (compiler)` job checks their reports together against the manifest. The job name
+# `compiler` (publish-nuget.yml) still runs all four parts and the replays on one runner.
 
 set -euo pipefail
 
 SHARD_LETTERS=("C D J U P" "B F I Y" "A E S T V")
 REPLAY_FILTER="Category=HistoricalReplay"
 PAIRS=("1,4" "2,3")
+JOBS=("compiler" "compiler-1" "compiler-2" "compiler-replay")
 NOT_REPLAY="Category!=HistoricalReplay"
 FILTERS=()
 
@@ -79,7 +89,7 @@ build_filters() {
 }
 
 usage() {
-    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4 | --replay | --pairs]" >&2
+    echo "Usage: $0 [--self-test | --parts | --part 1|2|3|4 | --replay | --pairs | --job NAME]" >&2
     exit 2
 }
 
@@ -108,6 +118,18 @@ if [ "$#" -gt 0 ]; then
         --pairs)
             [ "$#" -eq 1 ] || usage
             printf '%s\n' "${PAIRS[@]}"
+            exit 0
+            ;;
+        --job)
+            # The parts one job runs, one per line, and nothing for compiler-replay.
+            [ "$#" -eq 2 ] || usage
+            case "$2" in
+                compiler) printf '%s\n' 1 2 3 4 ;;
+                compiler-1) printf '%s\n' "${PAIRS[0]}" | tr ',' '\n' ;;
+                compiler-2) printf '%s\n' "${PAIRS[1]}" | tr ',' '\n' ;;
+                compiler-replay) ;;
+                *) usage ;;
+            esac
             exit 0
             ;;
         *) usage ;;
@@ -170,6 +192,17 @@ if [ "${1:-}" = "--self-test" ]; then
     )"
     [ "$(bash "$0")" = "$expected_assignments" ] \
         || { echo "FAIL: legacy assignment output changed"; fail=1; }
+    # #1749: the split jobs run every part exactly once between them, and compiler runs all four.
+    [ "$( { bash "$0" --job compiler-1; bash "$0" --job compiler-2; bash "$0" --job compiler-replay; } | sort)" = "$(bash "$0" --parts)" ] \
+        && [ "$(bash "$0" --job compiler)" = "$(bash "$0" --parts)" ] \
+        && [ -z "$(bash "$0" --job compiler-replay)" ] \
+        || { echo "FAIL: the jobs do not run each part exactly once"; fail=1; }
+    [ "${#JOBS[@]}" = 4 ] || { echo "FAIL: unexpected job inventory"; fail=1; }
+    if bash "$0" --job compiler-3 >/dev/null 2>&1 || bash "$0" --job >/dev/null 2>&1 \
+        || bash "$0" --job compiler-1 extra >/dev/null 2>&1; then
+        echo "FAIL: accepted an invalid job"
+        fail=1
+    fi
     for invalid in 0 5 invalid ""; do
         if bash "$0" --part "$invalid" >/dev/null 2>&1; then
             echo "FAIL: accepted invalid part '$invalid'"

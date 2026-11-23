@@ -496,22 +496,12 @@ jobs:
   remaining-tests:
     name: tests (${{ matrix.name }})
     runs-on: ubuntu-latest
-    # The compiler shard includes the recursively checked-out corpus ratchets.
-    # Scalar-nullability coverage moved two consecutive runs just beyond the
-    # former 15-minute ceiling while tests were still passing.
-    # Inventory grew from 7,978 to 12,018. Run 34981014060 completed the first
-    # 6,466-case host, then hit the old 20m cap during the second host.
-    # Keep both fresh hosts and all inventory/assertion gates unchanged.
-    # 0.25 W1 (#1566) added W1GuideTranscriptTests, which re-run the CLI and MCP surfaces against fresh
-    # processes; the shard went from about 23.5 to 29-30 minutes. Main's run 39197466834 (676701415) and two
-    # #1570 runs were cancelled at the 30m cap with 0 failing tests (14414/14417 passed when cut off).
-    timeout-minutes: ${{ fromJSON(matrix.name == 'compiler' && '40' || '15') }}
+    # #1749: Calor.Compiler.Tests runs in the compiler-shards jobs below, gathered by `tests (compiler)`.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: compiler
-            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
           - name: conversion
             project: tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj
           - name: enforcement
@@ -537,7 +527,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: ${{ matrix.name == 'compiler' && 'recursive' || 'false' }}
+          submodules: false
           # #1159/#1417: LedgerCommitStampTests needs full history and fetched
           # protected main to decide whether each provenance identity is durable.
           # Under a depth-1 checkout it now FAILS (it used to skip).
@@ -609,6 +599,133 @@ jobs:
           name: test-report-${{ matrix.name }}
           path: artifacts/test/
           retention-days: 30
+
+  compiler-shards:
+    # #1749: Calor.Compiler.Tests on three runners. Five test hosts on one 4-vCPU runner took 32-33 min
+    # on a good runner and hit the 40-minute cap on slow ones with every test passing (main runs
+    # 44932686266 and 45077844186, PR #1740 twice). compiler-1 runs parts 1 and 4, compiler-2 parts 2
+    # and 3, compiler-replay the historical replays (scripts/compiler-shard-filter.sh --job). Each job
+    # checks its own parts; `tests (compiler)` below checks all of them against the manifest.
+    # The checkout includes the recursively checked-out corpus ratchets.
+    name: tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: compiler-1
+            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          - name: compiler-2
+            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          - name: compiler-replay
+            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # #1159/#1417: LedgerCommitStampTests needs full history and fetched
+          # protected main to decide whether each provenance identity is durable.
+          # Under a depth-1 checkout it now FAILS (it used to skip).
+          fetch-depth: 0
+
+      # #1417 (v0.24 §6): provenance identities resolve from fetched protected main,
+      # never HEAD (refs/pull/N/merge here). Fetch it, and every tag a fresh clone has.
+      - name: Fetch protected main and tags for provenance (#1417)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-recurse-submodules --force origin \
+            '+refs/heads/main:refs/remotes/origin/main' '+refs/tags/*:refs/tags/*'
+          test "$(git rev-parse --is-shallow-repository)" = false
+          git rev-parse --verify 'refs/remotes/origin/main^{commit}'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      # #1666: the shard body is a checked-in script, called with no inline shell. The
+      # determinism protocol (D014) requires this step to be exactly this call and pins the
+      # script; "Enforce test inventory" checks every part's TRX from the test host, so a
+      # script that skips or masks its tests fails there even after a re-pin. The script
+      # also builds the compiler shard once, streams the #1150 resource sampler, splits the
+      # compiler suite in four fresh hosts, and fails if a Z3-gated test skipped.
+      - name: Run project tests
+        run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"
+
+      # Issue #1150: this shard has been SIGTERM'd seven times in two days
+      # ("The runner has received a shutdown signal", exit 143) with ZERO test
+      # failures in every log. Three hypotheses were advanced and all three
+      # discarded by evidence — per-job memory pressure (it also hit
+      # release-quality), an Actions quota (the repo is public, so standard
+      # runners are free), and a platform incident (the status feed shows none).
+      # Guessing has cost more than measuring would. `df` and `free` before and
+      # after the run cost ~1 s and settle the resource question directly: if the
+      # disk is near full or memory is exhausted at the point of death, the next
+      # kill's log says so.
+      #
+      # CORRECTED 2026-09-03 (v0.18 M2): `if: always()` does NOT run when the
+      # runner is shut down — checked on run 33687411104, where this probe
+      # emitted nothing. It is kept for ORDINARY failures, where it still reports
+      # a useful post-mortem; the instrument that actually observes a kill is the
+      # streaming sampler started inside the test step above.
+      - name: Runner resource probe (#1150)
+        if: always()
+        run: |
+          echo "--- disk ---"; df -h / /home/runner 2>/dev/null || df -h
+          echo "--- memory ---"; free -m 2>/dev/null || vm_stat
+          echo "--- dotnet build servers ---"; ps -o pid,rss,comm -A 2>/dev/null | sort -k2 -rn | head -12
+
+      - name: Enforce test inventory
+        # #1749: each part this job wrote is checked on its own (tests executed, all passed, this
+        # project's assembly, no test in two parts). The sum against eng/test-manifest.json is
+        # checked by `tests (compiler)`, which gathers every job's parts. Frozen by D014.
+        run: |
+          set -euo pipefail
+          python3 scripts/check_trx.py --trx-dir artifacts/test --project "${{ matrix.project }}" --partial
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ matrix.name }}
+          path: artifacts/test/
+          retention-days: 30
+
+  compiler-inventory:
+    # #1749: the required check `tests (compiler)`. It gathers the TRX reports of the three
+    # compiler-shards jobs and checks them together against eng/test-manifest.json, so a missing,
+    # overlapping or failed part fails it. It runs even when a shard job failed or was cancelled
+    # (a skipped required check would count as passing) and then fails on that job's result.
+    name: tests (compiler)
+    needs: compiler-shards
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download every shard's reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-report-compiler-*
+          path: artifacts/test
+          merge-multiple: true
+
+      - name: Enforce test inventory
+        # Frozen by D014 (protocol.json registers the job's `if: always()` as its jobIf).
+        run: |
+          set -euo pipefail
+          test "${{ needs.compiler-shards.result }}" = success
+          python3 scripts/check_trx.py --trx-dir artifacts/test --project "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj"
 
   ds15-fixtures:
     # PP-S4's instrument (A-1.5.7; roadmap v0.13 §2.5 gate 6): every SupportLevel

@@ -62,8 +62,8 @@ namespace Calor.Compiler.Tests;
 ///
 /// <para>D-A and the shape test run wherever <c>Calor.Compiler.Tests</c> runs;
 /// D-B skips only where the corpus submodules are absent. In CI the project runs
-/// in the <c>compiler</c> shard of <c>remaining-tests</c> (the manifest-enforcing
-/// run) and in the <c>quality-ratchets</c> coverage sweep — both check out the
+/// in the <c>compiler-shards</c> jobs, gathered by <c>tests (compiler)</c> (the
+/// manifest-enforcing run, #1749), and in the <c>quality-ratchets</c> coverage sweep — both check out the
 /// submodules, and the ratchet step in <c>test.yml</c> greps for the skip message
 /// so a silent D-B skip fails the job.</para>
 /// </summary>

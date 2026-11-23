@@ -29,6 +29,13 @@
 # waits for every part, prints each log, then fails if any part failed. Two pairs run back to back
 # used 40.3 min on a slow runner (run 44793777859), past the job limit; four at once bound the
 # step by the slowest part instead of two parts in sequence.
+#
+# 0.31 (#1749): five hosts on one 4-vCPU runner still took 32-33 min and hit the 40-minute cap on
+# slow runners with every test passing. The job name now selects the hosts: `compiler` runs all
+# five as before (publish-nuget.yml); test.yml runs `compiler-1` (parts 1 and 4), `compiler-2`
+# (parts 2 and 3) and `compiler-replay` (the replay host) on three runners. Each writes the same
+# TRX names prefixed by its job name, and test.yml's `tests (compiler)` job checks all of them
+# together against eng/test-manifest.json.
 set -euo pipefail
 # usage: bash scripts/run-shard-tests.sh <matrix name> <test project>
 test "$#" -eq 2
@@ -43,7 +50,11 @@ mkdir -p artifacts/test
 bash scripts/runner-resource-sampler.sh 10 &
 sampler_pid=$!
 trap 'kill "$sampler_pid" 2>/dev/null || true' EXIT
-if [ "$name" = "compiler" ]; then
+case "$name" in
+  compiler|compiler-1|compiler-2|compiler-replay) compiler_job="$name" ;;
+  *) compiler_job="" ;;
+esac
+if [ -n "$compiler_job" ]; then
   # 0.30 (#1730): five hosts (four parts and the replay host, which rebuilds archived
   # compilers) peak above the runner's 16 GB of RAM plus its 3 GB of swap: two runs on
   # 2026-11-20 filled the swap, and the second was killed (exit 143, memAvail 47M). On a
@@ -60,16 +71,23 @@ if [ "$name" = "compiler" ]; then
   bash scripts/compiler-shard-filter.sh --self-test
   # The invocations pass --no-build, so build once up front.
   dotnet build "$project" -c Release
-  replay_filter="$(bash scripts/compiler-shard-filter.sh --replay)"
-  dotnet test "$project" -c Release --no-build --no-restore \
-    --filter "$replay_filter" \
-    --logger "trx;LogFileName=$name-replay.trx" \
-    --results-directory artifacts/test \
-    --verbosity normal > replay-output.log 2>&1 &
-  replay_pid=$!
-  # Parts 1-3 in the background; the last (largest) part in the foreground, then wait for the rest.
+  # #1749: the job name selects the parts. compiler (publish-nuget.yml) runs all four and the
+  # replays; test.yml splits them over compiler-1, compiler-2 and compiler-replay, and its
+  # `tests (compiler)` job checks the three jobs' reports together against the manifest.
+  parts="$(bash scripts/compiler-shard-filter.sh --job "$name")"
+  replay_pid=""
+  if [ "$name" = "compiler" ] || [ "$name" = "compiler-replay" ]; then
+    replay_filter="$(bash scripts/compiler-shard-filter.sh --replay)"
+    dotnet test "$project" -c Release --no-build --no-restore \
+      --filter "$replay_filter" \
+      --logger "trx;LogFileName=$name-replay.trx" \
+      --results-directory artifacts/test \
+      --verbosity normal > replay-output.log 2>&1 &
+    replay_pid=$!
+  fi
+  # Every part but the last in the background; the last in the foreground, then wait for the rest.
   part_pids=()
-  for part in $(bash scripts/compiler-shard-filter.sh --parts | head -n 3); do
+  for part in $(printf '%s\n' "$parts" | sed '$d'); do
     filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
     dotnet test "$project" -c Release --no-build --no-restore \
       --filter "$filter" \
@@ -78,15 +96,17 @@ if [ "$name" = "compiler" ]; then
       --verbosity normal > "part-$part.log" 2>&1 &
     part_pids+=("$part:$!")
   done
-  part="$(bash scripts/compiler-shard-filter.sh --parts | tail -n 1)"
-  filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
-  dotnet test "$project" -c Release --no-build --no-restore \
-    --filter "$filter" \
-    --logger "trx;LogFileName=$name-$part.trx" \
-    --results-directory artifacts/test \
-    --verbosity normal 2>&1 | tee -a test-output.log
+  part="$(printf '%s\n' "$parts" | tail -n 1)"
+  if [ -n "$part" ]; then
+    filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
+    dotnet test "$project" -c Release --no-build --no-restore \
+      --filter "$filter" \
+      --logger "trx;LogFileName=$name-$part.trx" \
+      --results-directory artifacts/test \
+      --verbosity normal 2>&1 | tee -a test-output.log
+  fi
   parts_failed=0
-  for entry in "${part_pids[@]}"; do
+  for entry in ${part_pids[@]+"${part_pids[@]}"}; do
     part="${entry%%:*}"
     part_status=0
     wait "${entry#*:}" || part_status=$?
@@ -95,9 +115,11 @@ if [ "$name" = "compiler" ]; then
     [ "$part_status" = 0 ] || parts_failed=1
   done
   replay_status=0
-  wait "$replay_pid" || replay_status=$?
-  echo "--- historical replay host (exit $replay_status) ---"
-  tee -a test-output.log < replay-output.log
+  if [ -n "$replay_pid" ]; then
+    wait "$replay_pid" || replay_status=$?
+    echo "--- historical replay host (exit $replay_status) ---"
+    tee -a test-output.log < replay-output.log
+  fi
   test "$replay_status" = 0
   test "$parts_failed" = 0
 else
