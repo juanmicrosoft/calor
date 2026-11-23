@@ -2560,11 +2560,19 @@ public sealed class CallGraphAnalysis
 
     private static bool TryReadMarker(SyntaxTrivia trivia, string prefix, out int index)
     {
-        var text = trivia.ToString();
-        var marker = "/*" + prefix;
         index = 0;
-        return text.StartsWith(marker, StringComparison.Ordinal) && text.EndsWith("*/", StringComparison.Ordinal)
-            && int.TryParse(text.AsSpan(marker.Length, text.Length - marker.Length - 2),
+        // A trivia's text is exactly its full span. One shorter than "/*" + prefix cannot
+        // start with it, so its text is not materialized: most trivia read here are
+        // whitespace and line ends, and spelling each one out was a large share of a
+        // project index build's allocations (#1738).
+        var markerLength = prefix.Length + 2;
+        if (trivia.FullSpan.Length < markerLength)
+            return false;
+        var text = trivia.ToString();
+        return text.StartsWith("/*", StringComparison.Ordinal)
+            && text.AsSpan(2).StartsWith(prefix, StringComparison.Ordinal)
+            && text.EndsWith("*/", StringComparison.Ordinal)
+            && int.TryParse(text.AsSpan(markerLength, text.Length - markerLength - 2),
                 System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out index);
     }
 

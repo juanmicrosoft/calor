@@ -157,18 +157,23 @@ public sealed class ProjectSymbolIndex
 
             parsed.Add((path, source, ast));
         }
-        if (initializeIdentityRoot != null)
-            Ids.DeclarationIdentityStore.SyncActiveInputs(parsed.Select(document => document.Path), initializeIdentityRoot);
-        // Explicit project enrollment above already reconciled every selected input.
-        // Each sync reconciles its whole store, so syncing before attaching changes nothing
-        // an attachment sees; attaching as one batch reconciles each store once, not per file.
-        if (synchronizeIdentities && initializeIdentityRoot == null)
+        // Syncing and attaching each reconcile the whole store over the same sources; the
+        // declarations of an unchanged source are parsed once for both (#1738).
+        using (Ids.DeclarationIdentityStore.ShareDeclarationParses())
         {
-            foreach (var (path, _, _) in parsed)
-                Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(path));
+            if (initializeIdentityRoot != null)
+                Ids.DeclarationIdentityStore.SyncActiveInputs(parsed.Select(document => document.Path), initializeIdentityRoot);
+            // Explicit project enrollment above already reconciled every selected input.
+            // Each sync reconciles its whole store, so syncing before attaching changes nothing
+            // an attachment sees; attaching as one batch reconciles each store once, not per file.
+            if (synchronizeIdentities && initializeIdentityRoot == null)
+            {
+                foreach (var (path, _, _) in parsed)
+                    Ids.DeclarationIdentityStore.SyncIfRegistered(Path.GetFullPath(path));
+            }
+            Ids.DeclarationIdentityStore.AttachAllIfRegistered(
+                parsed.Select(document => (Path.GetFullPath(document.Path), document.Source, document.Ast)));
         }
-        Ids.DeclarationIdentityStore.AttachAllIfRegistered(
-            parsed.Select(document => (Path.GetFullPath(document.Path), document.Source, document.Ast)));
         var sourceTypes = CrossModuleTypeRegistry.Build(
             parsed.Select(document => (document.Ast, document.Path)).ToArray(),
             sourceHashes);

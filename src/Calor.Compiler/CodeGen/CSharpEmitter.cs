@@ -955,15 +955,33 @@ public sealed class CSharpEmitter : IAstVisitor<string>, IAstResultObserver<stri
     private static bool ContainsOpaqueCSharp(IReadOnlyList<StatementNode> body) =>
         TraverseStatements(body).Any(statement => statement is RawCSharpNode);
 
+    // Pre-order: the node, then each child followed by that child's descendants. The
+    // pending children are an explicit stack of enumerators rather than one nested
+    // iterator per level, which handed every descendant up through each ancestor's
+    // iterator. The order and the lazy reading of each node's children are the same (#1738).
     private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
     {
         yield return node;
-        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+        var pending = new Stack<IEnumerator<AstNode>>();
+        pending.Push(Analysis.RecursiveAstWalker.GetAllChildren(node).GetEnumerator());
+        try
         {
-            foreach (var descendant in DescendantsAndSelf(child))
+            while (pending.TryPeek(out var children))
             {
-                yield return descendant;
+                if (!children.MoveNext())
+                {
+                    pending.Pop().Dispose();
+                    continue;
+                }
+                var child = children.Current;
+                yield return child;
+                pending.Push(Analysis.RecursiveAstWalker.GetAllChildren(child).GetEnumerator());
             }
+        }
+        finally
+        {
+            while (pending.TryPop(out var children))
+                children.Dispose();
         }
     }
 

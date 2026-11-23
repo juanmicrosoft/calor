@@ -2326,12 +2326,23 @@ public sealed class Binder
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, SnapshotProperty[]> SnapshotProperties = new();
     private static HashSet<AstNode>? SnapshotVisited;
 
-    private sealed class SnapshotHashWriter : IDisposable
+    /// <summary>
+    /// Hashes the snapshot text as UTF-8. Encoded bytes are collected in a buffer and
+    /// handed to the hash in blocks: SHA-256 of a byte stream does not depend on how
+    /// the stream is split into updates, and the bytes keep their order, so the key is
+    /// the one per-fragment updates gave. Those updates (one per separator, number and
+    /// property) were most of this key's cost (#1738).
+    /// </summary>
+    internal sealed class SnapshotHashWriter : IDisposable
     {
+        // The encoder writes at least one character's bytes (at most 4 for UTF-8, plus a
+        // pending surrogate's replacement) into whatever room it is given.
+        private const int MinimumRoom = 16;
         private readonly System.Security.Cryptography.IncrementalHash _hash =
             System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
         private readonly System.Text.Encoder _encoder = System.Text.Encoding.UTF8.GetEncoder();
         private readonly byte[] _bytes = new byte[4096];
+        private int _buffered;
         private readonly System.Buffers.ArrayBufferWriter<byte> _jsonBytes = new(512);
         public System.Text.Json.Utf8JsonWriter Json { get; }
         public List<KeyValuePair<string, string>> MapEntries { get; } = new();
@@ -2341,10 +2352,33 @@ public sealed class Binder
         {
             while (!text.IsEmpty)
             {
-                _encoder.Convert(text, _bytes, false, out var characters, out var bytes, out _);
-                _hash.AppendData(_bytes.AsSpan(0, bytes));
+                if (_bytes.Length - _buffered < MinimumRoom)
+                    FlushBuffer();
+                _encoder.Convert(text, _bytes.AsSpan(_buffered), false, out var characters, out var bytes, out _);
+                _buffered += bytes;
                 text = text[characters..];
             }
+        }
+
+        private void AppendBytes(ReadOnlySpan<byte> bytes)
+        {
+            if (bytes.Length > _bytes.Length - _buffered)
+            {
+                FlushBuffer();
+                if (bytes.Length > _bytes.Length)
+                {
+                    _hash.AppendData(bytes);
+                    return;
+                }
+            }
+            bytes.CopyTo(_bytes.AsSpan(_buffered));
+            _buffered += bytes.Length;
+        }
+
+        private void FlushBuffer()
+        {
+            _hash.AppendData(_bytes.AsSpan(0, _buffered));
+            _buffered = 0;
         }
 
         public void Append(int value)
@@ -2367,13 +2401,16 @@ public sealed class Binder
         public void AppendJson()
         {
             Json.Flush();
-            _hash.AppendData(_jsonBytes.WrittenSpan);
+            AppendBytes(_jsonBytes.WrittenSpan);
         }
 
         public string Finish()
         {
-            _encoder.Convert(ReadOnlySpan<char>.Empty, _bytes, true, out _, out var bytes, out _);
-            _hash.AppendData(_bytes.AsSpan(0, bytes));
+            if (_bytes.Length - _buffered < MinimumRoom)
+                FlushBuffer();
+            _encoder.Convert(ReadOnlySpan<char>.Empty, _bytes.AsSpan(_buffered), true, out _, out var bytes, out _);
+            _buffered += bytes;
+            FlushBuffer();
             return Convert.ToHexString(_hash.GetHashAndReset());
         }
 
