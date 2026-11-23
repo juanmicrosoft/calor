@@ -149,7 +149,7 @@ public class W1Slice2TrustSurfaceTests
         {
             var command = Calor.Compiler.Commands.FormatCommand.Create();
 
-            var exit = await command.InvokeAsync(["--write", file]);
+            var exit = await command.Parse(["--write", file]).InvokeAsync();
 
             Assert.Equal(0, exit);
             Assert.Equal("module T T block\n", await File.ReadAllTextAsync(file));
@@ -170,7 +170,7 @@ public class W1Slice2TrustSurfaceTests
         {
             var command = Calor.Compiler.Commands.FormatCommand.Create();
 
-            var exit = await command.InvokeAsync(["--write", "--experimental", file]);
+            var exit = await command.Parse(["--write", "--experimental", file]).InvokeAsync();
 
             Assert.Equal(0, exit);
         }
@@ -190,7 +190,7 @@ public class W1Slice2TrustSurfaceTests
         {
             var command = Calor.Compiler.Commands.LintCommand.Create();
 
-            var exit = await command.InvokeAsync(["--fix", file]);
+            var exit = await command.Parse(["--fix", file]).InvokeAsync();
 
             Assert.Equal(0, exit);
             Assert.Equal("module T T block\n", await File.ReadAllTextAsync(file));
@@ -211,7 +211,7 @@ public class W1Slice2TrustSurfaceTests
         {
             var command = Calor.Compiler.Commands.LintCommand.Create();
 
-            var exit = await command.InvokeAsync(["--fix", "--experimental", file]);
+            var exit = await command.Parse(["--fix", "--experimental", file]).InvokeAsync();
 
             Assert.Equal(0, exit);
         }

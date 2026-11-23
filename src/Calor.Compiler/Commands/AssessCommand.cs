@@ -18,35 +18,39 @@ public static class AssessCommand
 {
     public static Command Create()
     {
-        var pathArgument = new Argument<DirectoryInfo>(
-            name: "path",
-            description: "Directory to assess recursively")
+        var pathArgument = new Argument<DirectoryInfo>("path")
         {
+            Description = "Directory to assess recursively",
             Arity = ArgumentArity.ExactlyOne
         };
 
-        var formatOption = new Option<string>(
-            aliases: ["--format", "-f"],
-            getDefaultValue: () => "text",
-            description: "Output format: text, json, or sarif");
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Output format: text, json, or sarif",
+            DefaultValueFactory = _ => "text"
+        };
 
-        var outputOption = new Option<FileInfo?>(
-            aliases: ["--output", "-o"],
-            description: "Output file (stdout if not specified)");
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "Output file (stdout if not specified)"
+        };
 
-        var thresholdOption = new Option<int>(
-            aliases: ["--threshold", "-t"],
-            getDefaultValue: () => 0,
-            description: "Minimum score to include (0-100)");
+        var thresholdOption = new Option<int>("--threshold", "-t")
+        {
+            Description = "Minimum score to include (0-100)",
+            DefaultValueFactory = _ => 0
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show detailed per-file breakdown");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Show detailed per-file breakdown"
+        };
 
-        var topOption = new Option<int>(
-            aliases: ["--top", "-n"],
-            getDefaultValue: () => 20,
-            description: "Number of top files to show");
+        var topOption = new Option<int>("--top", "-n")
+        {
+            Description = "Number of top files to show",
+            DefaultValueFactory = _ => 20
+        };
 
         var command = new Command("assess", "Assess C# files for Calor migration potential")
         {
@@ -59,9 +63,15 @@ public static class AssessCommand
         };
 
         // Add 'analyze' as alias for backwards compatibility
-        command.AddAlias("analyze");
+        command.Aliases.Add("analyze");
 
-        command.SetHandler(ExecuteAsync, pathArgument, formatOption, outputOption, thresholdOption, verboseOption, topOption);
+        command.SetAction((parseResult, cancellationToken) => ExecuteAsync(
+            parseResult.GetValue(pathArgument)!,
+            parseResult.GetValue(formatOption)!,
+            parseResult.GetValue(outputOption),
+            parseResult.GetValue(thresholdOption),
+            parseResult.GetValue(verboseOption),
+            parseResult.GetValue(topOption)));
 
         return command;
     }

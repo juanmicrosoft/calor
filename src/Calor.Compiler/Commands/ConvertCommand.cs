@@ -35,91 +35,104 @@ public static class ConvertCommand
 
     public static Command Create()
     {
-        var inputArgument = new Argument<FileInfo>(
-            name: "input",
-            description: "The source file to convert (.cs or .calr)");
-
-        var outputOption = new Option<FileInfo?>(
-            aliases: new[] { "--output", "-o" },
-            description: "The output file path (auto-detected if not specified)");
-
-        var benchmarkOption = new Option<bool>(
-            aliases: new[] { "--benchmark", "-b" },
-            description: "Include benchmark metrics comparison");
-
-        var verboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Enable verbose output");
-
-        var explainOption = new Option<bool>(
-            aliases: new[] { "--explain", "-e" },
-            description: "Show detailed explanation of unsupported features");
-
-        var noFallbackOption = new Option<bool>(
-            aliases: new[] { "--no-fallback" },
-            description: "Disable TODO fallback; default lossless conversion still preserves unsupported C#.");
-
-        var validateOption = new Option<bool>(
-            aliases: new[] { "--validate" },
-            description: "Parse the generated Calor output and report any errors before writing");
-
-        var noImplicitSystemOption = new Option<bool>(
-            "--no-implicit-system",
-            "Use standalone C# validation without the default System-only project import");
-
-        var passthroughOption = new Option<bool>(
-            aliases: new[] { "--passthrough" },
-            description: "Request member-level C# preservation on conversion errors (C# → Calor). Default lossless rescue also preserves unsupported code in converter-owned raw frames.");
-
-        var defineOption = new Option<string[]>(
-            aliases: new[] { "--define" },
-            description: "Conditional-compilation symbol. Repeat for multiple symbols.")
+        var inputArgument = new Argument<FileInfo>("input")
         {
-            AllowMultipleArgumentsPerToken = true
-        };
-        var referenceOption = new Option<string[]>(
-            aliases: new[] { "--reference" },
-            description: "Metadata reference path optionally followed by =alias1,alias2.")
-        {
-            AllowMultipleArgumentsPerToken = true
-        };
-        var configurationOption = new Option<string?>(
-            aliases: new[] { "--configuration" },
-            description: "Configuration name recorded in conversion metadata.");
-        var targetFrameworkOption = new Option<string?>(
-            aliases: new[] { "--framework" },
-            description: "Target framework recorded in conversion metadata.");
-        var languageVersionOption = new Option<string?>(
-            aliases: new[] { "--language-version" },
-            description: "C# language version used by Roslyn (for example preview or 13).");
-        var documentationModeOption = new Option<string>(
-            aliases: new[] { "--documentation-mode" },
-            getDefaultValue: () => "parse",
-            description: "Roslyn documentation mode: none, parse, or diagnose.");
-        documentationModeOption.FromAmong("none", "parse", "diagnose");
-        var sourceKindOption = new Option<string>(
-            aliases: new[] { "--source-kind" },
-            getDefaultValue: () => "regular",
-            description: "Roslyn source kind: regular or script.");
-        sourceKindOption.FromAmong("regular", "script");
-        var featureOption = new Option<string[]>(
-            aliases: new[] { "--feature" },
-            description: "Roslyn parse feature key=value. Repeat for multiple features.")
-        {
-            AllowMultipleArgumentsPerToken = true
+            Description = "The source file to convert (.cs or .calr)"
         };
 
-        var timeoutOption = new Option<int>(
-            aliases: new[] { "--timeout", "-t" },
-            description: "Timeout in seconds for the conversion (0 = no timeout)",
-            getDefaultValue: () => 0);
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "The output file path (auto-detected if not specified)"
+        };
+
+        var benchmarkOption = new Option<bool>("--benchmark", "-b")
+        {
+            Description = "Include benchmark metrics comparison"
+        };
+
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
+
+        var explainOption = new Option<bool>("--explain", "-e")
+        {
+            Description = "Show detailed explanation of unsupported features"
+        };
+
+        var noFallbackOption = new Option<bool>("--no-fallback")
+        {
+            Description = "Disable TODO fallback; default lossless conversion still preserves unsupported C#."
+        };
+
+        var validateOption = new Option<bool>("--validate")
+        {
+            Description = "Parse the generated Calor output and report any errors before writing"
+        };
+
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system")
+        {
+            Description = "Use standalone C# validation without the default System-only project import"
+        };
+
+        var passthroughOption = new Option<bool>("--passthrough")
+        {
+            Description = "Request member-level C# preservation on conversion errors (C# → Calor). Default lossless rescue also preserves unsupported code in converter-owned raw frames."
+        };
+
+        var defineOption = new Option<string[]>("--define")
+        {
+            Description = "Conditional-compilation symbol. Repeat for multiple symbols.",
+            AllowMultipleArgumentsPerToken = true
+        };
+        var referenceOption = new Option<string[]>("--reference")
+        {
+            Description = "Metadata reference path optionally followed by =alias1,alias2.",
+            AllowMultipleArgumentsPerToken = true
+        };
+        var configurationOption = new Option<string?>("--configuration")
+        {
+            Description = "Configuration name recorded in conversion metadata."
+        };
+        var targetFrameworkOption = new Option<string?>("--framework")
+        {
+            Description = "Target framework recorded in conversion metadata."
+        };
+        var languageVersionOption = new Option<string?>("--language-version")
+        {
+            Description = "C# language version used by Roslyn (for example preview or 13)."
+        };
+        var documentationModeOption = new Option<string>("--documentation-mode")
+        {
+            Description = "Roslyn documentation mode: none, parse, or diagnose.",
+            DefaultValueFactory = _ => "parse"
+        };
+        documentationModeOption.AcceptOnlyFromAmong("none", "parse", "diagnose");
+        var sourceKindOption = new Option<string>("--source-kind")
+        {
+            Description = "Roslyn source kind: regular or script.",
+            DefaultValueFactory = _ => "regular"
+        };
+        sourceKindOption.AcceptOnlyFromAmong("regular", "script");
+        var featureOption = new Option<string[]>("--feature")
+        {
+            Description = "Roslyn parse feature key=value. Repeat for multiple features.",
+            AllowMultipleArgumentsPerToken = true
+        };
+
+        var timeoutOption = new Option<int>("--timeout", "-t")
+        {
+            Description = "Timeout in seconds for the conversion (0 = no timeout)",
+            DefaultValueFactory = _ => 0
+        };
 
         // No -f short alias (consistent with lint, where -f means --fix).
-        var formatOption = new Option<string>(
-            aliases: new[] { "--format" },
-            getDefaultValue: () => "text",
-            description: "Output format: text (human-readable) or json (envelope document on stdout). No short alias.");
-        formatOption.FromAmong("text", "json");
+        var formatOption = new Option<string>("--format")
+        {
+            Description = "Output format: text (human-readable) or json (envelope document on stdout). No short alias.",
+            DefaultValueFactory = _ => "text"
+        };
+        formatOption.AcceptOnlyFromAmong("text", "json");
 
         var command = new Command("convert", "Convert a single file between C# and Calor")
         {
@@ -144,35 +157,35 @@ public static class ConvertCommand
             formatOption
         };
 
-        command.SetHandler(async ctx =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var input = ctx.ParseResult.GetValueForArgument(inputArgument);
-            var output = ctx.ParseResult.GetValueForOption(outputOption);
-            var benchmark = ctx.ParseResult.GetValueForOption(benchmarkOption);
-            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-            var explain = ctx.ParseResult.GetValueForOption(explainOption);
-            var noFallback = ctx.ParseResult.GetValueForOption(noFallbackOption);
-            var validate = ctx.ParseResult.GetValueForOption(validateOption);
-            var passthrough = ctx.ParseResult.GetValueForOption(passthroughOption);
-            var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
-            var configuration = ctx.ParseResult.GetValueForOption(configurationOption);
-            var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
-            var languageVersion = ctx.ParseResult.GetValueForOption(languageVersionOption);
-            var documentationMode = ctx.ParseResult.GetValueForOption(documentationModeOption) ?? "parse";
-            var sourceKind = ctx.ParseResult.GetValueForOption(sourceKindOption) ?? "regular";
-            var features = ctx.ParseResult.GetValueForOption(featureOption) ?? [];
-            var references = ctx.ParseResult.GetValueForOption(referenceOption) ?? [];
-            var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
-            var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
-            // Exit code returned through ctx.ExitCode: a code parked only on
+            var input = parseResult.GetValue(inputArgument)!;
+            var output = parseResult.GetValue(outputOption);
+            var benchmark = parseResult.GetValue(benchmarkOption);
+            var verbose = parseResult.GetValue(verboseOption);
+            var explain = parseResult.GetValue(explainOption);
+            var noFallback = parseResult.GetValue(noFallbackOption);
+            var validate = parseResult.GetValue(validateOption);
+            var passthrough = parseResult.GetValue(passthroughOption);
+            var definedSymbols = parseResult.GetValue(defineOption) ?? [];
+            var configuration = parseResult.GetValue(configurationOption);
+            var targetFramework = parseResult.GetValue(targetFrameworkOption);
+            var languageVersion = parseResult.GetValue(languageVersionOption);
+            var documentationMode = parseResult.GetValue(documentationModeOption) ?? "parse";
+            var sourceKind = parseResult.GetValue(sourceKindOption) ?? "regular";
+            var features = parseResult.GetValue(featureOption) ?? [];
+            var references = parseResult.GetValue(referenceOption) ?? [];
+            var timeoutSeconds = parseResult.GetValue(timeoutOption);
+            var format = parseResult.GetValue(formatOption) ?? "text";
+            // Exit code returned from the action: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-            ctx.ExitCode = await ExecuteAsync(
+            return await ExecuteAsync(
                 input, output, benchmark, verbose, explain, noFallback, validate,
                 passthrough, definedSymbols, configuration,
                 targetFramework, languageVersion, timeoutSeconds,
                 documentationMode, sourceKind, features,
                 references, format,
-                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
+                !parseResult.GetValue(noImplicitSystemOption));
         });
 
         return command;

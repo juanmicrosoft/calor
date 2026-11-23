@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -23,34 +22,60 @@ public static class WatchCommand
 {
     public static Command Create()
     {
-        var pathsArgument = new Argument<string[]>(
-            name: "paths",
-            description: ".calr files and/or directories to watch (directories are scanned recursively; bin/, obj/ and reference/ subdirectories are excluded)")
-        { Arity = ArgumentArity.OneOrMore };
+        var pathsArgument = new Argument<string[]>("paths")
+        {
+            Description = ".calr files and/or directories to watch (directories are scanned recursively; bin/, obj/ and reference/ subdirectories are excluded)",
+            Arity = ArgumentArity.OneOrMore
+        };
 
-        var formatOption = new Option<string>(
-            aliases: ["--format", "-f"],
-            getDefaultValue: () => "text",
-            description: "Diagnostic output format per rebuild: text (stderr) or json (NDJSON on stdout: one compact document per line, one line per rebuild)");
-        formatOption.FromAmong("text", "json");
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Diagnostic output format per rebuild: text (stderr) or json (NDJSON on stdout: one compact document per line, one line per rebuild)",
+            DefaultValueFactory = _ => "text"
+        };
+        formatOption.AcceptOnlyFromAmong("text", "json");
 
-        var verboseOption = new Option<bool>(["--verbose", "-v"], "Enable verbose output");
-        var noCacheOption = new Option<bool>(["--no-cache"], "Disable the incremental build cache (every rebuild recompiles all files)");
-        var noImplicitSystemOption = new Option<bool>("--no-implicit-system", "Validate standalone without the default System-only project import");
-        var clearCacheOption = new Option<bool>(["--clear-cache"], "Clear .calor-build-state.json before the initial compile");
-        var strictApiOption = new Option<bool>(["--strict-api"], "Enable strict API mode");
-        var requireDocsOption = new Option<bool>(["--require-docs"], "Require documentation on public functions and types");
-        var enforceEffectsOption = new Option<bool>(["--enforce-effects"], () => true, "Enforce effect declarations (default: true as of v0.11)");
-        var noEnforceEffectsOption = new Option<bool>(["--no-enforce-effects"], () => false, "Disable effect enforcement (opt out of the v0.11 default-on behavior)");
-        var strictEffectsOption = new Option<bool>(["--strict-effects"], () => false, "Promote unknown external call warnings (Calor0411) to errors");
-        var permissiveEffectsOption = new Option<bool>(["--permissive-effects"], () => false, "Permissive effect mode (unknown calls assumed pure, violations demoted to warnings)");
-        var contractModeOption = new Option<string>(["--contract-mode"], () => "debug", "Contract enforcement mode: off, debug, or release");
-        var debounceOption = new Option<int>(["--debounce-ms"], () => WatchSession.DefaultDebounceMs, "Quiet period in milliseconds before a change burst triggers a rebuild");
-        debounceOption.AddValidator(result =>
+        var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Enable verbose output" };
+        var noCacheOption = new Option<bool>("--no-cache") { Description = "Disable the incremental build cache (every rebuild recompiles all files)" };
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system") { Description = "Validate standalone without the default System-only project import" };
+        var clearCacheOption = new Option<bool>("--clear-cache") { Description = "Clear .calor-build-state.json before the initial compile" };
+        var strictApiOption = new Option<bool>("--strict-api") { Description = "Enable strict API mode" };
+        var requireDocsOption = new Option<bool>("--require-docs") { Description = "Require documentation on public functions and types" };
+        var enforceEffectsOption = new Option<bool>("--enforce-effects")
+        {
+            Description = "Enforce effect declarations (default: true as of v0.11)",
+            DefaultValueFactory = _ => true
+        };
+        var noEnforceEffectsOption = new Option<bool>("--no-enforce-effects")
+        {
+            Description = "Disable effect enforcement (opt out of the v0.11 default-on behavior)",
+            DefaultValueFactory = _ => false
+        };
+        var strictEffectsOption = new Option<bool>("--strict-effects")
+        {
+            Description = "Promote unknown external call warnings (Calor0411) to errors",
+            DefaultValueFactory = _ => false
+        };
+        var permissiveEffectsOption = new Option<bool>("--permissive-effects")
+        {
+            Description = "Permissive effect mode (unknown calls assumed pure, violations demoted to warnings)",
+            DefaultValueFactory = _ => false
+        };
+        var contractModeOption = new Option<string>("--contract-mode")
+        {
+            Description = "Contract enforcement mode: off, debug, or release",
+            DefaultValueFactory = _ => "debug"
+        };
+        var debounceOption = new Option<int>("--debounce-ms")
+        {
+            Description = "Quiet period in milliseconds before a change burst triggers a rebuild",
+            DefaultValueFactory = _ => WatchSession.DefaultDebounceMs
+        };
+        debounceOption.Validators.Add(result =>
         {
             if (result.GetValueOrDefault<int>() <= 0)
             {
-                result.ErrorMessage = "Debounce must be a positive integer (milliseconds)";
+                result.AddError("Debounce must be a positive integer (milliseconds)");
             }
         });
 
@@ -72,25 +97,25 @@ public static class WatchCommand
             debounceOption
         };
 
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             var settings = new WatchSession.WatchSettings(
-                Format: ctx.ParseResult.GetValueForOption(formatOption) ?? "text",
-                Verbose: ctx.ParseResult.GetValueForOption(verboseOption),
-                NoCache: ctx.ParseResult.GetValueForOption(noCacheOption),
-                ClearCache: ctx.ParseResult.GetValueForOption(clearCacheOption),
-                StrictApi: ctx.ParseResult.GetValueForOption(strictApiOption),
-                RequireDocs: ctx.ParseResult.GetValueForOption(requireDocsOption),
-                EnforceEffects: ctx.ParseResult.GetValueForOption(enforceEffectsOption)
-                    && !ctx.ParseResult.GetValueForOption(noEnforceEffectsOption),
-                StrictEffects: ctx.ParseResult.GetValueForOption(strictEffectsOption),
-                PermissiveEffects: ctx.ParseResult.GetValueForOption(permissiveEffectsOption),
-                ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
-                DebounceMs: ctx.ParseResult.GetValueForOption(debounceOption),
-                IncludeImplicitSystemUsing: !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
+                Format: parseResult.GetValue(formatOption) ?? "text",
+                Verbose: parseResult.GetValue(verboseOption),
+                NoCache: parseResult.GetValue(noCacheOption),
+                ClearCache: parseResult.GetValue(clearCacheOption),
+                StrictApi: parseResult.GetValue(strictApiOption),
+                RequireDocs: parseResult.GetValue(requireDocsOption),
+                EnforceEffects: parseResult.GetValue(enforceEffectsOption)
+                    && !parseResult.GetValue(noEnforceEffectsOption),
+                StrictEffects: parseResult.GetValue(strictEffectsOption),
+                PermissiveEffects: parseResult.GetValue(permissiveEffectsOption),
+                ContractMode: parseResult.GetValue(contractModeOption) ?? "debug",
+                DebounceMs: parseResult.GetValue(debounceOption),
+                IncludeImplicitSystemUsing: !parseResult.GetValue(noImplicitSystemOption));
 
-            var paths = ctx.ParseResult.GetValueForArgument(pathsArgument);
-            ctx.ExitCode = await ExecuteAsync(paths, settings);
+            var paths = parseResult.GetValue(pathsArgument)!;
+            return await ExecuteAsync(paths, settings);
         });
 
         return command;

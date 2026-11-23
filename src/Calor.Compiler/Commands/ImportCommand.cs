@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -31,38 +30,47 @@ public static class ImportCommand
 {
     public static Command Create()
     {
-        var packageArgument = new Argument<string>(
-            name: "package",
-            description: "NuGet package id (resolved from the global packages folder) or a path to a .dll");
+        var packageArgument = new Argument<string>("package")
+        {
+            Description = "NuGet package id (resolved from the global packages folder) or a path to a .dll"
+        };
 
-        var versionOption = new Option<string?>(
-            aliases: ["--version"],
-            description: "Package version to import (default: highest version in the packages folder)");
+        var versionOption = new Option<string?>("--version")
+        {
+            Description = "Package version to import (default: highest version in the packages folder)"
+        };
 
-        var referencesOption = new Option<string[]>(
-            aliases: ["--references", "-r"],
-            description: "Additional assembly files or directories loaded for call-chain resolution")
-        { Arity = ArgumentArity.ZeroOrMore, AllowMultipleArgumentsPerToken = true };
+        var referencesOption = new Option<string[]>("--references", "-r")
+        {
+            Description = "Additional assembly files or directories loaded for call-chain resolution",
+            Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true
+        };
 
-        var projectOption = new Option<DirectoryInfo?>(
-            aliases: ["--project", "-p"],
-            description: "Project directory for loading project-local manifests");
+        var projectOption = new Option<DirectoryInfo?>("--project", "-p")
+        {
+            Description = "Project directory for loading project-local manifests"
+        };
 
-        var solutionOption = new Option<DirectoryInfo?>(
-            aliases: ["--solution", "-s"],
-            description: "Solution directory for loading solution-level manifests");
+        var solutionOption = new Option<DirectoryInfo?>("--solution", "-s")
+        {
+            Description = "Solution directory for loading solution-level manifests"
+        };
 
-        var outputOption = new Option<FileInfo?>(
-            aliases: ["--output", "-o"],
-            description: "Manifest output path (default: <package>.calor-effects.json)");
+        var outputOption = new Option<FileInfo?>("--output", "-o")
+        {
+            Description = "Manifest output path (default: <package>.calor-effects.json)"
+        };
 
-        var noContractsOption = new Option<bool>(
-            aliases: ["--no-contracts"],
-            description: "Skip the mechanical contract synthesis (assumed-provenance sidecar)");
+        var noContractsOption = new Option<bool>("--no-contracts")
+        {
+            Description = "Skip the mechanical contract synthesis (assumed-provenance sidecar)"
+        };
 
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Emit the envelope document to stdout instead of writing files");
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Emit the envelope document to stdout instead of writing files"
+        };
 
         var command = new Command("import",
             "Generate effect manifests (and assumed-provenance contract facts) for a package's public surface")
@@ -77,19 +85,19 @@ public static class ImportCommand
             jsonOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            ctx.ExitCode = Execute(
-                ctx.ParseResult.GetValueForArgument(packageArgument),
-                ctx.ParseResult.GetValueForOption(versionOption),
-                ctx.ParseResult.GetValueForOption(referencesOption) ?? [],
-                ctx.ParseResult.GetValueForOption(projectOption),
-                ctx.ParseResult.GetValueForOption(solutionOption),
-                ctx.ParseResult.GetValueForOption(outputOption),
-                ctx.ParseResult.GetValueForOption(noContractsOption),
-                ctx.ParseResult.GetValueForOption(jsonOption));
+            return Execute(
+                parseResult.GetValue(packageArgument)!,
+                parseResult.GetValue(versionOption),
+                parseResult.GetValue(referencesOption) ?? [],
+                parseResult.GetValue(projectOption),
+                parseResult.GetValue(solutionOption),
+                parseResult.GetValue(outputOption),
+                parseResult.GetValue(noContractsOption),
+                parseResult.GetValue(jsonOption));
         });
 
         return command;

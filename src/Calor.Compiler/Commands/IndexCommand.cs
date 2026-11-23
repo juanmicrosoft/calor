@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using Calor.Compiler.Indexing;
 
 namespace Calor.Compiler.Commands;
@@ -27,24 +26,26 @@ public static class IndexCommand
 
     private static Command CreateBuildCommand()
     {
-        var pathArgument = new Argument<string>(
-            name: "path",
-            description: "Project directory to index",
-            getDefaultValue: () => ".");
-        var outputOption = new Option<string?>(
-            aliases: ["--output"],
-            description: "Where to write the index (default: <path>/obj/calor)");
+        var pathArgument = new Argument<string>("path")
+        {
+            Description = "Project directory to index",
+            DefaultValueFactory = _ => "."
+        };
+        var outputOption = new Option<string?>("--output")
+        {
+            Description = "Where to write the index (default: <path>/obj/calor)"
+        };
 
         var command = new Command("build", "Build the project index")
         {
             pathArgument, outputOption,
         };
 
-        command.SetHandler((InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            var path = context.ParseResult.GetValueForArgument(pathArgument);
-            var output = context.ParseResult.GetValueForOption(outputOption);
-            context.ExitCode = Build(path, output);
+            var path = parseResult.GetValue(pathArgument)!;
+            var output = parseResult.GetValue(outputOption);
+            return Build(path, output);
         });
 
         return command;
@@ -52,24 +53,26 @@ public static class IndexCommand
 
     private static Command CreateStatusCommand()
     {
-        var pathArgument = new Argument<string>(
-            name: "path",
-            description: "Project directory",
-            getDefaultValue: () => ".");
-        var outputOption = new Option<string?>(
-            aliases: ["--output"],
-            description: "Where the index lives (default: <path>/obj/calor)");
+        var pathArgument = new Argument<string>("path")
+        {
+            Description = "Project directory",
+            DefaultValueFactory = _ => "."
+        };
+        var outputOption = new Option<string?>("--output")
+        {
+            Description = "Where the index lives (default: <path>/obj/calor)"
+        };
 
         var command = new Command("status", "Report whether the index is current")
         {
             pathArgument, outputOption,
         };
 
-        command.SetHandler((InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            var path = context.ParseResult.GetValueForArgument(pathArgument);
-            var output = context.ParseResult.GetValueForOption(outputOption);
-            context.ExitCode = Status(path, output);
+            var path = parseResult.GetValue(pathArgument)!;
+            var output = parseResult.GetValue(outputOption);
+            return Status(path, output);
         });
 
         return command;

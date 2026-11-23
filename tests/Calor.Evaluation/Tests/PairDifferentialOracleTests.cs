@@ -1,4 +1,3 @@
-using System.CommandLine.Parsing;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -213,11 +212,10 @@ public class PairDifferentialOracleTests
         // Regression (verification pass after review round 3): every child invocation must parse,
         // or all pairs become ORACLE_CRASH and the known witness can never be reproduced.
         var root = new System.CommandLine.RootCommand();
-        root.AddCommand(PairOracleCommand.Create());
-        var parser = new Parser(root);
-        var child = parser.Parse(PairOracleCommand.ChildArguments("reg", new string('a', 40), PairOracleCommand.KnownWitness));
+        root.Subcommands.Add(PairOracleCommand.Create());
+        var child = root.Parse(PairOracleCommand.ChildArguments("reg", new string('a', 40), PairOracleCommand.KnownWitness));
         Assert.Empty(child.Errors);
-        var parent = parser.Parse(["pair-oracle", "--registration", "reg", "--registration-commit", new string('a', 40)]);
+        var parent = root.Parse(["pair-oracle", "--registration", "reg", "--registration-commit", new string('a', 40)]);
         Assert.Empty(parent.Errors); // a missing --output is refused by the handler, before any pair runs
     }
 

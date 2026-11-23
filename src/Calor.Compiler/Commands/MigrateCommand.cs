@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Diagnostics;
@@ -19,78 +18,94 @@ public static class MigrateCommand
 {
     public static Command Create()
     {
-        var pathArgument = new Argument<DirectoryInfo>(
-            name: "path",
-            description: "The project directory or .csproj file to migrate");
-
-        var dryRunOption = new Option<bool>(
-            aliases: new[] { "--dry-run", "-n" },
-            description: "Preview changes without writing files");
-
-        var benchmarkOption = new Option<bool>(
-            aliases: new[] { "--benchmark", "-b" },
-            description: "Include before/after metrics");
-
-        var directionOption = new Option<string>(
-            aliases: new[] { "--direction", "-d" },
-            description: "Migration direction (cs-to-calor or calor-to-cs)",
-            getDefaultValue: () => "cs-to-calor");
-
-        var parallelOption = new Option<bool>(
-            aliases: new[] { "--parallel", "-p" },
-            description: "Run conversions in parallel",
-            getDefaultValue: () => true);
-
-        var reportOption = new Option<FileInfo?>(
-            aliases: new[] { "--report", "-r" },
-            description: "Save migration report to file (supports .md or .json)");
-
-        var verboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Enable verbose output");
-
-        var skipAnalyzeOption = new Option<bool>(
-            aliases: new[] { "--skip-analyze" },
-            description: "Skip the migration analysis phase");
-
-        var skipVerifyOption = new Option<bool>(
-            aliases: new[] { "--skip-verify" },
-            description: "Skip the Z3 contract verification phase");
-
-        var verificationTimeoutOption = new Option<int>(
-            aliases: new[] { "--verification-timeout" },
-            description: "Z3 verification timeout per contract in milliseconds",
-            getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs);
-
-        var noImplicitSystemOption = new Option<bool>(
-            "--no-implicit-system", "Validate without the implicit System project import");
-        var splitNamespacesOption = new Option<bool>(
-            "--split-namespaces", "Opt in to separate native files for split-safe top-level namespaces");
-        var defineOption = new Option<string[]>(
-            aliases: new[] { "--define" },
-            description: "Additional conditional-compilation symbol. Repeat for multiple symbols.")
+        var pathArgument = new Argument<DirectoryInfo>("path")
         {
+            Description = "The project directory or .csproj file to migrate"
+        };
+
+        var dryRunOption = new Option<bool>("--dry-run", "-n")
+        {
+            Description = "Preview changes without writing files"
+        };
+
+        var benchmarkOption = new Option<bool>("--benchmark", "-b")
+        {
+            Description = "Include before/after metrics"
+        };
+
+        var directionOption = new Option<string>("--direction", "-d")
+        {
+            Description = "Migration direction (cs-to-calor or calor-to-cs)",
+            DefaultValueFactory = _ => "cs-to-calor"
+        };
+
+        var parallelOption = new Option<bool>("--parallel", "-p")
+        {
+            Description = "Run conversions in parallel",
+            DefaultValueFactory = _ => true
+        };
+
+        var reportOption = new Option<FileInfo?>("--report", "-r")
+        {
+            Description = "Save migration report to file (supports .md or .json)"
+        };
+
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
+
+        var skipAnalyzeOption = new Option<bool>("--skip-analyze")
+        {
+            Description = "Skip the migration analysis phase"
+        };
+
+        var skipVerifyOption = new Option<bool>("--skip-verify")
+        {
+            Description = "Skip the Z3 contract verification phase"
+        };
+
+        var verificationTimeoutOption = new Option<int>("--verification-timeout")
+        {
+            Description = "Z3 verification timeout per contract in milliseconds",
+            DefaultValueFactory = _ => (int)VerificationOptions.DefaultTimeoutMs
+        };
+
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system")
+        {
+            Description = "Validate without the implicit System project import"
+        };
+        var splitNamespacesOption = new Option<bool>("--split-namespaces")
+        {
+            Description = "Opt in to separate native files for split-safe top-level namespaces"
+        };
+        var defineOption = new Option<string[]>("--define")
+        {
+            Description = "Additional conditional-compilation symbol. Repeat for multiple symbols.",
             AllowMultipleArgumentsPerToken = true
         };
-        var configurationOption = new Option<string>(
-            aliases: new[] { "--configuration" },
-            getDefaultValue: () => "Debug",
-            description: "MSBuild configuration used to resolve project parse options.");
-        var targetFrameworkOption = new Option<string?>(
-            aliases: new[] { "--framework" },
-            description: "Target framework to select for configuration-sensitive conversion.");
-        var languageVersionOption = new Option<string?>(
-            aliases: new[] { "--language-version" },
-            description: "Override the project C# language version.");
-        var documentationModeOption = new Option<string>(
-            aliases: new[] { "--documentation-mode" },
-            getDefaultValue: () => "parse",
-            description: "Roslyn documentation mode: none, parse, or diagnose.");
-        documentationModeOption.FromAmong("none", "parse", "diagnose");
-        var featureOption = new Option<string[]>(
-            aliases: new[] { "--feature" },
-            description: "Roslyn parse feature key=value. Repeat for multiple features.")
+        var configurationOption = new Option<string>("--configuration")
         {
+            Description = "MSBuild configuration used to resolve project parse options.",
+            DefaultValueFactory = _ => "Debug"
+        };
+        var targetFrameworkOption = new Option<string?>("--framework")
+        {
+            Description = "Target framework to select for configuration-sensitive conversion."
+        };
+        var languageVersionOption = new Option<string?>("--language-version")
+        {
+            Description = "Override the project C# language version."
+        };
+        var documentationModeOption = new Option<string>("--documentation-mode")
+        {
+            Description = "Roslyn documentation mode: none, parse, or diagnose.",
+            DefaultValueFactory = _ => "parse"
+        };
+        documentationModeOption.AcceptOnlyFromAmong("none", "parse", "diagnose");
+        var featureOption = new Option<string[]>("--feature")
+        {
+            Description = "Roslyn parse feature key=value. Repeat for multiple features.",
             AllowMultipleArgumentsPerToken = true
         };
 
@@ -116,34 +131,34 @@ public static class MigrateCommand
             featureOption
         };
 
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var path = ctx.ParseResult.GetValueForArgument(pathArgument);
-            var dryRun = ctx.ParseResult.GetValueForOption(dryRunOption);
-            var benchmark = ctx.ParseResult.GetValueForOption(benchmarkOption);
-            var direction = ctx.ParseResult.GetValueForOption(directionOption)!;
-            var parallel = ctx.ParseResult.GetValueForOption(parallelOption);
-            var reportPath = ctx.ParseResult.GetValueForOption(reportOption);
-            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-            var skipAnalyze = ctx.ParseResult.GetValueForOption(skipAnalyzeOption);
-            var skipVerify = ctx.ParseResult.GetValueForOption(skipVerifyOption);
-            var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
-            var definedSymbols = ctx.ParseResult.GetValueForOption(defineOption) ?? [];
-            var configuration = ctx.ParseResult.GetValueForOption(configurationOption) ?? "Debug";
-            var targetFramework = ctx.ParseResult.GetValueForOption(targetFrameworkOption);
-            var languageVersion = ctx.ParseResult.GetValueForOption(languageVersionOption);
-            var documentationMode = ctx.ParseResult.GetValueForOption(documentationModeOption) ?? "parse";
-            var parseFeatures = ctx.ParseResult.GetValueForOption(featureOption) ?? [];
+            var path = parseResult.GetValue(pathArgument)!;
+            var dryRun = parseResult.GetValue(dryRunOption);
+            var benchmark = parseResult.GetValue(benchmarkOption);
+            var direction = parseResult.GetValue(directionOption)!;
+            var parallel = parseResult.GetValue(parallelOption);
+            var reportPath = parseResult.GetValue(reportOption);
+            var verbose = parseResult.GetValue(verboseOption);
+            var skipAnalyze = parseResult.GetValue(skipAnalyzeOption);
+            var skipVerify = parseResult.GetValue(skipVerifyOption);
+            var verificationTimeout = parseResult.GetValue(verificationTimeoutOption);
+            var definedSymbols = parseResult.GetValue(defineOption) ?? [];
+            var configuration = parseResult.GetValue(configurationOption) ?? "Debug";
+            var targetFramework = parseResult.GetValue(targetFrameworkOption);
+            var languageVersion = parseResult.GetValue(languageVersionOption);
+            var documentationMode = parseResult.GetValue(documentationModeOption) ?? "parse";
+            var parseFeatures = parseResult.GetValue(featureOption) ?? [];
 
-            // Exit code returned through ctx.ExitCode: a code parked only on
+            // Exit code returned from the action: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-            ctx.ExitCode = await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
+            return await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
                 reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
                 definedSymbols,
                 configuration, targetFramework, languageVersion,
                 documentationMode, parseFeatures,
-                !ctx.ParseResult.GetValueForOption(noImplicitSystemOption),
-                ctx.ParseResult.GetValueForOption(splitNamespacesOption));
+                !parseResult.GetValue(noImplicitSystemOption),
+                parseResult.GetValue(splitNamespacesOption));
         });
 
         return command;
@@ -473,7 +488,7 @@ public static class MigrateCommand
                 }
             }
 
-            // Exit code based on results (returned through ctx.ExitCode)
+            // Exit code based on results (returned from the action)
             if (enrichedReport.Summary.FailedFiles > 0)
             {
                 exitCode = 1;

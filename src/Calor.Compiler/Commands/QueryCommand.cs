@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using Calor.Compiler.Indexing;
 
 namespace Calor.Compiler.Commands;
@@ -45,34 +44,42 @@ public static class QueryCommand
 
     private static Command CreateImpactCommand()
     {
-        var subjectArgument = new Argument<string>(
-            name: "subject",
-            description: "Declaration name to treat as changed (or a file with --file)");
-        var pathOption = new Option<string>(
-            aliases: ["--project"],
-            description: "Project directory",
-            getDefaultValue: () => ".");
-        var inFileOption = new Option<string?>(
-            aliases: ["--in-file"],
-            description: "Disambiguate when several files declare the name");
-        var fileOption = new Option<bool>(
-            aliases: ["--file"],
-            description: "Treat the subject as a whole changed FILE rather than one declaration");
-        var noBuildOption = new Option<bool>(
-            aliases: ["--no-build"],
-            description: "Refuse a missing or stale index instead of rebuilding it");
-        var effectsOption = new Option<bool>(
-            aliases: ["--effects"],
-            description: "Effect-row blast radius: which affected callers' declared rows the "
-                + "subject's row would stop fitting");
-        var rowOption = new Option<string?>(
-            aliases: ["--row"],
-            description: "With --effects: the row the subject would carry after the change, as "
+        var subjectArgument = new Argument<string>("subject")
+        {
+            Description = "Declaration name to treat as changed (or a file with --file)"
+        };
+        var pathOption = new Option<string>("--project")
+        {
+            Description = "Project directory",
+            DefaultValueFactory = _ => "."
+        };
+        var inFileOption = new Option<string?>("--in-file")
+        {
+            Description = "Disambiguate when several files declare the name"
+        };
+        var fileOption = new Option<bool>("--file")
+        {
+            Description = "Treat the subject as a whole changed FILE rather than one declaration"
+        };
+        var noBuildOption = new Option<bool>("--no-build")
+        {
+            Description = "Refuse a missing or stale index instead of rebuilding it"
+        };
+        var effectsOption = new Option<bool>("--effects")
+        {
+            Description = "Effect-row blast radius: which affected callers' declared rows the "
+                + "subject's row would stop fitting"
+        };
+        var rowOption = new Option<string?>("--row")
+        {
+            Description = "With --effects: the row the subject would carry after the change, as "
                 + "comma-separated effect codes (e.g. \"cw,fs:w\"; \"\" for pure). "
-                + "Default: the subject's current declared row");
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Emit the answer as an envelope document (schema v1.1) instead of text");
+                + "Default: the subject's current declared row"
+        };
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Emit the answer as an envelope document (schema v1.1) instead of text"
+        };
 
         var command = new Command("impact", "What a change could affect")
         {
@@ -80,17 +87,17 @@ public static class QueryCommand
             effectsOption, rowOption, jsonOption,
         };
 
-        command.SetHandler((InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            context.ExitCode = ExecuteImpact(
-                context.ParseResult.GetValueForArgument(subjectArgument),
-                context.ParseResult.GetValueForOption(pathOption)!,
-                context.ParseResult.GetValueForOption(inFileOption),
-                context.ParseResult.GetValueForOption(fileOption),
-                context.ParseResult.GetValueForOption(noBuildOption),
-                context.ParseResult.GetValueForOption(effectsOption),
-                context.ParseResult.GetValueForOption(rowOption),
-                context.ParseResult.GetValueForOption(jsonOption));
+            return ExecuteImpact(
+                parseResult.GetValue(subjectArgument)!,
+                parseResult.GetValue(pathOption)!,
+                parseResult.GetValue(inFileOption),
+                parseResult.GetValue(fileOption),
+                parseResult.GetValue(noBuildOption),
+                parseResult.GetValue(effectsOption),
+                parseResult.GetValue(rowOption),
+                parseResult.GetValue(jsonOption));
         });
 
         return command;
@@ -175,39 +182,44 @@ public static class QueryCommand
 
     private static Command CreateFacetCommand(string facet, string description, bool withJson = false)
     {
-        var nameArgument = new Argument<string>(
-            name: "name",
-            description: "Declaration name to ask about");
-        var pathOption = new Option<string>(
-            aliases: ["--project"],
-            description: "Project directory",
-            getDefaultValue: () => ".");
-        var inFileOption = new Option<string?>(
-            aliases: ["--in-file"],
-            description: "Disambiguate when several files declare the name");
-        var noBuildOption = new Option<bool>(
-            aliases: ["--no-build"],
-            description: "Refuse a missing or stale index instead of rebuilding it");
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Emit the answer as an envelope document (schema v1.1) instead of text");
+        var nameArgument = new Argument<string>("name")
+        {
+            Description = "Declaration name to ask about"
+        };
+        var pathOption = new Option<string>("--project")
+        {
+            Description = "Project directory",
+            DefaultValueFactory = _ => "."
+        };
+        var inFileOption = new Option<string?>("--in-file")
+        {
+            Description = "Disambiguate when several files declare the name"
+        };
+        var noBuildOption = new Option<bool>("--no-build")
+        {
+            Description = "Refuse a missing or stale index instead of rebuilding it"
+        };
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Emit the answer as an envelope document (schema v1.1) instead of text"
+        };
 
         var command = new Command(facet, description)
         {
             nameArgument, pathOption, inFileOption, noBuildOption,
         };
         if (withJson)
-            command.AddOption(jsonOption);
+            command.Options.Add(jsonOption);
 
-        command.SetHandler((InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            context.ExitCode = Execute(
+            return Execute(
                 facet,
-                context.ParseResult.GetValueForArgument(nameArgument),
-                context.ParseResult.GetValueForOption(pathOption)!,
-                context.ParseResult.GetValueForOption(inFileOption),
-                context.ParseResult.GetValueForOption(noBuildOption),
-                withJson && context.ParseResult.GetValueForOption(jsonOption));
+                parseResult.GetValue(nameArgument)!,
+                parseResult.GetValue(pathOption)!,
+                parseResult.GetValue(inFileOption),
+                parseResult.GetValue(noBuildOption),
+                withJson && parseResult.GetValue(jsonOption));
         });
 
         return command;

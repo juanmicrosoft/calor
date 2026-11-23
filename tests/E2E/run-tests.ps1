@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
-$Compiler = Join-Path $RepoRoot "src\Calor.Compiler\bin\Debug\net8.0\calor.exe"
+$Compiler = Join-Path $RepoRoot "src\Calor.Compiler\bin\Debug\net10.0\calor.exe"
 $ScenariosDir = Join-Path $ScriptDir "scenarios"
 
 $Script:Passed = 0

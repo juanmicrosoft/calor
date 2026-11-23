@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
@@ -15,20 +14,21 @@ public static class FeatureCheckCommand
 {
     public static Command Create()
     {
-        var featureArgument = new Argument<string?>(
-            name: "feature",
-            description: "The C# feature to check (e.g., 'yield-return', 'async-await', 'linq-method')")
+        var featureArgument = new Argument<string?>("feature")
         {
+            Description = "The C# feature to check (e.g., 'yield-return', 'async-await', 'linq-method')",
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var listOption = new Option<bool>(
-            aliases: ["--list", "-l"],
-            description: "List all known features and their support levels");
+        var listOption = new Option<bool>("--list", "-l")
+        {
+            Description = "List all known features and their support levels"
+        };
 
-        var levelOption = new Option<string?>(
-            aliases: ["--level"],
-            description: "Filter by support level: full, partial, notsupported, manualrequired");
+        var levelOption = new Option<string?>("--level")
+        {
+            Description = "Filter by support level: full, partial, notsupported, manualrequired"
+        };
 
         var command = new Command("feature-check", "Check if a C# feature is supported in Calor conversion")
         {
@@ -37,14 +37,14 @@ public static class FeatureCheckCommand
             levelOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler((InvocationContext ctx) =>
+        command.SetAction(parseResult =>
         {
-            ctx.ExitCode = Execute(
-                ctx.ParseResult.GetValueForArgument(featureArgument),
-                ctx.ParseResult.GetValueForOption(listOption),
-                ctx.ParseResult.GetValueForOption(levelOption));
+            return Execute(
+                parseResult.GetValue(featureArgument),
+                parseResult.GetValue(listOption),
+                parseResult.GetValue(levelOption));
         });
 
         return command;

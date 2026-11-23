@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Text.Json;
 using Calor.Compiler.Experiments;
 
@@ -17,9 +16,9 @@ public static class EvaluationCommand
     {
         var command = new Command("evaluation", "Evaluation harness for the Calor-native type-system research plan (Phase 0+).");
 
-        command.AddCommand(CreateRegistryCommand());
-        command.AddCommand(CreateRegistryValidateCommand());
-        command.AddCommand(CreateAbCommand());
+        command.Subcommands.Add(CreateRegistryCommand());
+        command.Subcommands.Add(CreateRegistryValidateCommand());
+        command.Subcommands.Add(CreateAbCommand());
 
         return command;
     }
@@ -30,44 +29,52 @@ public static class EvaluationCommand
 
     private static Command CreateAbCommand()
     {
-        var baselineOption = new Option<FileInfo>(
-            aliases: ["--baseline-file"],
-            description: "JSON file with baseline-run per-program metric values (AbRun schema).")
-        { IsRequired = true };
+        var baselineOption = new Option<FileInfo>("--baseline-file")
+        {
+            Description = "JSON file with baseline-run per-program metric values (AbRun schema).",
+            Required = true
+        };
 
-        var candidateOption = new Option<FileInfo>(
-            aliases: ["--candidate-file"],
-            description: "JSON file with candidate-run per-program metric values (AbRun schema).")
-        { IsRequired = true };
+        var candidateOption = new Option<FileInfo>("--candidate-file")
+        {
+            Description = "JSON file with candidate-run per-program metric values (AbRun schema).",
+            Required = true
+        };
 
-        var primaryMetricOption = new Option<string>(
-            aliases: ["--primary-metric"],
-            description: "Name of the primary metric to gate on.")
-        { IsRequired = true };
+        var primaryMetricOption = new Option<string>("--primary-metric")
+        {
+            Description = "Name of the primary metric to gate on.",
+            Required = true
+        };
 
-        var thresholdOption = new Option<double>(
-            aliases: ["--threshold"],
-            description: "Minimum primary-metric relative effect (e.g., 0.15 = +15%).")
-        { IsRequired = true };
+        var thresholdOption = new Option<double>("--threshold")
+        {
+            Description = "Minimum primary-metric relative effect (e.g., 0.15 = +15%).",
+            Required = true
+        };
 
-        var directionOption = new Option<string>(
-            aliases: ["--direction"],
-            description: "Direction of effect: up (candidate > baseline) or down (candidate < baseline).",
-            getDefaultValue: () => "up");
+        var directionOption = new Option<string>("--direction")
+        {
+            Description = "Direction of effect: up (candidate > baseline) or down (candidate < baseline).",
+            DefaultValueFactory = _ => "up"
+        };
 
-        var guardOption = new Option<string[]>(
-            aliases: ["--guard"],
-            description: "No-regression guard: 'MetricName=Tolerance', e.g., 'Comprehension=0.03'. Repeatable.")
-        { Arity = ArgumentArity.ZeroOrMore };
+        var guardOption = new Option<string[]>("--guard")
+        {
+            Description = "No-regression guard: 'MetricName=Tolerance', e.g., 'Comprehension=0.03'. Repeatable.",
+            Arity = ArgumentArity.ZeroOrMore
+        };
 
-        var resamplesOption = new Option<int>(
-            aliases: ["--bootstrap-resamples"],
-            description: "Bootstrap resample count (default: 2000).",
-            getDefaultValue: () => 2000);
+        var resamplesOption = new Option<int>("--bootstrap-resamples")
+        {
+            Description = "Bootstrap resample count (default: 2000).",
+            DefaultValueFactory = _ => 2000
+        };
 
-        var seedOption = new Option<int?>(
-            aliases: ["--seed"],
-            description: "Random seed for reproducible bootstrap output.");
+        var seedOption = new Option<int?>("--seed")
+        {
+            Description = "Random seed for reproducible bootstrap output."
+        };
 
         var command = new Command("ab",
             "Paired baseline-vs-candidate evaluation. Emits a decision memo (PASS/FAIL/INCONCLUSIVE) with PROMOTE/HOLD/DROP recommendation.")
@@ -76,19 +83,19 @@ public static class EvaluationCommand
             directionOption, guardOption, resamplesOption, seedOption
         };
 
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             await Task.Yield();
-            var baselineFile = ctx.ParseResult.GetValueForOption(baselineOption)!;
-            var candidateFile = ctx.ParseResult.GetValueForOption(candidateOption)!;
-            var primaryName = ctx.ParseResult.GetValueForOption(primaryMetricOption)!;
-            var threshold = ctx.ParseResult.GetValueForOption(thresholdOption);
-            var directionRaw = ctx.ParseResult.GetValueForOption(directionOption) ?? "up";
-            var guardArgs = ctx.ParseResult.GetValueForOption(guardOption) ?? Array.Empty<string>();
-            var resamples = ctx.ParseResult.GetValueForOption(resamplesOption);
-            var seed = ctx.ParseResult.GetValueForOption(seedOption);
+            var baselineFile = parseResult.GetValue(baselineOption)!;
+            var candidateFile = parseResult.GetValue(candidateOption)!;
+            var primaryName = parseResult.GetValue(primaryMetricOption)!;
+            var threshold = parseResult.GetValue(thresholdOption);
+            var directionRaw = parseResult.GetValue(directionOption) ?? "up";
+            var guardArgs = parseResult.GetValue(guardOption) ?? Array.Empty<string>();
+            var resamples = parseResult.GetValue(resamplesOption);
+            var seed = parseResult.GetValue(seedOption);
 
-            ctx.ExitCode = ExecuteAb(
+            return ExecuteAb(
                 baselineFile, candidateFile, primaryName, threshold, directionRaw,
                 guardArgs, resamples, seed);
         });
@@ -166,20 +173,23 @@ public static class EvaluationCommand
 
     private static Command CreateRegistryValidateCommand()
     {
-        var baseFileOption = new Option<FileInfo>(
-            aliases: ["--base-file"],
-            description: "Path to the base-branch version of registry.json (e.g., from `git show <base>:docs/experiments/registry.json`).")
-        { IsRequired = true };
+        var baseFileOption = new Option<FileInfo>("--base-file")
+        {
+            Description = "Path to the base-branch version of registry.json (e.g., from `git show <base>:docs/experiments/registry.json`).",
+            Required = true
+        };
 
-        var headFileOption = new Option<FileInfo>(
-            aliases: ["--head-file"],
-            description: "Path to the head (PR) version of registry.json.")
-        { IsRequired = true };
+        var headFileOption = new Option<FileInfo>("--head-file")
+        {
+            Description = "Path to the head (PR) version of registry.json.",
+            Required = true
+        };
 
-        var jsonOption = new Option<bool>(
-            aliases: ["--json"],
-            description: "Emit a JSON report on stdout in addition to human-readable output.",
-            getDefaultValue: () => false);
+        var jsonOption = new Option<bool>("--json")
+        {
+            Description = "Emit a JSON report on stdout in addition to human-readable output.",
+            DefaultValueFactory = _ => false
+        };
 
         var command = new Command("registry-validate",
             "Validate registry.json append-only invariant: no existing entry's fields may change. Exits 0 on pass, non-zero on violation.")
@@ -189,13 +199,13 @@ public static class EvaluationCommand
             jsonOption
         };
 
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
             await Task.Yield();
-            var baseFile = ctx.ParseResult.GetValueForOption(baseFileOption)!;
-            var headFile = ctx.ParseResult.GetValueForOption(headFileOption)!;
-            var json = ctx.ParseResult.GetValueForOption(jsonOption);
-            ctx.ExitCode = ExecuteRegistryValidate(baseFile, headFile, json);
+            var baseFile = parseResult.GetValue(baseFileOption)!;
+            var headFile = parseResult.GetValue(headFileOption)!;
+            var json = parseResult.GetValue(jsonOption);
+            return ExecuteRegistryValidate(baseFile, headFile, json);
         });
         return command;
     }
@@ -250,31 +260,37 @@ public static class EvaluationCommand
 
     private static Command CreateRegistryCommand()
     {
-        var fileOption = new Option<FileInfo?>(
-            aliases: ["--file", "-f"],
-            description: "Path to the registry JSON file. Defaults to ./docs/experiments/registry.json.");
+        var fileOption = new Option<FileInfo?>("--file", "-f")
+        {
+            Description = "Path to the registry JSON file. Defaults to ./docs/experiments/registry.json."
+        };
 
-        var queryOption = new Option<string?>(
-            aliases: ["--query", "-q"],
-            description: "Query mode: current-state | two-kill-risk | held-owned-by | stale-holds | audit-trail")
-        { IsRequired = true };
+        var queryOption = new Option<string?>("--query", "-q")
+        {
+            Description = "Query mode: current-state | two-kill-risk | held-owned-by | stale-holds | audit-trail",
+            Required = true
+        };
 
-        var hypothesisOption = new Option<string?>(
-            aliases: ["--hypothesis"],
-            description: "Hypothesis ID (required for current-state, audit-trail).");
+        var hypothesisOption = new Option<string?>("--hypothesis")
+        {
+            Description = "Hypothesis ID (required for current-state, audit-trail)."
+        };
 
-        var tupleOption = new Option<string?>(
-            aliases: ["--tuple"],
-            description: "Identity tuple for two-kill-risk: '<tag>/<code-class>/<direction>'.");
+        var tupleOption = new Option<string?>("--tuple")
+        {
+            Description = "Identity tuple for two-kill-risk: '<tag>/<code-class>/<direction>'."
+        };
 
-        var userOption = new Option<string?>(
-            aliases: ["--user"],
-            description: "GitHub username (required for held-owned-by).");
+        var userOption = new Option<string?>("--user")
+        {
+            Description = "GitHub username (required for held-owned-by)."
+        };
 
-        var prettyOption = new Option<bool>(
-            aliases: ["--pretty"],
-            description: "Pretty-print JSON output (default: false — compact for machine consumption).",
-            getDefaultValue: () => false);
+        var prettyOption = new Option<bool>("--pretty")
+        {
+            Description = "Pretty-print JSON output (default: false — compact for machine consumption).",
+            DefaultValueFactory = _ => false
+        };
 
         var command = new Command("registry", "Query the experimental hypothesis registry.")
         {
@@ -286,8 +302,13 @@ public static class EvaluationCommand
             prettyOption
         };
 
-        command.SetHandler(ExecuteRegistry,
-            fileOption, queryOption, hypothesisOption, tupleOption, userOption, prettyOption);
+        command.SetAction((parseResult, cancellationToken) => ExecuteRegistry(
+            parseResult.GetValue(fileOption),
+            parseResult.GetValue(queryOption),
+            parseResult.GetValue(hypothesisOption),
+            parseResult.GetValue(tupleOption),
+            parseResult.GetValue(userOption),
+            parseResult.GetValue(prettyOption)));
 
         return command;
     }

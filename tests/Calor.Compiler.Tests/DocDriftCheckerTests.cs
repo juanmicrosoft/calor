@@ -34,7 +34,7 @@ public class DocDriftCheckerTests
     [Fact]
     public void ConverterPreservationHelp_UsesOwnedFramesWithoutAnUnconditionalParseGuarantee()
     {
-        var option = Commands.ConvertCommand.Create().Options.Single(option => option.HasAlias("--passthrough"));
+        var option = Commands.ConvertCommand.Create().Options.Single(option => option.Name == "--passthrough");
         var description = Assert.IsType<string>(option.Description);
         Assert.Contains("converter-owned raw frames", description);
         Assert.DoesNotContain("§", description);

@@ -25,529 +25,586 @@ public static class Program
         // Run command
         var runCommand = new Command("run", "Run benchmarks and generate reports");
 
-        var outputOption = new Option<string>(
-            aliases: new[] { "--output", "-o" },
-            description: "Output file path for the report",
-            getDefaultValue: () => "report.json");
-
-        var formatOption = new Option<string>(
-            aliases: new[] { "--format", "-f" },
-            description: "Output format (json, markdown, both, website, html)",
-            getDefaultValue: () => "json");
-
-        var categoryOption = new Option<string[]>(
-            aliases: new[] { "--category", "-c" },
-            description: "Specific categories to run (default: all)")
+        var outputOption = new Option<string>("--output", "-o")
         {
+            Description = "Output file path for the report",
+            DefaultValueFactory = _ => "report.json"
+        };
+
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Output format (json, markdown, both, website, html)",
+            DefaultValueFactory = _ => "json"
+        };
+
+        var categoryOption = new Option<string[]>("--category", "-c")
+        {
+            Description = "Specific categories to run (default: all)",
             AllowMultipleArgumentsPerToken = true
         };
 
-        var verboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Enable verbose output");
-
-        var manifestOption = new Option<string>(
-            aliases: new[] { "--manifest", "-m" },
-            description: "Path to benchmark manifest file");
-
-        var statisticalOption = new Option<bool>(
-            aliases: new[] { "--statistical", "-s" },
-            description: "Enable statistical analysis with multiple runs");
-
-        var runsOption = new Option<int>(
-            aliases: new[] { "--runs", "-r" },
-            description: "Number of runs for statistical analysis",
-            getDefaultValue: () => 30);
-
-        var llmOption = new Option<bool>(
-            aliases: new[] { "--llm" },
-            description: "Enable LLM-based comprehension evaluation (requires ANTHROPIC_API_KEY)");
-
-        runCommand.AddOption(outputOption);
-        runCommand.AddOption(formatOption);
-        runCommand.AddOption(categoryOption);
-        runCommand.AddOption(verboseOption);
-        runCommand.AddOption(manifestOption);
-        runCommand.AddOption(statisticalOption);
-        runCommand.AddOption(runsOption);
-        runCommand.AddOption(llmOption);
-
-        runCommand.SetHandler(async (context) =>
+        var verboseOption = new Option<bool>("--verbose", "-v")
         {
-            var output = context.ParseResult.GetValueForOption(outputOption)!;
-            var format = context.ParseResult.GetValueForOption(formatOption)!;
-            var categories = context.ParseResult.GetValueForOption(categoryOption) ?? Array.Empty<string>();
-            var verbose = context.ParseResult.GetValueForOption(verboseOption);
-            var manifest = context.ParseResult.GetValueForOption(manifestOption);
-            var statistical = context.ParseResult.GetValueForOption(statisticalOption);
-            var runs = context.ParseResult.GetValueForOption(runsOption);
-            var llm = context.ParseResult.GetValueForOption(llmOption);
+            Description = "Enable verbose output"
+        };
+
+        var manifestOption = new Option<string>("--manifest", "-m")
+        {
+            Description = "Path to benchmark manifest file"
+        };
+
+        var statisticalOption = new Option<bool>("--statistical", "-s")
+        {
+            Description = "Enable statistical analysis with multiple runs"
+        };
+
+        var runsOption = new Option<int>("--runs", "-r")
+        {
+            Description = "Number of runs for statistical analysis",
+            DefaultValueFactory = _ => 30
+        };
+
+        var llmOption = new Option<bool>("--llm")
+        {
+            Description = "Enable LLM-based comprehension evaluation (requires ANTHROPIC_API_KEY)"
+        };
+
+        runCommand.Options.Add(outputOption);
+        runCommand.Options.Add(formatOption);
+        runCommand.Options.Add(categoryOption);
+        runCommand.Options.Add(verboseOption);
+        runCommand.Options.Add(manifestOption);
+        runCommand.Options.Add(statisticalOption);
+        runCommand.Options.Add(runsOption);
+        runCommand.Options.Add(llmOption);
+
+        runCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var output = parseResult.GetValue(outputOption)!;
+            var format = parseResult.GetValue(formatOption)!;
+            var categories = parseResult.GetValue(categoryOption) ?? Array.Empty<string>();
+            var verbose = parseResult.GetValue(verboseOption);
+            var manifest = parseResult.GetValue(manifestOption);
+            var statistical = parseResult.GetValue(statisticalOption);
+            var runs = parseResult.GetValue(runsOption);
+            var llm = parseResult.GetValue(llmOption);
 
             await RunBenchmarksAsync(output, format, categories, verbose, manifest, statistical, runs, llm);
         });
 
-        rootCommand.AddCommand(runCommand);
+        rootCommand.Subcommands.Add(runCommand);
 
         // Quick command for inline testing
         var quickCommand = new Command("quick", "Run a quick test with inline code");
 
-        var calorOption = new Option<string>(
-            aliases: new[] { "--calor" },
-            description: "Calor source code or file path")
-        { IsRequired = true };
-
-        var csharpOption = new Option<string>(
-            aliases: new[] { "--csharp" },
-            description: "C# source code or file path")
-        { IsRequired = true };
-
-        quickCommand.AddOption(calorOption);
-        quickCommand.AddOption(csharpOption);
-
-        quickCommand.SetHandler(async (calor, csharp) =>
+        var calorOption = new Option<string>("--calor")
         {
-            await RunQuickTestAsync(calor, csharp);
-        }, calorOption, csharpOption);
+            Description = "Calor source code or file path",
+            Required = true
+        };
 
-        rootCommand.AddCommand(quickCommand);
+        var csharpOption = new Option<string>("--csharp")
+        {
+            Description = "C# source code or file path",
+            Required = true
+        };
+
+        quickCommand.Options.Add(calorOption);
+        quickCommand.Options.Add(csharpOption);
+
+        quickCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            await RunQuickTestAsync(parseResult.GetValue(calorOption)!, parseResult.GetValue(csharpOption)!);
+        });
+
+        rootCommand.Subcommands.Add(quickCommand);
 
         // Discover command
         var discoverCommand = new Command("discover", "Discover benchmark files in a directory");
 
-        var dirOption = new Option<string>(
-            aliases: new[] { "--dir", "-d" },
-            description: "Directory to scan for Calor/C# pairs")
-        { IsRequired = true };
-
-        var discoverOutputOption = new Option<string>(
-            aliases: new[] { "--output", "-o" },
-            description: "Output manifest file path",
-            getDefaultValue: () => "manifest.json");
-
-        discoverCommand.AddOption(dirOption);
-        discoverCommand.AddOption(discoverOutputOption);
-
-        discoverCommand.SetHandler(async (dir, discoverOutput) =>
+        var dirOption = new Option<string>("--dir", "-d")
         {
-            await DiscoverBenchmarksAsync(dir, discoverOutput);
-        }, dirOption, discoverOutputOption);
+            Description = "Directory to scan for Calor/C# pairs",
+            Required = true
+        };
 
-        rootCommand.AddCommand(discoverCommand);
+        var discoverOutputOption = new Option<string>("--output", "-o")
+        {
+            Description = "Output manifest file path",
+            DefaultValueFactory = _ => "manifest.json"
+        };
+
+        discoverCommand.Options.Add(dirOption);
+        discoverCommand.Options.Add(discoverOutputOption);
+
+        discoverCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            await DiscoverBenchmarksAsync(parseResult.GetValue(dirOption)!, parseResult.GetValue(discoverOutputOption)!);
+        });
+
+        rootCommand.Subcommands.Add(discoverCommand);
 
         // LLM tasks command
         var llmTasksCommand = new Command("llm-tasks", "Run LLM-based task completion benchmarks");
 
-        var providerOption = new Option<string>(
-            aliases: new[] { "--provider", "-p" },
-            description: "LLM provider to use (claude, mock)",
-            getDefaultValue: () => "claude");
-
-        var modelOption = new Option<string?>(
-            aliases: new[] { "--model" },
-            description: "Specific model to use (e.g., claude-opus-4-5-20251101, claude-sonnet-4-20250514)");
-
-        var budgetOption = new Option<decimal>(
-            aliases: new[] { "--budget", "-b" },
-            description: "Maximum budget in USD",
-            getDefaultValue: () => 5.00m);
-
-        var llmOutputOption = new Option<string>(
-            aliases: new[] { "--output", "-o" },
-            description: "Output file for results",
-            getDefaultValue: () => "llm-results.json");
-
-        var dryRunOption = new Option<bool>(
-            aliases: new[] { "--dry-run" },
-            description: "Estimate costs without making API calls");
-
-        var refreshCacheOption = new Option<bool>(
-            aliases: new[] { "--refresh-cache" },
-            description: "Refresh cached responses");
-
-        var tasksOption = new Option<string[]>(
-            aliases: new[] { "--tasks", "-t" },
-            description: "Specific task IDs to run (comma-separated)")
+        var providerOption = new Option<string>("--provider", "-p")
         {
+            Description = "LLM provider to use (claude, mock)",
+            DefaultValueFactory = _ => "claude"
+        };
+
+        var modelOption = new Option<string?>("--model")
+        {
+            Description = "Specific model to use (e.g., claude-opus-4-5-20251101, claude-sonnet-4-20250514)"
+        };
+
+        var budgetOption = new Option<decimal>("--budget", "-b")
+        {
+            Description = "Maximum budget in USD",
+            DefaultValueFactory = _ => 5.00m
+        };
+
+        var llmOutputOption = new Option<string>("--output", "-o")
+        {
+            Description = "Output file for results",
+            DefaultValueFactory = _ => "llm-results.json"
+        };
+
+        var dryRunOption = new Option<bool>("--dry-run")
+        {
+            Description = "Estimate costs without making API calls"
+        };
+
+        var refreshCacheOption = new Option<bool>("--refresh-cache")
+        {
+            Description = "Refresh cached responses"
+        };
+
+        var tasksOption = new Option<string[]>("--tasks", "-t")
+        {
+            Description = "Specific task IDs to run (comma-separated)",
             AllowMultipleArgumentsPerToken = true
         };
 
-        var llmCategoryOption = new Option<string>(
-            aliases: new[] { "--category", "-c" },
-            description: "Run only tasks in this category");
+        var llmCategoryOption = new Option<string>("--category", "-c")
+        {
+            Description = "Run only tasks in this category"
+        };
 
-        var sampleOption = new Option<int?>(
-            aliases: new[] { "--sample", "-s" },
-            description: "Number of tasks to sample");
+        var sampleOption = new Option<int?>("--sample", "-s")
+        {
+            Description = "Number of tasks to sample"
+        };
 
         // Seed for the sampling shuffle. Fixed default (42) keeps corpus order
         // reproducible across developers; pass a different value to explore variance.
         // See docs/plans/2026-08-18-test-suite-audit.md (R11).
-        var seedOption = new Option<int>(
-            aliases: new[] { "--seed" },
-            description: "Random seed for the sample shuffle (reproducible corpus order)",
-            getDefaultValue: () => 42);
-
-        var llmManifestOption = new Option<string>(
-            aliases: new[] { "--manifest", "-m" },
-            description: "Path to task manifest file");
-
-        var llmVerboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Enable verbose output");
-
-        llmTasksCommand.AddOption(providerOption);
-        llmTasksCommand.AddOption(modelOption);
-        llmTasksCommand.AddOption(budgetOption);
-        llmTasksCommand.AddOption(llmOutputOption);
-        llmTasksCommand.AddOption(dryRunOption);
-        llmTasksCommand.AddOption(refreshCacheOption);
-        llmTasksCommand.AddOption(tasksOption);
-        llmTasksCommand.AddOption(llmCategoryOption);
-        llmTasksCommand.AddOption(sampleOption);
-        llmTasksCommand.AddOption(seedOption);
-        llmTasksCommand.AddOption(llmManifestOption);
-        llmTasksCommand.AddOption(llmVerboseOption);
-
-        llmTasksCommand.SetHandler(async (context) =>
+        var seedOption = new Option<int>("--seed")
         {
-            var provider = context.ParseResult.GetValueForOption(providerOption)!;
-            var model = context.ParseResult.GetValueForOption(modelOption);
-            var budget = context.ParseResult.GetValueForOption(budgetOption);
-            var llmOutput = context.ParseResult.GetValueForOption(llmOutputOption)!;
-            var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
-            var refreshCache = context.ParseResult.GetValueForOption(refreshCacheOption);
-            var tasks = context.ParseResult.GetValueForOption(tasksOption) ?? Array.Empty<string>();
-            var llmCategory = context.ParseResult.GetValueForOption(llmCategoryOption);
-            var sample = context.ParseResult.GetValueForOption(sampleOption);
-            var seed = context.ParseResult.GetValueForOption(seedOption);
-            var llmManifest = context.ParseResult.GetValueForOption(llmManifestOption);
-            var llmVerbose = context.ParseResult.GetValueForOption(llmVerboseOption);
+            Description = "Random seed for the sample shuffle (reproducible corpus order)",
+            DefaultValueFactory = _ => 42
+        };
+
+        var llmManifestOption = new Option<string>("--manifest", "-m")
+        {
+            Description = "Path to task manifest file"
+        };
+
+        var llmVerboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
+
+        llmTasksCommand.Options.Add(providerOption);
+        llmTasksCommand.Options.Add(modelOption);
+        llmTasksCommand.Options.Add(budgetOption);
+        llmTasksCommand.Options.Add(llmOutputOption);
+        llmTasksCommand.Options.Add(dryRunOption);
+        llmTasksCommand.Options.Add(refreshCacheOption);
+        llmTasksCommand.Options.Add(tasksOption);
+        llmTasksCommand.Options.Add(llmCategoryOption);
+        llmTasksCommand.Options.Add(sampleOption);
+        llmTasksCommand.Options.Add(seedOption);
+        llmTasksCommand.Options.Add(llmManifestOption);
+        llmTasksCommand.Options.Add(llmVerboseOption);
+
+        llmTasksCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var provider = parseResult.GetValue(providerOption)!;
+            var model = parseResult.GetValue(modelOption);
+            var budget = parseResult.GetValue(budgetOption);
+            var llmOutput = parseResult.GetValue(llmOutputOption)!;
+            var dryRun = parseResult.GetValue(dryRunOption);
+            var refreshCache = parseResult.GetValue(refreshCacheOption);
+            var tasks = parseResult.GetValue(tasksOption) ?? Array.Empty<string>();
+            var llmCategory = parseResult.GetValue(llmCategoryOption);
+            var sample = parseResult.GetValue(sampleOption);
+            var seed = parseResult.GetValue(seedOption);
+            var llmManifest = parseResult.GetValue(llmManifestOption);
+            var llmVerbose = parseResult.GetValue(llmVerboseOption);
 
             await RunLlmTasksAsync(provider, model, budget, llmOutput, dryRun, refreshCache, tasks, llmCategory, sample, seed, llmManifest, llmVerbose);
         });
 
-        rootCommand.AddCommand(llmTasksCommand);
+        rootCommand.Subcommands.Add(llmTasksCommand);
 
         // Safety benchmark command
         var safetyBenchmarkCommand = new Command("safety-benchmark", "Run safety benchmarks measuring contract enforcement quality");
 
-        var safetyProviderOption = new Option<string>(
-            aliases: new[] { "--provider", "-p" },
-            description: "LLM provider to use (claude, mock)",
-            getDefaultValue: () => "claude");
-
-        var safetyModelOption = new Option<string?>(
-            aliases: new[] { "--model" },
-            description: "Specific model to use");
-
-        var safetyBudgetOption = new Option<decimal>(
-            aliases: new[] { "--budget", "-b" },
-            description: "Maximum budget in USD",
-            getDefaultValue: () => 5.00m);
-
-        var safetyOutputOption = new Option<string>(
-            aliases: new[] { "--output", "-o" },
-            description: "Output file for results",
-            getDefaultValue: () => "safety-results.json");
-
-        var safetyDryRunOption = new Option<bool>(
-            aliases: new[] { "--dry-run" },
-            description: "Estimate costs without making API calls");
-
-        var safetyRefreshCacheOption = new Option<bool>(
-            aliases: new[] { "--refresh-cache" },
-            description: "Refresh cached responses");
-
-        var safetyTasksOption = new Option<string[]>(
-            aliases: new[] { "--tasks", "-t" },
-            description: "Specific task IDs to run")
+        var safetyProviderOption = new Option<string>("--provider", "-p")
         {
+            Description = "LLM provider to use (claude, mock)",
+            DefaultValueFactory = _ => "claude"
+        };
+
+        var safetyModelOption = new Option<string?>("--model")
+        {
+            Description = "Specific model to use"
+        };
+
+        var safetyBudgetOption = new Option<decimal>("--budget", "-b")
+        {
+            Description = "Maximum budget in USD",
+            DefaultValueFactory = _ => 5.00m
+        };
+
+        var safetyOutputOption = new Option<string>("--output", "-o")
+        {
+            Description = "Output file for results",
+            DefaultValueFactory = _ => "safety-results.json"
+        };
+
+        var safetyDryRunOption = new Option<bool>("--dry-run")
+        {
+            Description = "Estimate costs without making API calls"
+        };
+
+        var safetyRefreshCacheOption = new Option<bool>("--refresh-cache")
+        {
+            Description = "Refresh cached responses"
+        };
+
+        var safetyTasksOption = new Option<string[]>("--tasks", "-t")
+        {
+            Description = "Specific task IDs to run",
             AllowMultipleArgumentsPerToken = true
         };
 
-        var safetyCategoryOption = new Option<string>(
-            aliases: new[] { "--category", "-c" },
-            description: "Run only tasks in this category");
-
-        var safetySampleOption = new Option<int?>(
-            aliases: new[] { "--sample", "-s" },
-            description: "Number of tasks to sample");
-
-        var safetySeedOption = new Option<int>(
-            aliases: new[] { "--seed" },
-            description: "Random seed for the sample shuffle (reproducible corpus order)",
-            getDefaultValue: () => 42);
-
-        var safetyManifestOption = new Option<string>(
-            aliases: new[] { "--manifest", "-m" },
-            description: "Path to task manifest file");
-
-        var safetyVerboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Enable verbose output");
-
-        safetyBenchmarkCommand.AddOption(safetyProviderOption);
-        safetyBenchmarkCommand.AddOption(safetyModelOption);
-        safetyBenchmarkCommand.AddOption(safetyBudgetOption);
-        safetyBenchmarkCommand.AddOption(safetyOutputOption);
-        safetyBenchmarkCommand.AddOption(safetyDryRunOption);
-        safetyBenchmarkCommand.AddOption(safetyRefreshCacheOption);
-        safetyBenchmarkCommand.AddOption(safetyTasksOption);
-        safetyBenchmarkCommand.AddOption(safetyCategoryOption);
-        safetyBenchmarkCommand.AddOption(safetySampleOption);
-        safetyBenchmarkCommand.AddOption(safetySeedOption);
-        safetyBenchmarkCommand.AddOption(safetyManifestOption);
-        safetyBenchmarkCommand.AddOption(safetyVerboseOption);
-
-        safetyBenchmarkCommand.SetHandler(async (context) =>
+        var safetyCategoryOption = new Option<string>("--category", "-c")
         {
-            var provider = context.ParseResult.GetValueForOption(safetyProviderOption)!;
-            var model = context.ParseResult.GetValueForOption(safetyModelOption);
-            var budget = context.ParseResult.GetValueForOption(safetyBudgetOption);
-            var output = context.ParseResult.GetValueForOption(safetyOutputOption)!;
-            var dryRun = context.ParseResult.GetValueForOption(safetyDryRunOption);
-            var refreshCache = context.ParseResult.GetValueForOption(safetyRefreshCacheOption);
-            var tasks = context.ParseResult.GetValueForOption(safetyTasksOption) ?? Array.Empty<string>();
-            var category = context.ParseResult.GetValueForOption(safetyCategoryOption);
-            var sample = context.ParseResult.GetValueForOption(safetySampleOption);
-            var seed = context.ParseResult.GetValueForOption(safetySeedOption);
-            var manifest = context.ParseResult.GetValueForOption(safetyManifestOption);
-            var verbose = context.ParseResult.GetValueForOption(safetyVerboseOption);
+            Description = "Run only tasks in this category"
+        };
+
+        var safetySampleOption = new Option<int?>("--sample", "-s")
+        {
+            Description = "Number of tasks to sample"
+        };
+
+        var safetySeedOption = new Option<int>("--seed")
+        {
+            Description = "Random seed for the sample shuffle (reproducible corpus order)",
+            DefaultValueFactory = _ => 42
+        };
+
+        var safetyManifestOption = new Option<string>("--manifest", "-m")
+        {
+            Description = "Path to task manifest file"
+        };
+
+        var safetyVerboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
+
+        safetyBenchmarkCommand.Options.Add(safetyProviderOption);
+        safetyBenchmarkCommand.Options.Add(safetyModelOption);
+        safetyBenchmarkCommand.Options.Add(safetyBudgetOption);
+        safetyBenchmarkCommand.Options.Add(safetyOutputOption);
+        safetyBenchmarkCommand.Options.Add(safetyDryRunOption);
+        safetyBenchmarkCommand.Options.Add(safetyRefreshCacheOption);
+        safetyBenchmarkCommand.Options.Add(safetyTasksOption);
+        safetyBenchmarkCommand.Options.Add(safetyCategoryOption);
+        safetyBenchmarkCommand.Options.Add(safetySampleOption);
+        safetyBenchmarkCommand.Options.Add(safetySeedOption);
+        safetyBenchmarkCommand.Options.Add(safetyManifestOption);
+        safetyBenchmarkCommand.Options.Add(safetyVerboseOption);
+
+        safetyBenchmarkCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var provider = parseResult.GetValue(safetyProviderOption)!;
+            var model = parseResult.GetValue(safetyModelOption);
+            var budget = parseResult.GetValue(safetyBudgetOption);
+            var output = parseResult.GetValue(safetyOutputOption)!;
+            var dryRun = parseResult.GetValue(safetyDryRunOption);
+            var refreshCache = parseResult.GetValue(safetyRefreshCacheOption);
+            var tasks = parseResult.GetValue(safetyTasksOption) ?? Array.Empty<string>();
+            var category = parseResult.GetValue(safetyCategoryOption);
+            var sample = parseResult.GetValue(safetySampleOption);
+            var seed = parseResult.GetValue(safetySeedOption);
+            var manifest = parseResult.GetValue(safetyManifestOption);
+            var verbose = parseResult.GetValue(safetyVerboseOption);
 
             await RunSafetyBenchmarkAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, seed, manifest, verbose);
         });
 
-        rootCommand.AddCommand(safetyBenchmarkCommand);
+        rootCommand.Subcommands.Add(safetyBenchmarkCommand);
 
         // Effect discipline benchmark command
         var effectDisciplineCommand = new Command("effect-discipline", "Run effect discipline benchmarks measuring side effect management");
 
-        var effectProviderOption = new Option<string>(
-            aliases: new[] { "--provider", "-p" },
-            description: "LLM provider to use (claude, mock)",
-            getDefaultValue: () => "claude");
-
-        var effectModelOption = new Option<string?>(
-            aliases: new[] { "--model" },
-            description: "Specific model to use");
-
-        var effectBudgetOption = new Option<decimal>(
-            aliases: new[] { "--budget", "-b" },
-            description: "Maximum budget in USD",
-            getDefaultValue: () => 5.00m);
-
-        var effectOutputOption = new Option<string>(
-            aliases: new[] { "--output", "-o" },
-            description: "Output file for results",
-            getDefaultValue: () => "effect-discipline-results.json");
-
-        var effectDryRunOption = new Option<bool>(
-            aliases: new[] { "--dry-run" },
-            description: "Estimate costs without making API calls");
-
-        var effectRefreshCacheOption = new Option<bool>(
-            aliases: new[] { "--refresh-cache" },
-            description: "Refresh cached responses");
-
-        var effectTasksOption = new Option<string[]>(
-            aliases: new[] { "--tasks", "-t" },
-            description: "Specific task IDs to run")
+        var effectProviderOption = new Option<string>("--provider", "-p")
         {
+            Description = "LLM provider to use (claude, mock)",
+            DefaultValueFactory = _ => "claude"
+        };
+
+        var effectModelOption = new Option<string?>("--model")
+        {
+            Description = "Specific model to use"
+        };
+
+        var effectBudgetOption = new Option<decimal>("--budget", "-b")
+        {
+            Description = "Maximum budget in USD",
+            DefaultValueFactory = _ => 5.00m
+        };
+
+        var effectOutputOption = new Option<string>("--output", "-o")
+        {
+            Description = "Output file for results",
+            DefaultValueFactory = _ => "effect-discipline-results.json"
+        };
+
+        var effectDryRunOption = new Option<bool>("--dry-run")
+        {
+            Description = "Estimate costs without making API calls"
+        };
+
+        var effectRefreshCacheOption = new Option<bool>("--refresh-cache")
+        {
+            Description = "Refresh cached responses"
+        };
+
+        var effectTasksOption = new Option<string[]>("--tasks", "-t")
+        {
+            Description = "Specific task IDs to run",
             AllowMultipleArgumentsPerToken = true
         };
 
-        var effectCategoryOption = new Option<string>(
-            aliases: new[] { "--category", "-c" },
-            description: "Run only tasks in this category (flaky-test-prevention, security-boundaries, side-effect-transparency, cache-safety)");
-
-        var effectSampleOption = new Option<int?>(
-            aliases: new[] { "--sample", "-s" },
-            description: "Number of tasks to sample");
-
-        var effectSeedOption = new Option<int>(
-            aliases: new[] { "--seed" },
-            description: "Random seed for the sample shuffle (reproducible corpus order)",
-            getDefaultValue: () => 42);
-
-        var effectManifestOption = new Option<string>(
-            aliases: new[] { "--manifest", "-m" },
-            description: "Path to task manifest file");
-
-        var effectVerboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Enable verbose output");
-
-        var effectEnableAnalyzersOption = new Option<bool>(
-            aliases: new[] { "--enable-analyzers", "-a" },
-            description: "Enable Roslyn analyzers for C# code evaluation (ED001-ED007)");
-
-        effectDisciplineCommand.AddOption(effectProviderOption);
-        effectDisciplineCommand.AddOption(effectModelOption);
-        effectDisciplineCommand.AddOption(effectBudgetOption);
-        effectDisciplineCommand.AddOption(effectOutputOption);
-        effectDisciplineCommand.AddOption(effectDryRunOption);
-        effectDisciplineCommand.AddOption(effectRefreshCacheOption);
-        effectDisciplineCommand.AddOption(effectTasksOption);
-        effectDisciplineCommand.AddOption(effectCategoryOption);
-        effectDisciplineCommand.AddOption(effectSampleOption);
-        effectDisciplineCommand.AddOption(effectSeedOption);
-        effectDisciplineCommand.AddOption(effectManifestOption);
-        effectDisciplineCommand.AddOption(effectVerboseOption);
-        effectDisciplineCommand.AddOption(effectEnableAnalyzersOption);
-
-        effectDisciplineCommand.SetHandler(async (context) =>
+        var effectCategoryOption = new Option<string>("--category", "-c")
         {
-            var provider = context.ParseResult.GetValueForOption(effectProviderOption)!;
-            var model = context.ParseResult.GetValueForOption(effectModelOption);
-            var budget = context.ParseResult.GetValueForOption(effectBudgetOption);
-            var output = context.ParseResult.GetValueForOption(effectOutputOption)!;
-            var dryRun = context.ParseResult.GetValueForOption(effectDryRunOption);
-            var refreshCache = context.ParseResult.GetValueForOption(effectRefreshCacheOption);
-            var tasks = context.ParseResult.GetValueForOption(effectTasksOption) ?? Array.Empty<string>();
-            var category = context.ParseResult.GetValueForOption(effectCategoryOption);
-            var sample = context.ParseResult.GetValueForOption(effectSampleOption);
-            var seed = context.ParseResult.GetValueForOption(effectSeedOption);
-            var manifest = context.ParseResult.GetValueForOption(effectManifestOption);
-            var verbose = context.ParseResult.GetValueForOption(effectVerboseOption);
-            var enableAnalyzers = context.ParseResult.GetValueForOption(effectEnableAnalyzersOption);
+            Description = "Run only tasks in this category (flaky-test-prevention, security-boundaries, side-effect-transparency, cache-safety)"
+        };
+
+        var effectSampleOption = new Option<int?>("--sample", "-s")
+        {
+            Description = "Number of tasks to sample"
+        };
+
+        var effectSeedOption = new Option<int>("--seed")
+        {
+            Description = "Random seed for the sample shuffle (reproducible corpus order)",
+            DefaultValueFactory = _ => 42
+        };
+
+        var effectManifestOption = new Option<string>("--manifest", "-m")
+        {
+            Description = "Path to task manifest file"
+        };
+
+        var effectVerboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
+
+        var effectEnableAnalyzersOption = new Option<bool>("--enable-analyzers", "-a")
+        {
+            Description = "Enable Roslyn analyzers for C# code evaluation (ED001-ED007)"
+        };
+
+        effectDisciplineCommand.Options.Add(effectProviderOption);
+        effectDisciplineCommand.Options.Add(effectModelOption);
+        effectDisciplineCommand.Options.Add(effectBudgetOption);
+        effectDisciplineCommand.Options.Add(effectOutputOption);
+        effectDisciplineCommand.Options.Add(effectDryRunOption);
+        effectDisciplineCommand.Options.Add(effectRefreshCacheOption);
+        effectDisciplineCommand.Options.Add(effectTasksOption);
+        effectDisciplineCommand.Options.Add(effectCategoryOption);
+        effectDisciplineCommand.Options.Add(effectSampleOption);
+        effectDisciplineCommand.Options.Add(effectSeedOption);
+        effectDisciplineCommand.Options.Add(effectManifestOption);
+        effectDisciplineCommand.Options.Add(effectVerboseOption);
+        effectDisciplineCommand.Options.Add(effectEnableAnalyzersOption);
+
+        effectDisciplineCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var provider = parseResult.GetValue(effectProviderOption)!;
+            var model = parseResult.GetValue(effectModelOption);
+            var budget = parseResult.GetValue(effectBudgetOption);
+            var output = parseResult.GetValue(effectOutputOption)!;
+            var dryRun = parseResult.GetValue(effectDryRunOption);
+            var refreshCache = parseResult.GetValue(effectRefreshCacheOption);
+            var tasks = parseResult.GetValue(effectTasksOption) ?? Array.Empty<string>();
+            var category = parseResult.GetValue(effectCategoryOption);
+            var sample = parseResult.GetValue(effectSampleOption);
+            var seed = parseResult.GetValue(effectSeedOption);
+            var manifest = parseResult.GetValue(effectManifestOption);
+            var verbose = parseResult.GetValue(effectVerboseOption);
+            var enableAnalyzers = parseResult.GetValue(effectEnableAnalyzersOption);
 
             await RunEffectDisciplineAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, seed, manifest, verbose, enableAnalyzers);
         });
 
-        rootCommand.AddCommand(effectDisciplineCommand);
+        rootCommand.Subcommands.Add(effectDisciplineCommand);
 
         // Correctness benchmark command
         var correctnessCommand = new Command("correctness-benchmark", "Run correctness benchmarks measuring edge case handling");
 
-        var correctnessProviderOption = new Option<string>(
-            aliases: new[] { "--provider", "-p" },
-            description: "LLM provider to use (claude, mock)",
-            getDefaultValue: () => "claude");
-
-        var correctnessModelOption = new Option<string?>(
-            aliases: new[] { "--model" },
-            description: "Specific model to use");
-
-        var correctnessBudgetOption = new Option<decimal>(
-            aliases: new[] { "--budget", "-b" },
-            description: "Maximum budget in USD",
-            getDefaultValue: () => 5.00m);
-
-        var correctnessOutputOption = new Option<string>(
-            aliases: new[] { "--output", "-o" },
-            description: "Output file for results",
-            getDefaultValue: () => "correctness-results.json");
-
-        var correctnessDryRunOption = new Option<bool>(
-            aliases: new[] { "--dry-run" },
-            description: "Estimate costs without making API calls");
-
-        var correctnessRefreshCacheOption = new Option<bool>(
-            aliases: new[] { "--refresh-cache" },
-            description: "Refresh cached responses");
-
-        var correctnessTasksOption = new Option<string[]>(
-            aliases: new[] { "--tasks", "-t" },
-            description: "Specific task IDs to run")
+        var correctnessProviderOption = new Option<string>("--provider", "-p")
         {
+            Description = "LLM provider to use (claude, mock)",
+            DefaultValueFactory = _ => "claude"
+        };
+
+        var correctnessModelOption = new Option<string?>("--model")
+        {
+            Description = "Specific model to use"
+        };
+
+        var correctnessBudgetOption = new Option<decimal>("--budget", "-b")
+        {
+            Description = "Maximum budget in USD",
+            DefaultValueFactory = _ => 5.00m
+        };
+
+        var correctnessOutputOption = new Option<string>("--output", "-o")
+        {
+            Description = "Output file for results",
+            DefaultValueFactory = _ => "correctness-results.json"
+        };
+
+        var correctnessDryRunOption = new Option<bool>("--dry-run")
+        {
+            Description = "Estimate costs without making API calls"
+        };
+
+        var correctnessRefreshCacheOption = new Option<bool>("--refresh-cache")
+        {
+            Description = "Refresh cached responses"
+        };
+
+        var correctnessTasksOption = new Option<string[]>("--tasks", "-t")
+        {
+            Description = "Specific task IDs to run",
             AllowMultipleArgumentsPerToken = true
         };
 
-        var correctnessCategoryOption = new Option<string>(
-            aliases: new[] { "--category", "-c" },
-            description: "Run only tasks in this category");
-
-        var correctnessSampleOption = new Option<int?>(
-            aliases: new[] { "--sample", "-s" },
-            description: "Number of tasks to sample");
-
-        var correctnessSeedOption = new Option<int>(
-            aliases: new[] { "--seed" },
-            description: "Random seed for the sample shuffle (reproducible corpus order)",
-            getDefaultValue: () => 42);
-
-        var correctnessManifestOption = new Option<string>(
-            aliases: new[] { "--manifest", "-m" },
-            description: "Path to task manifest file");
-
-        var correctnessVerboseOption = new Option<bool>(
-            aliases: new[] { "--verbose", "-v" },
-            description: "Enable verbose output");
-
-        correctnessCommand.AddOption(correctnessProviderOption);
-        correctnessCommand.AddOption(correctnessModelOption);
-        correctnessCommand.AddOption(correctnessBudgetOption);
-        correctnessCommand.AddOption(correctnessOutputOption);
-        correctnessCommand.AddOption(correctnessDryRunOption);
-        correctnessCommand.AddOption(correctnessRefreshCacheOption);
-        correctnessCommand.AddOption(correctnessTasksOption);
-        correctnessCommand.AddOption(correctnessCategoryOption);
-        correctnessCommand.AddOption(correctnessSampleOption);
-        correctnessCommand.AddOption(correctnessSeedOption);
-        correctnessCommand.AddOption(correctnessManifestOption);
-        correctnessCommand.AddOption(correctnessVerboseOption);
-
-        correctnessCommand.SetHandler(async (context) =>
+        var correctnessCategoryOption = new Option<string>("--category", "-c")
         {
-            var provider = context.ParseResult.GetValueForOption(correctnessProviderOption)!;
-            var model = context.ParseResult.GetValueForOption(correctnessModelOption);
-            var budget = context.ParseResult.GetValueForOption(correctnessBudgetOption);
-            var output = context.ParseResult.GetValueForOption(correctnessOutputOption)!;
-            var dryRun = context.ParseResult.GetValueForOption(correctnessDryRunOption);
-            var refreshCache = context.ParseResult.GetValueForOption(correctnessRefreshCacheOption);
-            var tasks = context.ParseResult.GetValueForOption(correctnessTasksOption) ?? Array.Empty<string>();
-            var category = context.ParseResult.GetValueForOption(correctnessCategoryOption);
-            var sample = context.ParseResult.GetValueForOption(correctnessSampleOption);
-            var seed = context.ParseResult.GetValueForOption(correctnessSeedOption);
-            var manifest = context.ParseResult.GetValueForOption(correctnessManifestOption);
-            var verbose = context.ParseResult.GetValueForOption(correctnessVerboseOption);
+            Description = "Run only tasks in this category"
+        };
+
+        var correctnessSampleOption = new Option<int?>("--sample", "-s")
+        {
+            Description = "Number of tasks to sample"
+        };
+
+        var correctnessSeedOption = new Option<int>("--seed")
+        {
+            Description = "Random seed for the sample shuffle (reproducible corpus order)",
+            DefaultValueFactory = _ => 42
+        };
+
+        var correctnessManifestOption = new Option<string>("--manifest", "-m")
+        {
+            Description = "Path to task manifest file"
+        };
+
+        var correctnessVerboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
+
+        correctnessCommand.Options.Add(correctnessProviderOption);
+        correctnessCommand.Options.Add(correctnessModelOption);
+        correctnessCommand.Options.Add(correctnessBudgetOption);
+        correctnessCommand.Options.Add(correctnessOutputOption);
+        correctnessCommand.Options.Add(correctnessDryRunOption);
+        correctnessCommand.Options.Add(correctnessRefreshCacheOption);
+        correctnessCommand.Options.Add(correctnessTasksOption);
+        correctnessCommand.Options.Add(correctnessCategoryOption);
+        correctnessCommand.Options.Add(correctnessSampleOption);
+        correctnessCommand.Options.Add(correctnessSeedOption);
+        correctnessCommand.Options.Add(correctnessManifestOption);
+        correctnessCommand.Options.Add(correctnessVerboseOption);
+
+        correctnessCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var provider = parseResult.GetValue(correctnessProviderOption)!;
+            var model = parseResult.GetValue(correctnessModelOption);
+            var budget = parseResult.GetValue(correctnessBudgetOption);
+            var output = parseResult.GetValue(correctnessOutputOption)!;
+            var dryRun = parseResult.GetValue(correctnessDryRunOption);
+            var refreshCache = parseResult.GetValue(correctnessRefreshCacheOption);
+            var tasks = parseResult.GetValue(correctnessTasksOption) ?? Array.Empty<string>();
+            var category = parseResult.GetValue(correctnessCategoryOption);
+            var sample = parseResult.GetValue(correctnessSampleOption);
+            var seed = parseResult.GetValue(correctnessSeedOption);
+            var manifest = parseResult.GetValue(correctnessManifestOption);
+            var verbose = parseResult.GetValue(correctnessVerboseOption);
 
             await RunCorrectnessBenchmarkAsync(provider, model, budget, output, dryRun, refreshCache, tasks, category, sample, seed, manifest, verbose);
         });
 
-        rootCommand.AddCommand(correctnessCommand);
+        rootCommand.Subcommands.Add(correctnessCommand);
 
         // Scorecard command — C# → Calor → C# round-trip conversion scorecard
         var scorecardCommand = new Command("scorecard", "Run C# to Calor conversion scorecard on the CSharpImport corpus");
 
-        var scorecardOutputOption = new Option<string>(
-            aliases: new[] { "--output", "-o" },
-            description: "Output file base path (without extension)",
-            getDefaultValue: () => "conversion-scorecard");
-
-        var scorecardFormatOption = new Option<string>(
-            aliases: new[] { "--format", "-f" },
-            description: "Output format (json, markdown, both)",
-            getDefaultValue: () => "both");
-
-        var scorecardBaselineOption = new Option<string?>(
-            aliases: new[] { "--baseline", "-b" },
-            description: "Path to baseline scorecard JSON for regression comparison");
-
-        scorecardCommand.AddOption(scorecardOutputOption);
-        scorecardCommand.AddOption(scorecardFormatOption);
-        scorecardCommand.AddOption(scorecardBaselineOption);
-
-        scorecardCommand.SetHandler(async (output, format, baseline) =>
+        var scorecardOutputOption = new Option<string>("--output", "-o")
         {
-            await RunScorecardAsync(output, format, baseline);
-        }, scorecardOutputOption, scorecardFormatOption, scorecardBaselineOption);
+            Description = "Output file base path (without extension)",
+            DefaultValueFactory = _ => "conversion-scorecard"
+        };
 
-        rootCommand.AddCommand(scorecardCommand);
+        var scorecardFormatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Output format (json, markdown, both)",
+            DefaultValueFactory = _ => "both"
+        };
+
+        var scorecardBaselineOption = new Option<string?>("--baseline", "-b")
+        {
+            Description = "Path to baseline scorecard JSON for regression comparison"
+        };
+
+        scorecardCommand.Options.Add(scorecardOutputOption);
+        scorecardCommand.Options.Add(scorecardFormatOption);
+        scorecardCommand.Options.Add(scorecardBaselineOption);
+
+        scorecardCommand.SetAction(async (parseResult, cancellationToken) =>
+        {
+            await RunScorecardAsync(
+                parseResult.GetValue(scorecardOutputOption)!,
+                parseResult.GetValue(scorecardFormatOption)!,
+                parseResult.GetValue(scorecardBaselineOption));
+        });
+
+        rootCommand.Subcommands.Add(scorecardCommand);
 
         // #1276 registered pair differential oracle (run only after the registration merges)
-        rootCommand.AddCommand(Equivalence.PairOracleCommand.Create());
+        rootCommand.Subcommands.Add(Equivalence.PairOracleCommand.Create());
         // #1276 results generator: metric runs over EQUIVALENT pairs and the dispositioned pair manifest
         foreach (var command in Equivalence.PairResultsCommand.Create())
-            rootCommand.AddCommand(command);
+            rootCommand.Subcommands.Add(command);
 
         // Default: run benchmarks if no command specified
-        rootCommand.SetHandler(async () =>
+        rootCommand.SetAction(async (parseResult, cancellationToken) =>
         {
             await RunBenchmarksAsync("report.json", "both", Array.Empty<string>(), false, null);
         });
 
-        return await rootCommand.InvokeAsync(args);
+        return await rootCommand.Parse(args).InvokeAsync();
     }
 
     private static async Task RunBenchmarksAsync(

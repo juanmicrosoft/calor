@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
@@ -31,151 +30,180 @@ public class Program
             _ = Binding.Metadata.MetadataContext.StartWarmUp();
         }
 
-        var inputOption = new Option<FileInfo[]>(
-            aliases: ["--input", "-i"],
-            description: "The Calor source file(s) to compile. Pass multiple files to enable cross-module effect enforcement.")
-        { Arity = ArgumentArity.OneOrMore };
+        var inputOption = new Option<FileInfo[]>("--input", "-i")
+        {
+            Description = "The Calor source file(s) to compile. Pass multiple files to enable cross-module effect enforcement.",
+            Arity = ArgumentArity.OneOrMore
+        };
 
-        var outputOption = new Option<FileInfo>(
-            aliases: ["--output", "-o"],
-            description: "The output C# file path");
+        var outputOption = new Option<FileInfo>("--output", "-o")
+        {
+            Description = "The output C# file path"
+        };
 
-        var referenceOption = new Option<FileInfo[]>(
-            aliases: ["--reference", "-r"],
-            description: "Assembly reference: calls on its types bind to their metadata, and generated C# is validated against it (repeatable)")
-        { Arity = ArgumentArity.ZeroOrMore };
+        var referenceOption = new Option<FileInfo[]>("--reference", "-r")
+        {
+            Description = "Assembly reference: calls on its types bind to their metadata, and generated C# is validated against it (repeatable)",
+            Arity = ArgumentArity.ZeroOrMore
+        };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Enable verbose output");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Enable verbose output"
+        };
 
-        var strictApiOption = new Option<bool>(
-            aliases: ["--strict-api"],
-            description: "Enable strict API mode: requires /// breaking metadata for public API changes");
+        var strictApiOption = new Option<bool>("--strict-api")
+        {
+            Description = "Enable strict API mode: requires /// breaking metadata for public API changes"
+        };
 
-        var requireDocsOption = new Option<bool>(
-            aliases: ["--require-docs"],
-            description: "Require documentation on public functions and types");
+        var requireDocsOption = new Option<bool>("--require-docs")
+        {
+            Description = "Require documentation on public functions and types"
+        };
 
-        var enforceEffectsOption = new Option<bool>(
-            aliases: ["--enforce-effects"],
-            description: "Enforce effect declarations (default: true as of v0.11; use --no-enforce-effects to opt out)",
-            getDefaultValue: () => true);
+        var enforceEffectsOption = new Option<bool>("--enforce-effects")
+        {
+            Description = "Enforce effect declarations (default: true as of v0.11; use --no-enforce-effects to opt out)",
+            DefaultValueFactory = _ => true
+        };
 
-        var noEnforceEffectsOption = new Option<bool>(
-            aliases: ["--no-enforce-effects"],
-            description: "Disable effect enforcement (opt out of the v0.11 default-on behavior)",
-            getDefaultValue: () => false);
+        var noEnforceEffectsOption = new Option<bool>("--no-enforce-effects")
+        {
+            Description = "Disable effect enforcement (opt out of the v0.11 default-on behavior)",
+            DefaultValueFactory = _ => false
+        };
 
         // Opt-out for the v0.12 default-on type checker, matching the shape the repo already
         // uses for --no-enforce-effects (v0.11) and --no-strict-bind-inference (v0.6.3). A
         // default flip that rejects previously-compiling programs needs an escape hatch; v0.12
         // shipped the flip without one until this was caught in release review.
-        var noTypeCheckOption = new Option<bool>(
-            aliases: ["--no-type-check"],
-            description: "Disable the type checker (opt out of the v0.12 default-on behavior)",
-            getDefaultValue: () => false);
+        var noTypeCheckOption = new Option<bool>("--no-type-check")
+        {
+            Description = "Disable the type checker (opt out of the v0.12 default-on behavior)",
+            DefaultValueFactory = _ => false
+        };
 
-        var transpileOnlyOption = new Option<bool>(
-            aliases: ["--transpile-only"],
-            description: "UNSAFE: emit C# without type checking or Roslyn validation; no validated-success claim or incremental cache entry is produced",
-            getDefaultValue: () => false);
+        var transpileOnlyOption = new Option<bool>("--transpile-only")
+        {
+            Description = "UNSAFE: emit C# without type checking or Roslyn validation; no validated-success claim or incremental cache entry is produced",
+            DefaultValueFactory = _ => false
+        };
 
-        var noImplicitSystemOption = new Option<bool>(
-            "--no-implicit-system",
-            "Validate standalone, without the default System-only project import");
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system")
+        {
+            Description = "Validate standalone, without the default System-only project import"
+        };
 
-        var strictEffectsOption = new Option<bool>(
-            aliases: ["--strict-effects"],
-            description: "Promote unknown external call warnings (Calor0411) to errors",
-            getDefaultValue: () => false);
+        var strictEffectsOption = new Option<bool>("--strict-effects")
+        {
+            Description = "Promote unknown external call warnings (Calor0411) to errors",
+            DefaultValueFactory = _ => false
+        };
 
-        var permissiveEffectsOption = new Option<bool>(
-            aliases: ["--permissive-effects"],
-            description: "Permissive effect mode: unknown calls assumed pure, forbidden effects demoted to warnings. Designed for converted code.",
-            getDefaultValue: () => false);
+        var permissiveEffectsOption = new Option<bool>("--permissive-effects")
+        {
+            Description = "Permissive effect mode: unknown calls assumed pure, forbidden effects demoted to warnings. Designed for converted code.",
+            DefaultValueFactory = _ => false
+        };
 
-        var contractModeOption = new Option<string>(
-            aliases: ["--contract-mode"],
-            description: "Contract enforcement mode: off, debug, or release (default: debug)",
-            getDefaultValue: () => "debug");
+        var contractModeOption = new Option<string>("--contract-mode")
+        {
+            Description = "Contract enforcement mode: off, debug, or release (default: debug)",
+            DefaultValueFactory = _ => "debug"
+        };
 
-        var verifyOption = new Option<bool>(
-            aliases: ["--verify"],
-            description: "Enable static contract verification with Z3 SMT solver");
+        var verifyOption = new Option<bool>("--verify")
+        {
+            Description = "Enable static contract verification with Z3 SMT solver"
+        };
 
-        var elideProvenGuardsOption = new Option<bool>(
-            aliases: ["--elide-proven-guards"],
-            description: "Drop runtime contract guards on clean Proven verdicts (default since v0.15 — roadmap §4.5; accepted for compatibility). Use --keep-proven-guards to opt out.",
-            getDefaultValue: () => true);
+        var elideProvenGuardsOption = new Option<bool>("--elide-proven-guards")
+        {
+            Description = "Drop runtime contract guards on clean Proven verdicts (default since v0.15 — roadmap §4.5; accepted for compatibility). Use --keep-proven-guards to opt out.",
+            DefaultValueFactory = _ => true
+        };
 
-        var keepProvenGuardsOption = new Option<bool>(
-            aliases: ["--keep-proven-guards", "--no-elide-proven-guards"],
-            description: "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; verification stays diagnostic)",
-            getDefaultValue: () => false);
+        var keepProvenGuardsOption = new Option<bool>("--keep-proven-guards", "--no-elide-proven-guards")
+        {
+            Description = "Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; verification stays diagnostic)",
+            DefaultValueFactory = _ => false
+        };
 
-        var cacheOption = new Option<bool>(
-            aliases: ["--cache"],
-            description: "Enable the incremental-build cache (.calor-build-state.json next to the outputs): unchanged files are skipped and report 'Up-to-date (cached)'. Opt-in for plain compiles; 'calor watch' always caches.");
+        var cacheOption = new Option<bool>("--cache")
+        {
+            Description = "Enable the incremental-build cache (.calor-build-state.json next to the outputs): unchanged files are skipped and report 'Up-to-date (cached)'. Opt-in for plain compiles; 'calor watch' always caches."
+        };
 
-        var noCacheOption = new Option<bool>(
-            aliases: ["--no-cache"],
-            description: "Disable caching (verification results and the incremental-build cache; overrides --cache)");
+        var noCacheOption = new Option<bool>("--no-cache")
+        {
+            Description = "Disable caching (verification results and the incremental-build cache; overrides --cache)"
+        };
 
-        var clearCacheOption = new Option<bool>(
-            aliases: ["--clear-cache"],
-            description: "Clear caches before compiling (verification cache and .calor-build-state.json)");
+        var clearCacheOption = new Option<bool>("--clear-cache")
+        {
+            Description = "Clear caches before compiling (verification cache and .calor-build-state.json)"
+        };
 
-        var verificationTimeoutOption = new Option<int>(
-            aliases: ["--verification-timeout"],
-            getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs,
-            description: "Z3 solver timeout per contract in milliseconds (default: 5000)");
-        verificationTimeoutOption.AddValidator(result =>
+        var verificationTimeoutOption = new Option<int>("--verification-timeout")
+        {
+            Description = "Z3 solver timeout per contract in milliseconds (default: 5000)",
+            DefaultValueFactory = _ => (int)VerificationOptions.DefaultTimeoutMs
+        };
+        verificationTimeoutOption.Validators.Add(result =>
         {
             var value = result.GetValueOrDefault<int>();
             if (value <= 0)
             {
-                result.ErrorMessage = "Verification timeout must be a positive integer";
+                result.AddError("Verification timeout must be a positive integer");
             }
         });
 
-        var noTelemetryOption = new Option<bool>(
-            aliases: ["--no-telemetry"],
-            description: "Force-disable anonymous usage telemetry (telemetry is OPT-IN and off " +
-                         "by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)");
+        var noTelemetryOption = new Option<bool>("--no-telemetry")
+        {
+            Description = "Force-disable anonymous usage telemetry (telemetry is OPT-IN and off " +
+                         "by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)"
+        };
 
-        var telemetryPreviewOption = new Option<bool>(
-            aliases: ["--telemetry-preview"],
-            description: "Print schema-approved telemetry payloads locally to stderr without network transmission");
+        var telemetryPreviewOption = new Option<bool>("--telemetry-preview")
+        {
+            Description = "Print schema-approved telemetry payloads locally to stderr without network transmission"
+        };
 
-        var analyzeOption = new Option<bool>(
-            aliases: ["--analyze"],
-            description: "Enable advanced verification analyses (dataflow, bug patterns, taint tracking)");
+        var analyzeOption = new Option<bool>("--analyze")
+        {
+            Description = "Enable advanced verification analyses (dataflow, bug patterns, taint tracking)"
+        };
 
-        var allFindingsOption = new Option<bool>(
-            aliases: ["--all-findings"],
-            description: "Report all analysis findings including inconclusive and low-confidence results (default: only report verified findings)");
+        var allFindingsOption = new Option<bool>("--all-findings")
+        {
+            Description = "Report all analysis findings including inconclusive and low-confidence results (default: only report verified findings)"
+        };
 
-        var strictBindInferenceOption = new Option<bool>(
-            aliases: ["--strict-bind-inference"],
-            description: "Enable strict bind-inference diagnostics Calor0251-0253 (null/none, generic factory, ambiguous-numeric). Default-on as of v0.6.3.",
-            getDefaultValue: () => true);
+        var strictBindInferenceOption = new Option<bool>("--strict-bind-inference")
+        {
+            Description = "Enable strict bind-inference diagnostics Calor0251-0253 (null/none, generic factory, ambiguous-numeric). Default-on as of v0.6.3.",
+            DefaultValueFactory = _ => true
+        };
 
-        var noStrictBindInferenceOption = new Option<bool>(
-            aliases: ["--no-strict-bind-inference"],
-            description: "Disable the strict bind-inference diagnostics Calor0251-0253 (opt-out of the v0.6.3 default).",
-            getDefaultValue: () => false);
+        var noStrictBindInferenceOption = new Option<bool>("--no-strict-bind-inference")
+        {
+            Description = "Disable the strict bind-inference diagnostics Calor0251-0253 (opt-out of the v0.6.3 default).",
+            DefaultValueFactory = _ => false
+        };
 
-        var experimentalOption = new Option<string[]>(
-            aliases: ["--experimental"],
-            description: "Enable an experimental feature flag (repeatable). Flag names are defined in docs/experiments/registry.json. Unknown flags are accepted silently.")
-        { Arity = ArgumentArity.ZeroOrMore };
+        var experimentalOption = new Option<string[]>("--experimental")
+        {
+            Description = "Enable an experimental feature flag (repeatable). Flag names are defined in docs/experiments/registry.json. Unknown flags are accepted silently.",
+            Arity = ArgumentArity.ZeroOrMore
+        };
 
-        var formatOption = new Option<string>(
-            aliases: ["--format", "-f"],
-            getDefaultValue: () => "text",
-            description: "Diagnostic output format: text (human-readable, stderr), json, or sarif (machine-readable, stdout)");
-        formatOption.FromAmong("text", "json", "sarif");
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Diagnostic output format: text (human-readable, stderr), json, or sarif (machine-readable, stdout)",
+            DefaultValueFactory = _ => "text"
+        };
+        formatOption.AcceptOnlyFromAmong("text", "json", "sarif");
 
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
@@ -207,17 +235,35 @@ public class Program
             experimentalOption,
             formatOption
         };
-        rootCommand.AddGlobalOption(noTelemetryOption);
-        rootCommand.AddGlobalOption(telemetryPreviewOption);
+        noTelemetryOption.Recursive = true;
+        telemetryPreviewOption.Recursive = true;
+        rootCommand.Options.Add(noTelemetryOption);
+        rootCommand.Options.Add(telemetryPreviewOption);
+
+        // RootCommand registers --help and --version first; move them last (version, then
+        // help) so every help screen lists them after the command's own options, as the
+        // beta4 parser did.
+        var helpOption = rootCommand.Options.OfType<System.CommandLine.Help.HelpOption>().Single();
+        var versionOption = rootCommand.Options.OfType<VersionOption>().Single();
+        rootCommand.Options.Remove(helpOption);
+        rootCommand.Options.Remove(versionOption);
+        rootCommand.Options.Add(versionOption);
+        rootCommand.Options.Add(helpOption);
+
+        // The beta4 default pipeline also honored [env:NAME=VALUE] and a parse-diagram
+        // directive; 2.0 registers only [suggest] by default and renames [parse] to [diagram].
+        rootCommand.Directives.Add(new EnvironmentVariablesDirective());
+        rootCommand.Directives.Add(new DiagramDirective());
 
         // Legacy compile handler (when --input is provided)
-        rootCommand.SetHandler(async (InvocationContext ctx) =>
+        rootCommand.SetAction(async (parseResult, cancellationToken) =>
         {
+            var exitCode = 0;
             var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
             telemetry?.SetCommand("compile");
 
             var sw = Stopwatch.StartNew();
-            var input = ctx.ParseResult.GetValueForOption(inputOption);
+            var input = parseResult.GetValue(inputOption);
 
             // Discover .calor/config.json for coding agent telemetry (use first input for discovery)
             if (telemetry != null && input != null && input.Length > 0)
@@ -225,44 +271,44 @@ public class Program
                 var discovered = CalorConfigManager.Discover(input[0].FullName);
                 telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
             }
-            var output = ctx.ParseResult.GetValueForOption(outputOption);
-            var references = ctx.ParseResult.GetValueForOption(referenceOption)
+            var output = parseResult.GetValue(outputOption);
+            var references = parseResult.GetValue(referenceOption)
                 ?? Array.Empty<FileInfo>();
-            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-            var strictApi = ctx.ParseResult.GetValueForOption(strictApiOption);
-            var requireDocs = ctx.ParseResult.GetValueForOption(requireDocsOption);
-            var enforceEffects = ctx.ParseResult.GetValueForOption(enforceEffectsOption);
-            var noEnforceEffects = ctx.ParseResult.GetValueForOption(noEnforceEffectsOption);
+            var verbose = parseResult.GetValue(verboseOption);
+            var strictApi = parseResult.GetValue(strictApiOption);
+            var requireDocs = parseResult.GetValue(requireDocsOption);
+            var enforceEffects = parseResult.GetValue(enforceEffectsOption);
+            var noEnforceEffects = parseResult.GetValue(noEnforceEffectsOption);
             // --no-enforce-effects always wins over the default-on behavior (D-W2.5)
             if (noEnforceEffects) enforceEffects = false;
-            var noTypeCheck = ctx.ParseResult.GetValueForOption(noTypeCheckOption);
-            var transpileOnly = ctx.ParseResult.GetValueForOption(transpileOnlyOption);
-            var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
-            var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
-            var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
-            var verify = ctx.ParseResult.GetValueForOption(verifyOption);
+            var noTypeCheck = parseResult.GetValue(noTypeCheckOption);
+            var transpileOnly = parseResult.GetValue(transpileOnlyOption);
+            var strictEffects = parseResult.GetValue(strictEffectsOption);
+            var permissiveEffects = parseResult.GetValue(permissiveEffectsOption);
+            var contractMode = parseResult.GetValue(contractModeOption) ?? "debug";
+            var verify = parseResult.GetValue(verifyOption);
             // v0.15 (roadmap §4.5): elision is the default. --keep-proven-guards is the
             // opt-out; --elide-proven-guards is still accepted (a no-op default) so
             // v0.13/v0.14 command lines keep working.
-            var keepProvenGuards = ctx.ParseResult.GetValueForOption(keepProvenGuardsOption);
-            var elideProvenGuards = ctx.ParseResult.GetValueForOption(elideProvenGuardsOption) && !keepProvenGuards;
-            var elisionFlagGiven = ctx.ParseResult.FindResultFor(keepProvenGuardsOption) is { IsImplicit: false }
+            var keepProvenGuards = parseResult.GetValue(keepProvenGuardsOption);
+            var elideProvenGuards = parseResult.GetValue(elideProvenGuardsOption) && !keepProvenGuards;
+            var elisionFlagGiven = parseResult.GetResult(keepProvenGuardsOption) is { Implicit: false }
                 ? "--keep-proven-guards"
-                : ctx.ParseResult.FindResultFor(elideProvenGuardsOption) is { IsImplicit: false }
+                : parseResult.GetResult(elideProvenGuardsOption) is { Implicit: false }
                     ? "--elide-proven-guards"
                     : null;
-            var cache = ctx.ParseResult.GetValueForOption(cacheOption);
-            var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
-            var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
-            var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
-            var analyze = ctx.ParseResult.GetValueForOption(analyzeOption);
-            var allFindings = ctx.ParseResult.GetValueForOption(allFindingsOption);
-            var strictBindInference = ctx.ParseResult.GetValueForOption(strictBindInferenceOption);
-            var noStrictBindInference = ctx.ParseResult.GetValueForOption(noStrictBindInferenceOption);
+            var cache = parseResult.GetValue(cacheOption);
+            var noCache = parseResult.GetValue(noCacheOption);
+            var clearCache = parseResult.GetValue(clearCacheOption);
+            var verificationTimeout = parseResult.GetValue(verificationTimeoutOption);
+            var analyze = parseResult.GetValue(analyzeOption);
+            var allFindings = parseResult.GetValue(allFindingsOption);
+            var strictBindInference = parseResult.GetValue(strictBindInferenceOption);
+            var noStrictBindInference = parseResult.GetValue(noStrictBindInferenceOption);
             // --no-strict-bind-inference always wins over the default
             if (noStrictBindInference) strictBindInference = false;
-            var experimental = ctx.ParseResult.GetValueForOption(experimentalOption) ?? Array.Empty<string>();
-            var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
+            var experimental = parseResult.GetValue(experimentalOption) ?? Array.Empty<string>();
+            var format = parseResult.GetValue(formatOption) ?? "text";
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
             {
@@ -283,7 +329,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards, elisionFlagGiven, !ctx.ParseResult.GetValueForOption(noImplicitSystemOption));
+                exitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards, elisionFlagGiven, !parseResult.GetValue(noImplicitSystemOption));
             }
             catch (Exception ex)
             {
@@ -293,55 +339,57 @@ public class Program
             finally
             {
                 sw.Stop();
-                telemetry?.TrackCommand("compile", ctx.ExitCode, new Dictionary<string, string>
+                telemetry?.TrackCommand("compile", exitCode, new Dictionary<string, string>
                 {
                     ["durationMs"] = sw.ElapsedMilliseconds.ToString()
                 });
 
-                if (ctx.ExitCode != 0)
+                if (exitCode != 0)
                 {
                     IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "compile",
                         "Compilation failed (see errors above)");
                 }
             }
+
+            return exitCode;
         });
 
         // Add subcommands
-        rootCommand.AddCommand(ConvertCommand.Create());
-        rootCommand.AddCommand(MigrateCommand.Create());
-        rootCommand.AddCommand(BenchmarkCommand.Create());
-        rootCommand.AddCommand(InitCommand.Create());
-        rootCommand.AddCommand(FormatCommand.Create());
-        rootCommand.AddCommand(RenameCommand.Create());
-        rootCommand.AddCommand(IndexCommand.Create());
-        rootCommand.AddCommand(QueryCommand.Create());
-        rootCommand.AddCommand(LintCommand.Create());
-        rootCommand.AddCommand(AssessCommand.Create());
-        rootCommand.AddCommand(AnalyzeConvertibilityCommand.Create());
-        rootCommand.AddCommand(HookCommand.Create());
-        rootCommand.AddCommand(IdsCommand.Create());
-        rootCommand.AddCommand(FixCommand.Create());
-        rootCommand.AddCommand(EffectsCommand.Create());
-        rootCommand.AddCommand(ImportCommand.Create());
-        rootCommand.AddCommand(VerifyCommand.Create());
-        rootCommand.AddCommand(ReviewPacketCommand.Create());
-        rootCommand.AddCommand(LspCommand.Create());
-        rootCommand.AddCommand(McpCommand.Create());
-        rootCommand.AddCommand(FeatureCheckCommand.Create());
-        rootCommand.AddCommand(CoverageCommand.Create());
-        rootCommand.AddCommand(SelfTestCommand.Create());
-        rootCommand.AddCommand(SelfCheckCommand.Create());
-        rootCommand.AddCommand(EvaluationCommand.Create());
-        rootCommand.AddCommand(RunCommand.Create());
-        rootCommand.AddCommand(TestCommand.Create());
-        rootCommand.AddCommand(TestCommand.CreateLoop());
-        rootCommand.AddCommand(WatchCommand.Create());
+        rootCommand.Subcommands.Add(ConvertCommand.Create());
+        rootCommand.Subcommands.Add(MigrateCommand.Create());
+        rootCommand.Subcommands.Add(BenchmarkCommand.Create());
+        rootCommand.Subcommands.Add(InitCommand.Create());
+        rootCommand.Subcommands.Add(FormatCommand.Create());
+        rootCommand.Subcommands.Add(RenameCommand.Create());
+        rootCommand.Subcommands.Add(IndexCommand.Create());
+        rootCommand.Subcommands.Add(QueryCommand.Create());
+        rootCommand.Subcommands.Add(LintCommand.Create());
+        rootCommand.Subcommands.Add(AssessCommand.Create());
+        rootCommand.Subcommands.Add(AnalyzeConvertibilityCommand.Create());
+        rootCommand.Subcommands.Add(HookCommand.Create());
+        rootCommand.Subcommands.Add(IdsCommand.Create());
+        rootCommand.Subcommands.Add(FixCommand.Create());
+        rootCommand.Subcommands.Add(EffectsCommand.Create());
+        rootCommand.Subcommands.Add(ImportCommand.Create());
+        rootCommand.Subcommands.Add(VerifyCommand.Create());
+        rootCommand.Subcommands.Add(ReviewPacketCommand.Create());
+        rootCommand.Subcommands.Add(LspCommand.Create());
+        rootCommand.Subcommands.Add(McpCommand.Create());
+        rootCommand.Subcommands.Add(FeatureCheckCommand.Create());
+        rootCommand.Subcommands.Add(CoverageCommand.Create());
+        rootCommand.Subcommands.Add(SelfTestCommand.Create());
+        rootCommand.Subcommands.Add(SelfCheckCommand.Create());
+        rootCommand.Subcommands.Add(EvaluationCommand.Create());
+        rootCommand.Subcommands.Add(RunCommand.Create());
+        rootCommand.Subcommands.Add(TestCommand.Create());
+        rootCommand.Subcommands.Add(TestCommand.CreateLoop());
+        rootCommand.Subcommands.Add(WatchCommand.Create());
 
         // Parse telemetry options through System.CommandLine so every accepted
         // delimiter/form has the same behavior as command execution.
         var earlyParseResult = rootCommand.Parse(args);
-        var noTelemetryEarly = earlyParseResult.GetValueForOption(noTelemetryOption);
-        var telemetryPreviewEarly = earlyParseResult.GetValueForOption(telemetryPreviewOption);
+        var noTelemetryEarly = earlyParseResult.GetValue(noTelemetryOption);
+        var telemetryPreviewEarly = earlyParseResult.GetValue(telemetryPreviewOption);
         if (!CalorTelemetry.IsInitialized || telemetryPreviewEarly)
         {
             CalorTelemetry.Initialize(noTelemetryEarly, telemetryPreviewEarly);
@@ -351,7 +399,7 @@ public class Program
             CalorTelemetry.Instance.TrackSessionStarted();
         }
 
-        var result = await rootCommand.InvokeAsync(args);
+        var result = await earlyParseResult.InvokeAsync();
 
         if (CalorTelemetry.IsInitialized)
         {

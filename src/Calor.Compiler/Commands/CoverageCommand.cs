@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Diagnostics;
@@ -15,16 +14,16 @@ public static class CoverageCommand
 {
     public static Command Create()
     {
-        var fileArgument = new Argument<FileInfo>(
-            name: "file",
-            description: "The C# file to analyze for Calor conversion coverage")
+        var fileArgument = new Argument<FileInfo>("file")
         {
+            Description = "The C# file to analyze for Calor conversion coverage",
             Arity = ArgumentArity.ExactlyOne
         };
 
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Include detailed dimension scores and examples");
+        var verboseOption = new Option<bool>("--verbose", "-v")
+        {
+            Description = "Include detailed dimension scores and examples"
+        };
 
         var command = new Command("coverage", "Analyze a C# file for Calor conversion coverage and blockers")
         {
@@ -32,13 +31,13 @@ public static class CoverageCommand
             verboseOption
         };
 
-        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Exit code returned from the action: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-        command.SetHandler(async (InvocationContext ctx) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            ctx.ExitCode = await ExecuteAsync(
-                ctx.ParseResult.GetValueForArgument(fileArgument),
-                ctx.ParseResult.GetValueForOption(verboseOption));
+            return await ExecuteAsync(
+                parseResult.GetValue(fileArgument)!,
+                parseResult.GetValue(verboseOption));
         });
 
         return command;

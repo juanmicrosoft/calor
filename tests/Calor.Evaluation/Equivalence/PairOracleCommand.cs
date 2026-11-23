@@ -24,25 +24,25 @@ public static class PairOracleCommand
     public static Command Create()
     {
         var command = new Command("pair-oracle", "Run the #1276 registered pair differential oracle");
-        var registration = new Option<string>("--registration", "Registration directory (contains pairs.json)") { IsRequired = true };
-        var commit = new Option<string>("--registration-commit", "Full SHA of the main commit that merged the registration") { IsRequired = true };
-        var output = new Option<string?>("--output", "Results file, outside the repository (required except in child mode)");
-        var pair = new Option<string?>("--pair", "Evaluate one pair in-process and print its verdict (child mode)");
-        var compareWith = new Option<string?>("--compare-with", "First run's results; makes this the reconciling second run");
+        var registration = new Option<string>("--registration") { Description = "Registration directory (contains pairs.json)", Required = true };
+        var commit = new Option<string>("--registration-commit") { Description = "Full SHA of the main commit that merged the registration", Required = true };
+        var output = new Option<string?>("--output") { Description = "Results file, outside the repository (required except in child mode)" };
+        var pair = new Option<string?>("--pair") { Description = "Evaluate one pair in-process and print its verdict (child mode)" };
+        var compareWith = new Option<string?>("--compare-with") { Description = "First run's results; makes this the reconciling second run" };
         foreach (var option in new Option[] { registration, commit, output, pair, compareWith })
-            command.AddOption(option);
-        command.SetHandler(async context =>
+            command.Options.Add(option);
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var (reg, sha, pairId) = (context.ParseResult.GetValueForOption(registration)!, context.ParseResult.GetValueForOption(commit)!, context.ParseResult.GetValueForOption(pair));
-            var outputPath = context.ParseResult.GetValueForOption(output);
+            var (reg, sha, pairId) = (parseResult.GetValue(registration)!, parseResult.GetValue(commit)!, parseResult.GetValue(pair));
+            var outputPath = parseResult.GetValue(output);
             var problem = pairId is null && string.IsNullOrWhiteSpace(outputPath)
                 ? "--output is required unless --pair selects child mode"
                 : Preflight(reg, sha);
             if (problem is not null)
                 Console.Error.WriteLine("pair-oracle refused: " + problem);
-            context.ExitCode = problem is not null ? 2
+            return problem is not null ? 2
                 : pairId is not null ? RunOne(reg, pairId)
-                : await RunAllAsync(reg, sha, outputPath!, context.ParseResult.GetValueForOption(compareWith));
+                : await RunAllAsync(reg, sha, outputPath!, parseResult.GetValue(compareWith));
         });
         return command;
     }

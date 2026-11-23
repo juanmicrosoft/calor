@@ -16,24 +16,25 @@ public static class FixCommand
 {
     public static Command Create()
     {
-        var rootArgument = new Argument<string>(
-            name: "root",
-            getDefaultValue: () => ".",
-            description: "Calor file or root directory (default: current directory)")
+        var rootArgument = new Argument<string>("root")
         {
+            Description = "Calor file or root directory (default: current directory)",
+            DefaultValueFactory = _ => ".",
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        var applyOption = new Option<bool>("--apply", "Apply deterministic safe diagnostic patches");
-        var noImplicitSystemOption = new Option<bool>("--no-implicit-system", "Validate without the implicit System project import");
-        var dryRunOption = new Option<bool>(
-            aliases: ["--dry-run", "-n"],
-            description: "Report what would change without writing files");
+        var applyOption = new Option<bool>("--apply") { Description = "Apply deterministic safe diagnostic patches" };
+        var noImplicitSystemOption = new Option<bool>("--no-implicit-system") { Description = "Validate without the implicit System project import" };
+        var dryRunOption = new Option<bool>("--dry-run", "-n")
+        {
+            Description = "Report what would change without writing files"
+        };
 
-        var formatOption = new Option<string>(
-            aliases: ["--format", "-f"],
-            getDefaultValue: () => "text",
-            description: "Output format: text or json (envelope v1.1)");
+        var formatOption = new Option<string>("--format", "-f")
+        {
+            Description = "Output format: text or json (envelope v1.1)",
+            DefaultValueFactory = _ => "text"
+        };
 
         var command = new Command("fix", "Apply safe diagnostic patches")
         {
@@ -44,22 +45,20 @@ public static class FixCommand
             formatOption,
         };
 
-        command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var parse = context.ParseResult;
-            var json = string.Equals(parse.GetValueForOption(formatOption), "json", StringComparison.OrdinalIgnoreCase);
-            if (!parse.GetValueForOption(applyOption))
+            var json = string.Equals(parseResult.GetValue(formatOption), "json", StringComparison.OrdinalIgnoreCase);
+            if (!parseResult.GetValue(applyOption))
             {
                 const string message = "specify --apply";
                 EmitErrorEnvelope(json, DiagnosticCode.CliUsageError, message, filePath: null);
                 Console.Error.WriteLine(message);
-                context.ExitCode = 2;
-                return;
+                return 2;
             }
-            context.ExitCode = await ApplyDiagnosticsAsync(
-                parse.GetValueForArgument(rootArgument),
-                parse.GetValueForOption(dryRunOption), json,
-                !parse.GetValueForOption(noImplicitSystemOption));
+            return await ApplyDiagnosticsAsync(
+                parseResult.GetValue(rootArgument)!,
+                parseResult.GetValue(dryRunOption), json,
+                !parseResult.GetValue(noImplicitSystemOption));
         });
 
         return command;

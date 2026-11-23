@@ -26,28 +26,28 @@ public static class PairResultsCommand
 
     public static IEnumerable<Command> Create()
     {
-        var registration = new Option<string>("--registration", "Registration directory") { IsRequired = true };
-        var oracle = new Option<string>("--oracle-result", "The reconciled (second) pair-oracle output") { IsRequired = true };
-        var output = new Option<string>("--output", "Output file") { IsRequired = true };
+        var registration = new Option<string>("--registration") { Description = "Registration directory", Required = true };
+        var oracle = new Option<string>("--oracle-result") { Description = "The reconciled (second) pair-oracle output", Required = true };
+        var output = new Option<string>("--output") { Description = "Output file", Required = true };
         var metrics = new Command("pair-metrics", "Compute CompositeTokenEconomics for EQUIVALENT pairs (#1276)");
         foreach (var option in new Option[] { registration, oracle, output })
-            metrics.AddOption(option);
-        metrics.SetHandler(async context => context.ExitCode = await RunMetricsAsync(
-            context.ParseResult.GetValueForOption(registration)!, context.ParseResult.GetValueForOption(oracle)!, context.ParseResult.GetValueForOption(output)!));
+            metrics.Options.Add(option);
+        metrics.SetAction(async (parseResult, cancellationToken) => await RunMetricsAsync(
+            parseResult.GetValue(registration)!, parseResult.GetValue(oracle)!, parseResult.GetValue(output)!));
 
-        var firstRun = new Option<string>("--first-oracle-result", "The first pair-oracle output") { IsRequired = true };
-        var metricRuns = new Option<string[]>("--metrics", "The two pair-metrics outputs") { IsRequired = true, AllowMultipleArgumentsPerToken = true };
+        var firstRun = new Option<string>("--first-oracle-result") { Description = "The first pair-oracle output", Required = true };
+        var metricRuns = new Option<string[]>("--metrics") { Description = "The two pair-metrics outputs", Required = true, AllowMultipleArgumentsPerToken = true };
         var results = new Command("pair-results", "Build the #1276 dispositioned pair manifest and aggregate");
         foreach (var option in new Option[] { registration, firstRun, oracle, metricRuns, output })
-            results.AddOption(option);
-        results.SetHandler(context =>
+            results.Options.Add(option);
+        results.SetAction(parseResult =>
         {
-            var p = context.ParseResult;
-            var problem = BuildResults(p.GetValueForOption(registration)!, p.GetValueForOption(firstRun)!, p.GetValueForOption(oracle)!,
-                p.GetValueForOption(metricRuns)!, p.GetValueForOption(output)!);
+            var p = parseResult;
+            var problem = BuildResults(p.GetValue(registration)!, p.GetValue(firstRun)!, p.GetValue(oracle)!,
+                p.GetValue(metricRuns)!, p.GetValue(output)!);
             if (problem is not null)
                 Console.Error.WriteLine("pair-results refused: " + problem);
-            context.ExitCode = problem is null ? 0 : 2;
+            return problem is null ? 0 : 2;
         });
         return [metrics, results];
     }

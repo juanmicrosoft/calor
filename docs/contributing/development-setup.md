@@ -339,10 +339,10 @@ Set `CalorCompilerOverride` to use a locally-built compiler:
 
 ```bash
 # For projects using Calor.Sdk (MSBuild task integration)
-dotnet build -p:CalorCompilerOverride=path/to/Calor.Tasks/bin/Debug/net8.0/Calor.Tasks.dll
+dotnet build -p:CalorCompilerOverride=path/to/Calor.Tasks/bin/Debug/net10.0/Calor.Tasks.dll
 
 # For projects using calor init (CLI integration)
-dotnet build -p:CalorCompilerOverride=path/to/Calor.Compiler/bin/Debug/net8.0/calor
+dotnet build -p:CalorCompilerOverride=path/to/Calor.Compiler/bin/Debug/net10.0/calor
 ```
 
 This overrides the compiler path without modifying project files. If an explicit
@@ -369,7 +369,7 @@ Add to `.vscode/launch.json`:
       "name": "Debug Compiler",
       "type": "coreclr",
       "request": "launch",
-      "program": "${workspaceFolder}/src/Calor.Compiler/bin/Debug/net8.0/Calor.Compiler.dll",
+      "program": "${workspaceFolder}/src/Calor.Compiler/bin/Debug/net10.0/Calor.Compiler.dll",
       "args": ["--input", "test.calr", "--output", "test.g.cs"],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole"

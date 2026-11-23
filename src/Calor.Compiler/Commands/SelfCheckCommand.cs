@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
 
@@ -18,29 +17,33 @@ public static class SelfCheckCommand
     {
         var command = new Command("self-check",
             "Verify that agent-facing artifacts stay in sync with the implementation");
-        command.AddCommand(CreateDocsCommand());
+        command.Subcommands.Add(CreateDocsCommand());
         return command;
     }
 
     private static Command CreateDocsCommand()
     {
-        var rootOption = new Option<string?>(
-            aliases: ["--root", "-r"],
-            description: "Repository root (default: nearest ancestor of the current directory containing CLAUDE.md and Directory.Build.props)");
+        var rootOption = new Option<string?>("--root", "-r")
+        {
+            Description = "Repository root (default: nearest ancestor of the current directory containing CLAUDE.md and Directory.Build.props)"
+        };
 
-        var formatOption = new Option<string>(
-            aliases: ["--format"],
-            getDefaultValue: () => "text",
-            description: "Output format: text (human-readable, stderr), json (unified schema on stdout), or sarif (SARIF 2.1.0 on stdout)");
-        formatOption.FromAmong("text", "json", "sarif");
+        var formatOption = new Option<string>("--format")
+        {
+            Description = "Output format: text (human-readable, stderr), json (unified schema on stdout), or sarif (SARIF 2.1.0 on stdout)",
+            DefaultValueFactory = _ => "text"
+        };
+        formatOption.AcceptOnlyFromAmong("text", "json", "sarif");
 
-        var fixOption = new Option<bool>(
-            aliases: ["--fix"],
-            description: "Validate complete teaching examples before regenerating mirrors (also syntax references, AGENTS.md and AST inventory unless --teaching-only), then check");
+        var fixOption = new Option<bool>("--fix")
+        {
+            Description = "Validate complete teaching examples before regenerating mirrors (also syntax references, AGENTS.md and AST inventory unless --teaching-only), then check"
+        };
 
-        var teachingOnlyOption = new Option<bool>(
-            "--teaching-only",
-            "Check only generated teaching mirrors and their complete examples (not repository-wide documentation)");
+        var teachingOnlyOption = new Option<bool>("--teaching-only")
+        {
+            Description = "Check only generated teaching mirrors and their complete examples (not repository-wide documentation)"
+        };
         var docsCommand = new Command("docs",
             "Check agent-facing docs against the compiler implementation. " +
             "Covered files: CLAUDE.md, docs/syntax-reference/*.md, docs/cli/*.md, and undated docs/semantics/*.md " +
@@ -69,12 +72,12 @@ public static class SelfCheckCommand
             teachingOnlyOption
         };
 
-        docsCommand.SetHandler((InvocationContext ctx) =>
+        docsCommand.SetAction(parseResult =>
         {
-            var root = ctx.ParseResult.GetValueForOption(rootOption);
-            var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
-            var fix = ctx.ParseResult.GetValueForOption(fixOption);
-            ctx.ExitCode = Execute(root, format, fix, ctx.ParseResult.GetValueForOption(teachingOnlyOption));
+            var root = parseResult.GetValue(rootOption);
+            var format = parseResult.GetValue(formatOption) ?? "text";
+            var fix = parseResult.GetValue(fixOption);
+            return Execute(root, format, fix, parseResult.GetValue(teachingOnlyOption));
         });
         return docsCommand;
     }

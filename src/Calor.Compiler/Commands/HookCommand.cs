@@ -32,29 +32,29 @@ public static class HookCommand
     {
         var command = new Command("hook", "AI agent hook commands for Calor-first enforcement");
 
-        command.AddCommand(CreateValidateWriteCommand());
-        command.AddCommand(CreateValidateEditCommand());
-        command.AddCommand(CreateValidateCalrContentCommand());
-        command.AddCommand(CreatePostWriteLintCommand());
-        command.AddCommand(CreateValidateIdsCommand());
-        command.AddCommand(CreateCodexWriteHookCommand());
+        command.Subcommands.Add(CreateValidateWriteCommand());
+        command.Subcommands.Add(CreateValidateEditCommand());
+        command.Subcommands.Add(CreateValidateCalrContentCommand());
+        command.Subcommands.Add(CreatePostWriteLintCommand());
+        command.Subcommands.Add(CreateValidateIdsCommand());
+        command.Subcommands.Add(CreateCodexWriteHookCommand());
 
         return command;
     }
 
     private static Command CreateCodexWriteHookCommand()
     {
-        var phaseOption = new Option<string>("--phase", () => "pre", "Hook phase: pre or post");
+        var phaseOption = new Option<string>("--phase") { Description = "Hook phase: pre or post", DefaultValueFactory = _ => "pre" };
         var command = new Command("codex-write", "Validate Codex apply_patch writes using the Codex hook stdin schema")
         {
             phaseOption
         };
 
-        command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var phase = context.ParseResult.GetValueForOption(phaseOption) ?? "pre";
+            var phase = parseResult.GetValue(phaseOption) ?? "pre";
             var envelope = await Console.In.ReadToEndAsync();
-            context.ExitCode = await RunCodexWriteHookAsync(envelope, phase);
+            return await RunCodexWriteHookAsync(envelope, phase);
         });
 
         return command;
@@ -169,13 +169,15 @@ public static class HookCommand
 
     private static Command CreateValidateWriteCommand()
     {
-        var inputArgument = new Argument<string>(
-            name: "tool-input",
-            description: "The JSON tool input from the AI agent");
+        var inputArgument = new Argument<string>("tool-input")
+        {
+            Description = "The JSON tool input from the AI agent"
+        };
 
-        var formatOption = new Option<string?>(
-            aliases: new[] { "--format", "-f" },
-            description: "Output format: 'gemini' for JSON response, default for exit codes only");
+        var formatOption = new Option<string?>("--format", "-f")
+        {
+            Description = "Output format: 'gemini' for JSON response, default for exit codes only"
+        };
 
         var command = new Command("validate-write", "Validate a Write tool call to enforce Calor-first development")
         {
@@ -183,10 +185,10 @@ public static class HookCommand
             formatOption
         };
 
-        command.SetHandler((System.CommandLine.Invocation.InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
-            var format = context.ParseResult.GetValueForOption(formatOption);
+            var toolInputJson = parseResult.GetValue(inputArgument)!;
+            var format = parseResult.GetValue(formatOption);
             var isGemini = string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase);
 
             var (exitCode, blockReason, suggestedPath) = ValidateWriteWithReason(toolInputJson);
@@ -208,7 +210,7 @@ public static class HookCommand
                 }
             }
 
-            context.ExitCode = exitCode;
+            return exitCode;
         });
 
         return command;
@@ -324,13 +326,15 @@ public static class HookCommand
 
     private static Command CreateValidateEditCommand()
     {
-        var inputArgument = new Argument<string>(
-            name: "tool-input",
-            description: "The JSON tool input from the AI agent");
+        var inputArgument = new Argument<string>("tool-input")
+        {
+            Description = "The JSON tool input from the AI agent"
+        };
 
-        var formatOption = new Option<string?>(
-            aliases: new[] { "--format", "-f" },
-            description: "Output format: 'gemini' for JSON response, default for exit codes only");
+        var formatOption = new Option<string?>("--format", "-f")
+        {
+            Description = "Output format: 'gemini' for JSON response, default for exit codes only"
+        };
 
         var command = new Command("validate-edit", "Validate an Edit tool call to enforce Calor-first development")
         {
@@ -338,10 +342,10 @@ public static class HookCommand
             formatOption
         };
 
-        command.SetHandler((System.CommandLine.Invocation.InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
-            var format = context.ParseResult.GetValueForOption(formatOption);
+            var toolInputJson = parseResult.GetValue(inputArgument)!;
+            var format = parseResult.GetValue(formatOption);
             var isGemini = string.Equals(format, "gemini", StringComparison.OrdinalIgnoreCase);
 
             // Edit validation uses the same logic as Write validation
@@ -364,7 +368,7 @@ public static class HookCommand
                 }
             }
 
-            context.ExitCode = exitCode;
+            return exitCode;
         });
 
         return command;
@@ -372,18 +376,19 @@ public static class HookCommand
 
     private static Command CreateValidateCalrContentCommand()
     {
-        var inputArgument = new Argument<string>(
-            name: "tool-input",
-            description: "The JSON tool input from the AI agent");
+        var inputArgument = new Argument<string>("tool-input")
+        {
+            Description = "The JSON tool input from the AI agent"
+        };
 
         var command = new Command("validate-calr-content", "Report native .calr syntax diagnostics without blocking the write")
         {
             inputArgument
         };
 
-        command.SetHandler((System.CommandLine.Invocation.InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
+            var toolInputJson = parseResult.GetValue(inputArgument)!;
             var (exitCode, warning) = ValidateCalrContent(toolInputJson);
 
             if (!string.IsNullOrEmpty(warning))
@@ -391,7 +396,7 @@ public static class HookCommand
                 Console.Error.WriteLine(warning);
             }
 
-            context.ExitCode = exitCode;
+            return exitCode;
         });
 
         return command;
@@ -441,20 +446,21 @@ public static class HookCommand
 
     private static Command CreatePostWriteLintCommand()
     {
-        var inputArgument = new Argument<string>(
-            name: "tool-input",
-            description: "The JSON tool input from the AI agent");
+        var inputArgument = new Argument<string>("tool-input")
+        {
+            Description = "The JSON tool input from the AI agent"
+        };
 
         var command = new Command("post-write-lint", "Run lint check after .calr file is written")
         {
             inputArgument
         };
 
-        command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
+        command.SetAction(async (parseResult, cancellationToken) =>
         {
-            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
+            var toolInputJson = parseResult.GetValue(inputArgument)!;
             var exitCode = await PostWriteLintAsync(toolInputJson);
-            context.ExitCode = exitCode;
+            return exitCode;
         });
 
         return command;
@@ -575,13 +581,15 @@ public static class HookCommand
 
     private static Command CreateValidateIdsCommand()
     {
-        var inputArgument = new Argument<string>(
-            name: "tool-input",
-            description: "The JSON tool input from the AI agent");
+        var inputArgument = new Argument<string>("tool-input")
+        {
+            Description = "The JSON tool input from the AI agent"
+        };
 
-        var formatOption = new Option<string?>(
-            aliases: new[] { "--format", "-f" },
-            description: "Output format: 'gemini' for JSON response, default for exit codes only");
+        var formatOption = new Option<string?>("--format", "-f")
+        {
+            Description = "Output format: 'gemini' for JSON response, default for exit codes only"
+        };
 
         var command = new Command("validate-ids", "Validate IDs in .calr file content")
         {
@@ -589,10 +597,10 @@ public static class HookCommand
             formatOption
         };
 
-        command.SetHandler((System.CommandLine.Invocation.InvocationContext context) =>
+        command.SetAction(parseResult =>
         {
-            var toolInputJson = context.ParseResult.GetValueForArgument(inputArgument);
-            var format = context.ParseResult.GetValueForOption(formatOption);
+            var toolInputJson = parseResult.GetValue(inputArgument)!;
+            var format = parseResult.GetValue(formatOption);
 
             var (exitCode, blockReason) = ValidateIds(toolInputJson);
 
@@ -608,7 +616,7 @@ public static class HookCommand
                 }
             }
 
-            context.ExitCode = exitCode;
+            return exitCode;
         });
 
         return command;
