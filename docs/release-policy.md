@@ -129,6 +129,7 @@ OIDC exchange, publication, retry and Pages deployment still requires an explici
 hosted run. Offline positive/negative boundary tests are not evidence that these live actions
 have executed.
 
+<!-- drift:ignore -->
 ### Hosted evidence: v0.30.0 (2026-11-21/22, #1728)
 
 <!-- drift:ignore -->
