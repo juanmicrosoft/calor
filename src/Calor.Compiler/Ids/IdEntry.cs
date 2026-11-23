@@ -979,7 +979,44 @@ public sealed class DeclarationIdentityStore
         || (parts.Count == 2 && parts.All(d => d.Node is MethodNode { IsPartial: true })
             && parts.Count(d => ((MethodNode)d.Node).Body.Count == 0) == 1);
 
+    // A project pass reconciles a store more than once over the same source texts: the
+    // index syncs the store (one reconciliation) and then attaches identities to its
+    // parsed modules (another), and each reconciliation parses every registered source.
+    // Within a pass that opts in, a source's declarations are parsed once per file name,
+    // diagnostic path and text. Parsing is a function of those three and nothing else
+    // (a fresh lexer and parser over the text), the declarations are immutable records,
+    // and a reconciliation only reads them, so a second parse returned equal values.
+    // A parse that throws is not kept: the next request throws the same way (#1738).
+    private static readonly AsyncLocal<System.Collections.Concurrent.ConcurrentDictionary<
+        (string File, string? DiagnosticPath, string Source), IReadOnlyList<ParsedDeclaration>>?> SharedParses = new();
+
+    /// <summary>Parses each registered source at most once until the returned scope ends.</summary>
+    internal static IDisposable ShareDeclarationParses()
+    {
+        var previous = SharedParses.Value;
+        SharedParses.Value = new();
+        return new SharedParseScope(previous);
+    }
+
+    private sealed class SharedParseScope(System.Collections.Concurrent.ConcurrentDictionary<
+        (string File, string? DiagnosticPath, string Source), IReadOnlyList<ParsedDeclaration>>? previous) : IDisposable
+    {
+        public void Dispose() => SharedParses.Value = previous;
+    }
+
     private static IReadOnlyList<ParsedDeclaration> ParseDeclarations(string file, string source, string? diagnosticPath = null)
+    {
+        if (SharedParses.Value is not { } shared)
+            return ParseDeclarationsCore(file, source, diagnosticPath);
+        var key = (file, diagnosticPath, source);
+        if (shared.TryGetValue(key, out var parsed))
+            return parsed;
+        parsed = ParseDeclarationsCore(file, source, diagnosticPath);
+        shared.TryAdd(key, parsed);
+        return parsed;
+    }
+
+    private static IReadOnlyList<ParsedDeclaration> ParseDeclarationsCore(string file, string source, string? diagnosticPath)
     {
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(diagnosticPath ?? file);

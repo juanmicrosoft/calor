@@ -108,8 +108,43 @@ public static class RecursiveAstWalker
     /// the universal traversal surface for analyses that must not hide nested
     /// calls or diagnostic seeds inside newly added expression wrappers.
     /// </summary>
+    /// <remarks>
+    /// The same children, in the same order, as the nodes of
+    /// <see cref="GetAllChildEdges"/>. Both unwrap a property value's first level
+    /// in place (a node, an initializer, a refinement, or a sequence of those) and
+    /// fall back to <see cref="UnwrapAstChildren"/> only for a nested sequence, so
+    /// a visit no longer allocates an iterator per child (#1738).
+    /// </remarks>
     public static IEnumerable<AstNode> GetAllChildren(AstNode node)
-        => GetAllChildEdges(node).Select(edge => edge.Node);
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        var yielded = new YieldedChildren();
+
+        foreach (var prop in GetAllChildProperties(node.GetType()))
+        {
+            // Universal analyses must not silently hide a subtree if an AST accessor fails.
+            var value = prop.GetValue(node);
+            if (value is IEnumerable sequence and not string and not AstNode)
+            {
+                foreach (var item in sequence)
+                {
+                    if (TryUnwrapDirect(item, out var direct))
+                    {
+                        if (yielded.Add(direct))
+                            yield return direct;
+                    }
+                    else if (item is IEnumerable and not string)
+                    {
+                        foreach (var child in UnwrapAstChildren(item))
+                            if (yielded.Add(child))
+                                yield return child;
+                    }
+                }
+            }
+            else if (TryUnwrapDirect(value, out var direct) && yielded.Add(direct))
+                yield return direct;
+        }
+    }
 
     /// <summary>
     /// Enumerates every direct AST child, including expression subtrees, together
@@ -118,16 +153,104 @@ public static class RecursiveAstWalker
     public static IEnumerable<ChildEdge> GetAllChildEdges(AstNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        var yielded = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+        var yielded = new YieldedChildren();
 
         foreach (var prop in GetAllChildProperties(node.GetType()))
         {
             // Universal analyses must not silently hide a subtree if an AST accessor fails.
-            foreach (var child in UnwrapAstChildren(prop.GetValue(node)))
+            var value = prop.GetValue(node);
+            if (value is IEnumerable sequence and not string and not AstNode)
             {
-                if (yielded.Add(child))
-                    yield return new ChildEdge(child, prop);
+                foreach (var item in sequence)
+                {
+                    if (TryUnwrapDirect(item, out var direct))
+                    {
+                        if (yielded.Add(direct))
+                            yield return new ChildEdge(direct, prop);
+                    }
+                    else if (item is IEnumerable and not string)
+                    {
+                        foreach (var child in UnwrapAstChildren(item))
+                            if (yielded.Add(child))
+                                yield return new ChildEdge(child, prop);
+                    }
+                }
             }
+            else if (TryUnwrapDirect(value, out var direct) && yielded.Add(direct))
+                yield return new ChildEdge(direct, prop);
+        }
+    }
+
+    // The non-sequence cases of UnwrapAstChildren, which yield exactly one child.
+    private static bool TryUnwrapDirect(object? value, out AstNode child)
+    {
+        switch (value)
+        {
+            case AstNode node:
+                child = node;
+                return true;
+            case ObjectInitializerAssignment initializer:
+                child = initializer.Value;
+                return true;
+            case InlineRefinementInfo refinement:
+                child = refinement.Predicate;
+                return true;
+            default:
+                child = null!;
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// The children already yielded for one node, compared by reference: the same
+    /// answers as a <see cref="ReferenceEqualityComparer"/> hash set. Most nodes have
+    /// a handful of children, so they are compared by a scan (the first without any
+    /// storage); a node with more switches to a hash set. Hashing every child of every
+    /// node was a large part of a project index build (#1738). A mutable struct held in
+    /// an iterator's local is a field of the iterator, so each Add updates it in place.
+    /// </summary>
+    private struct YieldedChildren
+    {
+        private const int ScanLimit = 16;
+        private int _count;
+        private AstNode? _first;
+        private AstNode?[]? _rest;
+        private HashSet<AstNode?>? _hashed;
+
+        public bool Add(AstNode? child)
+        {
+            if (_hashed != null)
+                return _hashed.Add(child);
+            if (_count > 0)
+            {
+                if (ReferenceEquals(_first, child))
+                    return false;
+                for (var index = 0; index < _count - 1; index++)
+                {
+                    if (ReferenceEquals(_rest![index], child))
+                        return false;
+                }
+            }
+            if (_count == ScanLimit)
+            {
+                _hashed = new HashSet<AstNode?>(ReferenceEqualityComparer.Instance) { _first };
+                for (var index = 0; index < _count - 1; index++)
+                    _hashed.Add(_rest![index]);
+                _hashed.Add(child);
+                _rest = null;
+                return true;
+            }
+            if (_count == 0)
+                _first = child;
+            else
+            {
+                _rest ??= new AstNode?[4];
+                if (_count - 1 == _rest.Length)
+                    Array.Resize(ref _rest, _rest.Length * 2);
+                _rest[_count - 1] = child;
+            }
+            _count++;
+            return true;
         }
     }
 
