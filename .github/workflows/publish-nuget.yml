@@ -69,7 +69,8 @@ jobs:
   test:
     # One project per runner, mirroring test.yml's matrix. A single runner running all 13
     # projects ran out of resources and blocked the v0.13.1 publish twice. `package` (and so the
-    # push) needs every leg green on the commit being released.
+    # push) needs every leg green on the commit being released. Calor.Compiler.Tests runs in
+    # compiler-shards below (#1749), and `test (compiler)` checks those jobs' reports together.
     name: test (${{ matrix.name }})
     needs: preflight
     runs-on: ubuntu-latest
@@ -77,8 +78,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: compiler
-            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
           - name: conversion
             project: tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj
           - name: enforcement
@@ -195,6 +194,150 @@ jobs:
           path: artifacts/test/
           retention-days: 90
 
+  compiler-shards:
+    # #1749: Calor.Compiler.Tests on three runners, as in test.yml. Five test hosts on one 4-vCPU
+    # runner lost the runner in the 0.30.0 release run (44947647159 attempt 1: load 36, then "The
+    # hosted runner lost communication with the server"). compiler-1 runs parts 1 and 4,
+    # compiler-2 parts 2 and 3, compiler-replay the historical replays
+    # (scripts/compiler-shard-filter.sh --job). Each job checks its own parts; `test (compiler)`
+    # below checks all of them against the manifest.
+    name: test (${{ matrix.name }})
+    needs: preflight
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: compiler-1
+            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          - name: compiler-2
+            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          - name: compiler-replay
+            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.candidate }}
+          persist-credentials: false
+          submodules: recursive
+          # #1159/#1417: LedgerCommitStampTests needs full history and fetched
+          # protected main to decide whether each provenance identity is durable.
+          # Under a depth-1 checkout it used to SKIP — that extra skip once failed
+          # `Enforce test inventory` ("executed 8043, expected 8044") and shipped
+          # nothing. It now FAILS instead. The release path is where provenance
+          # most wants verifying.
+          fetch-depth: 0
+
+      # #1417 (v0.24 §6): provenance identities resolve from fetched protected main,
+      # never HEAD (refs/pull/N/merge here). Fetch it, and every tag a fresh clone has.
+      - name: Fetch protected main and tags for provenance (#1417)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-recurse-submodules --force origin \
+            '+refs/heads/main:refs/remotes/origin/main' '+refs/tags/*:refs/tags/*'
+          test "$(git rev-parse --is-shallow-repository)" = false
+          git rev-parse --verify 'refs/remotes/origin/main^{commit}'
+
+      - name: Set up the pinned release SDK (#1548)
+        uses: ./.github/actions/setup-release-sdk
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Restore dependencies
+        run: dotnet restore --locked-mode
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Assert this project is release-critical in the manifest
+        # Guards the matrix against drift: if a project is added to or removed
+        # from the manifest's release-critical set without updating this list,
+        # the gate would silently stop covering it.
+        run: |
+          set -euo pipefail
+          python3 - "${{ matrix.project }}" <<'PY'
+          import json, sys
+          project = sys.argv[1]
+          manifest = json.load(open("eng/test-manifest.json"))["projects"]
+          if not any(p["path"] == project and p["releaseCritical"] for p in manifest):
+              sys.exit(f"::error::{project} is not release-critical in eng/test-manifest.json")
+          PY
+
+      # #1666: the same checked-in script as test.yml's shard step, called with no inline shell
+      # (D014 checks the call and pins the script). It splits the compiler suite into four fresh
+      # test hosts (#1150) and writes the TRX files the next step checks part by part.
+      - name: Run project tests
+        run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"
+
+      # --submodules because THIS workflow checks out `submodules: recursive` for
+      # every shard (above), unlike test.yml:375 which gives all but `compiler`
+      # `submodules: false`. Corpus-gated tests therefore RUN here and SKIP
+      # there, so the two checkouts need different skip expectations. Omitting
+      # this is what skipped the v0.16.0 publish: run 33568423848 reported
+      # "executed 640, expected 639" on a shard where all 640 tests PASSED.
+      - name: Enforce test inventory
+        # #1749: each part this job ran, checked on its own (--partial); `test (compiler)` checks
+        # the sum over all three jobs. The determinism protocol freezes this step (D014).
+        run: |
+          set -euo pipefail
+          python3 scripts/check_trx.py --trx-dir artifacts/test --project "${{ matrix.project }}" --submodules --partial
+
+      # Assert the property that matters, not a filename: no Z3-gated test may skip on the
+      # commit being released. This regression is invisible by construction otherwise —
+      # the tests skip rather than fail.
+      - name: Assert no Z3-gated test silently skipped
+        run: |
+          set -euo pipefail
+          if grep -q "Z3 not available" test-output.log; then
+            echo "::error::Z3-gated tests skipped on the release commit — natives did not reach the test hosts."
+            grep -c "Z3 not available" test-output.log
+            exit 1
+          fi
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-test-reports-${{ matrix.name }}
+          path: artifacts/test/
+          retention-days: 90
+
+  compiler-inventory:
+    # #1749: `test (compiler)`. It gathers the TRX reports of the three compiler-shards jobs and
+    # checks them together against eng/test-manifest.json, so a missing, overlapping or failed
+    # part fails it. It runs even when a shard job failed or was cancelled and then fails on that
+    # job's result; `package` needs it, so no push happens without every part.
+    name: test (compiler)
+    needs: [preflight, compiler-shards]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.candidate }}
+          persist-credentials: false
+
+      - name: Download every shard's reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-test-reports-compiler-*
+          path: artifacts/test
+          merge-multiple: true
+
+      - name: Enforce test inventory
+        # Frozen by D014 (protocol.json registers the job's `if: always()` as its jobIf).
+        run: |
+          set -euo pipefail
+          test "${{ needs.compiler-shards.result }}" = success
+          python3 scripts/check_trx.py --trx-dir artifacts/test --project "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj" --submodules
+
   sdk-consumer:
     # M-A1: a template consumer restores/builds/tests green against the
     # packaged Calor.Sdk from a local feed (wedge plan v0.11 D-W1.2, PP-A1).
@@ -304,34 +447,8 @@ jobs:
       - name: Collect and enforce component coverage
         run: |
           set -euo pipefail
-          for project in \
-            Calor.Compiler.Tests \
-            Calor.Conversion.Tests \
-            Calor.Enforcement.Tests \
-            Calor.Semantics.Tests \
-            Calor.Verification.Tests
-          do
-            if [ "$project" = "Calor.Compiler.Tests" ]; then
-              # The coverage checker unions all reports under this shared root.
-              for part in $(bash scripts/compiler-shard-filter.sh --parts); do
-                filter="$(bash scripts/compiler-shard-filter.sh --part "$part")"
-                dotnet test "tests/$project/$project.csproj" \
-                  -c Release --no-build --no-restore \
-                  --filter "$filter" \
-                  --collect:"XPlat Code Coverage" \
-                  --logger "trx;LogFileName=$project-$part.trx" \
-                  --results-directory "artifacts/coverage/raw/$project" \
-                  --verbosity quiet
-              done
-            else
-              dotnet test "tests/$project/$project.csproj" \
-                -c Release --no-build --no-restore \
-                --collect:"XPlat Code Coverage" \
-                --logger "trx;LogFileName=$project.trx" \
-                --results-directory "artifacts/coverage/raw/$project" \
-                --verbosity quiet
-            fi
-          done
+          # #1749: the same script as test.yml's quality-ratchets (parts two at a time).
+          bash scripts/collect-coverage.sh
           python3 scripts/check_coverage.py
 
       - name: Run mutation and release flake ratchets
@@ -420,7 +537,7 @@ jobs:
   # can obtain a NuGet key. A dry run ends after this job.
   package:
     runs-on: ubuntu-latest
-    needs: [preflight, test, sdk-consumer, release-quality, site]
+    needs: [preflight, test, compiler-inventory, sdk-consumer, release-quality, site]
     outputs:
       sums: ${{ steps.bundle.outputs.sums }}
       artifact: ${{ steps.bundle-upload.outputs.artifact-id }}
@@ -561,7 +678,7 @@ jobs:
 
   promotion-check:
     runs-on: ubuntu-latest
-    needs: [preflight, test, sdk-consumer, release-quality, site, package]
+    needs: [preflight, test, compiler-inventory, sdk-consumer, release-quality, site, package]
     if: ${{ !inputs.dry_run }}
     permissions:
       contents: read
@@ -589,7 +706,7 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    needs: [preflight, test, sdk-consumer, release-quality, site, package, promotion-check]
+    needs: [preflight, test, compiler-inventory, sdk-consumer, release-quality, site, package, promotion-check]
     if: ${{ !inputs.dry_run }}
     # #1545: no NuGet key is stored anywhere. nuget.org Trusted Publishing (policy "calor-release":
     # juanmicrosoft/calor, workflow file publish-nuget.yml, environment nuget-release) exchanges this

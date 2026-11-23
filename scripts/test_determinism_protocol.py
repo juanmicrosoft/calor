@@ -261,9 +261,9 @@ class NegativeRegistrationControls(unittest.TestCase):
         """#1666: each shard step is one call of the checked-in script, with no inline shell, no other step key,
         and no env or defaults that could change how bash runs it (BASH_ENV, a shell override)."""
         call = '        run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"\n'
-        # #1749: test.yml calls the script from remaining-tests and from compiler-shards.
+        # #1749: each workflow calls the script from its project matrix and from compiler-shards.
         jobs_by_path = {".github/workflows/test.yml": ("remaining-tests", "compiler-shards"),
-                        ".github/workflows/publish-nuget.yml": ("test",)}
+                        ".github/workflows/publish-nuget.yml": ("test", "compiler-shards")}
         for path, jobs in jobs_by_path.items():
             text = (ROOT / path).read_text(encoding="utf-8")
             self.assertEqual(len(jobs), text.count(call))
@@ -287,14 +287,17 @@ class NegativeRegistrationControls(unittest.TestCase):
         """#1749: `tests (compiler)` gathers the compiler-shards reports. It must run when a shard job failed or was
         cancelled (a skipped required check counts as passing), so its job carries exactly the registered jobIf
         "always()". Dropping it, changing it, or registering a jobIf other than always() fails D014."""
-        path = ".github/workflows/test.yml"
-        text = (ROOT / path).read_text(encoding="utf-8")
-        head = "    name: tests (compiler)\n    needs: compiler-shards\n    if: always()\n"
-        self.assertEqual(1, text.count(head))
-        for mutated in (text.replace(head, head.replace("    if: always()\n", "")),
-                        text.replace(head, head.replace("always()", "success()")),
-                        text.replace(head, head.replace("always()", "always() && false"))):
-            self.only("D014", texts={path: mutated})
+        # publish-nuget.yml's `test (compiler)` gathers its own compiler-shards the same way.
+        for path, head in (
+                (".github/workflows/test.yml", "    name: tests (compiler)\n    needs: compiler-shards\n    if: always()\n"),
+                (".github/workflows/publish-nuget.yml",
+                 "    name: test (compiler)\n    needs: [preflight, compiler-shards]\n    if: always()\n")):
+            text = (ROOT / path).read_text(encoding="utf-8")
+            self.assertEqual(1, text.count(head))
+            for mutated in (text.replace(head, head.replace("    if: always()\n", "")),
+                            text.replace(head, head.replace("always()", "success()")),
+                            text.replace(head, head.replace("always()", "always() && false"))):
+                self.only("D014", texts={path: mutated})
         def gather(p):
             return next(g for g in p["gates"]["steps"] if g["job"] == "compiler-inventory")
         self.assertIn("D014", codes(protocol=mutate(lambda p: gather(p).pop("jobIf"))))
