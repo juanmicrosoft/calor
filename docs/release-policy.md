@@ -129,6 +129,39 @@ OIDC exchange, publication, retry and Pages deployment still requires an explici
 hosted run. Offline positive/negative boundary tests are not evidence that these live actions
 have executed.
 
+### Hosted evidence: v0.30.0 (2026-11-21/22, #1728)
+
+<!-- drift:ignore -->
+v0.30.0 was the first release through this path. It also ran the preliminary dry dispatch this
+policy forbids, which measures what that dispatch costs. Read from the GitHub API on
+2026-11-23 with the method above (job-minutes across every attempt, skipped jobs excluded):
+
+| Run | Attempts | Job-minutes | Notes |
+|---|---:|---:|---|
+| [Dry dispatch 44935998950](https://github.com/juanmicrosoft/calor/actions/runs/44935998950) | 2 | 362 | Attempt 1 failed on a formatter replay flake (#1749); 18:31-20:40 UTC before the real run could start |
+| [Release 44947647159](https://github.com/juanmicrosoft/calor/actions/runs/44947647159) | 2 | 310 | Validation, approval, publish and install check |
+
+The dry dispatch added 362 job-minutes (more than the release itself) and 2 h 9 min of elapsed
+time, and validated nothing the release run did not validate again. Skip it.
+
+What the release run exercised on hosted runners, which the offline tests could not:
+
+- `promotion-check` passed against live settings: two required reviewers, self-review
+  prevented, admin bypass off, main-only branch policy.
+- The environment approval admitted `publish` only after a reviewer other than the dispatcher
+  approved it.
+- A failed-job rerun (attempt 2, after a lost runner in `test (compiler)`) kept the candidate
+  and the same bundle.
+- The OIDC exchange returned a key. The push and the served-package comparison passed for both
+  packages.
+
+One gap surfaced. `install-check` failed on a stale `Proven: 14` pin after #1618 changed the
+sample, after the push, so the GitHub release and the site were finished by hand from that
+run's verified `release-bundle`. `preflight --require-unpublished` correctly refused a second
+dispatch of a published version. PR #1750 fixed the pin and added
+`ReleaseWorkflowTests.InstallCheckProvenPin_MatchesTheSample`, so the pin and the sample can no
+longer drift apart unnoticed.
+
 ## Formatter write-path gate
 
 `calor format --write`, `calor lint --fix`, and LSP formatting may ship enabled
