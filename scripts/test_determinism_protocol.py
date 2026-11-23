@@ -261,24 +261,49 @@ class NegativeRegistrationControls(unittest.TestCase):
         """#1666: each shard step is one call of the checked-in script, with no inline shell, no other step key,
         and no env or defaults that could change how bash runs it (BASH_ENV, a shell override)."""
         call = '        run: bash scripts/run-shard-tests.sh "${{ matrix.name }}" "${{ matrix.project }}"\n'
-        for path in (".github/workflows/test.yml", ".github/workflows/publish-nuget.yml"):
+        # #1749: test.yml calls the script from remaining-tests and from compiler-shards.
+        jobs_by_path = {".github/workflows/test.yml": ("remaining-tests", "compiler-shards"),
+                        ".github/workflows/publish-nuget.yml": ("test",)}
+        for path, jobs in jobs_by_path.items():
             text = (ROOT / path).read_text(encoding="utf-8")
-            self.assertEqual(1, text.count(call))
-            job = "remaining-tests" if path.endswith("test.yml") else "test"
-            job_head = f"  {job}:\n"
-            for mutated in (
-                text.replace(call, "        run: |\n          set -euo pipefail\n          bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"\n"),
-                text.replace(call, call.rstrip("\n") + " || true\n"),
-                text.replace(call, call.replace("run-shard-tests.sh", "run-shard-tests.sh --dry-run")),
-                text.replace(call, call + "        env:\n          BASH_ENV: scripts/skip.sh\n"),
-                text.replace(call, call + "        shell: sh\n"),
-                text.replace(call, call + "        timeout-minutes: 1\n"),
-                text.replace(job_head, job_head + "    env:\n      BASH_ENV: scripts/skip.sh\n", 1),
-                text.replace(job_head, job_head + "    defaults:\n      run:\n        shell: sh\n", 1),
-                text.replace("\njobs:\n", "\nenv:\n  BASH_ENV: scripts/skip.sh\n\njobs:\n", 1),
-            ):
-                self.assertNotEqual(text, mutated)
-                self.only("D014", texts={path: mutated})
+            self.assertEqual(len(jobs), text.count(call))
+            for job in jobs:
+                job_head = f"  {job}:\n"
+                for mutated in (
+                    text.replace(call, "        run: |\n          set -euo pipefail\n          bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"\n"),
+                    text.replace(call, call.rstrip("\n") + " || true\n"),
+                    text.replace(call, call.replace("run-shard-tests.sh", "run-shard-tests.sh --dry-run")),
+                    text.replace(call, call + "        env:\n          BASH_ENV: scripts/skip.sh\n"),
+                    text.replace(call, call + "        shell: sh\n"),
+                    text.replace(call, call + "        timeout-minutes: 1\n"),
+                    text.replace(job_head, job_head + "    env:\n      BASH_ENV: scripts/skip.sh\n", 1),
+                    text.replace(job_head, job_head + "    defaults:\n      run:\n        shell: sh\n", 1),
+                    text.replace("\njobs:\n", "\nenv:\n  BASH_ENV: scripts/skip.sh\n\njobs:\n", 1),
+                ):
+                    self.assertNotEqual(text, mutated)
+                    self.only("D014", texts={path: mutated})
+
+    def test_d014_gathering_gate_runs_exactly_always(self) -> None:
+        """#1749: `tests (compiler)` gathers the compiler-shards reports. It must run when a shard job failed or was
+        cancelled (a skipped required check counts as passing), so its job carries exactly the registered jobIf
+        "always()". Dropping it, changing it, or registering a jobIf other than always() fails D014."""
+        path = ".github/workflows/test.yml"
+        text = (ROOT / path).read_text(encoding="utf-8")
+        head = "    name: tests (compiler)\n    needs: compiler-shards\n    if: always()\n"
+        self.assertEqual(1, text.count(head))
+        for mutated in (text.replace(head, head.replace("    if: always()\n", "")),
+                        text.replace(head, head.replace("always()", "success()")),
+                        text.replace(head, head.replace("always()", "always() && false"))):
+            self.only("D014", texts={path: mutated})
+        def gather(p):
+            return next(g for g in p["gates"]["steps"] if g["job"] == "compiler-inventory")
+        self.assertIn("D014", codes(protocol=mutate(lambda p: gather(p).pop("jobIf"))))
+        self.assertIn("D014", codes(protocol=mutate(lambda p: gather(p).update(jobIf="success()"))))
+        # A jobIf on a gate whose job has no condition is refused too.
+        self.assertIn("D014", codes(protocol=mutate(lambda p: next(
+            g for g in p["gates"]["steps"] if g["job"] == "compiler-shards").update(jobIf="always()"))))
+        # The gate checks the shard jobs' result before the reports.
+        self.assertIn('test "${{ needs.compiler-shards.result }}" = success', gather(PROTOCOL)["commands"])
 
     def test_harness_never_touches_the_real_home(self) -> None:
         self.assertTrue(dp.home_safe((ROOT / dp.HARNESS).read_text(encoding="utf-8")))
@@ -350,9 +375,10 @@ class NegativeRegistrationControls(unittest.TestCase):
         script = (ROOT / rel).read_text(encoding="utf-8")
         head = "set -euo pipefail\n"
         test_line = 'else\n  dotnet test "$project" -c Release \\\n'
-        branch = 'if [ "$name" = "compiler" ]; then\n'
+        branch = 'if [ -n "$compiler_job" ]; then\n'
+        last_part = '  if [ -n "$part" ]; then\n'
         z3 = 'if grep -q "Z3 not available" test-output.log; then\n'
-        for anchor in (head, test_line, branch, z3):
+        for anchor in (head, test_line, branch, z3, last_part):
             self.assertIn(anchor, script)
         for mutated in (script.replace(head, head + "exit 0\n", 1),
                         script.replace(head, head + "exit\n", 1),
@@ -362,6 +388,8 @@ class NegativeRegistrationControls(unittest.TestCase):
                         script.replace(head, head + "while ! true; do\n", 1).replace(z3, "done\n" + z3, 1),
                         script.replace(head, head + "until ! false; do\n", 1).replace(z3, "done\n" + z3, 1),
                         script.replace(branch, "if [ 1 = 0 ]; then\n", 1),
+                        # #1749: the foreground part of a split compiler job cannot be guarded away.
+                        script.replace(last_part, "  if false; then\n", 1),
                         script.replace(head, head + "trap 'exit 0' ERR\n", 1),
                         script.replace(head, head + "set +e\n", 1),
                         script.replace("  dotnet build \"$project\" -c Release\n", "  dotnet build \"$project\" -c Release || true\n", 1),
@@ -414,7 +442,9 @@ class NegativeRegistrationControls(unittest.TestCase):
         old_gates = {(g["workflow"], g["job"], g["step"]): g
                      for g in baseline[0]["gates"]["shardSteps"]}
         for gate in moved["gates"]["shardSteps"]:
-            gate["repinnedFrom"] = old_gates[(gate["workflow"], gate["job"], gate["step"])]["scriptSha256"]
+            # #1749 added the compiler-shards gate after #1584; a new gate has no baseline to name.
+            if (gate["workflow"], gate["job"], gate["step"]) in old_gates:
+                gate["repinnedFrom"] = old_gates[(gate["workflow"], gate["job"], gate["step"])]["scriptSha256"]
         self.assertEqual(set(), codes(protocol=moved, baseline=baseline))
         moved["determinismRows"].pop()
         self.assertIn("D016", codes(protocol=moved, baseline=baseline))

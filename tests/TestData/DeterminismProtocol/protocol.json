@@ -75,7 +75,7 @@
       "oracle": false,
       "processTimeoutMinutes": 15,
       "gateSites": [
-        "test.yml remaining-tests 'tests (compiler)'",
+        "test.yml compiler-shards 'tests (compiler-1)', 'tests (compiler-2)', 'tests (compiler-replay)', gathered by 'tests (compiler)'",
         "publish-nuget.yml test matrix 'test (compiler)'"
       ]
     }
@@ -573,7 +573,7 @@
     "rule": "The recorder and the CaseResult schema are reviewed with the protocol (#1584 removed their D015 hash freeze); the three call sites (DifferentialGate.Run, CommittedReportsMatchGeneratedOracle, TranslatorOutputMatchesCommittedBaseline) must stay (D014), and the decider rejects any record made under other protocol or harness bytes within a run."
   },
   "gates": {
-    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) is, since #1666, exactly one call of a checked-in script (run, scriptPath) with no other step key, in a job and workflow with no env or defaults; the checks below apply to that script. The script must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e; every trap must be one registered in traps, and no condition may be arithmetic ('(( ))' or let). A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing a gate step is a weakening that D016 reports against protected main. A shard step's script is pinned by the SHA-256 of its non-blank lines (scriptSha256). A reviewed change to it updates the pin and records the pin it replaces in repinnedFrom; D016 rejects a changed pin without that. Its dotnet test commands must equal testCommands exactly, and the script may not end before the last one (exit or return), negate a command, use a while or until loop, trap ERR, or put a test behind a constant, literal or negated condition. D016 requires every gate, prerequisite, command, script line and test command on protected main to remain (#1584 retired the two main's-validator steps). A shard step's one move from inline shell to a script (#1666) may replace its test commands when it records repinnedFrom; afterwards its run and scriptPath stay, and it may not gain a trap. Any workflow line at a job or step key position that the parser does not read as a plain key (a quoted key, flow mapping, anchor, or merge key) makes the gate fail.",
+    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error (#1749: a gate that gathers other jobs' reports registers jobIf \"always()\", and its job must carry exactly that condition, so a failed or cancelled shard job cannot leave the required check skipped), after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) is, since #1666, exactly one call of a checked-in script (run, scriptPath) with no other step key, in a job and workflow with no env or defaults; the checks below apply to that script. The script must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e; every trap must be one registered in traps, and no condition may be arithmetic ('(( ))' or let). A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing a gate step is a weakening that D016 reports against protected main. A shard step's script is pinned by the SHA-256 of its non-blank lines (scriptSha256). A reviewed change to it updates the pin and records the pin it replaces in repinnedFrom; D016 rejects a changed pin without that. Its dotnet test commands must equal testCommands exactly, and the script may not end before the last one (exit or return), negate a command, use a while or until loop, trap ERR, or put a test behind a constant, literal or negated condition. D016 requires every gate, prerequisite, command, script line and test command on protected main to remain (#1584 retired the two main's-validator steps). A shard step's one move from inline shell to a script (#1666) may replace its test commands when it records repinnedFrom; afterwards its run and scriptPath stay, and it may not gain a trap. Any workflow line at a job or step key position that the parser does not read as a plain key (a quoted key, flow mapping, anchor, or merge key) makes the gate fail.",
     "steps": [
       {
         "workflow": ".github/workflows/test.yml",
@@ -624,6 +624,39 @@
         ]
       },
       {
+        "workflow": ".github/workflows/test.yml",
+        "job": "compiler-shards",
+        "step": "Enforce test inventory",
+        "after": [
+          "Run project tests"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --partial"
+        ],
+        "commands": [
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --partial"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "compiler-inventory",
+        "step": "Enforce test inventory",
+        "jobIf": "always()",
+        "after": [
+          "Download every shard's reports"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "test \"${{ needs.compiler-shards.result }}\" = success",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj\""
+        ],
+        "commands": [
+          "test \"${{ needs.compiler-shards.result }}\" = success",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj\""
+        ]
+      },
+      {
         "workflow": ".github/workflows/publish-nuget.yml",
         "job": "test",
         "step": "Enforce test inventory",
@@ -649,8 +682,29 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
-        "repinnedFrom": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
+        "scriptSha256": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
+        "repinnedFrom": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
+        "testCommands": [
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal > \"part-$part.log\" 2>&1 &",
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
+          "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"
+        ],
+        "traps": [
+          "trap 'kill \"$sampler_pid\" 2>/dev/null || true' EXIT"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "compiler-shards",
+        "step": "Run project tests",
+        "after": [
+          "Bootstrap verified Z3 assets"
+        ],
+        "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
+        "scriptPath": "scripts/run-shard-tests.sh",
+        "scriptSha256": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
+        "repinnedFrom": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
         "testCommands": [
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal > \"part-$part.log\" 2>&1 &",
@@ -670,8 +724,8 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
-        "repinnedFrom": "1846487e4cdedfa830dfee96bcc7ee894576bc54d4be1de5ded2e5718bbd99fe",
+        "scriptSha256": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
+        "repinnedFrom": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
         "testCommands": [
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal > \"part-$part.log\" 2>&1 &",
