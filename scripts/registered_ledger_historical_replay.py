@@ -65,6 +65,11 @@ REPLAYS = {
         "Calor.Compiler.Tests.Calor0425CorpusLedgerTests.Calor0425CorpusLedgerMatchesRecomputation",
     ),
 }
+# #1749: the archived suite's build plus one corpus-wide test took over 600 s on a loaded
+# hosted runner (run 44935998950: the formatter test alone ran 6 m 59 s). Every caller waits
+# 20 minutes for the whole replay, so restore and test together stay inside that.
+RESTORE_SECONDS = 180
+TEST_SECONDS = 900
 REGENERATION_FLAGS = (
     "CALOR_REGENERATE_DISPLAYSTRING_GOLDEN",
     "CALOR_UPDATE_BINDER_BASELINE",
@@ -141,12 +146,12 @@ def replay_archived_closers() -> None:
         Path(environment["CALOR_HOME"]).mkdir()
         project = "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj"
         print(f"archived closer replay: compiler {ARCHIVED_CLOSER_COMPILER}", flush=True)
-        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=300)
+        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=RESTORE_SECONDS)
         run_dotnet(
             ["test", project, "--no-restore", "--filter",
              "|".join(f"FullyQualifiedName~Calor.Compiler.Tests.{name}" for name in ARCHIVED_CLOSER_CLASSES),
              "--logger", "trx;LogFileName=historical.trx", "--results-directory", str(scratch / "results")],
-            source, environment, timeout=600,
+            source, environment, timeout=TEST_SECONDS,
         )
         verify_archived_closer_results(scratch / "results/historical.trx", expected)
         for relative, original in original_tests.items():
@@ -290,13 +295,13 @@ def replay_translator(record: Path) -> None:
         Path(environment["CALOR_HOME"]).mkdir()
         project = "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj"
         print(f"translator historical exact replay: producer {TRANSLATOR_PRODUCER}", flush=True)
-        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=300)
+        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=RESTORE_SECONDS)
         run_dotnet(
             ["test", project, "-c", "Release", "--no-restore",
              "--filter", f"FullyQualifiedName={TRANSLATOR_TEST}",
              "--logger", "trx;LogFileName=historical.trx",
              "--results-directory", str(record)],
-            source, environment, timeout=600,
+            source, environment, timeout=TEST_SECONDS,
         )
         result = record / "historical.trx"
         verify_result(result, TRANSLATOR_TEST, strict=True)
@@ -379,14 +384,14 @@ def replay(name: str) -> None:
         Path(environment["CALOR_HOME"]).mkdir()
         project = "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj"
         print(f"{name} historical exact replay: compiler {producer}; ledger landing {landing}", flush=True)
-        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=300)
+        run_dotnet(["restore", project, "--locked-mode"], source, environment, timeout=RESTORE_SECONDS)
         run_dotnet(
             [
                 "test", project, "--no-restore", "--filter", f"FullyQualifiedName={test}",
                 "--logger", "trx;LogFileName=historical.trx",
                 "--results-directory", str(scratch / "results"),
             ],
-            source, environment, timeout=600,
+            source, environment, timeout=TEST_SECONDS,
         )
         verify_result(scratch / "results/historical.trx", test, strict=name in ("signature", "bound-types"))
         for relative, expected in artifacts.items():

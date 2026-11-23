@@ -64,7 +64,7 @@ public class ReleaseWorkflowTests
         Assert.Contains("--require-unpublished", check);
         Assert.Contains("ref: ${{ github.sha }}", Step(Job(text, "preflight"), "Checkout main with full history and tags"));
         // Every job that builds or ships waits for preflight.
-        foreach (var job in new[] { "test", "sdk-consumer", "release-quality", "site", "package", "promotion-check", "publish", "install-check", "release", "website", "website-deploy" })
+        foreach (var job in new[] { "test", "compiler-shards", "compiler-inventory", "sdk-consumer", "release-quality", "site", "package", "promotion-check", "publish", "install-check", "release", "website", "website-deploy" })
             Assert.Matches(new Regex(@"(?m)^    needs: (?:preflight|\[preflight[,\]])"), Job(text, job));
     }
 
@@ -73,9 +73,9 @@ public class ReleaseWorkflowTests
     {
         var text = Read(Publish);
         var checkouts = Steps(text).Where(s => s.Contains("uses: actions/checkout@", StringComparison.Ordinal)).ToList();
-        Assert.Equal(10, checkouts.Count);
+        Assert.Equal(12, checkouts.Count);
         Assert.All(checkouts, c => Assert.Contains("persist-credentials: false", c));
-        foreach (var job in new[] { "test", "release-quality" })
+        foreach (var job in new[] { "test", "compiler-shards", "release-quality" })
         {
             var body = Job(text, job);
             Assert.Contains("fetch-depth: 0", Steps(body).First(s => s.Contains("actions/checkout@", StringComparison.Ordinal)));
@@ -124,7 +124,7 @@ public class ReleaseWorkflowTests
         // committed facts directly and that CI runs the parser-based check with the pinned parser.
         var lines = File.ReadAllLines(Path.Combine(WorkflowDir(), Publish));
         var publish = Read(Publish);
-        Assert.Contains("  publish:\n    runs-on: ubuntu-latest\n    needs: [preflight, test, sdk-consumer, release-quality, site, package, promotion-check]\n", publish);
+        Assert.Contains("  publish:\n    runs-on: ubuntu-latest\n    needs: [preflight, test, compiler-inventory, sdk-consumer, release-quality, site, package, promotion-check]\n", publish);
         Assert.Single(lines, l => l == "    environment: nuget-release");
         Assert.Contains("    environment: nuget-release\n    permissions:\n      contents: read\n      actions: read\n      id-token: write\n", publish);
         Assert.Contains("    steps:\n      # promotion-check has already verified", publish);
@@ -171,8 +171,16 @@ public class ReleaseWorkflowTests
     [Fact]
     public void TestMatrixKeepsEveryReleaseCriticalProjectAndItsGuards()
     {
-        var job = Job(Read(Publish), "test");
-        var matrix = Regex.Matches(job, @"(?m)^            project: (\S+)$").Select(m => m.Groups[1].Value).OrderBy(p => p, StringComparer.Ordinal).ToList();
+        var publish = Read(Publish);
+        var job = Job(publish, "test");
+        // #1749: Calor.Compiler.Tests runs in compiler-shards (three jobs); the rest in the test matrix.
+        var shards = Job(publish, "compiler-shards");
+        var shardProjects = Regex.Matches(shards, @"(?m)^            project: (\S+)$").Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(new[] { "compiler-1", "compiler-2", "compiler-replay" },
+            Regex.Matches(shards, @"(?m)^          - name: (\S+)$").Select(m => m.Groups[1].Value));
+        Assert.Equal(new[] { "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj" }, shardProjects.Distinct());
+        var matrix = Regex.Matches(job, @"(?m)^            project: (\S+)$").Select(m => m.Groups[1].Value)
+            .Concat(shardProjects.Distinct()).OrderBy(p => p, StringComparer.Ordinal).ToList();
         var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "eng", "test-manifest.json")))!;
         var critical = manifest["projects"]!.AsArray().Where(p => (bool)p!["releaseCritical"]!).Select(p => (string)p!["path"]!)
             .OrderBy(p => p, StringComparer.Ordinal).ToList();
@@ -195,6 +203,19 @@ public class ReleaseWorkflowTests
         var z3 = Step(job, "Assert no Z3-gated test silently skipped");
         Assert.Contains("if grep -q \"Z3 not available\" test-output.log; then", z3);
         Assert.Contains("exit 1", z3);
+        // #1749: each compiler job runs the same script and guards, checks its own parts, and the
+        // gathering job checks every part against the manifest before package may run.
+        Assert.Equal("        " + shardCall, Step(shards, "Run project tests").Split('\n')[1]);
+        Assert.Contains("fail-fast: false", shards);
+        Assert.Contains("is not release-critical in eng/test-manifest.json", Step(shards, "Assert this project is release-critical in the manifest"));
+        Assert.Contains("python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules --partial",
+            Step(shards, "Enforce test inventory"));
+        Assert.Contains("if grep -q \"Z3 not available\" test-output.log; then", Step(shards, "Assert no Z3-gated test silently skipped"));
+        var gather = Job(publish, "compiler-inventory");
+        Assert.Contains("    name: test (compiler)\n    needs: [preflight, compiler-shards]\n    if: always()\n", gather);
+        Assert.Contains("pattern: release-test-reports-compiler-*", Step(gather, "Download every shard's reports"));
+        Assert.Contains("python3 scripts/check_trx.py --trx-dir artifacts/test --project \"tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj\" --submodules\n",
+            Step(gather, "Enforce test inventory") + "\n");
     }
 
     [Fact]
@@ -235,7 +256,7 @@ public class ReleaseWorkflowTests
     {
         var text = Read(Publish);
         var package = Job(text, "package");
-        Assert.Contains("    needs: [preflight, test, sdk-consumer, release-quality, site]\n", package);
+        Assert.Contains("    needs: [preflight, test, compiler-inventory, sdk-consumer, release-quality, site]\n", package);
         var order = new[]
         {
             "uses: ./.github/actions/setup-release-sdk",
@@ -266,7 +287,7 @@ public class ReleaseWorkflowTests
         Assert.Contains("./site/site.tar > SHA256SUMS", package);
         Assert.DoesNotContain("overwrite:", package);
         var boundary = Job(text, "promotion-check");
-        Assert.Contains("needs: [preflight, test, sdk-consumer, release-quality, site, package]", boundary);
+        Assert.Contains("needs: [preflight, test, compiler-inventory, sdk-consumer, release-quality, site, package]", boundary);
         Assert.Contains("if: ${{ !inputs.dry_run }}", boundary);
         Assert.Contains("RELEASE_NEEDS: ${{ toJSON(needs) }}", boundary);
         Assert.Contains("python3 scripts/release_promotion.py --candidate", boundary);
@@ -365,10 +386,20 @@ public class ReleaseWorkflowTests
             Assert.True(allowedIf.TryGetValue(name, out var expected) && condition.Value.Trim() == expected,
                 $"step '{name}' carries an unexpected condition: {condition.Value.Trim()}");
         }
-        // Job-level conditions: the dry-run stop and its pre-approval boundary.
+        // Job-level conditions: the dry-run stop and its pre-approval boundary, and (#1749) the
+        // `test (compiler)` gathering job, which must run even after a shard job failed so that it
+        // fails on that result; `package` needs it.
         foreach (var (name, body) in Jobs(text))
-            if (name is not ("publish" or "promotion-check"))
-                Assert.DoesNotMatch(new Regex(@"(?m)^    if:"), body);
+        {
+            if (name is "publish" or "promotion-check") continue;
+            if (name == "compiler-inventory")
+            {
+                Assert.Equal("    if: always()", Regex.Match(body, @"(?m)^    if:.*$").Value);
+                Assert.Contains("test \"${{ needs.compiler-shards.result }}\" = success", body);
+                continue;
+            }
+            Assert.DoesNotMatch(new Regex(@"(?m)^    if:"), body);
+        }
     }
 
     [Fact]

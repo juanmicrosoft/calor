@@ -76,7 +76,7 @@
       "processTimeoutMinutes": 15,
       "gateSites": [
         "test.yml compiler-shards 'tests (compiler-1)', 'tests (compiler-2)', 'tests (compiler-replay)', gathered by 'tests (compiler)'",
-        "publish-nuget.yml test matrix 'test (compiler)'"
+        "publish-nuget.yml compiler-shards 'test (compiler-1)', 'test (compiler-2)', 'test (compiler-replay)', gathered by 'test (compiler)'"
       ]
     }
   ],
@@ -670,6 +670,39 @@
         "commands": [
           "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules"
         ]
+      },
+      {
+        "workflow": ".github/workflows/publish-nuget.yml",
+        "job": "compiler-shards",
+        "step": "Enforce test inventory",
+        "after": [
+          "Run project tests"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules --partial"
+        ],
+        "commands": [
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"${{ matrix.project }}\" --submodules --partial"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/publish-nuget.yml",
+        "job": "compiler-inventory",
+        "step": "Enforce test inventory",
+        "jobIf": "always()",
+        "after": [
+          "Download every shard's reports"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "test \"${{ needs.compiler-shards.result }}\" = success",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj\" --submodules"
+        ],
+        "commands": [
+          "test \"${{ needs.compiler-shards.result }}\" = success",
+          "python3 scripts/check_trx.py --trx-dir artifacts/test --project \"tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj\" --submodules"
+        ]
       }
     ],
     "shardSteps": [
@@ -682,8 +715,8 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
-        "repinnedFrom": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
+        "scriptSha256": "8ecb5ae619eb06d3a752704437bb37889ebb0bd5dc5ae47b042e14bfe15c6244",
+        "repinnedFrom": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
         "testCommands": [
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal > \"part-$part.log\" 2>&1 &",
@@ -703,8 +736,8 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
-        "repinnedFrom": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
+        "scriptSha256": "8ecb5ae619eb06d3a752704437bb37889ebb0bd5dc5ae47b042e14bfe15c6244",
+        "repinnedFrom": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
         "testCommands": [
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal > \"part-$part.log\" 2>&1 &",
@@ -724,8 +757,29 @@
         ],
         "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
         "scriptPath": "scripts/run-shard-tests.sh",
-        "scriptSha256": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
-        "repinnedFrom": "99e62cac8605cc1c54b9beb1cffb377e950cc1c2d1204fb99a39bfd5cad151e2",
+        "scriptSha256": "8ecb5ae619eb06d3a752704437bb37889ebb0bd5dc5ae47b042e14bfe15c6244",
+        "repinnedFrom": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
+        "testCommands": [
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal > \"part-$part.log\" 2>&1 &",
+          "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log",
+          "dotnet test \"$project\" -c Release  --logger \"trx;LogFileName=$name.trx\"  --results-directory artifacts/test  --verbosity normal 2>&1 | tee -a test-output.log"
+        ],
+        "traps": [
+          "trap 'kill \"$sampler_pid\" 2>/dev/null || true' EXIT"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/publish-nuget.yml",
+        "job": "compiler-shards",
+        "step": "Run project tests",
+        "after": [
+          "Build"
+        ],
+        "run": "bash scripts/run-shard-tests.sh \"${{ matrix.name }}\" \"${{ matrix.project }}\"",
+        "scriptPath": "scripts/run-shard-tests.sh",
+        "scriptSha256": "8ecb5ae619eb06d3a752704437bb37889ebb0bd5dc5ae47b042e14bfe15c6244",
+        "repinnedFrom": "c237531b414c972bd3d0fd1a0d1e726e91babf2b6eb82a1e14d349357a48519e",
         "testCommands": [
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$replay_filter\"  --logger \"trx;LogFileName=$name-replay.trx\"  --results-directory artifacts/test  --verbosity normal > replay-output.log 2>&1 &",
           "dotnet test \"$project\" -c Release --no-build --no-restore  --filter \"$filter\"  --logger \"trx;LogFileName=$name-$part.trx\"  --results-directory artifacts/test  --verbosity normal > \"part-$part.log\" 2>&1 &",

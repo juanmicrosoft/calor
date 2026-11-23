@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -31,9 +32,11 @@ class HistoricalReplayTests(unittest.TestCase):
         )
         for arguments, timeout in launches:
             with self.subTest(command=arguments[0]):
-                with patch.object(replay.subprocess, "run") as run:
+                with patch.object(replay.subprocess, "Popen") as popen:
+                    popen.return_value.wait.return_value = 0
                     replay.run_dotnet(arguments, Path("/isolated/source"), environment, timeout)
-                    run.assert_called_once_with(
+                    popen.return_value.wait.assert_called_once_with(timeout=timeout)
+                    popen.assert_called_once_with(
                         [
                             "dotnet", *arguments, "--disable-build-servers",
                             "-nr:false", "-p:UseSharedCompilation=false",
@@ -44,10 +47,45 @@ class HistoricalReplayTests(unittest.TestCase):
                             "MSBUILDDISABLENODEREUSE": "1",
                             "DOTNET_CLI_USE_MSBUILD_SERVER": "0",
                         },
-                        check=True, timeout=timeout,
+                        start_new_session=True,
                     )
         self.assertEqual("0", environment["MSBUILDDISABLENODEREUSE"])
         self.assertEqual("1", environment["DOTNET_CLI_USE_MSBUILD_SERVER"])
+
+    def _fake_dotnet(self, directory: Path, body: str) -> dict[str, str]:
+        script = directory / "dotnet"
+        script.write_text("#!/usr/bin/env bash\n" + body)
+        script.chmod(0o755)
+        return {**os.environ, "PATH": f"{directory}{os.pathsep}{os.environ.get('PATH', '')}"}
+
+    def test_timeout_kills_the_whole_process_group(self):
+        """#1749: dotnet test's testhost is a child of dotnet. A timeout that killed only dotnet left
+        the testhost reading the scratch tree while TemporaryDirectory deleted it, so the timeout
+        surfaced as a DirectoryNotFoundException. The whole group must be gone when it raises."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            child = root / "child.pid"
+            environment = self._fake_dotnet(root, f'sleep 300 &\necho $! > "{child}"\nwait\n')
+            with self.assertRaises(subprocess.TimeoutExpired):
+                replay.run_dotnet(["test"], root, environment, timeout=2)
+            pid = int(child.read_text())
+            for _ in range(50):
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.1)
+            else:
+                os.kill(pid, 9)
+                self.fail("the timed-out command's child process outlived run_dotnet")
+
+    def test_failing_command_raises(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment = self._fake_dotnet(root, "exit 3\n")
+            with self.assertRaises(subprocess.CalledProcessError) as raised:
+                replay.run_dotnet(["test"], root, environment, timeout=30)
+            self.assertEqual(3, raised.exception.returncode)
 
     def test_frozen_bytes_must_match(self):
         with tempfile.TemporaryDirectory() as temporary:

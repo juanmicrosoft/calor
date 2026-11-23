@@ -62,8 +62,9 @@
 # the 40-minute cap on slow ones (main runs 44932686266 and 45077844186; PR #1740 twice), with
 # every test still passing. test.yml now spreads them over three runners: compiler-1 runs the
 # first pair, compiler-2 the second, compiler-replay only the historical replays, and the
-# `tests (compiler)` job checks their reports together against the manifest. The job name
-# `compiler` (publish-nuget.yml) still runs all four parts and the replays on one runner.
+# `tests (compiler)` job checks their reports together against the manifest. publish-nuget.yml
+# does the same (its `test (compiler)` job). The job name `compiler` runs all four parts and the
+# replays on one machine, for a local run; no workflow uses it.
 
 set -euo pipefail
 

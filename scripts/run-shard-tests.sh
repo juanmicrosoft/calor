@@ -31,11 +31,12 @@
 # step by the slowest part instead of two parts in sequence.
 #
 # 0.31 (#1749): five hosts on one 4-vCPU runner still took 32-33 min and hit the 40-minute cap on
-# slow runners with every test passing. The job name now selects the hosts: `compiler` runs all
-# five as before (publish-nuget.yml); test.yml runs `compiler-1` (parts 1 and 4), `compiler-2`
-# (parts 2 and 3) and `compiler-replay` (the replay host) on three runners. Each writes the same
-# TRX names prefixed by its job name, and test.yml's `tests (compiler)` job checks all of them
-# together against eng/test-manifest.json.
+# slow runners with every test passing. The job name now selects the hosts: test.yml and
+# publish-nuget.yml run `compiler-1` (parts 1 and 4), `compiler-2` (parts 2 and 3) and
+# `compiler-replay` (the replay host) on three runners. Each writes the same TRX names prefixed by
+# its job name, and each workflow's `tests (compiler)` / `test (compiler)` job checks all of them
+# together against eng/test-manifest.json. `compiler` still runs all five hosts on one machine,
+# for a local run; no workflow uses it.
 set -euo pipefail
 # usage: bash scripts/run-shard-tests.sh <matrix name> <test project>
 test "$#" -eq 2
@@ -71,9 +72,9 @@ if [ -n "$compiler_job" ]; then
   bash scripts/compiler-shard-filter.sh --self-test
   # The invocations pass --no-build, so build once up front.
   dotnet build "$project" -c Release
-  # #1749: the job name selects the parts. compiler (publish-nuget.yml) runs all four and the
-  # replays; test.yml splits them over compiler-1, compiler-2 and compiler-replay, and its
-  # `tests (compiler)` job checks the three jobs' reports together against the manifest.
+  # #1749: the job name selects the parts. Both workflows split them over compiler-1, compiler-2
+  # and compiler-replay, and a gathering job checks the three jobs' reports against the manifest.
+  # compiler (all four parts and the replays) is for a local run.
   parts="$(bash scripts/compiler-shard-filter.sh --job "$name")"
   replay_pid=""
   if [ "$name" = "compiler" ] || [ "$name" = "compiler-replay" ]; then

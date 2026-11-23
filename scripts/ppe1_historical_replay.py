@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -50,10 +51,25 @@ def run_dotnet(arguments: list[str], source: Path, environment: dict[str, str], 
     environment = environment.copy()
     environment["MSBUILDDISABLENODEREUSE"] = "1"
     environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0"
-    subprocess.run(
-        ["dotnet", *arguments, "--disable-build-servers", "-nr:false", "-p:UseSharedCompilation=false"],
-        cwd=source, env=environment, check=True, timeout=timeout,
-    )
+    command = ["dotnet", *arguments, "--disable-build-servers", "-nr:false", "-p:UseSharedCompilation=false"]
+    # #1749: dotnet test runs the suite in a child testhost. subprocess.run's timeout kills only
+    # `dotnet`, so the testhost kept reading the scratch tree while the caller's
+    # TemporaryDirectory deleted it, and the timeout surfaced as a DirectoryNotFoundException
+    # for a file that exists in the archived commit. Run the command in its own session and kill
+    # the whole process group before any cleanup, so a timeout reports as a timeout.
+    process = subprocess.Popen(command, cwd=source, env=environment, start_new_session=True)
+    try:
+        code = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+        raise subprocess.TimeoutExpired(command, timeout) from None
+    except BaseException:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+        raise
+    if code != 0:
+        raise subprocess.CalledProcessError(code, command)
 
 
 def replay() -> None:
