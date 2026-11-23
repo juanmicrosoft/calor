@@ -395,7 +395,7 @@ public class ReleaseWorkflowTests
         Assert.Contains("on:\n  workflow_call:\n    inputs:\n      version:\n", verify);
         // The sample comes from the candidate commit publish-nuget passes, never a tag that could move.
         Assert.Contains("ref: ${{ inputs.ref || format('v{0}', inputs.version) }}", verify);
-        Assert.Contains("echo \"$OUT\" | grep -Eq \"Proven:\\s+14\\b\"", verify);
+        Assert.Contains("echo \"$OUT\" | grep -Eq \"Proven:\\s+11\\b\"", verify);
         Assert.Contains("echo \"$OUT\" | grep -Eq \"Skipped:\\s+0\\b\"", verify);
         Assert.Contains("--add-source https://api.nuget.org/v3/index.json", verify);
         Assert.DoesNotContain("continue-on-error", verify);
@@ -585,6 +585,43 @@ public class ReleaseWorkflowTests
     }
 
     /// <summary>The repository root, from the test assembly's output directory.</summary>
+    /// <summary>
+    /// 0.30.0: verify-release pins the proven count of samples/Verification/proven-contracts.calr.
+    /// #1618 merged several preconditions into one refinement each, which lowered the count from 14
+    /// to 11, but the pin stayed at 14. The packages were pushed, then the install check failed on
+    /// every platform and blocked the GitHub release (run 44947647159). This test runs the current
+    /// compiler on the sample and requires the pinned count, so the next change that moves the
+    /// count fails here, before a release.
+    /// </summary>
+    [SkippableFact]
+    public void InstallCheckProvenPin_MatchesTheSample()
+    {
+        Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+        var pin = Regex.Match(Read("verify-release.yml"), @"grep -Eq ""Proven:\\s\+(\d+)\\b""");
+        Assert.True(pin.Success, "verify-release.yml no longer pins a proven count");
+
+        var dir = Path.Combine(Path.GetTempPath(), "calor-proven-pin-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var sample = Path.Combine(dir, "proven-contracts.calr");
+            File.Copy(Path.Combine(RepoRoot(), "samples", "Verification", "proven-contracts.calr"), sample);
+            var home = Path.Combine(dir, "calor-home");
+            Directory.CreateDirectory(home);
+            var (exit, stdOut, stdErr) = CliTestHarness.RunCli(
+                dir, new Dictionary<string, string> { ["CALOR_HOME"] = home }, "verify", sample);
+            Assert.True(exit == 0, $"calor verify exited {exit}\n{stdOut}\n{stdErr}");
+            Assert.Matches(@"Skipped:\s+0\b", stdOut);
+            var proven = Regex.Match(stdOut, @"Proven:\s+(\d+)\b");
+            Assert.True(proven.Success, stdOut);
+            Assert.Equal(pin.Groups[1].Value, proven.Groups[1].Value);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
+    }
+
     internal static string RepoRoot() =>
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 

@@ -1,7 +1,7 @@
 name: Verify Release (installed tool)
 
 # End-to-end check of a shipped release: install the `calor` tool from nuget.org as a downstream
-# consumer would, then require the Z3 verifier to prove a known sample (Proven: 14, Skipped: 0).
+# consumer would, then require the Z3 verifier to prove a known sample (Proven: 11, Skipped: 0).
 # publish-nuget.yml calls this after the push and before it creates the GitHub release, so a
 # failure here stops the release, its metadata, and the website (#1582). It can also be dispatched by hand for any shipped version, e.g.
 # from environments that cannot reach api.nuget.org directly.
@@ -109,7 +109,7 @@ jobs:
           echo "$OUT"
           # Guard against a shipped-but-broken Z3 that reports Calor0710 ("Static contract
           # verification skipped: Z3 SMT solver is not available"): those cases print Skipped>0
-          # and exit nonzero. The proven sample must land Proven: 14, Skipped: 0. \s+ because
-          # the CLI aligns numbers with padding, e.g. "  Proven:      14".
-          echo "$OUT" | grep -Eq "Proven:\s+14\b"
+          # and exit nonzero. The proven sample must land Proven: 11, Skipped: 0 (14 before 0.30: #1618 merged several `requires` into one refinement each). \s+ because
+          # the CLI aligns numbers with padding, e.g. "  Proven:      11".
+          echo "$OUT" | grep -Eq "Proven:\s+11\b"
           echo "$OUT" | grep -Eq "Skipped:\s+0\b"
