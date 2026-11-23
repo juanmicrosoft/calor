@@ -127,7 +127,14 @@
       "rid": "linux-x64",
       "workflow": ".github/workflows/test.yml",
       "job": "remaining-tests",
-      "coverage": "Full suites of 11 manifest projects, with check_trx.py inventory enforcement. Calor.Ids.Tests runs in the id-validation job and Calor.Performance.Tests in performance.yml; publish-nuget.yml's test job runs all 13 before a release."
+      "coverage": "Full suites of 10 manifest projects, with check_trx.py inventory enforcement. Calor.Compiler.Tests runs in compiler-shards (#1749). Calor.Ids.Tests runs in the id-validation job and Calor.Performance.Tests in performance.yml; publish-nuget.yml's test job runs all 13 before a release."
+    },
+    {
+      "consumer": "test-hosts",
+      "rid": "linux-x64",
+      "workflow": ".github/workflows/test.yml",
+      "job": "compiler-shards",
+      "coverage": "The full Calor.Compiler.Tests suite over three jobs (compiler-1, compiler-2, compiler-replay), each checking its own parts with check_trx.py --partial; the tests (compiler) job checks all parts together against eng/test-manifest.json (#1749)."
     },
     {
       "consumer": "test-hosts",
