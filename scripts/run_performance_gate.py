@@ -13,10 +13,32 @@ def assess(samples: list[float], maximum: float) -> tuple[float, bool]:
     return median, median <= maximum
 
 
+INDEX_TEST = "IndexBuildStaysWithinItsBudget"
+
+
+def trx_seconds(duration: str) -> float:
+    """A TRX duration ("hh:mm:ss.fffffff") in seconds."""
+    hours, minutes, seconds = duration.split(":")
+    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+
+
+def index_build_seconds(trx: Path) -> float | None:
+    """The index-build test's own duration in one run's TRX, or None if it is absent."""
+    for result in ET.parse(trx).iterfind(".//{*}UnitTestResult"):
+        if result.attrib.get("testName", "").endswith(INDEX_TEST) and "duration" in result.attrib:
+            return trx_seconds(result.attrib["duration"])
+    return None
+
+
 def self_test() -> None:
     median, passed = assess([8.0, 9.0, 40.0], 7.5)
     if passed or median != 9.0:
         raise AssertionError("performance threshold regression was not detected")
+    if abs(trx_seconds("00:00:02.5000000") - 2.5) > 1e-9 or trx_seconds("00:01:01.0000000") != 61.0:
+        raise AssertionError("TRX durations are not read correctly")
+    median, passed = assess([trx_seconds("00:00:03.9000000"), 4.1, 2.0], 3.75)
+    if passed or median != 3.9:
+        raise AssertionError("index-build regression was not detected")
     print("Performance ratchet negative self-test passed.")
 
 
@@ -35,12 +57,14 @@ def main() -> int:
     measured = int(baseline["measuredRuns"])
     expected_tests = int(baseline["expectedTestCount"])
     metric = baseline["metrics"]["performance-suite-seconds"]
+    index_metric = baseline["metrics"]["index-build-seconds"]
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     log_dir = output.parent / "logs"
     log_dir.mkdir(exist_ok=True)
 
     samples: list[float] = []
+    index_samples: list[float] = []
     for index in range(warmups + measured):
         results_dir = log_dir / f"results-{index + 1}"
         command = [
@@ -109,17 +133,22 @@ def main() -> int:
                 f"expected tests with {passed} passing; see {trx}"
             )
             return 1
+        # #1738: the project-index build is the suite's largest single cost and has
+        # its own ceiling (index-build-seconds), from its duration in each run's TRX.
+        index_seconds = index_build_seconds(trx)
+        if index_seconds is None:
+            print(f"ERROR: {INDEX_TEST} has no duration in {trx}")
+            return 1
         if index >= warmups:
             samples.append(elapsed)
-        print(f"{kind} run {index + 1}: {elapsed:.3f}s")
-        # #1738: the project-index build is the suite's largest single cost; its own
-        # duration is logged per run so it can be calibrated from CI without the TRX.
-        for result in ET.parse(trx).iterfind(".//{*}UnitTestResult"):
-            if result.attrib.get("testName", "").endswith("IndexBuildStaysWithinItsBudget"):
-                print(f"  IndexBuildStaysWithinItsBudget: {result.attrib.get('duration', '?')}")
+            index_samples.append(index_seconds)
+        print(f"{kind} run {index + 1}: {elapsed:.3f}s ({INDEX_TEST}: {index_seconds:.3f}s)")
 
     maximum = float(metric["maximumMedian"])
-    median, passed = assess(samples, maximum)
+    median, suite_passed = assess(samples, maximum)
+    index_maximum = float(index_metric["maximumMedian"])
+    index_median, index_passed = assess(index_samples, index_maximum)
+    passed = suite_passed and index_passed
     report = {
         "schemaVersion": 1,
         "metric": "performance-suite-seconds",
@@ -128,11 +157,23 @@ def main() -> int:
         "maximumMedian": maximum,
         "noisePolicy": metric["noisePolicy"],
         "passed": passed,
+        "indexBuild": {
+            "metric": "index-build-seconds",
+            "samples": [round(sample, 3) for sample in index_samples],
+            "median": round(index_median, 3),
+            "maximumMedian": index_maximum,
+            "noisePolicy": index_metric["noisePolicy"],
+            "passed": index_passed,
+        },
     }
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(f"median: {median:.3f}s (maximum {maximum:.3f}s)")
-    if not passed:
+    print(f"{INDEX_TEST} median: {index_median:.3f}s (maximum {index_maximum:.3f}s)")
+    if not suite_passed:
         print("ERROR: performance median exceeded the ratcheted maximum")
+    if not index_passed:
+        print(f"ERROR: {INDEX_TEST} median exceeded the index-build-seconds maximum")
+    if not passed:
         return 1
     return 0
 
