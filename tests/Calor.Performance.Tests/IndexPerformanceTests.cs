@@ -27,7 +27,8 @@ namespace Calor.Performance.Tests;
 /// </summary>
 public sealed class IndexPerformanceFixture : IDisposable
 {
-    // Built once and shared. Each build costs ~0.4s on the project-scale corpus,
+    // Built once and shared. Each build costs ~2-3s on the CI runner (#1738; ceiling in
+    // eng/performance-baselines.json, index-build-seconds),
     // and the suite carries a ratcheted total-duration ceiling — rebuilding per
     // test would spend that budget on setup rather than on coverage.
     public IndexPerformanceFixture()
