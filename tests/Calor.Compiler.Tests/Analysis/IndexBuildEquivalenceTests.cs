@@ -301,29 +301,31 @@ public sealed class IndexBuildEquivalenceTests
     }
 
     [Fact]
-    public void ForEachModule_RunsOnTheCallingThread_InsideTheSequentialScope()
+    public void ForEachModule_RunsOnTheCallingThread_InsideTheReferencePass()
     {
         var thread = Environment.CurrentManagedThreadId;
-        using (CallGraphAnalysis.RunModuleWorkSequentially())
+        using (CallGraphAnalysis.RunAsReferencePass())
         {
-            Assert.True(CallGraphAnalysis.ModuleWorkIsSequential);
+            Assert.True(CallGraphAnalysis.IsReferencePass);
             var threads = CallGraphAnalysis.ForEachModule(Enumerable.Range(0, 64).ToArray(),
                 _ => Environment.CurrentManagedThreadId);
             Assert.All(threads, result => Assert.Equal(thread, result.Value));
         }
-        Assert.False(CallGraphAnalysis.ModuleWorkIsSequential);
+        Assert.False(CallGraphAnalysis.IsReferencePass);
     }
 
     /// <summary>
-    /// The index build runs its per-module work concurrently: the source-call bindings
-    /// prewarm, the registry's plain and annotated projections, the shared image's parse
-    /// check, the effect summaries and the identity store's declaration parses. Built over
-    /// the project-scale fixture with all of it sequential (as before #1738) and then
-    /// concurrently, the serialized index is byte-identical: declarations, occurrences,
+    /// The index build runs its per-module work concurrently (parsing, the source-call
+    /// bindings prewarm, the registry's plain and annotated projections, the shared image's
+    /// parse check, the effect summaries and the identity store's declaration parses) and
+    /// reuses values while no AST changes (each module's binding in the effect pass, its
+    /// snapshot identity, repeated source-call answers). Built over the project-scale
+    /// fixture as the reference pass (sequential, no reuse: as before #1738) and then the
+    /// optimized way, the serialized index is byte-identical: declarations, occurrences,
     /// call edges, contracts, effect rows and residuals.
     /// </summary>
     [Fact]
-    public void IndexBuild_IsByteIdentical_WhenItsPerModuleWorkRunsConcurrently()
+    public void IndexBuild_IsByteIdentical_ToTheReferencePass()
     {
         var root = Path.Combine(Path.GetTempPath(), $"calor-index-equivalence-{Guid.NewGuid():N}");
         try
@@ -341,7 +343,7 @@ public sealed class IndexBuildEquivalenceTests
             ProjectIndexBuilder.Build(options);
 
             string sequential;
-            using (CallGraphAnalysis.RunModuleWorkSequentially())
+            using (CallGraphAnalysis.RunAsReferencePass())
                 sequential = Serialize(ProjectIndexBuilder.Build(options), root, "sequential");
             var concurrent = Serialize(ProjectIndexBuilder.Build(options), root, "concurrent");
 
@@ -362,6 +364,40 @@ public sealed class IndexBuildEquivalenceTests
         }
     }
 
-    private static string FixtureRoot => Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot,
+    // --- Reuse guarded by the AST mutation count (#1738, bind once) --------------------
+
+    internal static ModuleNode ParseFixtureModule(string name)
+    {
+        var diagnostics = new DiagnosticBag();
+        var source = File.ReadAllText(Path.Combine(FixtureRoot, name));
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors);
+        return module;
+    }
+
+    private static string[] BoundSymbolIds(ModuleNode module, string path) =>
+        new Binder(new DiagnosticBag(), path).Bind(module).SymbolsById.Keys
+            .Select(id => id.Value).Order(StringComparer.Ordinal).ToArray();
+
+    [Fact]
+    public void SnapshotIdentity_IsReusedOnlyUntilTheTreeChanges()
+    {
+        var module = ParseFixtureModule("l1m01.calr");
+        var first = BoundSymbolIds(module, "l1m01.calr");
+        Assert.Equal(first, BoundSymbolIds(module, "l1m01.calr"));
+
+        // A row edit changes the snapshot key, so the snapshot-local symbol IDs change too.
+        var method = module.Classes.SelectMany(cls => cls.Methods).First();
+        method.Effects = new EffectsNode(method.Span,
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["cw"] = "*" });
+        var reused = BoundSymbolIds(module, "l1m01.calr");
+        string[] reference;
+        using (CallGraphAnalysis.RunAsReferencePass())
+            reference = BoundSymbolIds(module, "l1m01.calr");
+        Assert.Equal(reference, reused);
+        Assert.NotEqual(first, reused);
+    }
+
+    internal static string FixtureRoot => Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot,
         "bench", "phase0-agent-native", "latency", "fixture-10k", "src");
 }

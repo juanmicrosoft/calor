@@ -47,8 +47,7 @@ public sealed class UsingDirectiveNode : AstNode
         Alias = alias;
         IsStatic = isStatic;
         IsGlobal = isGlobal;
-        NamespaceIdentity = namespaceIdentity;
-        NamespaceScopeId = namespaceScopeId;
+        InitializeNamespace(namespaceIdentity, namespaceScopeId);
     }
 
 

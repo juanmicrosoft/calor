@@ -29,13 +29,14 @@ public sealed class OutputNode : AstNode
     /// Position 6 of docs/design/effect-rows-in-the-type-system.md §3.3.
     /// A <c>§E</c> on a later line is the declaration's own row, not this.
     /// </summary>
-    public EffectsNode? Row { get; internal set; }
+    public EffectsNode? Row { get => _row; internal set => AstMutation.Set(ref _row, value); }
+    private EffectsNode? _row;
 
     public OutputNode(TextSpan span, string typeName, TextSpan? typeNameSpan = null, EffectsNode? row = null) : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
-        Row = row;
+        _row = row;
     }
 
 
@@ -130,7 +131,7 @@ public sealed class FunctionNode : AstNode
     }
 
     internal void SetSynthesizedEffectParameters(IReadOnlyList<EffectParameterInfo> parameters)
-        => _effectParameters = parameters;
+        => AstMutation.Set(ref _effectParameters, parameters);
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
     /// <summary>
@@ -140,7 +141,8 @@ public sealed class FunctionNode : AstNode
     /// of Calor source cannot emit a body that its own row contradicts. Nothing
     /// else may rewrite a parsed declaration's row.
     /// </summary>
-    public EffectsNode? Effects { get; internal set; }
+    public EffectsNode? Effects { get => _effects; internal set => AstMutation.Set(ref _effects, value); }
+    private EffectsNode? _effects;
     public IReadOnlyList<RequiresNode> Preconditions { get; }
     public IReadOnlyList<EnsuresNode> Postconditions { get; }
     public IReadOnlyList<StatementNode> Body { get; }
@@ -269,7 +271,7 @@ public sealed class FunctionNode : AstNode
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
-        Effects = effects;
+        _effects = effects;
         Preconditions = preconditions ?? throw new ArgumentNullException(nameof(preconditions));
         Postconditions = postconditions ?? throw new ArgumentNullException(nameof(postconditions));
         Body = body ?? throw new ArgumentNullException(nameof(body));
@@ -361,7 +363,8 @@ public sealed class ParameterNode : AstNode
     /// <c>(Func&lt;i32,i32&gt;:f §E{cw}, i32:v)</c> (inline form, position 5).
     /// See docs/design/effect-rows-in-the-type-system.md §3.3.
     /// </summary>
-    public EffectsNode? Row { get; internal set; }
+    public EffectsNode? Row { get => _row; internal set => AstMutation.Set(ref _row, value); }
+    private EffectsNode? _row;
 
     public ParameterNode(
         TextSpan span,
@@ -416,7 +419,7 @@ public sealed class ParameterNode : AstNode
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();
         DefaultValue = defaultValue;
         InlineRefinement = inlineRefinement;
-        Row = row;
+        _row = row;
     }
 
 

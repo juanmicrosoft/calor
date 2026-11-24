@@ -261,7 +261,7 @@ public sealed class PropertyAccessorNode : AstNode
     /// the declared effects, and <c>! unknown</c> admits any effect. Readers are charged the
     /// body's computed effects and the declared row.
     /// </summary>
-    public EffectsNode? Effects { get; set; }
+    public EffectsNode? Effects { get; set => AstMutation.Set(ref field, value); }
 
     public bool IsAutoImplemented => Body.Count == 0;
 
@@ -290,7 +290,7 @@ public sealed class ConstructorNode : AstNode
     /// the intrinsic initialization contract (<c>mut</c>, <c>alloc</c>); with one it may
     /// also perform the declared effects, and <c>! unknown</c> admits any effect.
     /// </summary>
-    public EffectsNode? Effects { get; set; }
+    public EffectsNode? Effects { get; set => AstMutation.Set(ref field, value); }
     public ConstructorInitializerNode? Initializer { get; }
     public IReadOnlyList<StatementNode> Body { get; }
     public AttributeCollection Attributes { get; }

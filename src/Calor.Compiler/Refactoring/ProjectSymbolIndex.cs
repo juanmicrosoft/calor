@@ -41,7 +41,15 @@ public sealed record IndexedDocument(
     string Source,
     ModuleNode Ast,
     BoundModule BoundModule,
-    bool BindHadErrors = false);
+    bool BindHadErrors = false)
+{
+    /// <summary>
+    /// #1738: the binding that produced <see cref="BoundModule"/>, offered to the effect
+    /// pass, which reuses it only when it is the bind it would make itself. Null when the
+    /// AST changed while it was bound.
+    /// </summary>
+    internal Analysis.CallGraphAnalysis.PriorModuleBinding? Binding { get; init; }
+}
 
 /// <summary>
 /// A call resolved to a declaration, attributed to the function containing it.
@@ -94,6 +102,9 @@ public sealed class ProjectSymbolIndex
     public IReadOnlyList<IndexedDocument> Documents { get; }
     internal CrossModuleTypeRegistry SourceTypes { get; }
 
+    /// <summary>The cross-module function map every document was bound over (null for one file).</summary>
+    internal IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctions { get; private init; }
+
     /// <summary>Calls resolved to a declaration, attributed to their containing function.</summary>
     public IReadOnlyList<ProjectCallEdge> CallEdges => _callEdges;
 
@@ -131,10 +142,14 @@ public sealed class ProjectSymbolIndex
         var parsed = new List<(string Path, string Source, ModuleNode Ast)>();
         var sourceHashes = new Dictionary<string, string>(BuildStateCache.GetPathComparer());
 
-        foreach (var path in filePaths.OrderBy(path => path, StringComparer.Ordinal))
+        // Reading, lexing and parsing a file read that file alone, so the files are parsed
+        // concurrently (#1738) and taken in path order: the same hashes, the same skipped
+        // files, and a read or lex failure surfaces as the first one in that order.
+        var ordered = filePaths.OrderBy(path => path, StringComparer.Ordinal).ToArray();
+        var reads = Analysis.CallGraphAnalysis.ForEachModule(ordered, path =>
         {
             var bytes = File.ReadAllBytes(path);
-            sourceHashes[Path.GetFullPath(path)] = BuildStateCache.ComputeContentHash(bytes);
+            var hash = BuildStateCache.ComputeContentHash(bytes);
             var source = CompilationDriver.DecodeSource(bytes);
             var parseDiagnostics = new DiagnosticBag();
             var parser = new Parser(new Lexer(source, parseDiagnostics).TokenizeAllForParser(), parseDiagnostics);
@@ -145,11 +160,16 @@ public sealed class ProjectSymbolIndex
             }
             catch (Exception)
             {
-                failed.Add(path);
-                continue;
+                ast = null;
             }
-
-            if (ast == null || parseDiagnostics.HasErrors)
+            return (Hash: hash, Source: source, Ast: ast == null || parseDiagnostics.HasErrors ? null : ast);
+        });
+        for (var position = 0; position < ordered.Length; position++)
+        {
+            var path = ordered[position];
+            var (hash, source, ast) = reads[position].Value;
+            sourceHashes[Path.GetFullPath(path)] = hash;
+            if (ast == null)
             {
                 failed.Add(path);
                 continue;
@@ -184,18 +204,27 @@ public sealed class ProjectSymbolIndex
         var crossModuleFunctions = parsed.Count > 1
             ? CompilationDriver.BuildCrossModuleFunctionMap(parsed.Select(document => document.Ast).ToList())
             : null;
-        PrewarmSourceCallBindings(parsed.Select(document => (document.Path, document.Ast)).ToArray(), sourceTypes);
+        // The prewarm runs on the thread pool while this thread binds: a binder that asks
+        // for a module the prewarm has answered takes the answer, and one that asks first
+        // resolves it itself (the same answer either way, see PrewarmSourceCallBindings).
+        var prewarm = PrewarmSourceCallBindings(parsed.Select(document => (document.Path, document.Ast)).ToArray(),
+            sourceTypes, crossModuleFunctions);
         foreach (var (path, source, ast) in parsed)
         {
             var bindDiagnostics = new DiagnosticBag();
             BoundModule bound;
+            // The AST mutation count before the bind: the binding is offered to the effect
+            // pass only while it is unchanged (see CallGraphAnalysis.PriorModuleBinding).
+            var version = AstMutation.Version;
+            Binder binder;
             try
             {
-                bound = new Binder(bindDiagnostics, path)
+                binder = new Binder(bindDiagnostics, path)
                 {
                     CrossModuleTypes = sourceTypes,
                     CrossModuleFunctionModules = crossModuleFunctions
-                }.Bind(ast);
+                };
+                bound = binder.Bind(ast);
             }
             catch (Exception)
             {
@@ -203,48 +232,71 @@ public sealed class ProjectSymbolIndex
                 continue;
             }
 
-            documents.Add(new IndexedDocument(path, source, ast, bound, bindDiagnostics.HasErrors));
+            documents.Add(new IndexedDocument(path, source, ast, bound, bindDiagnostics.HasErrors)
+            {
+                Binding = AstMutation.Version == version
+                    ? new Analysis.CallGraphAnalysis.PriorModuleBinding(ast, path, sourceTypes, crossModuleFunctions,
+                        ContractMode.Debug, version, binder, bound, bindDiagnostics)
+                    : null,
+            });
         }
 
+        prewarm?.Wait();
         skipped = failed;
         sourceTypes.EnsureSourceSnapshots();
-        var index = new ProjectSymbolIndex(documents, sourceTypes);
+        var index = new ProjectSymbolIndex(documents, sourceTypes) { CrossModuleFunctions = crossModuleFunctions };
         index.Populate();
         return index;
     }
 
     /// <summary>
-    /// Resolves every module's source-call bindings (the Roslyn binding of its C#
-    /// image) on all cores, before the sequential bind, and leaves the answers in the
-    /// pass's <see cref="Analysis.CallGraphAnalysis.OperatorBindingsMemo"/> (#1738).
+    /// Resolves every module's source-call bindings (the Roslyn binding of its C# image)
+    /// on the thread pool while the caller binds, leaving the answers in the pass's
+    /// <see cref="Analysis.CallGraphAnalysis.OperatorBindingsMemo"/> (#1738). The first
+    /// module is resolved before this returns: it builds the pass's shared image and
+    /// compilation, which every later request waits for anyway. The returned task (null
+    /// when there is nothing to prewarm) finishes the rest.
     ///
-    /// <para>Each request is exactly the one a module's binder makes later
-    /// (<c>Binder.SourceCallBindings</c>: the same module object, the binder's default
+    /// <para>Two requests per module, each exactly as a later consumer makes it: the
+    /// binder's (<c>Binder.SourceCallBindings</c>: the same module object, the default
     /// projection contract mode, the same registry and source path, a single-module
-    /// context and no cross-module map); the effect pass's binder makes the same request.
-    /// The memo returns a recorded answer only to an equal request whose projection
-    /// text is exactly the text the answer was computed from, and otherwise the
-    /// request is resolved again as before, so this can only change when an answer is
+    /// context, no cross-module map; the effect pass's binder makes the same one) and the
+    /// effect pass's call graph's (the same, with the cross-module map and a multi-module
+    /// context). The memo answers a request only when it is equal to a recorded one and its
+    /// projection text is the recorded text, or when it repeats a recorded request while no
+    /// AST has changed; otherwise the request is resolved again, as before. A consumer
+    /// that asks before the prewarm reaches its module resolves it itself, and both
+    /// resolutions give the same answer. So the prewarm changes when an answer is
     /// computed, never what it is. A request is a function of the module, the shared
-    /// compilation and the request itself: the shared image, its compilations, their
-    /// semantic models and diagnostics are built once under locks or lazies and read
-    /// concurrently, and each request writes only its own bindings and the memo
-    /// (under its lock). The only thing a request reports to its caller is the
-    /// projection's emission diagnostics, and those are reported again by the later
-    /// request, which emits the projection to compare it. A request that throws here is
-    /// left unanswered, so the later request throws as before.</para>
+    /// compilation and the request: the shared image, its compilations, their semantic
+    /// models and diagnostics are built once under locks or lazies and read concurrently,
+    /// and each request writes only its own bindings and the memo (under its lock). It
+    /// reports nothing but the projection's emission diagnostics, and the consumer's own
+    /// request reports those to its own bag. A request that throws here is left
+    /// unanswered, so the consumer's request throws as before. The snapshot identity of
+    /// each module is computed here too (see <c>Binder.SnapshotIdentity</c>).</para>
     /// </summary>
-    private static void PrewarmSourceCallBindings(
-        IReadOnlyList<(string Path, ModuleNode Ast)> modules, CrossModuleTypeRegistry sourceTypes)
+    private static Task? PrewarmSourceCallBindings(
+        IReadOnlyList<(string Path, ModuleNode Ast)> modules, CrossModuleTypeRegistry sourceTypes,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
     {
-        if (Analysis.CallGraphAnalysis.ModuleWorkIsSequential || modules.Count < 2)
-            return;
+        if (Analysis.CallGraphAnalysis.IsReferencePass || modules.Count < 2)
+            return null;
         void Resolve((string Path, ModuleNode Ast) module)
         {
             try
             {
+                // The module's snapshot identity too: every bind of the module reads it, and
+                // it is kept while no AST changes (Binder.SnapshotIdentity).
+                Binder.PrewarmSnapshotIdentity(module.Ast);
                 Analysis.CallGraphAnalysis.ResolveOperatorCalls(module.Ast, diagnostics: null,
                     ContractMode.Debug, crossModuleTypes: sourceTypes, sourcePath: module.Path);
+                // And the effect pass's call-graph request over the same map, which the effect
+                // rows ask for later (ProjectIndexBuilder.PrewarmCallGraphBindings).
+                if (crossModuleFunctions is not null)
+                    Analysis.CallGraphAnalysis.ResolveOperatorCalls(module.Ast, diagnostics: null,
+                        ContractMode.Debug, singleModuleContext: false, crossModuleTypes: sourceTypes,
+                        sourcePath: module.Path, crossModuleFunctions: crossModuleFunctions);
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
@@ -254,7 +306,7 @@ public sealed class ProjectSymbolIndex
         // which spreads its own per-module work over the cores); the rest then bind
         // against it concurrently instead of queueing behind its locks.
         Resolve(modules[0]);
-        System.Threading.Tasks.Parallel.For(1, modules.Count, index => Resolve(modules[index]));
+        return Task.Run(() => System.Threading.Tasks.Parallel.For(1, modules.Count, index => Resolve(modules[index])));
     }
 
     /// <summary>Every indexed occurrence in one file, in document order.</summary>

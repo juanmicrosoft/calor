@@ -1368,10 +1368,7 @@ public sealed class Binder
         _misplacedRowsReported.Clear();
         _currentNamespaceIdentity = null;
         _currentNamespaceScopeId = null;
-        _transientBindingId = CreateSnapshotIdentityKey(module, out var hasToolingIdentity);
-        _toolingIds = hasToolingIdentity
-            ? Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal)
-            : new HashSet<string>(StringComparer.Ordinal);
+        (_transientBindingId, _toolingIds) = SnapshotIdentity(module);
         _moduleSymbolId = module.ToolingId != null
             ? SymbolId.Create("declaration", module.ToolingId)
             : SymbolId.Create("source", _sourceIdentity, "module", module.Name);
@@ -2220,6 +2217,45 @@ public sealed class Binder
 
     private static string SnapshotIdentityKey(ModuleNode module) =>
         CreateSnapshotIdentityKey(module, out _);
+
+    // A module's snapshot key and tooling IDs, with the AST mutation count they were
+    // computed under (#1738).
+    private sealed record SnapshotIdentityEntry(long Version, string Key, HashSet<string> ToolingIds);
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ModuleNode, SnapshotIdentityEntry>
+        SnapshotIdentities = new();
+
+    /// <summary>
+    /// Computes and keeps the module's snapshot identity ahead of its binds, so a project
+    /// pass can do it for every module concurrently (#1738).
+    /// </summary>
+    internal static void PrewarmSnapshotIdentity(ModuleNode module) => SnapshotIdentity(module);
+
+    /// <summary>
+    /// The module's snapshot key and the tooling IDs it declares. Both are functions of
+    /// the module's AST alone: the key hashes every node's properties, the IDs are read
+    /// off its declarations. A module is bound several times in one project pass (the
+    /// symbol index, the effect summary, the effect pass, cross-module declaration
+    /// lookups), so the pair is kept with the <see cref="AstMutation.Version"/> it was
+    /// computed under and reused only while that count is unchanged: no node anywhere has
+    /// changed since, so computing it again would read the same tree and give the same
+    /// pair. Any mutation computes it afresh. The ID set is only read by binders.
+    /// </summary>
+    private static (string Key, HashSet<string> ToolingIds) SnapshotIdentity(ModuleNode module)
+    {
+        var reuse = !CallGraphAnalysis.IsReferencePass;
+        var version = AstMutation.Version;
+        if (reuse && SnapshotIdentities.TryGetValue(module, out var cached) && cached.Version == version)
+            return (cached.Key, cached.ToolingIds);
+        var key = CreateSnapshotIdentityKey(module, out var hasToolingIdentity);
+        var toolingIds = hasToolingIdentity
+            ? Ids.DeclarationIdentityStore.ToolingIds(module).ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
+        // Kept only when nothing changed while it was computed.
+        if (reuse && AstMutation.Version == version)
+            SnapshotIdentities.AddOrUpdate(module, new SnapshotIdentityEntry(version, key, toolingIds));
+        return (key, toolingIds);
+    }
 
     private static string CreateSnapshotIdentityKey(ModuleNode module, out bool hasToolingIdentity)
     {

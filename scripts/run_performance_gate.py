@@ -85,10 +85,18 @@ def main() -> int:
                 command, stdout=sink, stderr=subprocess.STDOUT, check=False
             )
         elapsed = time.monotonic() - started
+        trx = results_dir / "results.trx"
         if completed.returncode != 0:
             print(f"ERROR: performance test run failed; see {log}")
+            # Name the failing tests in the job log itself, so a failure can be read
+            # without the uploaded artifacts.
+            if trx.is_file():
+                for result in ET.parse(trx).iterfind(".//{*}UnitTestResult"):
+                    if result.attrib.get("outcome") == "Failed":
+                        message = result.find(".//{*}Message")
+                        print(f"  FAILED {result.attrib.get('testName', '?')}: "
+                              f"{(message.text or '').strip()[:500] if message is not None else ''}")
             return 1
-        trx = results_dir / "results.trx"
         if not trx.is_file():
             print(f"ERROR: performance test run produced no TRX report; see {log}")
             return 1
@@ -104,6 +112,11 @@ def main() -> int:
         if index >= warmups:
             samples.append(elapsed)
         print(f"{kind} run {index + 1}: {elapsed:.3f}s")
+        # #1738: the project-index build is the suite's largest single cost; its own
+        # duration is logged per run so it can be calibrated from CI without the TRX.
+        for result in ET.parse(trx).iterfind(".//{*}UnitTestResult"):
+            if result.attrib.get("testName", "").endswith("IndexBuildStaysWithinItsBudget"):
+                print(f"  IndexBuildStaysWithinItsBudget: {result.attrib.get('duration', '?')}")
 
     maximum = float(metric["maximumMedian"])
     median, passed = assess(samples, maximum)
