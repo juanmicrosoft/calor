@@ -1004,6 +1004,34 @@ public sealed class CallGraphAnalysis
                     ? (answer.EmissionDiagnostics, answer.Bindings) : null;
         }
 
+        private readonly Dictionary<Repeat, TaskCompletionSource> _inFlight = [];
+
+        /// <summary>
+        /// Null when the caller now owns the resolution of <paramref name="request"/> (and
+        /// must call <see cref="LeaveInFlight"/>); otherwise the task that completes when the
+        /// thread already resolving the same request finishes.
+        /// </summary>
+        internal Task? JoinInFlight(Repeat request)
+        {
+            lock (_answers)
+            {
+                if (_inFlight.TryGetValue(request, out var running))
+                    return running.Task;
+                _inFlight[request] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                return null;
+            }
+        }
+
+        internal void LeaveInFlight(Repeat request)
+        {
+            TaskCompletionSource? running;
+            lock (_answers)
+            {
+                _inFlight.Remove(request, out running);
+            }
+            running?.SetResult();
+        }
+
         /// <summary>
         /// Records a fully resolved request, only when no AST changed while it was resolved
         /// (<paramref name="version"/> is the count read before the request started).
@@ -1049,16 +1077,50 @@ public sealed class CallGraphAnalysis
         // A request repeated with the same arguments while no AST changed has the answer
         // its first resolution recorded (see OperatorBindingsMemo.FindRepeat).
         var version = AstMutation.Version;
-        var repeat = crossModuleTypes?.OperatorBindingsMemo is null || IsReferencePass ? null
+        var memo = crossModuleTypes?.OperatorBindingsMemo;
+        var repeat = memo is null || IsReferencePass ? null
             : new OperatorBindingsMemo.Repeat(module, contractMode, singleModuleContext, sourcePath,
                 Binding.Metadata.MetadataContext.ProjectionReferences(),
                 Binding.Metadata.MetadataContext.CurrentReferenceScope, crossModuleFunctions);
-        if (repeat is not null && crossModuleTypes!.OperatorBindingsMemo!.FindRepeat(repeat, version) is { } repeated)
+        if (repeat is null)
+            return ResolveOperatorCallsCore(module, diagnostics, contractMode, singleModuleContext,
+                crossModuleTypes, sourcePath, crossModuleFunctions, null, version);
+        OperatorBindings? Repeated()
         {
+            if (memo!.FindRepeat(repeat, version) is not { } repeated)
+                return null;
             foreach (var diagnostic in repeated.EmissionDiagnostics)
                 diagnostics?.Add(diagnostic);
             return repeated.Bindings;
         }
+        if (Repeated() is { } answer)
+            return answer;
+        // One resolution per request at a time: a request that another thread is already
+        // resolving waits for it and takes the recorded answer (the same answer it would
+        // compute). If none was recorded (the other resolution failed, or an AST changed)
+        // it resolves the request itself.
+        if (memo!.JoinInFlight(repeat) is { } running)
+        {
+            running.Wait();
+            return Repeated() ?? ResolveOperatorCallsCore(module, diagnostics, contractMode, singleModuleContext,
+                crossModuleTypes, sourcePath, crossModuleFunctions, repeat, version);
+        }
+        try
+        {
+            return ResolveOperatorCallsCore(module, diagnostics, contractMode, singleModuleContext,
+                crossModuleTypes, sourcePath, crossModuleFunctions, repeat, version);
+        }
+        finally
+        {
+            memo.LeaveInFlight(repeat);
+        }
+    }
+
+    private static OperatorBindings ResolveOperatorCallsCore(ModuleNode module, DiagnosticBag? diagnostics,
+        ContractMode contractMode, bool singleModuleContext, ISourceBindingContext? crossModuleTypes,
+        string? sourcePath, IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+        OperatorBindingsMemo.Repeat? repeat, long version)
+    {
         var bindings = new OperatorBindings();
         var types = bindings.ResultTypes;
         var bindingFailures = bindings.Failures;

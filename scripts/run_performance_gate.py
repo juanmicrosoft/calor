@@ -104,6 +104,11 @@ def main() -> int:
         if index >= warmups:
             samples.append(elapsed)
         print(f"{kind} run {index + 1}: {elapsed:.3f}s")
+        # #1738: the project-index build is the suite's largest single cost; its own
+        # duration is logged per run so it can be calibrated from CI without the TRX.
+        for result in ET.parse(trx).iter("{*}UnitTestResult"):
+            if result.attrib.get("testName", "").endswith("IndexBuildStaysWithinItsBudget"):
+                print(f"  IndexBuildStaysWithinItsBudget: {result.attrib.get('duration', '?')}")
 
     maximum = float(metric["maximumMedian"])
     median, passed = assess(samples, maximum)
