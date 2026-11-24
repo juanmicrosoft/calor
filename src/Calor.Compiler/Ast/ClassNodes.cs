@@ -182,7 +182,8 @@ public sealed class MethodSignatureNode : AstNode
     /// of Calor source cannot emit a body that its own row contradicts. Nothing
     /// else may rewrite a parsed declaration's row.
     /// </summary>
-    public EffectsNode? Effects { get; internal set; }
+    public EffectsNode? Effects { get => _effects; internal set => AstMutation.Set(ref _effects, value); }
+    private EffectsNode? _effects;
     public IReadOnlyList<RequiresNode> Preconditions { get; }
     public IReadOnlyList<EnsuresNode> Postconditions { get; }
     public AttributeCollection Attributes { get; }
@@ -249,7 +250,7 @@ public sealed class MethodSignatureNode : AstNode
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
-        Effects = effects;
+        _effects = effects;
         Preconditions = preconditions ?? Array.Empty<RequiresNode>();
         Postconditions = postconditions ?? Array.Empty<EnsuresNode>();
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
@@ -303,7 +304,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// is unchanged. A type with an explicit static constructor declares the row there.
     /// Readers of the type's static fields are charged the initializers' effects and this row.
     /// </summary>
-    public EffectsNode? StaticInitializerEffects { get; set; }
+    public EffectsNode? StaticInitializerEffects { get; set => AstMutation.Set(ref field, value); }
 
     public bool IsRecord { get; }
     public IReadOnlyList<ParameterNode>? RecordParameters { get; }
@@ -397,7 +398,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// <summary>
     /// Source file path for partial class tracking (set during project-level migration).
     /// </summary>
-    public string? SourceFile { get; set; }
+    public string? SourceFile { get; set => AstMutation.Set(ref field, value); }
 
     /// <summary>
     /// Nested class/struct/record declarations inside this type.
@@ -769,7 +770,7 @@ public sealed class MethodNode : AstNode
     }
 
     internal void SetSynthesizedEffectParameters(IReadOnlyList<EffectParameterInfo> parameters)
-        => _effectParameters = parameters;
+        => AstMutation.Set(ref _effectParameters, parameters);
 
     public IReadOnlyList<ParameterNode> Parameters { get; }
     public OutputNode? Output { get; }
@@ -780,7 +781,8 @@ public sealed class MethodNode : AstNode
     /// of Calor source cannot emit a body that its own row contradicts. Nothing
     /// else may rewrite a parsed declaration's row.
     /// </summary>
-    public EffectsNode? Effects { get; internal set; }
+    public EffectsNode? Effects { get => _effects; internal set => AstMutation.Set(ref _effects, value); }
+    private EffectsNode? _effects;
     public IReadOnlyList<RequiresNode> Preconditions { get; }
     public IReadOnlyList<EnsuresNode> Postconditions { get; }
     public IReadOnlyList<StatementNode> Body { get; }
@@ -848,7 +850,7 @@ public sealed class MethodNode : AstNode
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
-        Effects = effects;
+        _effects = effects;
         Preconditions = preconditions ?? throw new ArgumentNullException(nameof(preconditions));
         Postconditions = postconditions ?? throw new ArgumentNullException(nameof(postconditions));
         Body = body ?? throw new ArgumentNullException(nameof(body));
@@ -937,7 +939,7 @@ public sealed class OperatorOverloadNode : AstNode
     public IReadOnlyList<CalorAttributeNode> CSharpAttributes { get; }
 
     public bool IsConversion => Kind == OperatorOverloadKind.Implicit || Kind == OperatorOverloadKind.Explicit;
-    public EffectsNode? Effects { get; set; }
+    public EffectsNode? Effects { get; set => AstMutation.Set(ref field, value); }
     public bool IsUnary => Kind is OperatorOverloadKind.UnaryPlus or OperatorOverloadKind.UnaryNegate
         or OperatorOverloadKind.LogicalNot or OperatorOverloadKind.BitwiseNot
         or OperatorOverloadKind.Increment or OperatorOverloadKind.Decrement

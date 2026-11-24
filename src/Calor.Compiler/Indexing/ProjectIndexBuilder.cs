@@ -309,6 +309,12 @@ public static class ProjectIndexBuilder
         // call into another module (`OrderService.SaveOrder()`) is charged as
         // unknown by the pass and missed by the summary.
         var summaryCrossModuleMap = EffectSummaryBuilder.CrossModuleFunctionMap(modules);
+        // The symbol index bound every module over a map built the same way from its parsed
+        // modules. When the two are indistinguishable (same comparer, same entries in the
+        // same order) the index's object is used, so the effect pass's call graph can tell
+        // by reference that it binds over the same map as the index did (#1738).
+        if (CallGraphAnalysis.PriorModuleBinding.SameEntries(symbols.CrossModuleFunctions, summaryCrossModuleMap))
+            summaryCrossModuleMap = symbols.CrossModuleFunctions;
         // One summary per module, built once: the registry is built from them
         // (what CrossModuleEffectRegistry.Build(modules) does), and the same summary
         // is what each document's cross-module charge is resolved from. A summary is
@@ -325,6 +331,7 @@ public static class ProjectIndexBuilder
         var registry = CrossModuleEffectRegistry.Build(
             summaries.Select((summary, position) => (summary, modules[position].FilePath)).ToList());
         var crossPass = new CrossModuleEffectEnforcementPass(UnknownCallPolicy.Strict);
+        PrewarmCallGraphBindings(symbols, summaryCrossModuleMap);
 
         for (var position = 0; position < symbols.Documents.Count; position++)
         {
@@ -352,6 +359,7 @@ public static class ProjectIndexBuilder
                     summaryCrossModuleMap);
                 pass.CrossModuleTypes = symbols.SourceTypes;
                 pass.SourcePath = document.FilePath;
+                pass.PriorBinding = document.Binding;
                 pass.Enforce(document.Ast);
                 if (effectDiagnostics.Any(d => d.Code == DiagnosticCode.EffectInferenceDidNotConverge))
                 {
@@ -402,6 +410,37 @@ public static class ProjectIndexBuilder
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Resolves, on all cores, the source-call bindings each effect pass's call graph asks
+    /// for with the cross-module map (#1738). The request is exactly the call graph's:
+    /// <see cref="CallGraphAnalysis.Build"/> asks with the pass's projection contract mode
+    /// (<see cref="ContractMode.Debug"/> here), the project registry, the document's path,
+    /// the map, and a multi-module context. The answer lands in the pass's memo, where the
+    /// call graph's own request finds it (as a repeat while no AST has changed, otherwise
+    /// through the memo's text check, otherwise resolved afresh), so this changes when it
+    /// is computed, never what it is. Documents whose effect pass will not run are skipped;
+    /// a request that throws here is left for the call graph to throw again.
+    /// </summary>
+    private static void PrewarmCallGraphBindings(ProjectSymbolIndex symbols,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions)
+    {
+        if (crossModuleFunctions is null || CallGraphAnalysis.IsReferencePass)
+            return;
+        var documents = symbols.Documents.Where(document => !document.BindHadErrors).ToArray();
+        System.Threading.Tasks.Parallel.For(0, documents.Length, position =>
+        {
+            try
+            {
+                CallGraphAnalysis.ResolveOperatorCalls(documents[position].Ast, diagnostics: null,
+                    ContractMode.Debug, singleModuleContext: false, crossModuleTypes: symbols.SourceTypes,
+                    sourcePath: documents[position].FilePath, crossModuleFunctions: crossModuleFunctions);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+            }
+        });
     }
 
     /// <summary>

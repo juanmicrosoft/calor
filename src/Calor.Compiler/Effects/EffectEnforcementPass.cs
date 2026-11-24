@@ -24,6 +24,13 @@ public sealed class EffectEnforcementPass
     private readonly HashSet<string> _crossModuleFunctionNames;
     internal CrossModuleTypeRegistry? CrossModuleTypes { get; set; }
     internal string? SourcePath { get; set; }
+
+    /// <summary>
+    /// A binding of the module the project pass already made (#1738). The call graph uses
+    /// it only when it is the bind the call graph would make itself
+    /// (<see cref="CallGraphAnalysis.PriorModuleBinding.Answers"/>); otherwise it binds.
+    /// </summary>
+    internal CallGraphAnalysis.PriorModuleBinding? PriorBinding { get; set; }
     internal ContractMode ProjectionContractMode { get; init; } = ContractMode.Debug;
     private CrossModuleTypeRegistry _varianceTypes = null!;
     private ModuleNode _varianceModule = null!;
@@ -302,7 +309,7 @@ public sealed class EffectEnforcementPass
         // Phase 1: Build function map and call graph (includes functions and methods)
         _callGraphAnalysis = CallGraphAnalysis.Build(
             module, CrossModuleFunctionModules, contractInheritance, ProjectionContractMode,
-            CrossModuleTypes, SourcePath);
+            CrossModuleTypes, SourcePath, PriorBinding);
         if (_callGraphAnalysis.RuntimeQuantifierRejections.Count > 0)
         {
             foreach (var error in _callGraphAnalysis.RuntimeQuantifierRejections)

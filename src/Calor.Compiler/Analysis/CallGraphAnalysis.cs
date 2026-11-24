@@ -757,6 +757,80 @@ public sealed class CallGraphAnalysis
     }
 
     /// <summary>
+    /// A module bound once by a project pass, offered to the effect pass's call graph so it
+    /// does not bind the same module again (#1738). The symbol index binds each module with
+    /// <c>new Binder(bag, path) { CrossModuleTypes, CrossModuleFunctionModules }.Bind(module)</c>;
+    /// the call graph binds it with the same constructor arguments plus a projection contract
+    /// mode and a contract-inheritance result. <see cref="Answers"/> accepts the prior binding
+    /// only when that bind would be the same computation:
+    /// <list type="bullet">
+    /// <item>the same module object, source path and source registry (by reference);</item>
+    /// <item>a cross-module map with the same entries in the same order and the same key
+    /// comparer (<see cref="CodeGen.CrossModuleFunctionTarget"/> is a record, so entries
+    /// compare by value);</item>
+    /// <item>the same projection contract mode;</item>
+    /// <item>an inheritance result with no runtime contracts: the binder reads the result
+    /// only through <c>RuntimeContracts</c>, so an empty one binds exactly as no result;</item>
+    /// <item>an unchanged <see cref="AstMutation.Version"/>, recorded before the prior bind
+    /// and checked after it: no node of any tree has changed since, so the registry's
+    /// views of every module are the ones the prior bind saw.</item>
+    /// </list>
+    /// The bag holds exactly the diagnostics of that one bind. Anything else binds afresh.
+    /// </summary>
+    internal sealed record PriorModuleBinding(
+        ModuleNode Module,
+        string? SourcePath,
+        CrossModuleTypeRegistry? Types,
+        IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? CrossModuleFunctions,
+        ContractMode ProjectionContractMode,
+        long Version,
+        Binder Binder,
+        BoundModule BoundModule,
+        Diagnostics.DiagnosticBag Diagnostics)
+    {
+        internal bool Answers(ModuleNode module, string? sourcePath, CrossModuleTypeRegistry? types,
+            IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
+            ContractMode projectionContractMode, Verification.ModuleInheritanceResult contractInheritance) =>
+            !IsReferencePass
+            && ReferenceEquals(Module, module)
+            && string.Equals(SourcePath, sourcePath, StringComparison.Ordinal)
+            && ReferenceEquals(Types, types)
+            && ProjectionContractMode == projectionContractMode
+            && contractInheritance.RuntimeContracts.Count == 0
+            && SameEntries(CrossModuleFunctions, crossModuleFunctions)
+            && AstMutation.Version == Version;
+
+        /// <summary>
+        /// Whether two cross-module maps are indistinguishable to a binder: the same object,
+        /// or plain dictionaries with one key comparer and equal entries in the same order.
+        /// </summary>
+        internal static bool SameEntries(
+            IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? left,
+            IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            // Lookups must also behave the same: both plain dictionaries with one comparer.
+            if (left is not Dictionary<string, CodeGen.CrossModuleFunctionTarget> leftMap
+                || right is not Dictionary<string, CodeGen.CrossModuleFunctionTarget> rightMap
+                || !Equals(leftMap.Comparer, rightMap.Comparer) || left.Count != right.Count)
+                return false;
+            // Entry by entry in enumeration order, so a binder that iterates the map sees the
+            // same sequence too.
+            using var leftEntries = leftMap.GetEnumerator();
+            using var rightEntries = rightMap.GetEnumerator();
+            while (leftEntries.MoveNext())
+            {
+                if (!rightEntries.MoveNext()
+                    || !string.Equals(leftEntries.Current.Key, rightEntries.Current.Key, StringComparison.Ordinal)
+                    || !Equals(leftEntries.Current.Value, rightEntries.Current.Value))
+                    return false;
+            }
+            return !rightEntries.MoveNext();
+        }
+    }
+
+    /// <summary>
     /// The outcome of one item of <see cref="ForEachModule"/>: its value, or the
     /// exception it threw, rethrown (with its original stack) when the value is read.
     /// </summary>
@@ -804,7 +878,7 @@ public sealed class CallGraphAnalysis
                 results[index] = new(default!, System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception));
             }
         }
-        if (items.Count < 2 || ModuleWorkIsSequential)
+        if (items.Count < 2 || IsReferencePass)
         {
             for (var index = 0; index < items.Count; index++)
                 Run(index);
@@ -814,29 +888,32 @@ public sealed class CallGraphAnalysis
         return results;
     }
 
-    private static readonly AsyncLocal<bool> SequentialModuleWork = new();
+    private static readonly AsyncLocal<bool> ReferencePass = new();
 
     /// <summary>
-    /// True inside <see cref="RunModuleWorkSequentially"/>: per-module work runs one item
-    /// at a time on the calling thread, and the index build skips its concurrent
-    /// prewarm, which is how every pass ran before #1738.
+    /// True inside <see cref="RunAsReferencePass"/>: the flow computes everything the way
+    /// every pass did before #1738. Per-module work runs one item at a time on the calling
+    /// thread, the index build skips its concurrent prewarms, and no value is reused across
+    /// computations on the strength of an unchanged <see cref="AstMutation.Version"/> (the
+    /// binder's snapshot identity, repeated source-call requests, the symbol index's binding
+    /// offered to the effect pass).
     /// </summary>
-    internal static bool ModuleWorkIsSequential => SequentialModuleWork.Value;
+    internal static bool IsReferencePass => ReferencePass.Value;
 
     /// <summary>
-    /// Test hook: until the returned scope ends, this flow runs its per-module work
-    /// sequentially, so a test can compare the concurrent result with the sequential one.
+    /// Test hook: until the returned scope ends, this flow runs as the reference pass, so a
+    /// test can compare the optimized result with the one computed the original way.
     /// </summary>
-    internal static IDisposable RunModuleWorkSequentially()
+    internal static IDisposable RunAsReferencePass()
     {
-        var previous = SequentialModuleWork.Value;
-        SequentialModuleWork.Value = true;
-        return new SequentialModuleWorkScope(previous);
+        var previous = ReferencePass.Value;
+        ReferencePass.Value = true;
+        return new ReferencePassScope(previous);
     }
 
-    private sealed class SequentialModuleWorkScope(bool previous) : IDisposable
+    private sealed class ReferencePassScope(bool previous) : IDisposable
     {
-        public void Dispose() => SequentialModuleWork.Value = previous;
+        public void Dispose() => ReferencePass.Value = previous;
     }
 
     /// <summary>
@@ -884,6 +961,61 @@ public sealed class CallGraphAnalysis
             lock (_answers)
                 _answers[request] = (source, bindings);
         }
+
+        /// <summary>
+        /// A request exactly as its caller made it: the arguments above, plus the
+        /// caller's own module-context flag and cross-module map (by reference).
+        /// </summary>
+        internal sealed record Repeat(ModuleNode Module, ContractMode Mode, bool SingleModuleContext,
+            string? SourcePath, object References, object? ReferenceScope, object? CrossModuleFunctions)
+        {
+            public bool Equals(Repeat? other) => other is not null
+                && ReferenceEquals(Module, other.Module) && Mode == other.Mode
+                && SingleModuleContext == other.SingleModuleContext
+                && string.Equals(SourcePath, other.SourcePath, StringComparison.Ordinal)
+                && ReferenceEquals(References, other.References)
+                && ReferenceEquals(ReferenceScope, other.ReferenceScope)
+                && ReferenceEquals(CrossModuleFunctions, other.CrossModuleFunctions);
+
+            public override int GetHashCode() => HashCode.Combine(
+                System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Module), Mode, SingleModuleContext,
+                SourcePath is null ? 0 : StringComparer.Ordinal.GetHashCode(SourcePath));
+        }
+
+        private readonly Dictionary<Repeat, (long Version, Diagnostics.Diagnostic[] EmissionDiagnostics,
+            OperatorBindings Bindings)> _repeats = [];
+
+        /// <summary>
+        /// The answer to a request repeated with exactly the same arguments while no AST has
+        /// changed (#1738). The first request emitted the module's projection, which is a
+        /// function of the module's tree, the contract mode, the cross-module map and the
+        /// pass's image markers; with the same module object, map object and pass and an
+        /// unchanged <see cref="AstMutation.Version"/>, emitting it again gives the same text,
+        /// so <see cref="Find"/> would return the same answer. The repeat skips the second
+        /// emission and replays the emission diagnostics the first one reported. A recorded
+        /// version that differs from the current one (any AST mutation since) is a miss, and
+        /// the request is resolved the full way.
+        /// </summary>
+        internal (Diagnostics.Diagnostic[] EmissionDiagnostics, OperatorBindings Bindings)? FindRepeat(
+            Repeat request, long version)
+        {
+            lock (_answers)
+                return _repeats.TryGetValue(request, out var answer) && answer.Version == version
+                    ? (answer.EmissionDiagnostics, answer.Bindings) : null;
+        }
+
+        /// <summary>
+        /// Records a fully resolved request, only when no AST changed while it was resolved
+        /// (<paramref name="version"/> is the count read before the request started).
+        /// </summary>
+        internal void RecordRepeat(Repeat request, long version, Diagnostics.Diagnostic[] emissionDiagnostics,
+            OperatorBindings bindings)
+        {
+            if (AstMutation.Version != version)
+                return;
+            lock (_answers)
+                _repeats[request] = (version, emissionDiagnostics, bindings);
+        }
     }
 
     /// <summary>One configuration of a <see cref="SharedProjectionImage"/>.</summary>
@@ -914,6 +1046,19 @@ public sealed class CallGraphAnalysis
         ISourceBindingContext? crossModuleTypes = null, string? sourcePath = null,
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions = null)
     {
+        // A request repeated with the same arguments while no AST changed has the answer
+        // its first resolution recorded (see OperatorBindingsMemo.FindRepeat).
+        var version = AstMutation.Version;
+        var repeat = crossModuleTypes?.OperatorBindingsMemo is null || IsReferencePass ? null
+            : new OperatorBindingsMemo.Repeat(module, contractMode, singleModuleContext, sourcePath,
+                Binding.Metadata.MetadataContext.ProjectionReferences(),
+                Binding.Metadata.MetadataContext.CurrentReferenceScope, crossModuleFunctions);
+        if (repeat is not null && crossModuleTypes!.OperatorBindingsMemo!.FindRepeat(repeat, version) is { } repeated)
+        {
+            foreach (var diagnostic in repeated.EmissionDiagnostics)
+                diagnostics?.Add(diagnostic);
+            return repeated.Bindings;
+        }
         var bindings = new OperatorBindings();
         var types = bindings.ResultTypes;
         var bindingFailures = bindings.Failures;
@@ -1072,7 +1217,11 @@ public sealed class CallGraphAnalysis
             Binding.Metadata.MetadataContext.ProjectionReferences(),
             Binding.Metadata.MetadataContext.CurrentReferenceScope);
         if (memo?.Find(memoKey, source) is { } answered)
+        {
+            if (repeat is not null)
+                memo.RecordRepeat(repeat, version, [.. emissionDiagnostics], answered);
             return answered;
+        }
         var options = new CSharpParseOptions(LanguageVersion.Preview);
         var initial = CSharpSyntaxTree.ParseText(source, options);
         // A companion's condition symbols are read once per parsed companion, not once
@@ -1100,6 +1249,8 @@ public sealed class CallGraphAnalysis
                 BindTree(compilation.Trees[shared.Index], compilation.Compilation,
                     compilation.CompanionMethodsExcept(shared.Index));
             memo?.Record(memoKey, source, bindings);
+            if (repeat is not null)
+                memo?.RecordRepeat(repeat, version, [.. emissionDiagnostics], bindings);
             return bindings;
         }
         foreach (var configuration in configurations)
@@ -1116,6 +1267,8 @@ public sealed class CallGraphAnalysis
                 compilation, companion.Tree, companion.Projection.Marker, companion.Projection.Callables)));
         }
         memo?.Record(memoKey, source, bindings);
+        if (repeat is not null)
+            memo?.RecordRepeat(repeat, version, [.. emissionDiagnostics], bindings);
         return bindings;
 
         void BindTree(SyntaxTree tree, CSharpCompilation compilation,
@@ -3496,7 +3649,8 @@ public sealed class CallGraphAnalysis
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
         Verification.ModuleInheritanceResult? contractInheritance,
         ContractMode projectionContractMode,
-        CrossModuleTypeRegistry? crossModuleTypes, string? sourcePath)
+        CrossModuleTypeRegistry? crossModuleTypes, string? sourcePath,
+        PriorModuleBinding? priorBinding = null)
     {
         if (contractInheritance is null)
         {
@@ -3627,7 +3781,7 @@ public sealed class CallGraphAnalysis
         var (resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
              declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
             ResolveBoundCallSites(ast, functions, crossModuleFunctions, contractInheritance, projectionContractMode,
-                crossModuleTypes, sourcePath);
+                crossModuleTypes, sourcePath, priorBinding);
 
         foreach (var (id, declaration) in boundValues.ExternalSourceFunctions)
         {
@@ -3673,13 +3827,14 @@ public sealed class CallGraphAnalysis
         IReadOnlyDictionary<string, CodeGen.CrossModuleFunctionTarget>? crossModuleFunctions,
         Verification.ModuleInheritanceResult? contractInheritance = null,
         ContractMode projectionContractMode = ContractMode.Debug,
-        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null)
+        CrossModuleTypeRegistry? crossModuleTypes = null, string? sourcePath = null,
+        PriorModuleBinding? priorBinding = null)
     {
         var (functions, functionNameToId, methodNameToIds, calleeToCallers, callerToCallees,
             phaseInheritance, resolvedCallIds, boundCallSites, boundResolutionComplete, boundValueTypes,
             declaredFunctionTypes, declaredReturnTypes, declaredFieldTypes, boundValues) =
             BuildDeclarations(ast, crossModuleFunctions, contractInheritance, projectionContractMode,
-                crossModuleTypes, sourcePath);
+                crossModuleTypes, sourcePath, priorBinding);
         contractInheritance = phaseInheritance;
 
         // Build call edges
@@ -3875,7 +4030,8 @@ public sealed class CallGraphAnalysis
             Verification.ModuleInheritanceResult contractInheritance,
             ContractMode projectionContractMode,
             CrossModuleTypeRegistry? crossModuleTypes,
-            string? sourcePath)
+            string? sourcePath,
+            PriorModuleBinding? priorBinding = null)
     {
         var resolved = new Dictionary<AstCallKey, IReadOnlyList<string>>();
         var boundCallSites = new HashSet<AstCallKey>();
@@ -3948,14 +4104,30 @@ public sealed class CallGraphAnalysis
 
         try
         {
-            var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
-            var binder = new Binder(diagnostics, sourcePath)
+            Calor.Compiler.Diagnostics.DiagnosticBag diagnostics;
+            Binder binder;
+            BoundModule boundModule;
+            // The project pass already bound this module with exactly these inputs and no
+            // AST has changed since: reuse that binding (and its diagnostics) instead of
+            // binding the module a second time (#1738).
+            if (priorBinding is not null && priorBinding.Answers(ast, sourcePath, crossModuleTypes,
+                    crossModuleFunctions, projectionContractMode, contractInheritance))
             {
-                CrossModuleFunctionModules = crossModuleFunctions,
-                CrossModuleTypes = crossModuleTypes,
-                ProjectionContractMode = projectionContractMode
-            };
-            var boundModule = binder.Bind(ast, contractInheritance);
+                diagnostics = priorBinding.Diagnostics;
+                binder = priorBinding.Binder;
+                boundModule = priorBinding.BoundModule;
+            }
+            else
+            {
+                diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+                binder = new Binder(diagnostics, sourcePath)
+                {
+                    CrossModuleFunctionModules = crossModuleFunctions,
+                    CrossModuleTypes = crossModuleTypes,
+                    ProjectionContractMode = projectionContractMode
+                };
+                boundModule = binder.Bind(ast, contractInheritance);
+            }
             boundValues.Complete = true;
             boundValues.Module = boundModule;
             boundValues.SourceOperatorBindings = binder.ComputedSourceCallBindings(ast);

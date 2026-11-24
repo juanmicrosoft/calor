@@ -10,44 +10,62 @@ public abstract class AstNode
     private TextSpan _span;
     public TextSpan Span => _span;
 
-    internal void IncludeSpan(TextSpan span) => _span = _span.Union(span);
+    internal void IncludeSpan(TextSpan span)
+    {
+        AstMutation.Record();
+        _span = _span.Union(span);
+        AstMutation.Record();
+    }
 
     /// <summary>
     /// Tooling-owned identity projected from the registered project sidecar.
     /// Declaration LocalId values are ephemeral parser/converter handles, never source fields or durable identities.
     /// </summary>
-    public string? ToolingId { get; internal set; }
-    internal Ids.IdKind? ToolingIdAllocationKind { get; set; }
+    public string? ToolingId { get; internal set => AstMutation.Set(ref field, value); }
+    internal Ids.IdKind? ToolingIdAllocationKind { get; set => AstMutation.Set(ref field, value); }
 
     /// <summary>
     /// Fully-qualified C# namespace associated with this declaration.
     /// <c>null</c> means legacy module-level namespace inheritance and an empty
     /// string means the explicit global namespace.
     /// </summary>
-    public string? NamespaceIdentity { get; set; }
+    public string? NamespaceIdentity { get => _namespaceIdentity; set => AstMutation.Set(ref _namespaceIdentity, value); }
+    private string? _namespaceIdentity;
 
     /// <summary>
     /// Identity of the lexical namespace declaration that contains this node.
     /// Separate declarations of the same namespace intentionally have distinct
     /// scope IDs because their using aliases do not share a lexical scope.
     /// </summary>
-    public string? NamespaceScopeId { get; set; }
+    public string? NamespaceScopeId { get => _namespaceScopeId; set => AstMutation.Set(ref _namespaceScopeId, value); }
+    private string? _namespaceScopeId;
 
     /// <summary>
     /// Fully-qualified symbol identity used by recovery, source mapping, and
     /// partial-type merging.
     /// </summary>
-    public string? FullyQualifiedSymbolIdentity { get; set; }
+    public string? FullyQualifiedSymbolIdentity { get; set => AstMutation.Set(ref field, value); }
 
     /// <summary>
     /// Optional XML doc comment extracted during C# → Calor conversion.
     /// Emitted as line comments above the construct.
     /// </summary>
-    public string? DocComment { get; set; }
+    public string? DocComment { get; set => AstMutation.Set(ref field, value); }
 
     protected AstNode(TextSpan span)
     {
         _span = span;
+    }
+
+    /// <summary>
+    /// Sets the namespace metadata from a derived constructor. Initializing a node that is
+    /// still being constructed is not a mutation of an existing tree, so it does not count
+    /// (see <see cref="AstMutation"/>).
+    /// </summary>
+    private protected void InitializeNamespace(string? namespaceIdentity, string? namespaceScopeId)
+    {
+        _namespaceIdentity = namespaceIdentity;
+        _namespaceScopeId = namespaceScopeId;
     }
 
     internal T CopyMetadataTo<T>(T target) where T : AstNode
@@ -1049,6 +1067,40 @@ internal static class AstVisitorDispatch
 // </generated-ast-infrastructure>
 
 /// <summary>
+/// A process-wide count of AST mutations (#1738). A tree is built by its constructors;
+/// every way to change a node after that goes through here: each settable node property
+/// (<see cref="AstNode.ToolingId"/>, the namespace and doc metadata, the
+/// <c>Effects</c>/<c>Row</c> rows), <see cref="AstNode.IncludeSpan"/>,
+/// <c>SetSynthesizedEffectParameters</c> and <see cref="AttributeCollection.Add(string, string)"/>.
+/// <c>AstMutationStampTests</c> pins that every non-<c>init</c> setter and every
+/// mutable field of every node type is covered, so a new one cannot bypass the count.
+///
+/// <para>A pass that caches a value computed from ASTs records <see cref="Version"/>
+/// first and reuses the value only while the version is unchanged: then no node anywhere
+/// in the process has changed, so a fresh computation would read exactly the same trees.
+/// A value is kept only when the count was the same before and after computing it. Any
+/// mutation (in any tree, on any thread) makes every such cache recompute, which can only
+/// cost time. The count is bumped both before and after each write, so a write that
+/// overlaps a computation in any way changes the count it is checked against.</para>
+/// </summary>
+internal static class AstMutation
+{
+    private static long _version;
+
+    /// <summary>The number of AST mutations so far in this process.</summary>
+    internal static long Version => Interlocked.Read(ref _version);
+
+    internal static void Record() => Interlocked.Increment(ref _version);
+
+    internal static void Set<T>(ref T field, T value)
+    {
+        Record();
+        field = value;
+        Record();
+    }
+}
+
+/// <summary>
 /// Represents a collection of key-value attributes on a tag.
 /// </summary>
 public sealed class AttributeCollection
@@ -1061,13 +1113,17 @@ public sealed class AttributeCollection
 
     public void Add(string key, string value)
     {
+        AstMutation.Record();
         _attributes[key] = value;
+        AstMutation.Record();
     }
 
     public void Add(string key, string value, TextSpan span)
     {
+        AstMutation.Record();
         _attributes[key] = value;
         _spans[key] = span;
+        AstMutation.Record();
     }
 
     public bool TryGetValue(string key, out string? value)
