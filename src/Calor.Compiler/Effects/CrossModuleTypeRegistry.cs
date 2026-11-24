@@ -141,9 +141,14 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
         {
             if (_projections.TryGetValue(mode, out var projections))
                 return projections;
-            var emitted = new List<SourceProjection>();
-            foreach (var (module, path) in _sourcePaths)
+            // Each module's projection is a function of that module alone (the marker is
+            // random either way), so the modules are emitted concurrently (#1738) and
+            // kept in registry order. The first module in that order that fails fails
+            // the whole set, with the error it raised, as the sequential loop did.
+            var sources = _sourcePaths.ToArray();
+            var results = CallGraphAnalysis.ForEachModule(sources, source =>
             {
+                var (module, path) = source;
                 var callables = new List<AstNode>();
                 var marker = "calor-source-callable-" + Guid.NewGuid().ToString("N") + ":";
                 var diagnostics = new DiagnosticBag();
@@ -163,8 +168,11 @@ internal sealed class CrossModuleTypeRegistry : ISourceBindingContext
                     throw new InvalidOperationException(
                         $"Cannot project source '{path}': "
                         + string.Join("; ", diagnostics.Errors.Select(error => error.Message)));
-                emitted.Add(new(module, path, text, marker, callables));
-            }
+                return new SourceProjection(module, path, text, marker, callables);
+            });
+            var emitted = new List<SourceProjection>(results.Length);
+            foreach (var result in results)
+                emitted.Add(result.Value);
             _projections[mode] = projections = emitted;
             return projections;
         }

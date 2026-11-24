@@ -184,6 +184,7 @@ public sealed class ProjectSymbolIndex
         var crossModuleFunctions = parsed.Count > 1
             ? CompilationDriver.BuildCrossModuleFunctionMap(parsed.Select(document => document.Ast).ToList())
             : null;
+        PrewarmSourceCallBindings(parsed.Select(document => (document.Path, document.Ast)).ToArray(), sourceTypes);
         foreach (var (path, source, ast) in parsed)
         {
             var bindDiagnostics = new DiagnosticBag();
@@ -210,6 +211,50 @@ public sealed class ProjectSymbolIndex
         var index = new ProjectSymbolIndex(documents, sourceTypes);
         index.Populate();
         return index;
+    }
+
+    /// <summary>
+    /// Resolves every module's source-call bindings (the Roslyn binding of its C#
+    /// image) on all cores, before the sequential bind, and leaves the answers in the
+    /// pass's <see cref="Analysis.CallGraphAnalysis.OperatorBindingsMemo"/> (#1738).
+    ///
+    /// <para>Each request is exactly the one a module's binder makes later
+    /// (<c>Binder.SourceCallBindings</c>: the same module object, the binder's default
+    /// projection contract mode, the same registry and source path, a single-module
+    /// context and no cross-module map); the effect pass's binder makes the same request.
+    /// The memo returns a recorded answer only to an equal request whose projection
+    /// text is exactly the text the answer was computed from, and otherwise the
+    /// request is resolved again as before, so this can only change when an answer is
+    /// computed, never what it is. A request is a function of the module, the shared
+    /// compilation and the request itself: the shared image, its compilations, their
+    /// semantic models and diagnostics are built once under locks or lazies and read
+    /// concurrently, and each request writes only its own bindings and the memo
+    /// (under its lock). The only thing a request reports to its caller is the
+    /// projection's emission diagnostics, and those are reported again by the later
+    /// request, which emits the projection to compare it. A request that throws here is
+    /// left unanswered, so the later request throws as before.</para>
+    /// </summary>
+    private static void PrewarmSourceCallBindings(
+        IReadOnlyList<(string Path, ModuleNode Ast)> modules, CrossModuleTypeRegistry sourceTypes)
+    {
+        if (Analysis.CallGraphAnalysis.ModuleWorkIsSequential || modules.Count < 2)
+            return;
+        void Resolve((string Path, ModuleNode Ast) module)
+        {
+            try
+            {
+                Analysis.CallGraphAnalysis.ResolveOperatorCalls(module.Ast, diagnostics: null,
+                    ContractMode.Debug, crossModuleTypes: sourceTypes, sourcePath: module.Path);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+            }
+        }
+        // The first request builds the pass's shared image and compilation (each of
+        // which spreads its own per-module work over the cores); the rest then bind
+        // against it concurrently instead of queueing behind its locks.
+        Resolve(modules[0]);
+        System.Threading.Tasks.Parallel.For(1, modules.Count, index => Resolve(modules[index]));
     }
 
     /// <summary>Every indexed occurrence in one file, in document order.</summary>

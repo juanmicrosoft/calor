@@ -6,6 +6,7 @@ using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
+using Calor.Compiler.Indexing;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -224,4 +225,143 @@ public sealed class IndexBuildEquivalenceTests
             Assert.Throws<DeclarationIdentityParseException>(() => DeclarationIdentityStore.Describe("broken.calr", broken));
         }
     }
+
+    // --- Index positions --------------------------------------------------------------
+
+    // The position rule as it was written before #1738: a scan from the start of the text.
+    private static (int Line, int Column) ReferenceLineColumn(string source, int offset)
+    {
+        var line = 1;
+        var column = 1;
+        for (var index = 0; index < offset && index < source.Length; index++)
+        {
+            if (source[index] == '\n')
+            {
+                line++;
+                column = 1;
+            }
+            else
+            {
+                column++;
+            }
+        }
+        return (line, column);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("\n")]
+    [InlineData("\n\n\n")]
+    [InlineData("a")]
+    [InlineData("abc\ndef\n")]
+    [InlineData("abc\r\ndef\r\n\r\nx")]
+    [InlineData("\nleading\n\ntrailing")]
+    public void LineColumn_MatchesTheScanFromTheStart_AtEveryOffset(string source)
+    {
+        for (var offset = -2; offset <= source.Length + 2; offset++)
+            Assert.Equal(ReferenceLineColumn(source, offset), ProjectIndexBuilder.LineColumn(source, offset));
+    }
+
+    [Fact]
+    public void LineColumn_MatchesTheScanFromTheStart_OnTheFixtureSources()
+    {
+        foreach (var file in Directory.EnumerateFiles(FixtureRoot, "*.calr").Order(StringComparer.Ordinal).Take(10))
+        {
+            var source = File.ReadAllText(file);
+            for (var offset = 0; offset <= source.Length + 1; offset += 7)
+                Assert.Equal(ReferenceLineColumn(source, offset), ProjectIndexBuilder.LineColumn(source, offset));
+        }
+    }
+
+    // --- Concurrent per-module work -----------------------------------------------------
+
+    [Fact]
+    public void ForEachModule_ReturnsOutcomesInItemOrder_AndRethrowsTheItemsOwnException()
+    {
+        var items = Enumerable.Range(0, 200).ToArray();
+        var failures = new Dictionary<int, Exception>
+        {
+            [37] = new InvalidOperationException("first"),
+            [150] = new FormatException("second"),
+        };
+        var results = CallGraphAnalysis.ForEachModule(items, item =>
+            failures.TryGetValue(item, out var failure) ? throw failure : item * 3);
+
+        Assert.Equal(items.Length, results.Length);
+        for (var index = 0; index < items.Length; index++)
+        {
+            if (failures.TryGetValue(index, out var failure))
+                Assert.Same(failure, Assert.ThrowsAny<Exception>(() => results[index].Value));
+            else
+                Assert.Equal(index * 3, results[index].Value);
+        }
+        // Consumed in order, the first failure is the one a sequential loop met first.
+        var thrown = Assert.ThrowsAny<Exception>(() => results.Select(result => result.Value).ToList());
+        Assert.Same(failures[37], thrown);
+    }
+
+    [Fact]
+    public void ForEachModule_RunsOnTheCallingThread_InsideTheSequentialScope()
+    {
+        var thread = Environment.CurrentManagedThreadId;
+        using (CallGraphAnalysis.RunModuleWorkSequentially())
+        {
+            Assert.True(CallGraphAnalysis.ModuleWorkIsSequential);
+            var threads = CallGraphAnalysis.ForEachModule(Enumerable.Range(0, 64).ToArray(),
+                _ => Environment.CurrentManagedThreadId);
+            Assert.All(threads, result => Assert.Equal(thread, result.Value));
+        }
+        Assert.False(CallGraphAnalysis.ModuleWorkIsSequential);
+    }
+
+    /// <summary>
+    /// The index build runs its per-module work concurrently: the source-call bindings
+    /// prewarm, the registry's plain and annotated projections, the shared image's parse
+    /// check, the effect summaries and the identity store's declaration parses. Built over
+    /// the project-scale fixture with all of it sequential (as before #1738) and then
+    /// concurrently, the serialized index is byte-identical: declarations, occurrences,
+    /// call edges, contracts, effect rows and residuals.
+    /// </summary>
+    [Fact]
+    public void IndexBuild_IsByteIdentical_WhenItsPerModuleWorkRunsConcurrently()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"calor-index-equivalence-{Guid.NewGuid():N}");
+        try
+        {
+            foreach (var source in Directory.EnumerateFiles(FixtureRoot, "*.calr", SearchOption.AllDirectories))
+            {
+                var destination = Path.Combine(root, Path.GetRelativePath(FixtureRoot, source));
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(source, destination);
+            }
+            var options = new ProjectIndexBuilder.Options(
+                root, "equivalence", ProjectIndexBuilder.DiscoverSources(root));
+            Assert.True(options.Files.Count >= 100);
+            // The first build initializes the identity sidecars both later builds read.
+            ProjectIndexBuilder.Build(options);
+
+            string sequential;
+            using (CallGraphAnalysis.RunModuleWorkSequentially())
+                sequential = Serialize(ProjectIndexBuilder.Build(options), root, "sequential");
+            var concurrent = Serialize(ProjectIndexBuilder.Build(options), root, "concurrent");
+
+            Assert.Contains("\"EffectRows\"", concurrent);
+            Assert.Equal(sequential, concurrent);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+
+        static string Serialize(ProjectIndex index, string root, string name)
+        {
+            var output = Path.Combine(root, "obj", name);
+            index.Save(output);
+            return File.ReadAllText(ProjectIndex.PathFor(output));
+        }
+    }
+
+    private static string FixtureRoot => Path.Combine(ActiveSyntaxInputs.RepositoryRoot, ActiveSyntaxInputs.RelativeRoot,
+        "bench", "phase0-agent-native", "latency", "fixture-10k", "src");
 }

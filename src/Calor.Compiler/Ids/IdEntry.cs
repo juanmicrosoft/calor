@@ -687,8 +687,14 @@ public sealed class DeclarationIdentityStore
     private State Reconcile(State previous, IReadOnlyDictionary<string, string> sources,
         IReadOnlyList<DeclarationRelocation> relocations)
     {
-        var current = sources.OrderBy(p => p.Key, StringComparer.Ordinal)
-            .SelectMany(p => ParseDeclarations(p.Key, p.Value, ValidatePath(p.Key)))
+        // Each source's path check and declaration parse read that source alone (and the
+        // file system), so they run concurrently (#1738); the declarations are then taken
+        // in path order, and the first source in that order that fails throws what the
+        // sequential loop threw.
+        var current = Analysis.CallGraphAnalysis.ForEachModule(
+                sources.OrderBy(p => p.Key, StringComparer.Ordinal).ToArray(),
+                p => ParseDeclarations(p.Key, p.Value, ValidatePath(p.Key)))
+            .SelectMany(parsed => parsed.Value)
             .GroupBy(d => d.Identity.Key, StringComparer.Ordinal).Select(group =>
             {
                 var parts = group.ToArray();
