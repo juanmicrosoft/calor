@@ -33,7 +33,7 @@ Traditional languages make agents *infer* these answers through complex analysis
 | **Explicit over implicit** | Effect rows such as `! cw, fs:r, net:rw` (`!` alone means pure) | Know side effects without reading implementation |
 | **Contracts are code** | Parameter refinements (`int:x | (# >= 0)`) as preconditions and `=>` postconditions | Generate tests from specs, verify correctness |
 | **Tooling-owned identity** | `.calor/ids.json`; no declaration IDs in source | Precise references preserved by supported refactoring tools |
-| **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost (~16% fewer tokens in our studies) |
+| **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | No closer tag to keep in sync when a block is edited |
 | **Familiar expressions** | Ordinary C# operators and calls (`x * x`, `items.Count`) | No separate expression language to learn |
 
 ### Side-by-Side: What Agents See
@@ -84,17 +84,24 @@ module Math
     return a + b
 ```
 
-This tradeoff pays off when:
+The design bet is that this tradeoff pays off when:
 - Agents need to **reason** about code behavior
 - Agents need to **detect** contract violations
 - Agents need to **edit** specific code elements precisely
 - Code correctness matters more than brevity
 
-### Benchmark Results
+### Evidence and its limits
 
-Calor shows measurable advantages in AI agent comprehension, error detection, edit precision, and refactoring stability. C# wins on token efficiency, reflecting a fundamental tradeoff: explicit semantics require more tokens but enable better agent reasoning.
+That bet is a hypothesis. No experiment has yet shown that coding agents work
+better, faster, or more safely in Calor than in C#.
 
-[See benchmark methodology and results →](https://juanmicrosoft.github.io/calor/docs/benchmarking/)
+The published static benchmark was recorded on 2026-09-15 for v0.22.0, before the
+0.30 syntax. It runs deterministic calculators over 217 source pairs, with no LLM
+in the loop, and the pairs are not all behaviorally equivalent. Its scores do not
+establish a language, agent-productivity, correctness, or safety advantage. An
+end-to-end agent study has not been completed.
+
+[See what has been measured and what has not →](https://calor.dev/docs/benchmarking/)
 
 ## Quick Start
 
@@ -189,18 +196,18 @@ The server exposes 19 tools across five categories:
 | Code Quality | `calor_lint`, `calor_format`, `calor_validate_snippet` |
 | Syntax Help | `calor_syntax_help`, `calor_syntax_lookup`, `calor_ids` |
 
-See [calor mcp](https://juanmicrosoft.github.io/calor/docs/cli/mcp/) for the complete reference.
+See [calor mcp](https://calor.dev/docs/cli/mcp/) for the complete reference.
 
 ## Documentation
 
-- **[Getting Started](https://juanmicrosoft.github.io/calor/docs/getting-started/)** — Installation, hello world, and AI agent integration
-  - [Claude Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/claude-integration/) — Enforced Calor-first with hooks
-  - [Codex Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/codex-integration/) — OpenAI Codex CLI with MCP
-  - [Gemini Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/gemini-integration/) — Google Gemini CLI with hooks and MCP
-  - [GitHub Copilot Integration](https://juanmicrosoft.github.io/calor/docs/getting-started/github-integration/) — GitHub Copilot with MCP tools
-- **[Syntax Reference](https://juanmicrosoft.github.io/calor/docs/syntax-reference/)** — Complete language reference
-- **[CLI Reference](https://juanmicrosoft.github.io/calor/docs/cli/)** — All `calor` commands including `mcp`, `analyze`, `convert`, and `migrate`
-- **[Benchmarking](https://juanmicrosoft.github.io/calor/docs/benchmarking/)** — How we measure Calor vs C#
+- **[Getting Started](https://calor.dev/docs/getting-started/)** — Installation, hello world, and AI agent integration
+  - [Claude Integration](https://calor.dev/docs/getting-started/claude-integration/) — Enforced Calor-first with hooks
+  - [Codex Integration](https://calor.dev/docs/getting-started/codex-integration/) — OpenAI Codex CLI with MCP
+  - [Gemini Integration](https://calor.dev/docs/getting-started/gemini-integration/) — Google Gemini CLI with hooks and MCP
+  - [GitHub Copilot Integration](https://calor.dev/docs/getting-started/github-integration/) — GitHub Copilot with MCP tools
+- **[Syntax Reference](https://calor.dev/docs/syntax-reference/)** — Complete language reference
+- **[CLI Reference](https://calor.dev/docs/cli/)** — All `calor` commands including `mcp`, `analyze`, `convert`, and `migrate`
+- **[Benchmarking](https://calor.dev/docs/benchmarking/)** — What has been measured against C#, and what has not
 - **[Telemetry](docs/telemetry.md)** — Opt-in, off by default; exactly what is (and is never) collected
 
 ## Contributing
