@@ -314,8 +314,13 @@ public static class ProjectIndexBuilder
         // is what each document's cross-module charge is resolved from. A summary is
         // a function of the module and the map, and the effect pass below does not
         // change the module, so building it a second time gave the same summary.
-        var summaries = modules
-            .Select(module => EffectSummaryBuilder.Build(module.Ast, summaryCrossModuleMap))
+        // Each summary reads only its own module (bound without the project registry)
+        // and the shared read-only map, and nothing here has run the effect pass yet,
+        // so the summaries are built concurrently (#1738) and read in module order: a
+        // failure surfaces as the first one in that order, as with the sequential list.
+        var summaries = CallGraphAnalysis.ForEachModule(modules,
+                module => EffectSummaryBuilder.Build(module.Ast, summaryCrossModuleMap))
+            .Select(summary => summary.Value)
             .ToList();
         var registry = CrossModuleEffectRegistry.Build(
             summaries.Select((summary, position) => (summary, modules[position].FilePath)).ToList());
@@ -772,23 +777,33 @@ public static class ProjectIndexBuilder
         return Path.GetRelativePath(root, full).Replace('\\', '/');
     }
 
-    private static (int Line, int Column) LineColumn(string source, int offset)
-    {
-        var line = 1;
-        var column = 1;
-        for (var index = 0; index < offset && index < source.Length; index++)
-        {
-            if (source[index] == '\n')
-            {
-                line++;
-                column = 1;
-            }
-            else
-            {
-                column++;
-            }
-        }
+    // Where each line of a source starts: 0, then one past every '\n'. Built once per
+    // source text instead of rescanning the text from its start for every position the
+    // index records (#1738).
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<string, int[]> LineStarts = new();
 
-        return (line, column);
+    /// <summary>
+    /// The 1-based line and column of <paramref name="offset"/>: one line per '\n'
+    /// before it and one column per other character since the last one, counting only
+    /// characters inside the source (a negative offset is 1:1, a larger one is clamped
+    /// to the end).
+    /// </summary>
+    internal static (int Line, int Column) LineColumn(string source, int offset)
+    {
+        if (offset <= 0)
+            return (1, 1);
+        var position = Math.Min(offset, source.Length);
+        var starts = LineStarts.GetValue(source, static text =>
+        {
+            var lines = new List<int> { 0 };
+            for (var index = text.IndexOf('\n'); index >= 0; index = text.IndexOf('\n', index + 1))
+                lines.Add(index + 1);
+            return lines.ToArray();
+        });
+        // The last line start at or before the position: a '\n' at index p counts
+        // exactly when p < position, i.e. when its line start p + 1 <= position.
+        var found = Array.BinarySearch(starts, position);
+        var line = found >= 0 ? found : ~found - 1;
+        return (line + 1, position - starts[line] + 1);
     }
 }

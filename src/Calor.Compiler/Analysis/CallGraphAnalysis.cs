@@ -598,12 +598,18 @@ public sealed class CallGraphAnalysis
         {
             var markers = ProjectionMarkers.Create();
             var entries = new (string, AnnotatedProjection, SourceProjection)[plain.Count];
+            // A module's annotated projection is a function of that module and these
+            // markers alone, so the modules are emitted concurrently (#1738); the results
+            // are then read in module order, so the first module that fails decides, as
+            // in the sequential loop.
+            var projections = ForEachModule(plain, source =>
+                EmitAnnotatedProjection(source.Module, mode, crossModuleFunctions, markers));
             for (var index = 0; index < plain.Count; index++)
             {
                 AnnotatedProjection projection;
                 try
                 {
-                    projection = EmitAnnotatedProjection(plain[index].Module, mode, crossModuleFunctions, markers);
+                    projection = projections[index].Value;
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException)
                 {
@@ -656,13 +662,21 @@ public sealed class CallGraphAnalysis
 
         private SharedCompilation? Compile(CSharpParseOptions options, IReadOnlyList<MetadataReference> references)
         {
+            // Parsing an entry and checking it against its plain tree read that entry
+            // alone, so the entries are checked concurrently (#1738) and read back in
+            // order: the image is shared only when every entry passes, as before.
+            var checkedTrees = ForEachModule(_entries, entry =>
+            {
+                var (path, projection, plain) = entry;
+                var tree = CSharpSyntaxTree.ParseText(projection.Source, options, path);
+                return SameProgram(tree, projection.Callables, ParseCompanion(plain, options), plain) ? tree : null;
+            });
             var trees = new SyntaxTree[_entries.Length];
             for (var index = 0; index < _entries.Length; index++)
             {
-                var (path, projection, plain) = _entries[index];
-                trees[index] = CSharpSyntaxTree.ParseText(projection.Source, options, path);
-                if (!SameProgram(trees[index], projection.Callables, ParseCompanion(plain, options), plain))
+                if (checkedTrees[index].Value is not { } tree)
                     return null;
+                trees[index] = tree;
             }
             var compilation = CSharpCompilation.Create("CalorOperatorBindings", trees,
                 references,
@@ -740,6 +754,89 @@ public sealed class CallGraphAnalysis
             or SyntaxKind.Utf8SingleLineRawStringLiteralToken or SyntaxKind.MultiLineRawStringLiteralToken
             or SyntaxKind.Utf8MultiLineRawStringLiteralToken or SyntaxKind.InterpolatedStringTextToken
             or SyntaxKind.CharacterLiteralToken or SyntaxKind.XmlTextLiteralToken;
+    }
+
+    /// <summary>
+    /// The outcome of one item of <see cref="ForEachModule"/>: its value, or the
+    /// exception it threw, rethrown (with its original stack) when the value is read.
+    /// </summary>
+    internal readonly struct ModuleResult<T>
+    {
+        private readonly T _value;
+        private readonly System.Runtime.ExceptionServices.ExceptionDispatchInfo? _error;
+
+        internal ModuleResult(T value, System.Runtime.ExceptionServices.ExceptionDispatchInfo? error)
+        {
+            _value = value;
+            _error = error;
+        }
+
+        internal T Value
+        {
+            get
+            {
+                _error?.Throw();
+                return _value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="work"/> over every item concurrently and returns the
+    /// outcomes in item order (#1738). Only for work that reads its own item and
+    /// shared state that is safe to read concurrently, and writes nothing another
+    /// item reads: the caller then consumes the outcomes in order, so it sees exactly
+    /// what a sequential loop would have computed, including which item failed first.
+    /// Items after a failure are still computed; their outcomes are just not read.
+    /// </summary>
+    internal static ModuleResult<TResult>[] ForEachModule<TSource, TResult>(
+        IReadOnlyList<TSource> items, Func<TSource, TResult> work)
+    {
+        var results = new ModuleResult<TResult>[items.Count];
+        void Run(int index)
+        {
+            try
+            {
+                results[index] = new(work(items[index]), null);
+            }
+            catch (Exception exception)
+            {
+                results[index] = new(default!, System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception));
+            }
+        }
+        if (items.Count < 2 || ModuleWorkIsSequential)
+        {
+            for (var index = 0; index < items.Count; index++)
+                Run(index);
+        }
+        else
+            System.Threading.Tasks.Parallel.For(0, items.Count, Run);
+        return results;
+    }
+
+    private static readonly AsyncLocal<bool> SequentialModuleWork = new();
+
+    /// <summary>
+    /// True inside <see cref="RunModuleWorkSequentially"/>: per-module work runs one item
+    /// at a time on the calling thread, and the index build skips its concurrent
+    /// prewarm, which is how every pass ran before #1738.
+    /// </summary>
+    internal static bool ModuleWorkIsSequential => SequentialModuleWork.Value;
+
+    /// <summary>
+    /// Test hook: until the returned scope ends, this flow runs its per-module work
+    /// sequentially, so a test can compare the concurrent result with the sequential one.
+    /// </summary>
+    internal static IDisposable RunModuleWorkSequentially()
+    {
+        var previous = SequentialModuleWork.Value;
+        SequentialModuleWork.Value = true;
+        return new SequentialModuleWorkScope(previous);
+    }
+
+    private sealed class SequentialModuleWorkScope(bool previous) : IDisposable
+    {
+        public void Dispose() => SequentialModuleWork.Value = previous;
     }
 
     /// <summary>
