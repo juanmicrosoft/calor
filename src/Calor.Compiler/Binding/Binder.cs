@@ -2226,6 +2226,12 @@ public sealed class Binder
         SnapshotIdentities = new();
 
     /// <summary>
+    /// Computes and keeps the module's snapshot identity ahead of its binds, so a project
+    /// pass can do it for every module concurrently (#1738).
+    /// </summary>
+    internal static void PrewarmSnapshotIdentity(ModuleNode module) => SnapshotIdentity(module);
+
+    /// <summary>
     /// The module's snapshot key and the tooling IDs it declares. Both are functions of
     /// the module's AST alone: the key hashes every node's properties, the IDs are read
     /// off its declarations. A module is bound several times in one project pass (the
@@ -2235,12 +2241,6 @@ public sealed class Binder
     /// changed since, so computing it again would read the same tree and give the same
     /// pair. Any mutation computes it afresh. The ID set is only read by binders.
     /// </summary>
-    /// <summary>
-    /// Computes and keeps the module's snapshot identity ahead of its binds, so a project
-    /// pass can do it for every module concurrently (#1738).
-    /// </summary>
-    internal static void PrewarmSnapshotIdentity(ModuleNode module) => SnapshotIdentity(module);
-
     private static (string Key, HashSet<string> ToolingIds) SnapshotIdentity(ModuleNode module)
     {
         var reuse = !CallGraphAnalysis.IsReferencePass;
