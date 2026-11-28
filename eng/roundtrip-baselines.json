@@ -7,27 +7,27 @@
     "lowering": "Only a deliberate, reviewed manual PR may lower a blocking floor. Explain the regression, corpus change, and supporting run in the PR; edit blocking_floors and, if necessary, ProjectConfigs.cs together. The automatic updater refuses regressions rather than acknowledging them.",
     "validation": "python3 scripts/test_roundtrip_baselines.py; python3 scripts/roundtrip_baselines.py check --reports reports/lossy --mode lossy; python3 scripts/roundtrip_baselines.py check --reports reports/default --mode default"
   },
-  "_source_run": "https://github.com/juanmicrosoft/calor/actions/runs/40934561084",
-  "_updated_at": "2026-10-29T18:59:13Z",
+  "_source_run": "https://github.com/juanmicrosoft/calor/actions/runs/46154819607",
+  "_updated_at": "2026-11-28T14:36:37Z",
   "blocking_floors": {
     "lossy": {
       "FluentValidation": {
         "round_trip_passed": 865,
         "round_trip_total": 866,
         "native_fraction": 0.4172661870503597,
-        "coverage_fraction": 0.7338129496402878
+        "coverage_fraction": 1
       },
       "MediatR": {
         "round_trip_passed": 155,
         "round_trip_total": 157,
         "native_fraction": 0.3125,
-        "coverage_fraction": 0.71875
+        "coverage_fraction": 1
       },
       "Serilog": {
         "round_trip_passed": 811,
         "round_trip_total": 811,
         "native_fraction": 0.32142857142857145,
-        "coverage_fraction": 0.6517857142857143
+        "coverage_fraction": 0.9196428571428571
       },
       "Synthetic": {
         "round_trip_passed": 52,
@@ -46,20 +46,20 @@
       "FluentValidation": {
         "round_trip_passed": 865,
         "round_trip_total": 866,
-        "native_fraction": 0.03597122302158273,
-        "coverage_fraction": 0.460431654676259
+        "native_fraction": 0.41007194244604317,
+        "coverage_fraction": 1
       },
       "MediatR": {
         "round_trip_passed": 155,
         "round_trip_total": 157,
-        "native_fraction": 0.15625,
-        "coverage_fraction": 0.25
+        "native_fraction": 0.1875,
+        "coverage_fraction": 1
       },
       "Serilog": {
         "round_trip_passed": 811,
         "round_trip_total": 811,
         "native_fraction": 0.08928571428571429,
-        "coverage_fraction": 0.125
+        "coverage_fraction": 0.9464285714285714
       },
       "Synthetic": {
         "round_trip_passed": 52,
@@ -80,19 +80,19 @@
       "round_trip_passed": 865,
       "round_trip_total": 866,
       "native_fraction": 0.6906474820143885,
-      "coverage_fraction": 0.7338129496402878
+      "coverage_fraction": 1
     },
     "MediatR": {
       "round_trip_passed": 155,
       "round_trip_total": 157,
       "native_fraction": 0.53125,
-      "coverage_fraction": 0.75
+      "coverage_fraction": 1
     },
     "Serilog": {
       "round_trip_passed": 811,
       "round_trip_total": 811,
       "native_fraction": 0.48214285714285715,
-      "coverage_fraction": 0.6517857142857143
+      "coverage_fraction": 0.9196428571428571
     },
     "Synthetic": {
       "round_trip_passed": 52,
@@ -108,18 +108,18 @@
     }
   },
   "_writeback": {
-    "source_commit": "01158abf6686378fd75f03e4778406be87ebe437",
+    "source_commit": "109d74f1ca29df1c823a359048bb4b4ff994c596",
     "report_sha256": {
-      "lossy/FluentValidation-roundtrip.json": "cf1aa7a7a09df8a388393e6c27b97a3fe53519674a33afcf23df7e2c302154d4",
-      "lossy/MediatR-roundtrip.json": "251e57b933dcf889cfbb970ccf0d81f6fe6ba2137483aa8f7caf6cd19f0f69d0",
-      "lossy/Serilog-roundtrip.json": "1b2fdcfa533753c4100639eb770f9ca5142a326faf2dcf4d3af2aa2aa4f378c9",
-      "lossy/Synthetic-roundtrip.json": "499f25fa19dc85434fa72b075fa5a088d05c1ee532bee6c3e56fea82b8bae51f",
-      "lossy/Synthetic2-roundtrip.json": "a540b39e846c09837b569e7c1cad51a8d8fad9502c5919bcfa50c7a42b93c712",
-      "default/FluentValidation-roundtrip.json": "0e46aec3179f63272455544d90e915e2af9cf79ad0ed80c8024e83fb165a7616",
-      "default/MediatR-roundtrip.json": "1cdbcd2d794028894896660e1e25a5be2a40e553b96bcae3505baabe4e2b1ccc",
-      "default/Serilog-roundtrip.json": "00902cee5dd12d836f3ae109bcc7012c30590cd76f9f910eec43f87b69961365",
-      "default/Synthetic-roundtrip.json": "09d316fb362bc651cee675d4a53d09b7fe6f14cd787c38cd1e409fa3a86023fd",
-      "default/Synthetic2-roundtrip.json": "68e7fd8d586659ec77d248df630047c37147bb629d8c78edc0e9ac5150b53439"
+      "lossy/FluentValidation-roundtrip.json": "51a31f4d2a3e99799a05ade9296804ee98716091c5ae1abb9e8e975c987bdc79",
+      "lossy/MediatR-roundtrip.json": "24eae1f853f14c60c26ef77be4f3dfc854b2701424fb0f0383e272a28c560467",
+      "lossy/Serilog-roundtrip.json": "54743e318cecd935870ad25711cf2776701407c3c9e7a5e51bbf82e2c11c12b0",
+      "lossy/Synthetic-roundtrip.json": "8daae1d6e54d64cd47c0b2f9cdd9ef66af20f04861ed2f82af110f7be19b69a7",
+      "lossy/Synthetic2-roundtrip.json": "4a0478a1734c5322f7525a9631029dfdfd3f7ff5fdebf43ffb72f4c84128cb8f",
+      "default/FluentValidation-roundtrip.json": "1b644d65cc3f72bc30cc955db67027b47ffdca19411da68ee1e8f7b30b1f5375",
+      "default/MediatR-roundtrip.json": "f23194575c0434cb470a1b8080a81f0a196780fac824f7ecbd6c38f8e54401cf",
+      "default/Serilog-roundtrip.json": "720f56afdec34a80fc9d86a793ec2c3520094ac0a746eefb8bb929af8d48c6dd",
+      "default/Synthetic-roundtrip.json": "39254f70f46839529b44c6d80fa262f68bf9804df3425118746048cf3742a6ac",
+      "default/Synthetic2-roundtrip.json": "0647c053cee6012b245e4a812052684ea581798ebcc83a508ddb48af8bf84cf1"
     }
   }
 }
